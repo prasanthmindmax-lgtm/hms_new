@@ -117,6 +117,14 @@
                                 <li><a class="dropdown-item export-btn" href="#" data-export="neft" data-format="csv">
                                     <i class="bi bi-filetype-csv me-2 text-primary"></i>Export NEFT CSV
                                 </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header"><i class="bi bi-file-earmark-ruled me-1"></i>Original TDS Format</h6></li>
+                                <li><a class="dropdown-item export-btn" href="#" data-export="tds-original" data-format="xlsx">
+                                    <i class="bi bi-filetype-xlsx me-2 text-success"></i>Original TDS XLSX
+                                </a></li>
+                                <li><a class="dropdown-item export-btn" href="#" data-export="tds-original" data-format="csv">
+                                    <i class="bi bi-filetype-csv me-2 text-primary"></i>Original TDS CSV
+                                </a></li>
                             </ul>
                         </div>
                     </div>
@@ -2379,6 +2387,9 @@ $(document).ready(function () {
                 } else if (exportType === 'neft') {
                     exportUrl = '{{ route("superadmin.exportBillsNeft") }}';
                     downloadPrefix = 'Bills_NEFT';
+                } else if (exportType === 'tds-original') {
+                    exportUrl = '{{ route("superadmin.exportBillsTdsOriginal") }}';
+                    downloadPrefix = 'Bills_TDS_Original';
                 }
 
                 $.ajax({

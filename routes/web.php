@@ -503,6 +503,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('/billexport/tds', [VendorController::class, 'exportBillsTds'])->name('superadmin.exportBillsTds');
     Route::get('/billexport/gst', [VendorController::class, 'exportBillsGst'])->name('superadmin.exportBillsGst');
     Route::get('/billexport/neft', [VendorController::class, 'exportBillsNeft'])->name('superadmin.exportBillsNeft');
+    Route::get('/billexport/tds-original', [VendorController::class, 'exportBillsTdsOriginal'])->name('superadmin.exportBillsTdsOriginal');
     Route::post('/check-bill-number', [VendorController::class,'checkBillNumber'])->name('check.bill.number');
     //asset
     Route::get('/superadmin/asset_dashboard', [VendorController::class, 'getasset'])->name('superadmin.getasset');

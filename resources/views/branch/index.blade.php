@@ -800,26 +800,28 @@
 
     // ==================== APPLY FILTERS ====================
     function applyFilters(page = 1, perPage = null) {
-        const formData = new URLSearchParams();
+        // Clean params for the browser URL (no ajax/page/per_page pollution)
+        const cleanParams = new URLSearchParams();
 
         const dateRange = $('#dateRange').val();
-        if (dateRange) formData.append('date_range', dateRange);
+        if (dateRange) cleanParams.append('date_range', dateRange);
 
         if (zoneSelect) {
-            zoneSelect.getValues().forEach(zone => formData.append('zone_id[]', zone));
+            zoneSelect.getValues().forEach(zone => cleanParams.append('zone_id[]', zone));
         }
 
         if (branchSelect) {
-            branchSelect.getValues().forEach(branch => formData.append('branch_id[]', branch));
+            branchSelect.getValues().forEach(branch => cleanParams.append('branch_id[]', branch));
         }
 
-        if (page) formData.append('page', page);
-        if (perPage) formData.append('per_page', perPage);
-        else if ($('#perPageSelect').length) formData.append('per_page', $('#perPageSelect').val());
+        // AJAX params include page, per_page and ajax=1 (never pushed to browser URL)
+        const ajaxParams = new URLSearchParams(cleanParams.toString());
+        if (page) ajaxParams.append('page', page);
+        if (perPage) ajaxParams.append('per_page', perPage);
+        else if ($('#perPageSelect').length) ajaxParams.append('per_page', $('#perPageSelect').val());
+        ajaxParams.append('ajax', '1');
 
-        formData.append('ajax', '1');
-
-        const url = `${indexRoute}?${formData.toString()}`;
+        const url = `${indexRoute}?${ajaxParams.toString()}`;
 
         $('#loadingOverlay').addClass('active');
 
@@ -830,9 +832,12 @@
             success: function(response) {
                 updateSummaryCards(response.summary);
                 $('#tableContainer').html(response.table);
-                // $('#tableContainer').html(response);
                 displayAppliedFilters();
-                window.history.pushState({}, '', `${window.location.pathname}?${formData.toString()}`);
+                // Push only the clean params (no ajax=1, no page, no per_page)
+                const browserUrl = cleanParams.toString()
+                    ? `${window.location.pathname}?${cleanParams.toString()}`
+                    : window.location.pathname;
+                window.history.pushState({}, '', browserUrl);
                 $('#loadingOverlay').removeClass('active');
                 $('#tableContainer').css('opacity', '1');
             },

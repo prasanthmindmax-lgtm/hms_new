@@ -7800,6 +7800,29 @@ public function getprofessionalsummary(Request $request)
     }
 
     /**
+     * Export bills in Original TDS Format (matches TDS_Format.xlsx template). XLSX and CSV.
+     */
+    public function exportBillsTdsOriginal(Request $request)
+    {
+        $format = $request->get('format', 'xlsx');
+        if (!in_array($format, ['csv', 'xlsx'])) {
+            $format = 'xlsx';
+        }
+        $writerType = $format === 'csv' ? ExcelExcel::CSV : ExcelExcel::XLSX;
+        $fileName   = 'Bills_TDS_Original_' . now()->format('Y_m_d_His') . '.' . $format;
+        return Excel::download(
+            new \App\Exports\NewTDSFormate($request, $format),
+            $fileName,
+            $writerType,
+            [
+                'Content-Type' => $format === 'csv'
+                    ? 'text/csv'
+                    : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]
+        );
+    }
+
+    /**
      * Export bills with GST data (all entered data + CGST, SGST, GST %, etc.). XLSX and CSV.
      */
     public function exportBillsGst(Request $request)
