@@ -828,7 +828,9 @@
             type: 'GET',
             beforeSend: function() { $('#tableContainer').css('opacity', '0.5'); },
             success: function(response) {
-                $('#tableContainer').html(response);
+                updateSummaryCards(response.summary);
+                $('#tableContainer').html(response.table);
+                // $('#tableContainer').html(response);
                 displayAppliedFilters();
                 window.history.pushState({}, '', `${window.location.pathname}?${formData.toString()}`);
                 $('#loadingOverlay').removeClass('active');
@@ -842,6 +844,16 @@
             }
         });
     }
+    function updateSummaryCards(summary) {
+            $('.stat-card-1 h3').text(summary.report_count);
+            $('.stat-card-2 h3').text('₹' + Number(summary.total_radiant).toLocaleString());
+            $('.stat-card-3 h3').text('₹' + Number(summary.total_card).toLocaleString());
+            $('.stat-card-4 h3').text('₹' + Number(summary.total_upi).toLocaleString());
+            $('.stat-card-5 h3').text('₹' + Number(summary.total_deposit).toLocaleString());
+            $('.stat-card-6 h3').text('₹' + Number(summary.total_bank).toLocaleString());
+            $('.stat-card-7 h3').text(summary.reports_with_files);
+            $('.stat-card-8 h3').text(summary.reports_without_files);
+        }
 
     // ==================== DISPLAY APPLIED FILTERS ====================
     function displayAppliedFilters() {

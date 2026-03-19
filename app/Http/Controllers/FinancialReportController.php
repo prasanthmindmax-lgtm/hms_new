@@ -168,8 +168,17 @@ class FinancialReportController extends Controller
         /* =========================
         AJAX RESPONSE
         ========================== */
+        // if ($request->ajax() || $request->has('ajax')) {
+        //     return view('branch.partials.reports-table', compact('reports', 'summary', 'admin'));
+        // }
         if ($request->ajax() || $request->has('ajax')) {
-            return view('branch.partials.reports-table', compact('reports', 'summary', 'admin'));
+            return response()->json([
+                'table' => view(
+                    'branch.partials.reports-table',
+                    compact('reports', 'summary', 'admin')
+                )->render(),
+                'summary' => $summary
+            ]);
         }
 
         /* =========================
