@@ -1,0 +1,232 @@
+/* ========================================================================
+   Component: layout
+ ========================================================================== */
+body,
+.wrapper > section {
+  background-color: #e8e8e8;
+}
+
+.wrapper > .aside {
+  background-color: #1e1e2d;
+}
+
+/* ========================================================================
+   Component: top-navbar
+ ========================================================================== */
+.topnavbar {
+  background-color: #fff;
+}
+
+.topnavbar .navbar-header {
+  background: #fff; 
+  /* background-image: -webkit-linear-gradient(left, #a1076a 0%, #630560 100%);
+  background-image: -o-linear-gradient(left, #a1076a 0%, #630560 100%);
+  background-image: linear-gradient(to right, #a1076a 0%, #630560 100%); */
+  background-repeat: repeat-x;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffa1076a', endColorstr='#ff630560', GradientType=1);
+}
+
+@media only screen and (min-width: 768px) {
+  .topnavbar .navbar-header {
+    background-image: none;
+  }
+}
+
+.topnavbar .navbar-nav > li > a,
+.topnavbar .navbar-nav > .open > a {
+  color: #a1076a;
+}
+
+.topnavbar .navbar-nav > li > a:hover,
+.topnavbar .navbar-nav > .open > a:hover,
+.topnavbar .navbar-nav > li > a:focus,
+.topnavbar .navbar-nav > .open > a:focus {
+  color: #b3b3b3;
+}
+
+.topnavbar .navbar-nav > .active > a,
+.topnavbar .navbar-nav > .open > a,
+.topnavbar .navbar-nav > .active > a:hover,
+.topnavbar .navbar-nav > .open > a:hover,
+.topnavbar .navbar-nav > .active > a:focus,
+.topnavbar .navbar-nav > .open > a:focus {
+  background-color: transparent;
+}
+
+.topnavbar .navbar-nav > li > [data-toggle="navbar-search"] {
+  color: #ffffff;
+}
+
+.border-radi_5px{
+    border-radius: 5px;
+}
+.text-info{
+    color: #9d0669;
+}
+
+.topnavbar .nav-wrapper {
+  background-color: #a1076a;
+  background-image: -webkit-linear-gradient(left, #a1076a 0%, #630560 100%);
+  background-image: -o-linear-gradient(left, #a1076a 0%, #630560 100%);
+  background-image: linear-gradient(to right, #a1076a 0%, #630560 100%);
+  background-repeat: repeat-x;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffa1076a', endColorstr='#ff630560', GradientType=1);
+}
+
+@media only screen and (min-width: 768px) {
+  .topnavbar {
+    background-color: #a1076a;
+    background-image: -webkit-linear-gradient(left, #a1076a 0%, #630560 100%);
+    background-image: -o-linear-gradient(left, #a1076a 0%, #630560 100%);
+    background-image: linear-gradient(to right, #a1076a 0%, #630560 100%);
+    background-repeat: repeat-x;
+    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffa1076a', endColorstr='#ff630560', GradientType=1);
+  }
+
+  .topnavbar .navbar-nav > .open > a,
+  .topnavbar .navbar-nav > .open > a:hover,
+  .topnavbar .navbar-nav > .open > a:focus {
+    box-shadow: 0 -3px 0 rgba(255, 255, 255, 0.5) inset;
+  }
+
+  .topnavbar .navbar-nav > li > a,
+  .topnavbar .navbar-nav > .open > a {
+    color: #ffffff;
+  }
+
+  .topnavbar .navbar-nav > li > a:hover,
+  .topnavbar .navbar-nav > .open > a:hover,
+  .topnavbar .navbar-nav > li > a:focus,
+  .topnavbar .navbar-nav > .open > a:focus {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* ========================================================================
+   Component: sidebar
+ ========================================================================== */
+.sidebar {
+  background: #aa076b; /* fallback for old browsers */
+  background: -webkit-linear-gradient(
+    to right,
+    #61045f,
+    #aa076b
+  ); /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(
+    to right,
+    #61045f,
+    #aa076b
+  ); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+}
+
+.sidebar .nav-heading {
+  color: #919da8;
+}
+
+.sidebar .nav > li > a,
+.sidebar .nav > li > .nav-item {
+  color: #d7d9e3;
+}
+
+.sidebar .nav > li > a:focus,
+.sidebar .nav > li > .nav-item:focus,
+.sidebar .nav > li > a:hover,
+.sidebar .nav > li > .nav-item:hover {
+  color: #ccc;
+}
+
+.sidebar .nav > li > a > em,
+.sidebar .nav > li > .nav-item > em {
+  color: inherits;
+}
+
+.sidebar .nav > li.active,
+.sidebar .nav > li.open,
+.sidebar .nav > li.active > a,
+.sidebar .nav > li.open > a,
+.sidebar .nav > li.active .nav,
+.sidebar .nav > li.open .nav {
+  background-color: #383d4e;
+  color: #d7d9e3;
+}
+
+.sidebar .nav > li.active > a > em,
+.sidebar .nav > li.open > a > em {
+  color: #d7d9e3;
+}
+
+.sidebar .nav > li.active {
+  border-left-color: #a1076a;
+}
+
+.sidebar-subnav {
+  background-color: #1e1e2d;
+}
+
+.sidebar-subnav > .sidebar-subnav-header {
+  color: #888ea8;
+}
+
+.sidebar-subnav > li > a,
+.sidebar-subnav > li > .nav-item {
+  color: #888ea8;
+}
+
+.sidebar-subnav > li > a:focus,
+.sidebar-subnav > li > .nav-item:focus,
+.sidebar-subnav > li > a:hover,
+.sidebar-subnav > li > .nav-item:hover {
+  color: #a1076a;
+}
+
+.sidebar-subnav > li.active > a,
+.sidebar-subnav > li.active > .nav-item {
+  color: #a1076a;
+}
+
+.sidebar-subnav > li.active > a:after,
+.sidebar-subnav > li.active > .nav-item:after {
+  border-color: #a1076a;
+  /*background-color: #a1076a;*/
+}
+
+/* ========================================================================
+   Component: offsidebar
+ ========================================================================== */
+.offsidebar {
+  border-left: 1px solid #cccccc;
+  background-color: #ffffff;
+  color: #515253;
+}
+
+.nav-pills > li.active > a,
+.nav-pills > li.active > a:hover,
+.nav-pills > li.active > a:focus,
+li.user-header {
+  background-color: #a1076a !important;
+}
+
+.panel-custom .panel-heading {
+  border-bottom: 2px solid #a1076a;
+}
+
+.custom-bg,
+.fc-state-default {
+  background: #a1076a !important;
+  color: #ffffff !important;
+}
+
+.nav-tabs > li.active > a {
+  border-top: 2px solid #a1076a;
+}
+
+.timeline-2,
+.timeline-2 .time-item:after,
+.time-item,
+.time-item:after {
+  border-color: #a1076a;
+}
+
+.sub-active {
+  border-left-color: #a1076a;
+}

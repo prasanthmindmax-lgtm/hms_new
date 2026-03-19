@@ -1,0 +1,688 @@
+/* ============================================
+   BANK RECONCILIATION - COMPLETE CSS
+   public/css/bank-reconciliation.css
+   WITH IMPORT PAGE STYLING
+   ============================================ */
+
+/* General Styles */
+body {
+    background-color: #f8f9fa;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Header Card */
+.header-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+}
+
+.header-card h2 {
+    font-weight: 700;
+    font-size: 28px;
+}
+
+/* Statistics Cards */
+.stat-card {
+    border-radius: 15px;
+    padding: 25px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card-1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.stat-card-2 {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.stat-card-3 {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.stat-card-4 {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+}
+
+.stat-icon {
+    font-size: 48px;
+    opacity: 0.8;
+}
+
+.stat-content h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.stat-content p {
+    margin: 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* Filter Card */
+.filter-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+}
+
+.filter-header h5 {
+    font-weight: 600;
+}
+
+/* Table Styling */
+.table-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+}
+
+.table-header h5 {
+    font-weight: 600;
+}
+
+
+
+/* Table wrapper - overflow so table doesn't stretch page */
+.bank-recon-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 70vh;
+    margin-bottom: 1rem;
+}
+#statementsTable {
+    margin-bottom: 0;
+    min-width: 900px;
+}
+
+#statementsTable thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #495057;
+    padding: 15px 12px;
+}
+
+#statementsTable tbody tr {
+    transition: all 0.2s ease;
+}
+
+#statementsTable tbody tr:hover {
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+#statementsTable tbody td {
+    padding: 15px 12px;
+    vertical-align: middle;
+    font-size: 14px;
+}
+
+/* Statement Row Status Colors */
+.statement-row.matched {
+    background-color: #d4edda;
+}
+
+.statement-row.partially_matched {
+    background-color: #d1ecf1;
+}
+
+#txnDescription{
+    word-break: break-word;
+}
+/* Table Cell Styles */
+.date-cell {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.description-cell {
+    width: 300px;
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.4;
+}
+
+.reference-code {
+    background-color: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #495057;
+}
+
+.matched-bill-info {
+    font-size: 13px;
+}
+
+.matched-bill-info strong {
+    color: #28a745;
+}
+
+/* Category Badges */
+.category-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.category-badge.uncategorized {
+    background: #ffc107;
+    color: #000;
+}
+
+.category-badge.categorized {
+    background: #28a745;
+    color: white;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.btn-match, .btn-unmatch {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.btn-delete {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+}
+
+/* Status Badges */
+.badge {
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+/* Upload Area - Minimized Version */
+.upload-area-mini {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.upload-area-mini:hover {
+    border-color: #667eea;
+    background: #f0f1ff;
+}
+
+.upload-area-mini .file-name-display {
+    display: none;
+}
+
+/* Transaction Info Card */
+.transaction-info-card {
+    /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
+    background: linear-gradient(135deg, #4bc7d6 0%, #20e7b5 100%) !important;
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.transaction-info-card label {
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.transaction-info-card .fw-bold {
+    font-size: 14px;
+}
+
+/* Matches Section New */
+.matches-section-new {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+/* Filter Box inside Modal */
+.filter-box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+}
+
+/* Bill Match Card - New Design */
+.bill-match-card-new {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.bill-match-card-new:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.bill-match-card-new.selected {
+    border-color: #28a745;
+    background: #f0fff4;
+}
+
+.bill-match-card-new .selected-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #28a745;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Table Row Clickable */
+#statementsTable tbody tr {
+    cursor: pointer;
+}
+
+#statementsTable tbody tr:hover {
+    background-color: #f0f1ff !important;
+}
+
+/* Remove old drawer styles since we're using modal */
+
+/* Transaction Details */
+.transaction-info-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.transaction-info-card label {
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.transaction-info-card .fw-bold {
+    font-size: 14px;
+}
+
+/* Matches Section New */
+.matches-section-new {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+/* Filter Box inside Modal */
+.filter-box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+}
+
+/* Bill Match Card - New Design */
+.bill-match-card-new {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.bill-match-card-new:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.bill-match-card-new.selected {
+    border-color: #28a745;
+    background: #f0fff4;
+}
+
+.bill-match-card-new .selected-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #28a745;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.bill-match-card-new .btn-select-match {
+    transition: all 0.2s ease;
+}
+
+.bill-match-card-new:hover .btn-select-match {
+    transform: scale(1.05);
+}
+
+/* Pagination */
+.pagination {
+    margin: 0;
+}
+
+.pagination .page-link {
+    color: #667eea;
+    border: 1px solid #dee2e6;
+    margin: 0 3px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.pagination .page-link:hover {
+    background-color: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+/* Cards */
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+/* Form Controls */
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    padding: 10px 15px;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Buttons */
+.btn {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 10px 20px;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    border: none;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    border: none;
+    color: #000;
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    border: none;
+}
+
+/* Modal Styles */
+.modal-content {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    border: none;
+}
+
+.modal-header .btn-close {
+    filter: brightness(0) invert(1);
+}
+
+.modal-footer {
+    border-top: 1px solid #e9ecef;
+    padding: 20px;
+}
+
+/* Alert Styles */
+.alert {
+    border-radius: 10px;
+    border: none;
+}
+
+.alert-info {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    color: #0c5460;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .modal-xl {
+        max-width: 100%;
+    }
+    
+    .stat-card {
+        margin-bottom: 15px;
+    }
+    
+    .header-card h2 {
+        font-size: 20px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .transaction-info-card {
+        padding: 15px;
+    }
+}
+
+/* Match Modal - Right Side Drawer */
+.modal.right .modal-dialog {
+    position: fixed;
+    margin: auto;
+    width: 50%;
+    max-width: 800px;
+    height: 100%;
+    right: 0;
+    top: 0;
+    transform: translate3d(100%, 0, 0);
+    transition: transform 0.3s ease-out;
+}
+
+.modal.right.show .modal-dialog {
+    transform: translate3d(0, 0, 0);
+}
+
+.modal.right .modal-content {
+    height: 100%;
+    overflow-y: auto;
+    border-radius: 0;
+    border: none;
+}
+
+.modal.right .modal-body {
+    overflow-y: auto;
+    max-height: calc(100vh - 200px);
+}
+
+/* Modal backdrop - allow left side access */
+.modal-backdrop.show {
+    opacity: 0.3;
+}
+
+/* Nav Tabs Styling */
+.nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    font-weight: 600;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 10px 20px;
+}
+
+.nav-tabs .nav-link:hover {
+    border-bottom-color: #667eea;
+    color: #667eea;
+}
+
+.nav-tabs .nav-link.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: transparent;
+}
+
+/* Match Modal */
+.modal-xl {
+    max-width: 1200px;
+}
+
+/* Bill Match Card Improvements */
+.bill-match-card-new .btn-select-match {
+    transition: all 0.2s ease;
+}
+
+.bill-match-card-new:hover .btn-select-match {
+    transform: scale(1.05);
+}
+
+/* Scrollbar for match lists */
+#bestMatchesList,
+#possibleMatchesList {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.table-responsive::-webkit-scrollbar,
+#bestMatchesList::-webkit-scrollbar,
+#possibleMatchesList::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track, 
+#bestMatchesList::-webkit-scrollbar-track, 
+#possibleMatchesList::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#bestMatchesList::-webkit-scrollbar-thumb, .table-responsive::-webkit-scrollbar-thumb, 
+#possibleMatchesList::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 3px;
+}
+
+/* Remove old responsive drawer styles */
+
+/* Date range picker - show above modal so calendar is visible */
+#filterModal .modal-content,
+#matchTransactionModal .modal-content {
+    position: relative;
+}
+#filterModal .daterangepicker,
+#matchTransactionModal .daterangepicker,
+#filterModal .modal-content .daterangepicker,
+#matchTransactionModal .modal-content .daterangepicker,
+body > .daterangepicker {
+    z-index: 1060 !important;
+}
+
+/* Scrollbar Styling */
+#bestMatchesList::-webkit-scrollbar, .table-responsive::-webkit-scrollbar, 
+#possibleMatchesList::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+}
+
+#bestMatchesList::-webkit-scrollbar-track, .table-responsive::-webkit-scrollbar-track, 
+#possibleMatchesList::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#bestMatchesList::-webkit-scrollbar-thumb, .table-responsive::-webkit-scrollbar-thumb, 
+#possibleMatchesList::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 3px;
+}

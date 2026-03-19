@@ -1,0 +1,297 @@
+:root {
+  --sifoxen-text: #ffffff;
+  --sifoxen-text-rgb: 255, 255, 255;
+  --sifoxen-text2: #79767C;
+  --sifoxen-text2-rgb: 121, 118, 124;
+  --sifoxen-gray: #DDD8DB;
+  --sifoxen-gray-rgb: 221, 216, 219;
+  --sifoxen-black: #ffffff;
+  --sifoxen-black-rgb: 255, 255, 255;
+  --sifoxen-black2: #362048;
+  --sifoxen-black2-rgb: 54, 32, 72;
+  --sifoxen-black3: #251632;
+  --sifoxen-black3-rgb: 37, 22, 50;
+  --sifoxen-white: #362048;
+  --sifoxen-white-rgb: 54, 32, 72;
+  --sifoxen-white2: #F5F2F4;
+  --sifoxen-white2-rgb: 245, 242, 244;
+  --sifoxen-white3: #ffffff;
+  --sifoxen-white3-rgb: 255, 255, 255;
+}
+
+.preloader,
+.mobile-nav__content,
+.sidebar-one__content,
+.schedule-one__item,
+.solutions-one--home,
+.solutions-one--home .solutions-one__shape-2__inner,
+.testimonials-three {
+  background-color: var(--sifoxen-black2);
+}
+
+.services-three,
+.main-footer {
+  background-color: var(--sifoxen-black3);
+}
+
+.search-popup__form input[type=search],
+.search-popup__form input[type=text],
+.main-slider-three__title__overlay,
+.main-slider-three .social-links a,
+.mobile-nav__content .main-menu__list li a button.expanded,
+.about-three__video,
+.about-profile__image,
+.service-card-two__icon-box,
+.appointment-one__service__icon-box,
+.appointment-one__form,
+.appointment-one__form input[type=text],
+.appointment-one__form input[type=email],
+.appointment-one__form textarea,
+.ui-datepicker.ui-widget-content,
+.ui-datepicker .ui-datepicker-prev,
+.ui-datepicker .ui-datepicker-next,
+.ui-datepicker-calendar td,
+.therapist-card__identity__inner::before,
+.testimonials-three__inner,
+.testimonial-card,
+.testimonials-three__funfact,
+.blog-card__date__month,
+.blog-card__image__link::before,
+.blog-card__image__link::after {
+  background-color: var(--sifoxen-white3);
+}
+
+.appointment-one__form .bootstrap-select > .dropdown-toggle {
+  background-color: var(--sifoxen-white3) !important;
+}
+
+.sidebar-one__newsletter__input {
+  background-color: rgba(var(--sifoxen-white3-rgb), 0.09);
+}
+
+.schedule-one__number,
+.services-three__button .sifoxen-btn,
+.solutions-one__shape-2,
+.appointment-one__service__item:hover .appointment-one__service__icon-box {
+  background-color: var(--sifoxen-primary);
+}
+
+.solutions-one__image {
+  background-color: rgba(var(--sifoxen-white2-rgb), 0.1);
+}
+
+.solutions-one__main-tab-box .tab-buttons .tab-btn {
+  background-color: rgba(var(--sifoxen-white3-rgb), 0.2);
+}
+
+.gallery-instagram--home-3 .gallery-instagram__content,
+.appointment-one {
+  background-color: var(--sifoxen-base);
+}
+
+.gallery-instagram--home-3 .gallery-instagram__image__link {
+  background-color: rgba(var(--sifoxen-white-rgb), 0.8);
+}
+
+.therapist-card__image::after {
+  background-color: rgba(var(--sifoxen-black2-rgb), 0.5);
+}
+
+.blog-card__image__link {
+  background-color: rgba(var(--sifoxen-black2-rgb), 0.6);
+}
+
+.gallery-instagram--home-3 .sifoxen-btn {
+  background-color: transparent;
+  border: 1px solid var(--sifoxen-white2);
+}
+.gallery-instagram--home-3 .sifoxen-btn::before, .gallery-instagram--home-3 .sifoxen-btn::after {
+  background-color: var(--sifoxen-white3);
+}
+.gallery-instagram--home-3 .sifoxen-btn:hover {
+  color: var(--sifoxen-primary);
+}
+
+.services-three__bg {
+  opacity: 1;
+}
+
+.solutions-one__bg {
+  mix-blend-mode: color-burn;
+}
+
+.testimonials-three__bg {
+  mix-blend-mode: multiply;
+}
+
+.services-three__button .sifoxen-btn::before,
+.services-three__button .sifoxen-btn::after {
+  background-color: var(--sifoxen-base);
+}
+
+@media (max-width: 1199px) {
+  .main-header--three .main-header__sidebar-btn span {
+    background-color: var(--sifoxen-white3);
+  }
+  .main-header--three .main-header__sidebar-btn:hover span {
+    background-color: var(--sifoxen-white3);
+  }
+}
+.gallery-instagram--home-3 .gallery-instagram__content {
+  padding: 39px 30px;
+}
+
+.sifoxen-owl__carousel--basic-nav.owl-carousel .owl-nav button:hover,
+.sifoxen-btn:hover,
+.main-slider-three__title,
+.main-slider-three .social-links a:hover,
+.main-menu .main-menu__list li ul li.current > a,
+.main-menu .main-menu__list li ul li:hover > a,
+.main-menu .main-menu__list li ul li > a::after,
+.mobile-nav__content .main-menu__list li > a,
+.mobile-nav__content .main-menu__list li a button,
+.mobile-nav__contact__icon,
+.mobile-nav__contact li,
+.mobile-nav__social a,
+.sidebar-one__social a,
+.mobile-nav__close,
+.sidebar-one__social a:hover,
+.sidebar-one__newsletter__btn,
+.sidebar-one__newsletter__btn:hover,
+.schedule-one__number::after,
+.schedule-one__item:hover .schedule-one__number::after,
+.about-three__video:hover,
+.about-three__info:hover .about-three__info__icon,
+.services-three__button .sifoxen-btn,
+.services-three__button .sifoxen-btn:hover,
+.service-card-two:hover .service-card-two__icon,
+.service-card-two .service-card-two__title,
+.why-choose-two__item:hover .why-choose-two__icon,
+.gallery-instagram--home-3 .sec-title__title,
+.gallery-instagram--home-3 .sec-title__tagline,
+.gallery-instagram__image__link > *:hover,
+.appointment-one .sec-title__tagline,
+.appointment-one__service__item:hover .appointment-one__service__icon,
+.form-one .bootstrap-select .dropdown-menu > li:hover > a,
+.form-one .bootstrap-select .dropdown-menu > li.selected > a,
+.ui-datepicker .ui-datepicker-header,
+.ui-datepicker .ui-state-highlight,
+.ui-datepicker .ui-widget-content .ui-state-highlight,
+.ui-datepicker .ui-widget-header .ui-state-highlight,
+.therapist-card__name,
+.therapist-card__designation,
+.therapist-card .social-links a,
+.testimonials-three__funfact__number,
+.testimonials-three__funfact:hover .testimonials-three__funfact__title,
+.blog-card--three .blog-card__title,
+.blog-card__meta__icon,
+.blog-card__meta li,
+.blog-card__date__day,
+.footer-widget__title,
+.social-links a:hover {
+  color: var(--sifoxen-white3);
+}
+
+.search-popup__form input[type=search]:focus,
+.search-popup__form input[type=text]:focus,
+.mobile-nav__content .main-menu__list li a button.expanded,
+.solutions-one__main-tab-box .tab-buttons .tab-btn:hover,
+.solutions-one__main-tab-box .tab-buttons .tab-btn.active-btn,
+.form-one .bootstrap-select .dropdown-menu > li > a,
+.appointment-one__form input[type=text]:focus,
+.appointment-one__form input[type=email]:focus,
+.appointment-one__form textarea:focus,
+.ui-datepicker-calendar .ui-state-default,
+.ui-datepicker-calendar .ui-widget-content .ui-state-default,
+.ui-datepicker-calendar .ui-widget-header .ui-state-default,
+.testimonial-card__name,
+.testimonials-three__funfact__title,
+.blog-card__meta li a:hover,
+.main-footer__newsletter__form input[type=text]:focus,
+.main-footer__newsletter__form input[type=text]:focus + .main-footer__newsletter__icon {
+  color: var(--sifoxen-black2);
+}
+
+.ui-datepicker .ui-state-highlight,
+.ui-datepicker .ui-widget-content .ui-state-highlight,
+.ui-datepicker .ui-widget-header .ui-state-highlight {
+  color: var(--sifoxen-white3);
+}
+
+.ui-datepicker-calendar .ui-state-default:hover,
+.ui-datepicker-calendar .ui-widget-content .ui-state-default:hover,
+.ui-datepicker-calendar .ui-widget-header .ui-state-default:hover {
+  color: var(--sifoxen-white3);
+}
+
+.appointment-one__service__icon {
+  color: var(--sifoxen-base);
+}
+
+.search-popup__form input[type=search],
+.search-popup__form input[type=text],
+.main-slider-three .social-links a,
+.why-choose-two__text,
+.form-one input[type=text],
+.form-one input[type=email],
+.form-one input[type=tel],
+.form-one textarea,
+.form-one .bootstrap-select > .dropdown-toggle:before,
+.appointment-one__form__date__arrow,
+.testimonial-card__text,
+.testimonial-card__designation,
+.main-footer__newsletter__form input[type=text],
+.main-footer__newsletter__icon,
+.social-links a {
+  color: var(--sifoxen-text2);
+}
+
+.form-one .bootstrap-select > .dropdown-toggle {
+  color: var(--sifoxen-text2) !important;
+}
+
+.testimonials-three__funfact:hover .testimonials-three__funfact__number {
+  text-shadow: 1px 1px 0 var(--sifoxen-white3), -1px -1px 0 var(--sifoxen-white3), 1px -1px 0 var(--sifoxen-white3), -1px 1px 0 var(--sifoxen-white3), 1px 1px 0 var(--sifoxen-white3);
+}
+
+.mobile-nav__content .main-menu__list li:not(:last-child) {
+  border-color: rgba(var(--sifoxen-white3-rgb), 0.1);
+}
+
+.main-slider-three__carousel.owl-carousel .owl-dots .owl-dot,
+.about-three__video-box,
+.services-three .service-card-two,
+.therapist-card .social-links a {
+  border-color: var(--sifoxen-white3);
+}
+
+.schedule-one__item {
+  border: 1px solid var(--sifoxen-white3);
+}
+
+.about-three__inner,
+.why-choose-two__item:not(:last-child) {
+  border-color: rgba(var(--sifoxen-border-color-rgb), 0.2);
+}
+
+.services-three .sifoxen-owl__carousel--basic-nav.owl-carousel .owl-nav button,
+.services-three__top,
+.solutions-one__skills,
+.appointment-one__service__item {
+  border-color: rgba(var(--sifoxen-border-color-rgb), 0.25);
+}
+
+.appointment-one__shape {
+  right: 109px;
+  bottom: 174px;
+}
+@media (max-width: 1599px) {
+  .appointment-one__shape {
+    right: 30px;
+  }
+}
+
+.home-showcase__inner {
+  box-shadow: 0px 3px 18px rgba(var(--sifoxen-white2-rgb), 0.07);
+}
+/*# sourceMappingURL=sifoxen-dark.css.map */

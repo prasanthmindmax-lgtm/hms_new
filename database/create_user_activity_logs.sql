@@ -1,0 +1,26 @@
+-- Activity Logs Table
+CREATE TABLE IF NOT EXISTS `user_activity_logs` (
+    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id`       INT NULL,
+    `username`      VARCHAR(100)  NULL COMMENT 'Employee number / username from tbl_ticket_users',
+    `user_fullname` VARCHAR(255)  NULL,
+    `user_email`    VARCHAR(255)  NULL,
+    `user_role`     VARCHAR(100)  NULL,
+    `access_level`  TINYINT NULL COMMENT '1=SuperAdmin,2=Zonal,3=Admin,4=Audit',
+    `action`        VARCHAR(255)  NOT NULL COMMENT 'e.g. Login, Page Visit, Approve, Reject, Search, Edit, Create, Delete, Filter, Logout',
+    `module`        VARCHAR(100)  NULL COMMENT 'e.g. Discount, CancelBill, Refund, Vendor, Ticket, Dashboard',
+    `description`   TEXT          NULL,
+    `url`           VARCHAR(1000) NULL,
+    `method`        VARCHAR(10)   NULL,
+    `ip_address`    VARCHAR(60)   NULL,
+    `user_agent`    VARCHAR(500)  NULL,
+    `extra_data`    JSON          NULL COMMENT 'Any extra context like record_id, old_value, new_value',
+    `created_at`    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    INDEX `idx_user_id`     (`user_id`),
+    INDEX `idx_created_at`  (`created_at`),
+    INDEX `idx_module`      (`module`),
+    INDEX `idx_action`      (`action`),
+    INDEX `idx_access_level`(`access_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

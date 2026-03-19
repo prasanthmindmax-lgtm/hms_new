@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Dr. Aravind&#39;s IVF - Blogs &amp; Insights</title>
+    <link>https://www.draravindsivf.com/test_website/</link>
+    <description>Latest blogs from Dr. Aravind’s IVF Fertility Centre</description>
+    <language>en-IN</language>
+
+    <!-- Self reference (make sure this matches actual file location) -->
+    <atom:link href="https://www.draravindsivf.com/test_website/rss.xml" rel="self" type="application/rss+xml"/>
+
+    <lastBuildDate>Mon, 08 Sep 2025 10:00:00 +0530</lastBuildDate>
+    <managingEditor>info@draravindsivf.com (Dr. Aravind’s IVF Team)</managingEditor>
+    <webMaster>info@draravindsivf.com (Site Admin)</webMaster>
+    <copyright>Copyright © 2025 Dr. Aravind’s IVF Fertility Centre</copyright>
+    <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
+    <ttl>60</ttl>
+
+    <!-- Example blog posts -->
+    <item>
+      <title>When Should We Plan for Pregnancy</title>
+      <link>https://www.draravindsivf.com/test_website/blog/when-should-we-plan-for-pregnancy</link>
+      <guid isPermaLink="true">https://www.draravindsivf.com/test_website/blog/when-should-we-plan-for-pregnancy</guid>
+      <pubDate>Tue, 02 Sep 2025 09:00:00 +0530</pubDate>
+      <description><![CDATA[
+        Planning for pregnancy involves factors like age, health, and emotional readiness. Get our tips for a healthy journey to parenthood.
+      ]]></description>
+      <category>Planning</category>
+    </item>
+
+    <item>
+      <title>Ways to Cure Ovulation Problem</title>
+      <link>https://www.draravindsivf.com/test_website/blog/ways-to-cure-ovulation-problem</link>
+      <guid isPermaLink="true">https://www.draravindsivf.com/test_website/blog/ways-to-cure-ovulation-problem</guid>
+      <pubDate>Thu, 28 Aug 2025 09:00:00 +0530</pubDate>
+      <description><![CDATA[
+        Explore causes and corrective steps if you’re experiencing trouble with ovulation.
+      ]]></description>
+      <category>Ovulation</category>
+    </item>
+
+    <item>
+      <title>Which is the Best Time to Conceive — Morning or Night?</title>
+      <link>https://www.draravindsivf.com/test_website/blog/best-time-to-conceive</link>
+      <guid isPermaLink="true">https://www.draravindsivf.com/test_website/blog/best-time-to-conceive</guid>
+      <pubDate>Mon, 25 Aug 2025 09:00:00 +0530</pubDate>
+      <description><![CDATA[
+        Does timing matter? Discover what role timing and cycle understanding play in conception.
+      ]]></description>
+      <category>Conception</category>
+    </item>
+
+  </channel>
+</rss>

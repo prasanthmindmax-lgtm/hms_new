@@ -1,0 +1,83 @@
+# /.phpunit.cache
+# /node_modules
+# /public/build
+# /public/hot
+# /public/storage
+# /storage/*.key
+# /vendor
+# .env
+# .env.backup
+# .env.production
+# .phpunit.result.cache
+# Homestead.json
+# Homestead.yaml
+# auth.json
+# npm-debug.log
+# yarn-error.log
+# /.fleet
+# /.idea
+# /.vscode
+
+# # ✅ Add these
+# /storage
+# /public/uploads/*
+# /public/ticket_attachments/*
+# /public/bank_statements/*
+# /public/meeting_images/*
+# /public/refund_form/*
+# *.zip
+# *.sql
+# *.bak
+
+
+# Laravel
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+/storage/logs
+/storage/framework/cache
+/storage/framework/sessions
+/storage/framework/views
+
+# Environment files
+.env
+.env.backup
+.env.production
+
+# Composer
+composer.phar
+
+# NPM
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Build files
+/public/build
+/public/hot
+
+# IDE files
+/.idea
+/.vscode
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+/phpunit.xml
+
+# Temporary files
+*.log
+*.tmp
+
+# Laragon
+.laragon
+
+# Zip files
+*.zip
+
+# Misc
+/storage/*.key
+05_07vendor.zip
