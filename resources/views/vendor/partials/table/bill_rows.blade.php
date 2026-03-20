@@ -18,6 +18,7 @@
         <th>Q-NO</th>
         <th>BILL #</th>
         <th>REF NO</th>
+        <th>Bill Category</th>
         <th>NATURE</th>
         <th>VENDOR</th>
         <th>OTHER REASON</th>
@@ -112,6 +113,7 @@
             <td><a class="print-quot-pop-btn" style="color:#2a6fdb;">{{ $bill->Purchase->quotation->quotation_gen_no ?? '-' }}</a></td>
             <td>{{ $bill->bill_number ?? '-' }}</td>
             <td>{{ $bill->order_number ?? '-' }}</td>
+            <td>{{ $bill->category->name ?? '-' }}</td>
             <td>{{ $bill->BillLines->pluck('account')->unique()->sort()->implode(', ') }}</td>
 
             <td class="vendor_link">

@@ -203,6 +203,17 @@
                           <span class="error_zone" style="color:red"></span>
                         </div>
                     </div>
+                    <label for="bill_category" class="col-md-2">Category</label>
+                    <div class="col-md-4">
+                        <select class="form-select" name="bill_category" id="bill_category">
+                            <option value="">Select Category</option>
+                                @foreach ($billcategories as $cat)
+                                    <option value="{{ $cat->id }}">
+                                        {{ $cat->name }}
+                                    </option>
+                                @endforeach
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Row 6: Subject -->
@@ -3585,6 +3596,7 @@ function calculateFinalTotals() {
                         $('.discount_type').val(bill_header[0].discount_type);
                         $('.company-search-input').val(bill_header[0].company_name);
                         $('.company_id').val(bill_header[0].company_id);
+                        $('#bill_category').val(bill_header[0].bill_category);
 
                         let isFirst = true;
 
@@ -3762,6 +3774,7 @@ function calculateFinalTotals() {
                         $('.discount_type').val(bill_header[0].discount_type);
                         $('.company-search-input').val(bill_header[0].company_name);
                         $('.company_id').val(bill_header[0].company_id);
+                        $('#bill_category').val(bill_header[0].bill_category);
 
                         let isFirst = true;
 

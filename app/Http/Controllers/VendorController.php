@@ -2,100 +2,101 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\Session;
-use App\Providers\RouteServiceProvider;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Validator;
-use App\Models\TicketModel;
-use App\Models\TicketDetails;
-use App\Models\ImageModel;
-use App\Models\StatusModel;
-use App\Models\PriorityModel;
-use App\Models\CategoryModel;
-use App\Models\TblUserDepartments;
-use App\Models\LocationModel;
-use App\Models\SubCategoryModel;
-use App\Models\TicketActivitiesModel;
-use App\Models\TicketActivityModel;
-use App\Models\TblLocationModel;
-use App\Models\User;
-use App\Models\HrmUsers;
-use App\Models\UserProfile;
-use App\Models\UserDesignations;
-use App\Models\UserDepartments;
-use App\Models\AdminUserDepartments;
-use App\Models\Customer;
-use App\Models\Tblcustomer;
-use App\Models\TblBilling;
-use App\Models\TblShipping;
-use App\Models\TblContact;
-use App\Models\Tblbankdetails;
-use App\Models\Tblvendor;
-use App\Models\Tbltdstax;
-use App\Models\Tbltcstax;
-use App\Models\Tblgsttax;
-use App\Models\Tblbill;
-use App\Models\TblBillLines;
-use App\Models\Tblbillpay;
-use App\Models\TblDeliveryAddress;
-use App\Models\TblBillPayLines;
-use App\Models\TblPurchaseorder;
-use App\Models\TblPurchaseorderLines;
-use App\Models\Tblneft;
-use App\Models\Tblneftlines;
-use App\Models\TblQuotation;
-use App\Models\TblQuotationLines;
-use App\Models\Tblgrn;
-use App\Models\TblgrnLines;
-use App\Models\Tblnaturepayment;
-use App\Models\Tblaccount;
-use App\Models\TblZonesModel;
-use App\Models\TblPoEmail;
-use App\Models\Tbltdssection;
-use App\Models\TblVendorHistory;
-use App\Models\Tblcompany;
-use App\Models\TblVendortype;
-use App\Models\BillingListModel;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
-use Log;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Writer\Csv;
-use TCPDF;
-use App\Imports\QuotationImport;
-use App\Imports\VendorImport;
+use App\Exports\BillPaymentTemplateExport;
+use App\Exports\BillsExport;
+use App\Exports\BillTemplateExport;
+use App\Exports\GstSummaryExport;
+use App\Exports\ProfessionalSummaryExport;
+use App\Exports\PurchaseTemplateExport;
+use App\Exports\QuotationTemplateExport;
+use App\Exports\TdsDetailedExport;
+use App\Exports\TdsFyWiseExport;
+use App\Exports\TdsReportExport;
+use App\Exports\TdsSummaryExport;
+use App\Exports\VendorIncomeExport;
+use App\Exports\VendorTemplateExport;
 use App\Imports\billImport;
 use App\Imports\BillPaymentImport;
 use App\Imports\PurchaseImport;
+use App\Imports\QuotationImport;
+use App\Imports\VendorImport;
+use App\Models\AdminUserDepartments;
+use App\Models\BillCategory;
+use App\Models\BillingListModel;
+use App\Models\CategoryModel;
+use App\Models\Customer;
+use App\Models\HrmUsers;
+use App\Models\ImageModel;
+use App\Models\LocationModel;
+use App\Models\PriorityModel;
+use App\Models\StatusModel;
+use App\Models\SubCategoryModel;
+use App\Models\Tblaccount;
+use App\Models\Tblbankdetails;
+use App\Models\Tblbill;
+use App\Models\TblBilling;
+use App\Models\TblBillLines;
+use App\Models\Tblbillpay;
+use App\Models\TblBillPayLines;
+use App\Models\Tblcompany;
+use App\Models\TblContact;
+use App\Models\Tblcustomer;
+use App\Models\TblDeliveryAddress;
+use App\Models\Tblgrn;
+use App\Models\TblgrnLines;
+use App\Models\Tblgsttax;
+use App\Models\TblLocationModel;
+use App\Models\Tblnaturepayment;
+use App\Models\Tblneft;
+use App\Models\Tblneftlines;
+use App\Models\TblPoEmail;
+use App\Models\TblPurchaseorder;
+use App\Models\TblPurchaseorderLines;
+use App\Models\TblQuotation;
+use App\Models\TblQuotationLines;
+use App\Models\TblShipping;
+use App\Models\Tbltcstax;
+use App\Models\Tbltdssection;
+use App\Models\Tbltdstax;
+use App\Models\TblUserDepartments;
+use App\Models\Tblvendor;
+use App\Models\TblVendorHistory;
+use App\Models\TblVendortype;
+use App\Models\TblZonesModel;
+use App\Models\TicketActivitiesModel;
+use App\Models\TicketActivityModel;
+use App\Models\TicketDetails;
 
-use App\Exports\VendorTemplateExport;
-use App\Exports\QuotationTemplateExport;
-use App\Exports\BillTemplateExport;
-use App\Exports\TdsSummaryExport;
-use App\Exports\TdsReportExport;
-use App\Exports\GstSummaryExport;
-use App\Exports\PurchaseTemplateExport;
-use App\Exports\ProfessionalSummaryExport;
-use App\Exports\BillPaymentTemplateExport;
-use App\Exports\VendorIncomeExport;
-use App\Exports\BillsExport;
-use App\Exports\TdsFyWiseExport;
-use App\Exports\TdsDetailedExport;
-use Carbon\Carbon;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use Illuminate\Support\Facades\Mail;
+use App\Models\TicketModel;
+use App\Models\User;
+use App\Models\UserDepartments;
+use App\Models\UserDesignations;
+use App\Models\UserProfile;
+use App\Providers\RouteServiceProvider;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Log;
 use Maatwebsite\Excel\Excel as ExcelExcel;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Csv;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use TCPDF;
 
 class VendorController extends Controller
 {
@@ -1419,7 +1420,8 @@ public function statementprint(Request $request, $id)
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
         $Tblvendor = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
         $Tblaccount = Tblaccount::orderBy('id', 'asc')->get();
-        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments','TblTDSsection.section'])->where('delete_status',0)->orderBy('id', 'desc');
+        $Tblcategory = BillCategory::orderBy('id', 'asc')->get();
+        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments','TblTDSsection.section','category'])->where('delete_status',0)->orderBy('id', 'desc');
 
         // Apply filters
         if ($request->filled('date_from') && $request->filled('date_to')) {
@@ -1482,6 +1484,10 @@ public function statementprint(Request $request, $id)
                     });
                 }
             }
+        }
+        if ($request->filled('category_id')) {
+            $ids = explode(',', $request->category_id);
+            $query->whereIn('bill_category', $ids);
         }
         if ($request->filled('nature_id')) {
             $ids = explode(',', $request->nature_id);
@@ -1581,6 +1587,7 @@ public function statementprint(Request $request, $id)
             'Tblcompany'   => $Tblcompany,
             'Tblvendor'    => $Tblvendor,
             'Tblaccount'   => $Tblaccount,
+            'Tblcategory'  => $Tblcategory,
         ]);
     }
 
@@ -1680,19 +1687,22 @@ public function statementprint(Request $request, $id)
             }
         }
 
+        // Load category data for dropdowns
+        $billcategories = BillCategory::orderBy('name', 'asc')->get();
+
         if ($id !== "") {
             $bill = Tblbill::with(['TblBilling', 'BillLines', 'Tblvendor'])->where('delete_status',0)->where('id',$id)->get();
             if($type == 'edit'){
                 return view('vendor.bill_create', compact(
                     'admin','locations','vendor','customer',
                     'Tbltdstax','tdstax','Tbltcstax','Tblgsttax','Tblaccount','Tbltdssection',
-                    'TblQuotation','TblZonesModel','purchaselist','bill','perPage','Tblcompany','gsttax','type'
+                    'TblQuotation','TblZonesModel','purchaselist','bill','perPage','Tblcompany','gsttax','type', 'billcategories'
                 ));
             }else{
                 return view('vendor.bill_create', compact(
                     'admin','locations','vendor','customer',
                     'Tbltdstax','tdstax','Tbltcstax','Tblgsttax','Tblaccount','Tbltdssection',
-                    'TblQuotation','TblZonesModel','serial','purchaselist','bill','perPage','Tblcompany','gsttax','type'
+                    'TblQuotation','TblZonesModel','serial','purchaselist','bill','perPage','Tblcompany','gsttax','type', 'billcategories'
                 ));
 
             }
@@ -1700,7 +1710,7 @@ public function statementprint(Request $request, $id)
             return view('vendor.bill_create', compact(
                 'admin','locations','vendor','customer',
                 'Tbltdstax','tdstax','Tbltcstax','Tblgsttax','Tblaccount','Tbltdssection',
-                'TblQuotation','TblZonesModel','purchaselist','serial','perPage','Tblcompany','gsttax','type'
+                'TblQuotation','TblZonesModel','purchaselist','serial','perPage','Tblcompany','gsttax','type','billcategories'
             ));
         }
     }
@@ -1927,6 +1937,7 @@ public function statementprint(Request $request, $id)
             'branch_id' => $request->branch_id,
             'company_name' => $request->company_name,
             'company_id' => $request->company_id,
+            'bill_category' => $request->bill_category,
             'payment_terms' => $request->payment_terms,
             'subject' => $request->subject,
             'discount_percent' => $request->discount_percent,
@@ -2011,7 +2022,7 @@ public function statementprint(Request $request, $id)
             $bill = Tblbill::findOrFail($request->id);
             $grandTotal = (float) $this->cleanCurrency($request->grand_total_amount);
             $partial    = (float) $bill->partially_payment;
-            
+
             $balanceamount = $grandTotal - $partial;
             $data['balance_amount'] = $balanceamount;
             // ── Append to edit_history JSON column ──
@@ -4560,7 +4571,7 @@ public function getquotation(Request $request)
                 'status' => $request->save_status ?? $quotation->status,
                 'amount' => $request->grand_total_amount ?? $quotation->grand_total_amount,
             ];
-            
+
             $data['edit_history'] = json_encode($existingHistory);
             // dd($data);
             $quotation->update($data);
@@ -8092,17 +8103,17 @@ public function getprofessionalsummary(Request $request)
     public function exportBillsNeft(Request $request)
     {
         ini_set('memory_limit', '1024M');
-    
+
         $format = $request->input('format', 'xlsx');
         if (!in_array($format, ['csv', 'xlsx'])) {
             $format = 'xlsx';
         }
-    
+
         $r = $request;
-    
+
         // ── Bill query (same filters as bill dashboard) ─────────────────────────
         $billQuery = Tblbill::where('delete_status', 0)->orderBy('id', 'desc');
-    
+
         if ($r->filled('date_from') && $r->filled('date_to')) {
             try {
                 $from = Carbon::createFromFormat('d/m/Y', trim($r->date_from))->startOfDay();
@@ -8168,9 +8179,9 @@ public function getprofessionalsummary(Request $request)
                 $billQuery->whereIn('id', $ids);
             }
         }
-    
+
         $bills = $billQuery->with(['BillLines', 'Tblvendor', 'Tblvendor.bankdetails', 'Tblbankdetails'])->get();
-    
+
         // ── Helpers matching JS safeVal / emptyVal exactly ──────────────────────
         // safeVal: returns 'NA' for null / '' (used for name, mobile, email, remark, date, ref, addl)
         $safeVal = function ($v): string {
@@ -8180,15 +8191,15 @@ public function getprofessionalsummary(Request $request)
         $emptyVal = function ($v): string {
             return ($v === null || (is_string($v) && trim((string)$v) === '')) ? '' : (string) $v;
         };
-    
+
         // ── Date / period helpers (JS-identical) ────────────────────────────────
         $today            = now();
         $pymtDate         = $today->format('d-m-Y');
         $periodMonths     = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
         $toMonthStr       = $periodMonths[$today->month - 1];
         $currentYearShort = $today->format('y');
-    
-    
+
+
         // ── Headers — 19 columns (A–S) matching JS exactly ─────────────────────
         $headers = [
             'PYMT_PROD_TYPE_CODE', 'PYMT_MODE', 'DEBIT_ACC_NO', 'BNF_NAME',
@@ -8196,19 +8207,19 @@ public function getprofessionalsummary(Request $request)
             'MOBILE_NUM', 'EMAIL_ID', 'REMARK', 'PYMT_DATE', 'REF_NO',
             'ADDL_INFO1', 'ADDL_INFO2', 'ADDL_INFO3', 'ADDL_INFO4', 'ADDL_INFO5',
         ];
-    
+
         // ── Collect ALL rows into a plain PHP array first ────────────────────────
         // This single array is used for both CSV (fputcsv) and XLSX (PhpSpreadsheet).
         // Every value is a plain string — no numeric types — so neither Excel nor a
         // CSV reader can auto-convert account numbers / mobile to scientific notation.
         $allRows   = [];
         $allRows[] = $headers;   // row 0 = header
-    
+
         foreach ($bills as $bill) {
             $bankDetail = $bill->Tblbankdetails
                 ?? optional(optional($bill->Tblvendor)->bankdetails)->first();
             $vendor = $bill->Tblvendor;
-    
+
             // BNF_NAME
             $rawName = $bill->vendor_name ?: optional($vendor)->display_name ?? '';
             $bnfName = strtoupper(
@@ -8219,28 +8230,28 @@ public function getprofessionalsummary(Request $request)
                 )
             );
             $bnfName = $safeVal(trim($bnfName));
-    
+
             // Account number — plain string, no apostrophe
             $beneAccNo = $emptyVal(optional($bankDetail)->accont_number ?? '');
-    
+
             // IFSC / payment mode
             $rawIfsc   = trim((string) (optional($bankDetail)->ifsc_code ?? ''));
             $ifscValid = (bool) preg_match('/^[A-Z0-9]{11}$/i', $rawIfsc);
             $isIcici   = strtoupper(substr($rawIfsc, 0, 4)) === 'ICIC';
             $pymtMode  = $isIcici ? 'FT'   : 'NEFT';
             $beneIfsc  = $isIcici ? ''     : ($ifscValid ? $rawIfsc : '');
-    
+
             // Mobile
             $mobile = preg_replace('/[^0-9]/', '', (string) (optional($vendor)->mobile ?? ''));
             if (strlen($mobile) > 10) $mobile = substr($mobile, -10);
             $mobile = $safeVal($mobile !== '' ? $mobile : '');
-    
+
             // Email
             $rawEmail = trim((string) (optional($vendor)->email ?? ''));
             $emailId  = ($rawEmail !== '' && $rawEmail !== '-' && strpos($rawEmail, '@') !== false)
                 ? $rawEmail : 'payment@gmail.com';
             $emailId  = $safeVal($emailId);
-    
+
             // REMARK
             $zoneRaw = strtoupper(trim((string) ($bill->zone_name ?? '')));
             if      (str_contains($zoneRaw, 'KERALA'))                                  $zoneShort = 'KL';
@@ -8251,7 +8262,7 @@ public function getprofessionalsummary(Request $request)
             elseif  (str_contains($zoneRaw, 'MAHARASHTRA'))                             $zoneShort = 'MH';
             elseif  (str_contains($zoneRaw, 'WEST'))                                    $zoneShort = 'WES';
             else                                                                         $zoneShort = substr($zoneRaw, 0, 2);
-    
+
             $branchParts = explode('-', (string) ($bill->branch_name ?? ''));
             $branchCity  = strtoupper(trim(
                 preg_replace('/\s+/', ' ',
@@ -8260,7 +8271,7 @@ public function getprofessionalsummary(Request $request)
                     )
                 )
             ));
-    
+
             $fromMonthStr = '';
             try {
                 if (!empty($bill->bill_date)) {
@@ -8273,7 +8284,7 @@ public function getprofessionalsummary(Request $request)
                 $prevMonth    = $prevMonth < 0 ? 11 : $prevMonth;
                 $fromMonthStr = $periodMonths[$prevMonth];
             }
-    
+
             $remarkParts = array_filter(
                 [$zoneShort, $branchCity, $fromMonthStr, $toMonthStr, $currentYearShort, 'BILL'],
                 fn($p) => $p !== null && trim($p) !== ''
@@ -8281,17 +8292,17 @@ public function getprofessionalsummary(Request $request)
             $billNote   = trim((string) ($bill->note ?? ''));
             $remarkBase = implode(' ', $remarkParts);
             $remark     = $safeVal($billNote !== '' ? $remarkBase . ' ' . $billNote : $remarkBase);
-    
+
             // Lines loop
             $lines = $bill->BillLines;
             if ($lines->isEmpty()) {
                 $lines = collect([(object) ['amount' => $bill->grand_total_amount ?? 0]]);
             }
-    
+
             foreach ($lines as $line) {
                 $lineAmount = (int) round((float) ($line->amount ?? $bill->grand_total_amount ?? 0));
                 if ($lineAmount <= 0) continue;
-    
+
                 // Every value is cast to string — consistent between XLSX and CSV
                 $allRows[] = [
                     'PAB_VENDOR',           // A  PYMT_PROD_TYPE_CODE
@@ -8316,9 +8327,9 @@ public function getprofessionalsummary(Request $request)
                 ];
             }
         }
-    
+
         $filename = 'NEFT_export.' . $format;
-    
+
         // ════════════════════════════════════════════════════════════════════════
         // CSV — manually build the file so every value is wrapped in ="..." syntax.
         // This is the ONLY way to stop Excel auto-converting long numbers
@@ -8332,10 +8343,10 @@ public function getprofessionalsummary(Request $request)
         if ($format === 'csv') {
             $tempFile = tempnam(sys_get_temp_dir(), 'neft_csv_');
             $fh = fopen($tempFile, 'w');
-    
+
             // UTF-8 BOM — prevents garbled characters when Excel opens the file
             fwrite($fh, "\xEF\xBB\xBF");
-    
+
             foreach ($allRows as $rowIndex => $row) {
                 $csvCells = [];
                 foreach ($row as $value) {
@@ -8353,18 +8364,18 @@ public function getprofessionalsummary(Request $request)
                 fwrite($fh, implode(',', $csvCells) . "\r\n");
             }
             fclose($fh);
-    
+
             return response()->download($tempFile, $filename, [
                 'Content-Type' => 'text/csv; charset=UTF-8',
             ])->deleteFileAfterSend(true);
         }
-    
+
         // ════════════════════════════════════════════════════════════════════════
         // XLSX — build spreadsheet from $allRows; all cells explicit text strings.
         // ════════════════════════════════════════════════════════════════════════
         $spreadsheet = new Spreadsheet();
         $sheet       = $spreadsheet->getActiveSheet();
-    
+
         foreach ($allRows as $rowIdx => $row) {
             foreach ($row as $colIdx => $value) {
                 $sheet->setCellValueExplicitByColumnAndRow(
@@ -8378,17 +8389,17 @@ public function getprofessionalsummary(Request $request)
                     ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
             }
         }
-    
+
         // Column widths (A–S)
         $colWidths = [22, 10, 18, 30, 22, 15, 14, 12, 12, 16, 32, 36, 16, 10, 10, 10, 10, 10, 10];
         foreach ($colWidths as $colIdx => $width) {
             $sheet->getColumnDimensionByColumn($colIdx + 1)->setWidth($width);
         }
-    
+
         $tempFile = tempnam(sys_get_temp_dir(), 'neft_xlsx_');
         $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
         $writer->save($tempFile);
-    
+
         return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
     }
 public function getaddressdashboard(Request $request)
@@ -8425,4 +8436,48 @@ public function checkBillNumber(Request $request)
         'exists' => $exists
     ]);
 }
+
+    public function getBillCategory(Request $request)
+    {
+        $admin   = auth()->user();
+        $perPage = $request->get('per_page', 10);
+
+        $categories = BillCategory::orderBy('id', 'asc')->paginate($perPage)
+            ->appends(['per_page' => $perPage]);
+
+        return view('vendor.bill_category', [
+            'admin'      => $admin,
+            'categories' => $categories,
+            'perPage'    => $perPage,
+        ]);
+    }
+
+    public function storeBillCategory(Request $request)
+    {
+        $request->validate([
+            'name'      => 'required|string|max:255',
+            'is_active' => ['required', Rule::in([0, 1])],
+        ]);
+
+        $id = $request->id;
+
+        $data = [
+            'name'       => $request->name,
+            'is_active'  => $request->is_active,
+            'created_by' => auth()->id(),
+        ];
+
+        if (!empty($id)) {
+            BillCategory::where('id', $id)->update($data);
+            $message = 'Bill Category updated successfully!';
+        } else {
+            BillCategory::create($data);
+            $message = 'Bill Category created successfully!';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
+    }
 }

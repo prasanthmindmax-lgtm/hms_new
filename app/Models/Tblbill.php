@@ -26,6 +26,7 @@ class Tblbill extends Authenticatable
         'branch_id',
         'branch_name',
         'company_name',
+        'bill_category',
         'company_id',
         'bill_number',
         'bill_gen_number',
@@ -83,11 +84,11 @@ class Tblbill extends Authenticatable
     }
     public function TblBilling()
     {
-        return $this->belongsTo(TblBilling::class, 'vendor_id','vendor_id');
+        return $this->belongsTo(TblBilling::class, 'vendor_id', 'vendor_id');
     }
     public function Tblbankdetails()
     {
-        return $this->belongsTo(Tblbankdetails::class, 'vendor_id' ,'vendor_id');
+        return $this->belongsTo(Tblbankdetails::class, 'vendor_id', 'vendor_id');
     }
     public function TblCompany()
     {
@@ -114,18 +115,15 @@ class Tblbill extends Authenticatable
             'id',                     // Foreign key on TblBillPay (primary key)
             'id',                     // Local key on TblBill
             'bill_pay_id'             // Local key on TblBillPayLines referencing TblBillPay
-        )->with('billPayLines','Neftget'); // <-- this loads lines inside each TblBillPay
+        )->with('billPayLines', 'Neftget'); // <-- this loads lines inside each TblBillPay
     }
- public function TblTDSsection()
-{
-    return $this->belongsTo(Tbltdstax::class, 'tds_tax_id');
-}
+    public function TblTDSsection()
+    {
+        return $this->belongsTo(Tbltdstax::class, 'tds_tax_id');
+    }
 
-
-
-
-
-
-
-
+    public function category()
+    {
+        return $this->belongsTo(BillCategory::class, 'bill_category');
+    }
 }

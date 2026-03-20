@@ -701,7 +701,9 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('/billing-stats',  [BillingStatsController::class, 'index'])->name('superadmin.billingstats');
     Route::get('/billing-export/excel', [BillingStatsController::class, 'export'])->name('superadmin.billingexport');
 
-
+    // Bill Category routes
+    Route::get('superadmin/bill_category', [VendorController::class, 'getBillCategory'])->name('superadmin.billcategory.index');
+    Route::post('superadmin/bill_category', [VendorController::class, 'storeBillCategory'])->name('superadmin.billcategory.store');
 });
 
 

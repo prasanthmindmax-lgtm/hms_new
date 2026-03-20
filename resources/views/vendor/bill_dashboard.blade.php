@@ -268,6 +268,20 @@
                         </div>
 
                         <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
+                            <label>Category</label>
+                            <input type="text" class="form-control category-search-input dropdown-search-input" placeholder="Select Category" readonly>
+                            <input type="hidden" name="category_id" class="category_id">
+                            <div class="dropdown-menu tax-dropdown">
+                                <div class="inner-search-container"><input type="text" class="inner-search" placeholder="Search Category..."></div>
+                                <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                                </div>
+                                <div class="dropdown-list multiselect  category-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
                             <label>Nature of Payment</label>
                             <input type="text" class="form-control nature-search-input dropdown-search-input" placeholder="Select Nature" readonly>
                             <input type="hidden" name="nature_id" class="nature_id">
@@ -532,7 +546,7 @@
                   </div>
 
                   <!-- Journal Section -->
-                  <div class="zoho-section">
+                  {{-- <div class="zoho-section">
                     <div class="zoho-section-title">Journal</div>
                     <div class="zoho-journal-note">Amount is displayed in your base currency <strong>ING</strong></div>
                     <table class="zoho-journal-table">
@@ -561,7 +575,7 @@
                         </tr>
                       </tbody>
                     </table>
-                  </div>
+                  </div> --}}
                   <div class="upload_doc">
 
                   </div>
@@ -1367,6 +1381,9 @@ $(document).on('click', '.customer-row', function (e) {
                     vendor_id: $('.vendor_id').val(),
                     vendor_name: $('.vendor-search-input').val(),
 
+                    category_id: $('.category_id').val(),
+                    category_name: $('.category-search-input').val(),
+
                     nature_id: $('.nature_id').val(),
                     nature_name: $('.nature-search-input').val(),
 
@@ -1700,7 +1717,7 @@ $(document).on('click', '.customer-row', function (e) {
 
         }
 
-        
+
         // ✅ Group by label and sum amounts
         let mergedSummary = gstSummary.reduce((acc, curr) => {
             if (!acc[curr.label]) {
@@ -2155,6 +2172,7 @@ $(document).ready(function () {
      const TblZonesModel = @json($TblZonesModel);
     const Tblcompany = @json($Tblcompany);
     const Tblvendor = @json($Tblvendor);
+    const Tblcategory = @json($Tblcategory);
     const Tblaccount = @json($Tblaccount);
      (Array.isArray(TblZonesModel) ? TblZonesModel : (TblZonesModel.data || [])).forEach(locations => {
                         const item = $(`
@@ -2180,6 +2198,13 @@ $(document).ready(function () {
                         `);
                         $('.account-list').append(item);
                     });
+      Tblcategory.forEach(Tblcategory => {
+                        const item = $(`
+                            <div data-value="${Tblcategory.name}" data-id="${Tblcategory.id}">${Tblcategory.name}</div>
+                        `);
+                        $('.category-list').append(item);
+                    });
+
 
 $(document).ready(function () {
 
@@ -2348,6 +2373,15 @@ $(document).ready(function () {
             $(this).toggle(itemText.includes(searchText));
           });
         });
+         $('.category-inner-search').on('keyup', function () {
+          const searchText = $(this).val().toLowerCase();
+          const list = $(this).closest('.dropdown-menu').find('.category-list div');
+
+          list.each(function () {
+            const itemText = $(this).text().toLowerCase();
+            $(this).toggle(itemText.includes(searchText));
+          });
+        });
          $(document).on('click', function (e) {
             if (!$(e.target).closest('.tax-dropdown-wrapper').length) {
               $('.dropdown-menu.tax-dropdown').hide();
@@ -2435,6 +2469,8 @@ $(document).ready(function () {
               company_name: '',
               vendor_name: '',
               vendor_id: '',
+              category_name: '',
+              category_id: '',
               nature_name: '',
               nature_id: '',
               status_name: '',
@@ -2479,6 +2515,11 @@ $(document).ready(function () {
                       ${filters.vendor_name}
                   </span>`;
               }
+              if (filters.category_id) {
+                  summaryHtml += `<span class="filter-badge remove-icon" data-type="category">
+                      ${filters.category_name}
+                  </span>`;
+             }
               if (filters.nature_id) {
                   summaryHtml += `<span class="filter-badge remove-icon" data-type="nature">
                       ${filters.nature_name}
@@ -2518,6 +2559,7 @@ $(document).ready(function () {
                     quarter_name: filters.quarter_name,
                     financial_name: filters.financial_name,
                     status_name: filters.status_name,
+                    category_id: filters.category_id,
                     state_name: filters.state_name,
                     universal_search: filters.universal_search
                 };
@@ -2546,6 +2588,7 @@ $(document).ready(function () {
                     $('.company-search-input').val(filters.company_name);
                     $('.zone-search-input').val(filters.zone_name);
                     $('.branch-search-input').val(filters.branch_name);
+                    $('.category-search-input').val(filters.category_name);
                     $('.nature-search-input').val(filters.nature_name);
                     $('.status-search-input').val(filters.status_name);
                     $('.state-search-input').val(filters.state_name);
@@ -2674,6 +2717,9 @@ $(document).ready(function () {
                   } else if (selectorHidden === '.vendor_id') {
                       filters.vendor_id = selectedIds;
                       filters.vendor_name = selectedText;
+                  } else if (selectorHidden === '.category_id') {
+                      filters.category_id = selectedIds;
+                      filters.category_name = selectedText;
                   } else if (selectorHidden === '.nature_id') {
                       filters.nature_id = selectedIds;
                       filters.nature_name = selectedText;
@@ -2698,6 +2744,9 @@ $(document).ready(function () {
           });
           $('.vendor_id').on('click', function () {
             setupMultiSelect('.vendor-search-input', '.vendor_id');
+          });
+          $('.category_id').on('click', function () {
+            setupMultiSelect('.category-search-input', '.category_id');
           });
           $('.nature_id').on('click', function () {
             setupMultiSelect('.nature-search-input', '.nature_id');
@@ -2757,6 +2806,12 @@ $(document).ready(function () {
                   $('.vendor_id').val('');
                   $('.vendor-search-input').val('');
                   $('.vendor-list div').removeClass('selected');
+              } else if (type === 'category') {
+                  filters.category_id = '';
+                  filters.category_name = '';
+                  $('.category_id').val('');
+                  $('.category-search-input').val('');
+                  $('.category-list div').removeClass('selected');
               } else if (type === 'nature') {
                   filters.nature_id = '';
                   filters.nature_name = '';
@@ -2792,6 +2847,8 @@ $(document).ready(function () {
                   company_name: '',
                   vendor_name: '',
                   vendor_id: '',
+                  category_name: '',
+                  category_id: '',
                   nature_name: '',
                   nature_id: '',
                   status_name: '',
@@ -2800,7 +2857,7 @@ $(document).ready(function () {
                   state_name: '',
                   universal_search: '',
               };
-              $('.zone-search-input, .branch-search-input, .company-search-input, .vendor-search-input,.nature-search-input,.status-search-input,.state-search-input').val('');
+              $('.zone-search-input, .branch-search-input, .company-search-input, .vendor-search-input,.category-search-input,.nature-search-input,.status-search-input,.state-search-input').val('');
               $('.zone_id, .branch_id, .company_id, .vendor_id,.nature_id,.status_id,.state_id').val('');
               $('.data_values').val('');
               $('.dropdown-list div').removeClass('selected');
