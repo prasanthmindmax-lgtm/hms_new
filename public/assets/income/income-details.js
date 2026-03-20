@@ -340,16 +340,30 @@ function ticketrenderPagination(data, ticketpageSize) {
 		var startIdx = (pageNum - 1) * ticketpageSize;
 		var endIdx = pageNum * ticketpageSize;
 		var pageData = data.slice(startIdx, endIdx);
-
-		$('#total_cash').text(parseFloat(data[0]?.total_cash_amt || 0).toFixed(2));
-		$('#total_card').text(parseFloat(data[0]?.total_card_amt || 0).toFixed(2));
-		$('#total_cheque').text(parseFloat(data[0]?.totalPharmacyIncome || 0).toFixed(2));
-		$('#total_dd').text(parseFloat(data[0]?.totalPharmacyIncome || 0).toFixed(2));
-		$('#total_neft').text(parseFloat(data[0]?.total_neft_amt || 0).toFixed(2));
-		$('#total_credit').text(parseFloat(data[0]?.totalPharmacyIncome || 0).toFixed(2));
-		$('#total_upi').text(parseFloat(data[0]?.total_upi_amt || 0).toFixed(2));
-		$('#total_amount').text(parseFloat(data[0]?.total_total_amt || 0).toFixed(2));
-		var body = "";
+        console.log("data",data);
+        for(let i = 0; i < data.length; i++){
+            if(data[i].type === "Consolidated"){
+                $('#total_cash').text(parseFloat(data[i]?.total_cash_amt || 0).toFixed(2));
+                $('#total_card').text(parseFloat(data[i]?.total_card_amt || 0).toFixed(2));
+                $('#total_cheque').text(parseFloat(data[i]?.totalPharmacyIncome || 0).toFixed(2));
+                $('#total_dd').text(parseFloat(data[i]?.totalPharmacyIncome || 0).toFixed(2));
+                $('#total_neft').text(parseFloat(data[i]?.total_neft_amt || 0).toFixed(2));
+                $('#total_credit').text(parseFloat(data[i]?.totalPharmacyIncome || 0).toFixed(2));
+                $('#total_upi').text(parseFloat(data[i]?.total_upi_amt || 0).toFixed(2));
+                $('#total_amount').text(parseFloat(data[i]?.total_total_amt || 0).toFixed(2));
+            }
+        }
+        // if(data[type] === "Consolidated"){
+        //     $('#total_cash').text(parseFloat(data[0]?.total_cash_amt || 0).toFixed(2));
+        //     $('#total_card').text(parseFloat(data[0]?.total_card_amt || 0).toFixed(2));
+        //     $('#total_cheque').text(parseFloat(data[0]?.totalPharmacyIncome || 0).toFixed(2));
+        //     $('#total_dd').text(parseFloat(data[0]?.totalPharmacyIncome || 0).toFixed(2));
+        //     $('#total_neft').text(parseFloat(data[0]?.total_neft_amt || 0).toFixed(2));
+        //     $('#total_credit').text(parseFloat(data[0]?.totalPharmacyIncome || 0).toFixed(2));
+        //     $('#total_upi').text(parseFloat(data[0]?.total_upi_amt || 0).toFixed(2));
+        //     $('#total_amount').text(parseFloat(data[0]?.total_total_amt || 0).toFixed(2));
+        // }
+        var body = "";
 			body = ticketData(pageData,body);
 
 		$("#daily_details").html(body);

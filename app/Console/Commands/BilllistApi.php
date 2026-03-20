@@ -22,8 +22,9 @@ class BilllistApi extends Command
         // $startDate = Carbon::yesterday()->startOfDay();
         // $endDate   = Carbon::yesterday()->endOfDay();
         // $endDate   = Carbon::now()->startOfMonth()->day(20)->startOfDay();
-        $startDate = Carbon::now()->startOfMonth()->startOfDay();
-        $endDate   = Carbon::now()->endOfDay();
+
+        $startDate = Carbon::now()->startOfMonth()->addDays(9)->startOfDay();
+        $endDate   = Carbon::yesterday()->endOfDay();
 
 
 

@@ -18,7 +18,7 @@ class Kernel extends ConsoleKernel
     {
       $schedule->command('CheckInCron:cron')->dailyAt('23:59');
       // $schedule->command('fetch:api-data')->dailyAt('10:55');
-       $schedule->command('fetch:api-data')->dailyAt('14:47')->timezone('Asia/Kolkata')->withoutOverlapping();
+       $schedule->command('fetch:api-data')->dailyAt('11:25')->timezone('Asia/Kolkata')->withoutOverlapping();
        $schedule->command('fetch:api-data-new')->dailyAt('15:14')->timezone('Asia/Kolkata')->withoutOverlapping();
     }
 

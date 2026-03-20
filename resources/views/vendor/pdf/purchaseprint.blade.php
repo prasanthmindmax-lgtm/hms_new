@@ -553,60 +553,37 @@
             if(isset($purchase->BillLines) && count($purchase->BillLines) > 0) {
                 foreach ($purchase->BillLines as $line) {
 
-                    if (is_numeric($line->gst_rate) && $line->gst_rate > 0) {
+                    if (!is_numeric($line->gst_rate) || $line->gst_rate <= 0) continue;
 
-                        // CGST
+                    $gstType = strtoupper(trim($line->gst_type ?? 'GST'));
+
+                    if ($gstType === 'IGST') {
+                        // IGST — full rate; amount stored in gst_amount column
+                        if (is_numeric($line->gst_amount) && $line->gst_amount > 0) {
+                            $key = "IGST_{$line->gst_rate}";
+                            if (!isset($gstSummary[$key])) {
+                                $gstSummary[$key] = ['type' => 'IGST', 'rate' => $line->gst_rate, 'amount' => 0];
+                            }
+                            $gstSummary[$key]['amount'] += $line->gst_amount;
+                        }
+                    } else {
+                        // GST — split into CGST (half) and SGST (half)
+                        $halfRate = $line->gst_rate / 2;
+
                         if (is_numeric($line->cgst_amount) && $line->cgst_amount > 0) {
-
-                            $cgstRate = $line->gst_rate / 2;
-                            $cgstAmount = $line->cgst_amount;
-
-                            $key = "CGST_{$cgstRate}";
+                            $key = "CGST_{$halfRate}";
                             if (!isset($gstSummary[$key])) {
-                                $gstSummary[$key] = [
-                                    'type' => 'CGST',
-                                    'rate' => $cgstRate,
-                                    'amount' => 0
-                                ];
+                                $gstSummary[$key] = ['type' => 'CGST', 'rate' => $halfRate, 'amount' => 0];
                             }
-
-                            $gstSummary[$key]['amount'] += $cgstAmount;
+                            $gstSummary[$key]['amount'] += $line->cgst_amount;
                         }
 
-                        // SGST
                         if (is_numeric($line->sgst_amount) && $line->sgst_amount > 0) {
-
-                            $sgstRate = $line->gst_rate / 2;
-                            $sgstAmount = $line->sgst_amount;
-
-                            $key = "SGST_{$sgstRate}";
+                            $key = "SGST_{$halfRate}";
                             if (!isset($gstSummary[$key])) {
-                                $gstSummary[$key] = [
-                                    'type' => 'SGST',
-                                    'rate' => $sgstRate,
-                                    'amount' => 0
-                                ];
+                                $gstSummary[$key] = ['type' => 'SGST', 'rate' => $halfRate, 'amount' => 0];
                             }
-
-                            $gstSummary[$key]['amount'] += $sgstAmount;
-                        }
-
-                        // IGST
-                        if (is_numeric($line->igst_amount) && $line->igst_amount > 0) {
-
-                            $igstRate = $line->gst_rate;
-                            $igstAmount = $line->igst_amount;
-
-                            $key = "IGST_{$igstRate}";
-                            if (!isset($gstSummary[$key])) {
-                                $gstSummary[$key] = [
-                                    'type' => 'IGST',
-                                    'rate' => $igstRate,
-                                    'amount' => 0
-                                ];
-                            }
-
-                            $gstSummary[$key]['amount'] += $igstAmount;
+                            $gstSummary[$key]['amount'] += $line->sgst_amount;
                         }
                     }
                 }
