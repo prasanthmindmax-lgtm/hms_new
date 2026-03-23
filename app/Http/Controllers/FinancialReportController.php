@@ -53,10 +53,10 @@ class FinancialReportController extends Controller
         if ($request->filled('zone_id')) {
             $allowedZones = $this->getAllowedZones($admin);
             $requestedZones = (array) $request->zone_id;
-            
+
             // Only filter by zones that user has access to
             $filteredZones = array_intersect($requestedZones, $allowedZones);
-            
+
             if (!empty($filteredZones)) {
                 $query->whereIn('zone_id', $filteredZones);
             }
@@ -68,10 +68,10 @@ class FinancialReportController extends Controller
         if ($request->filled('branch_id')) {
             $allowedBranches = $this->getAllowedBranches($admin);
             $requestedBranches = (array) $request->branch_id;
-            
+
             // Only filter by branches that user has access to
             $filteredBranches = array_intersect($requestedBranches, $allowedBranches);
-            
+
             if (!empty($filteredBranches)) {
                 $query->whereIn('branch_id', $filteredBranches);
             }
@@ -81,7 +81,7 @@ class FinancialReportController extends Controller
         REPORTS with per_page parameter
         ========================== */
         $perPage = $request->get('per_page', 10);
-        
+
         $reports = $query
             ->orderBy('report_date', 'desc')
             ->orderBy('created_at', 'desc')
@@ -98,7 +98,7 @@ class FinancialReportController extends Controller
         ========================== */
         $summaryQuery = BranchFinancialReport::query();
         $this->applyAccessFilter($summaryQuery, $admin);
-        
+
         if ($request->filled('date_range')) {
             $dates = explode(' - ', $request->date_range);
             if (count($dates) == 2) {
@@ -106,7 +106,7 @@ class FinancialReportController extends Controller
                              ->whereDate('report_date', '<=', $dates[1]);
             }
         }
-        
+
         if ($request->filled('zone_id')) {
             $allowedZones = $this->getAllowedZones($admin);
             $requestedZones = (array) $request->zone_id;
@@ -115,7 +115,7 @@ class FinancialReportController extends Controller
                 $summaryQuery->whereIn('zone_id', $filteredZones);
             }
         }
-        
+
         if ($request->filled('branch_id')) {
             $allowedBranches = $this->getAllowedBranches($admin);
             $requestedBranches = (array) $request->branch_id;
@@ -137,26 +137,26 @@ class FinancialReportController extends Controller
             'total_cash_drawer'   => $summaryQuery->sum('cash_in_drawer'),
             'report_count'   => $summaryQuery->count(),
             'reports_with_files' => $summaryQuery->clone()
-                                        ->where(function ($q) {
-                                            $q->whereNotNull('radiant_collection_files')
-                                            ->orWhereNotNull('actual_card_files')
-                                            ->orWhereNotNull('bank_deposit_files')
-                                            ->orWhereNotNull('deposit_files')
-                                            ->orWhereNotNull('upi_files');
-                                        })->count(),
+                                    ->where(function ($q) {
+                                        $q->whereRaw("IFNULL(JSON_LENGTH(radiant_collection_files),0) > 0")
+                                        ->orWhereRaw("IFNULL(JSON_LENGTH(actual_card_files),0) > 0")
+                                        ->orWhereRaw("IFNULL(JSON_LENGTH(bank_deposit_files),0) > 0")
+                                        ->orWhereRaw("IFNULL(JSON_LENGTH(deposit_files),0) > 0")
+                                        ->orWhereRaw("IFNULL(JSON_LENGTH(upi_files),0) > 0");
+                                    })->count(),
 
             'reports_without_files' => $summaryQuery->clone()
                                         ->where(function ($q) {
-                                            $q->whereNull('radiant_collection_files')
-                                            ->whereNull('actual_card_files')
-                                            ->whereNull('bank_deposit_files')
-                                            ->whereNull('deposit_files')
-                                            ->whereNull('upi_files');
+                                            $q->whereRaw("IFNULL(JSON_LENGTH(radiant_collection_files),0) = 0")
+                                            ->whereRaw("IFNULL(JSON_LENGTH(actual_card_files),0) = 0")
+                                            ->whereRaw("IFNULL(JSON_LENGTH(bank_deposit_files),0) = 0")
+                                            ->whereRaw("IFNULL(JSON_LENGTH(deposit_files),0) = 0")
+                                            ->whereRaw("IFNULL(JSON_LENGTH(upi_files),0) = 0");
                                         })->count(),
-                                        ];
+        ];
 
         $summary['total_collection'] =
-            $summary['total_radiant'] + $summary['total_card'] + 
+            $summary['total_radiant'] + $summary['total_card'] +
             $summary['total_bank'] + $summary['total_deposit'] + $summary['total_upi'];
 
         $summary['total_deductions'] =
@@ -253,7 +253,7 @@ class FinancialReportController extends Controller
         } elseif ($admin->access_limits == 2) {
             return [$admin->zone_id];
         }
-        
+
         return [];
     }
 
@@ -267,12 +267,12 @@ class FinancialReportController extends Controller
         } elseif ($admin->access_limits == 2) {
             $branchIds = [];
             if (!empty($admin->zone_id)) {
-                $branchIds = array_merge($branchIds, 
+                $branchIds = array_merge($branchIds,
                     DB::table('tbl_locations')->where('zone_id', $admin->zone_id)->pluck('id')->toArray()
                 );
             }
             if (!empty($admin->multi_location)) {
-                $branchIds = array_merge($branchIds, 
+                $branchIds = array_merge($branchIds,
                     array_map('intval', explode(',', $admin->multi_location))
                 );
             }
@@ -282,7 +282,7 @@ class FinancialReportController extends Controller
                 return array_map('intval', explode(',', $admin->multi_location));
             }
         }
-        
+
         return [];
     }
 
@@ -390,7 +390,7 @@ class FinancialReportController extends Controller
     public function show($id)
     {
         $admin = Auth::user();
-        
+
         $report = BranchFinancialReport::with([
             'branch:id,name,zone_id',
             'zone:id,name',
@@ -402,14 +402,14 @@ class FinancialReportController extends Controller
             'auditorApprovedBy:id,user_fullname',
             'managementApprovedBy:id,user_fullname'
         ])->findOrFail($id);
-        
+
         $report->zone_name = optional($report->zone)->name;
         $report->branch_name = optional($report->branch)->name;
-        
+
         if (!$this->canAccessReport($admin, $report)) {
             return response()->json(['error' => 'Access denied'], 403);
         }
-        
+
         if (request()->ajax() || request()->wantsJson()) {
             return response()->json([
                 'report' => $report,
@@ -417,7 +417,7 @@ class FinancialReportController extends Controller
                 'can_approve_management' => $this->canApproveAsManagement($admin, $report)
             ]);
         }
-        
+
         return view('branch.show', compact('admin', 'report'));
     }
 
@@ -474,7 +474,7 @@ class FinancialReportController extends Controller
         if ($admin->access_limits == 1 || $admin->access_limits == 4) {
             return true;
         }
-        
+
         $allowedBranches = $this->getAllowedBranches($admin);
         return in_array($report->branch_id, $allowedBranches);
     }
@@ -487,11 +487,11 @@ class FinancialReportController extends Controller
         if ($admin->access_limits != 4) {
             return false;
         }
-        
+
         if ($report->auditor_approval_status != 0) {
             return false;
         }
-        
+
         return true;
     }
 
@@ -503,19 +503,19 @@ class FinancialReportController extends Controller
         if ($admin->access_limits != 1) {
             return false;
         }
-        
+
         if ($report->created_by == $admin->id) {
             return false;
         }
-        
+
         if ($report->auditor_approval_status != 1) {
             return false;
         }
-        
+
         if ($report->management_approval_status != 0) {
             return false;
         }
-        
+
         return true;
     }
 
@@ -525,21 +525,21 @@ class FinancialReportController extends Controller
     public function approveAuditor(Request $request, $id)
     {
         $admin = Auth::user();
-        
+
         $report = BranchFinancialReport::findOrFail($id);
-        
+
         if (!$this->canApproveAsAuditor($admin, $report)) {
             return response()->json(['error' => 'You cannot approve this report at auditor level'], 403);
         }
-        
+
         $report->auditor_approval_status = 1;
         $report->auditor_approved_by = $admin->id;
         $report->auditor_approved_at = Carbon::now();
         $report->auditor_approval_remarks = $request->remarks;
         $report->overall_approval_status = 1;
-        
+
         $report->save();
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Report approved by Auditor successfully',
@@ -553,25 +553,25 @@ class FinancialReportController extends Controller
     public function rejectAuditor(Request $request, $id)
     {
         $admin = Auth::user();
-        
+
         $report = BranchFinancialReport::findOrFail($id);
-        
+
         if (!$this->canApproveAsAuditor($admin, $report)) {
             return response()->json(['error' => 'You cannot reject this report at auditor level'], 403);
         }
-        
+
         $request->validate([
             'remarks' => 'required|string|max:500'
         ]);
-        
+
         $report->auditor_approval_status = 2;
         $report->auditor_approved_by = $admin->id;
         $report->auditor_approved_at = Carbon::now();
         $report->auditor_approval_remarks = $request->remarks;
         $report->overall_approval_status = 3;
-        
+
         $report->save();
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Report rejected by Auditor',
@@ -585,21 +585,21 @@ class FinancialReportController extends Controller
     public function approveManagement(Request $request, $id)
     {
         $admin = Auth::user();
-        
+
         $report = BranchFinancialReport::findOrFail($id);
-        
+
         if (!$this->canApproveAsManagement($admin, $report)) {
             return response()->json(['error' => 'You cannot approve this report at management level'], 403);
         }
-        
+
         $report->management_approval_status = 1;
         $report->management_approved_by = $admin->id;
         $report->management_approved_at = Carbon::now();
         $report->management_approval_remarks = $request->remarks;
         $report->overall_approval_status = 2;
-        
+
         $report->save();
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Report approved by Management successfully',
@@ -613,25 +613,25 @@ class FinancialReportController extends Controller
     public function rejectManagement(Request $request, $id)
     {
         $admin = Auth::user();
-        
+
         $report = BranchFinancialReport::findOrFail($id);
-        
+
         if (!$this->canApproveAsManagement($admin, $report)) {
             return response()->json(['error' => 'You cannot reject this report at management level'], 403);
         }
-        
+
         $request->validate([
             'remarks' => 'required|string|max:500'
         ]);
-        
+
         $report->management_approval_status = 2;
         $report->management_approved_by = $admin->id;
         $report->management_approved_at = Carbon::now();
         $report->management_approval_remarks = $request->remarks;
         $report->overall_approval_status = 3;
-        
+
         $report->save();
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Report rejected by Management',
@@ -687,7 +687,7 @@ class FinancialReportController extends Controller
                         ->get();
 
         return Excel::download(
-            new FinancialReportExport($reports), 
+            new FinancialReportExport($reports),
             'financial-report-' . date('Y-m-d-His') . '.xlsx'
         );
     }
@@ -740,7 +740,7 @@ class FinancialReportController extends Controller
                         ->get();
 
         return Excel::download(
-            new FinancialReportExport($reports), 
+            new FinancialReportExport($reports),
             'financial-report-' . date('Y-m-d-His') . '.csv'
         );
     }
