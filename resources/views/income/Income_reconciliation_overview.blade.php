@@ -1213,7 +1213,7 @@
                     </div>
                     <div class="row g-2">
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-diff">
+                            <div class="stat-card stat-diff stat-click" data-type="cash_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-exchange-alt text-success"></i>
                                     <span class="stat-label">Cash</span>
@@ -1222,7 +1222,7 @@
                             </div>
                         </div>
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-diff">
+                            <div class="stat-card stat-diff stat-click" data-type="card_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-exchange-alt text-info"></i>
                                     <span class="stat-label">Card</span>
@@ -1231,7 +1231,7 @@
                             </div>
                         </div>
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-diff">
+                            <div class="stat-card stat-diff stat-click" data-type="neft_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-exchange-alt text-primary"></i>
                                     <span class="stat-label">NEFT</span>
@@ -1240,7 +1240,7 @@
                             </div>
                         </div>
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-diff">
+                            <div class="stat-card stat-diff stat-click" data-type="upi_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-exchange-alt text-warning"></i>
                                     <span class="stat-label">UPI</span>
@@ -1249,7 +1249,7 @@
                             </div>
                         </div>
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-diff">
+                            <div class="stat-card stat-diff stat-click" data-type="other_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-exchange-alt text-secondary"></i>
                                     <span class="stat-label">Other</span>
@@ -1259,7 +1259,7 @@
                         </div>
 
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-diff">
+                            <div class="stat-card stat-diff stat-click" data-type="total_upicard_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-exchange-alt text-secondary"></i>
                                     <span class="stat-label">Total UPI/Card</span>
@@ -1268,7 +1268,7 @@
                             </div>
                         </div>
                         <div class="col-lg col-md-4 col-sm-6">
-                            <div class="stat-card stat-total stat-diff">
+                            <div class="stat-card stat-total stat-diff stat-click" data-type="amount_diff">
                                 <div class="stat-header">
                                     <i class="fas fa-calculator text-warning"></i>
                                     <span class="stat-label">Total</span>
@@ -1369,7 +1369,7 @@
                     <div class="card-body">
                         <div class="table-container">
                             <table class="tblvis">
-                              
+
                                 <thead>
                                     <tr>
                                         <th rowspan="2">Sl.no.</th>

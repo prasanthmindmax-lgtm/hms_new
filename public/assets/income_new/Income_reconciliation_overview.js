@@ -7,7 +7,7 @@ $(document).ready(function() {
         const statsSection = $('#statsSection');
         const toggleText = $(this).find('.toggle-text');
         const icon = $(this).find('i');
-        
+
         if (statsSection.is(':visible')) {
             statsSection.slideUp(300);
             toggleText.text('Show Statistics');
@@ -549,7 +549,23 @@ function ticketrenderTable(data, ticketpageSize, pageNum) {
         // const totalDiff = Math.abs(cashDiff) + Math.abs(neftDiff) + Math.abs(otherDiff) + Math.abs(upicardDiff);
         console.log('formatINR(cashDiff)',formatINR(cashDiff));
         console.log('formatINR(totalDiff)',formatINR(totalDiff));
-        
+
+        // Difference values into rows
+        data.forEach(row => {
+            if (row.type === "Consolidated") return;
+            if (row.type === "Actual") return;
+
+            row.cash_diff = parseFloat(row.deposite_amount || 0) - parseFloat(row.moc_cash_amt || 0);
+            row.card_diff = parseFloat(row.mespos_card || 0) - parseFloat(row.moc_card_amt || 0);
+            row.upi_diff = parseFloat(row.mespos_upi || 0) - parseFloat(row.moc_upi_amt || 0);
+            row.neft_diff = parseFloat(row.bank_neft || 0) - parseFloat(row.moc_neft_amt || 0);
+            row.other_diff = parseFloat(row.bank_others || 0) - parseFloat(row.moc_other_amt || 0);
+            row.total_upicard_diff = ( parseFloat(row.bank_upi_card || 0) + parseFloat(row.bank_chargers || 0) )
+                                    - ( parseFloat(row.moc_upi_amt || 0) + parseFloat(row.moc_card_amt || 0));
+            row.amount_diff = parseFloat(row.deposite_amount || 0) + parseFloat(row.mespos_card || 0) + parseFloat(row.mespos_upi || 0) + parseFloat(row.bank_neft || 0) + parseFloat(row.bank_others || 0)
+                            - ( parseFloat(row.moc_cash_amt || 0) + parseFloat(row.moc_card_amt || 0) + parseFloat(row.moc_upi_amt || 0) + parseFloat(row.moc_neft_amt || 0) + parseFloat(row.moc_other_amt || 0));
+        });
+
         // Set Difference values with color coding
         // setDifferenceValue('#actuall_cash_diff', formatINR(cashDiff));
         // setDifferenceValue('#actuall_card_diff',formatINR(cardDiff));
@@ -662,7 +678,8 @@ $(document).on("click", ".stat-click", function () {
     const filtered = window.fullMocDocData.filter(row =>
         row.type !== "Consolidated" &&
         row.type !== "Actual" &&
-        parseFloat(row[type] || 0) > 0
+        // parseFloat(row[type] || 0) > 0
+        parseFloat(row[type] || 0) !== 0
     );
 
     window._mocdocFilteredData = filtered;
@@ -720,6 +737,20 @@ function buildMocdocTable(filtered, type, showBranchTotals) {
             { key: "zone_location", label: "Zone/Location", align: "center" },
             { key: obj[type], label: "UTR/Transaction ID", align: "center" },
             { key: type, label: "Amount", align: "end" }
+        ];
+    }
+
+    // =========================
+    // Difference types
+    // =========================
+    if (["cash_diff", "card_diff", "upi_diff", "neft_diff", "other_diff", "total_upicard_diff", "amount_diff" ].includes(type)) {
+
+        Title = `${type.replace(/_/g, " ").toUpperCase()} – Date Wise`;
+
+        columns = [
+            { key: "date_range", label: "Date", align: "center" },
+            { key: "zone_location", label: "Zone/Location", align: "center" },
+            { key: type, label: "Difference", align: "end" }
         ];
     }
 
