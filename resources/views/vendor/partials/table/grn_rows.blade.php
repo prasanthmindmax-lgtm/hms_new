@@ -9,6 +9,7 @@
         <th>GRN NO #</th>
         <th>REFERENCE NO</th>
         <th>VENDOR</th>
+        <th>QC Checked By</th>
         <th>STATUS</th>
       </tr>
     </thead>
@@ -79,6 +80,8 @@
           <td class="qdt-mono">{{ $grn->order_number ?? '—' }}</td>
 
           <td class="qdt-vendor-link">{{ $grn->vendor_name ?? '—' }}</td>
+
+          <td><span class="qdt-qc-user">{{ $grn->QcCheckedBy->user_fullname ?? '-'}}</span></td>
 
           <td><span class="{{ $statusBadge }}">{{ $statusText }}</span></td>
 
