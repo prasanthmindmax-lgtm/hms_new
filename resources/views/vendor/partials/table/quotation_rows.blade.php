@@ -146,7 +146,16 @@
                 {{-- QO Status --}}
                 <td>
                     @if($quotation->approval_status == 0 && $quotation->reject_status == 0)
-                        <span class="qd-badge qd-badge-pending">Pending</span>
+                        @php
+                            $pendingDays = \Carbon\Carbon::parse($quotation->created_at)->diffInDays(now());
+                            $dayColor = $pendingDays > 7 ? '#dc3545' : ($pendingDays > 3 ? '#fd7e14' : '#6c757d');
+                        @endphp
+                        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
+                            <span class="qd-badge qd-badge-pending">Pending</span>
+                            <span style="font-size:10px;color:{{ $dayColor }};font-weight:600;" title="Pending for {{ $pendingDays }} day{{ $pendingDays != 1 ? 's' : '' }}">
+                                {{ $pendingDays }}d pending
+                            </span>
+                        </div>
                     @elseif($quotation->approval_status == 1)
                         <span class="qd-badge qd-badge-approved">Approved</span>
                     @elseif($quotation->reject_status == 1)

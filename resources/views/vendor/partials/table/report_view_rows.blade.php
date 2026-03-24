@@ -65,8 +65,11 @@
         </thead>
         <tbody>
           @forelse ($details as $bill)
+            @php $billLineIdx = 0; @endphp
             @foreach ($bill->BillLines as $line)
               @php
+                $isFirstBillLine = ($billLineIdx === 0);
+                $billLineIdx++;
                 $zoneRaw = strtolower($bill->zone_name ?? '');
                 $zoneCls = str_contains($zoneRaw,'karnataka') ? 'qdt-zone-orange'
                          : (str_contains($zoneRaw,'kerala')   ? 'qdt-zone-green'
@@ -101,10 +104,10 @@
                     {{ $line->account ?? '—' }}
                   </span>
                 </td>
-                <td class="qdt-amount text-end">₹{{ number_format($bill->sub_total_amount ?? 0, 2) }}</td>
-                <td class="qdt-amount text-end">₹{{ number_format($bill->tds_amount ?? 0, 2) }}</td>
-                <td class="qdt-amount text-end">₹{{ number_format($line->gst_amount ?? 0, 2) }}</td>
-                <td class="qdt-amount text-end" style="font-weight:700;color:#059669;">₹{{ number_format($bill->grand_total_amount ?? 0, 2) }}</td>
+                <td class="qdt-amount text-end">₹{{ number_format($isFirstBillLine ? ($bill->sub_total_amount ?? 0) : 0, 2) }}</td>
+                <td class="qdt-amount text-end">₹{{ number_format($isFirstBillLine ? ($bill->tds_amount ?? 0) : 0, 2) }}</td>
+                <td class="qdt-amount text-end">₹{{ number_format($isFirstBillLine ? ($bill->tax_amount ?? 0) : 0, 2) }}</td>
+                <td class="qdt-amount text-end" style="font-weight:700;color:#059669;">₹{{ number_format($isFirstBillLine ? ($bill->grand_total_amount ?? 0) : 0, 2) }}</td>
               </tr>
             @endforeach
           @empty

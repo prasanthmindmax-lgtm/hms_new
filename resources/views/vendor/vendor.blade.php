@@ -1736,27 +1736,20 @@
 
     // =================== MULTI-SELECT CHANGE LISTENER ===================
     function setupMultiSelect(selectorInput, selectorHidden) {
-        $(document).on('click', selectorHidden, function () {
-            const selectedIds = $(this).val();
+        var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+        $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
+            const selectedIds  = $(this).val();
             const selectedText = $(selectorInput).val();
-
             if (selectorHidden === '.vendor_id') {
-                filters.vendor_id = selectedIds;
-                filters.vendor_name = selectedText;
+                filters.vendor_id = selectedIds; filters.vendor_name = selectedText;
             } else if (selectorHidden === '.status_filter') {
-                filters.status_filter = selectedIds;
-                filters.status_name = selectedText;
+                filters.status_filter = selectedIds; filters.status_name = selectedText;
             }
             loadVendor();
         });
     }
-
-    $('.vendor_id').on('click', function () {
-      setupMultiSelect('.vendor-search-input', '.vendor_id');
-    });
-    $('.status_filter').on('click', function () {
-      setupMultiSelect('.status-search-input', '.status_filter');
-    });
+    setupMultiSelect('.vendor-search-input', '.vendor_id');
+    setupMultiSelect('.status-search-input', '.status_filter');
     $('.universal_search').on('keyup', function () {
       filters.universal_search = $('.universal_search').val();
         loadVendor();

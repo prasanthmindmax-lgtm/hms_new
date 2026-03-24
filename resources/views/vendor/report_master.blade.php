@@ -61,6 +61,10 @@
           <i class="bi bi-bar-chart-line"></i> Financial Dashboard
         </div>
         <div class="qd-header-actions">
+          <button class="btn btn-sm qd-toggle-btn" id="toggleStats">
+            <i class="bi bi-bar-chart-line me-1"></i>Stats
+            <i class="bi bi-chevron-up qd-toggle-icon" id="statsChevron"></i>
+          </button>
           <button class="btn btn-sm qd-toggle-btn" id="toggleFilters">
             <i class="bi bi-funnel me-1"></i>Filter
             <i class="bi bi-chevron-up qd-toggle-icon" id="filtersChevron"></i>
@@ -189,6 +193,34 @@
         <div id="filter-summary"></div>
       </div>
 
+      {{-- ── Stats Boxes ── --}}
+      <div class="qd-stats" id="statsSection" style="border-bottom:1px solid #eaedf3;margin-bottom:0;">
+        <div class="qd-stat-card qd-stat-blue" style="cursor:default;">
+          <div class="qd-stat-icon"><i class="bi bi-cash-coin"></i></div>
+          <div class="qd-stat-body">
+            <div class="qd-stat-label">Total Income</div>
+            <div class="qd-stat-value" data-stat-key="total_income">₹0</div>
+            <div class="qd-stat-sub">Billing collections</div>
+          </div>
+        </div>
+        <div class="qd-stat-card qd-stat-red" style="cursor:default;">
+          <div class="qd-stat-icon"><i class="bi bi-credit-card"></i></div>
+          <div class="qd-stat-body">
+            <div class="qd-stat-label">Total Expense</div>
+            <div class="qd-stat-value" data-stat-key="total_expense">₹0</div>
+            <div class="qd-stat-sub">Bills raised</div>
+          </div>
+        </div>
+        <div class="qd-stat-card qd-stat-green" style="cursor:default;">
+          <div class="qd-stat-icon"><i class="bi bi-graph-up"></i></div>
+          <div class="qd-stat-body">
+            <div class="qd-stat-label">Net</div>
+            <div class="qd-stat-value" data-stat-key="net_amount">₹0</div>
+            <div class="qd-stat-sub">Income − Expense</div>
+          </div>
+        </div>
+      </div>
+
       {{-- ── Charts Section ── --}}
       <div style="padding: 10px 10px;">
 
@@ -238,6 +270,7 @@
 <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script src="{{ asset('/assets/js/vendor/quotation_search.js') }}"></script>
 
@@ -274,6 +307,13 @@ $(document).ready(function () {
   // Reset date on load
   $('#data_values').text('All Dates');
   $('.data_values').val('');
+
+  // Toggle stats
+  $('#toggleStats').on('click', function () {
+    const $s = $('#statsSection'), $i = $('#statsChevron');
+    $s.is(':visible') ? ($s.slideUp(200), $i.removeClass('bi-chevron-up').addClass('bi-chevron-down'))
+                      : ($s.slideDown(200), $i.removeClass('bi-chevron-down').addClass('bi-chevron-up'));
+  });
 
   // Toggle filters
   $('#toggleFilters').on('click', function () {
@@ -381,9 +421,10 @@ $(document).ready(function () {
   }
 
   function setupMultiSelect(selectorInput, selectorHidden) {
-    $(document).on('click', selectorHidden, function () {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const ids = $(this).val(), text = $(selectorInput).val();
-      if (selectorHidden==='.zone_id')    { filters.zone_id=ids; filters.zone_name=text; }
+      if (selectorHidden==='.zone_id')         { filters.zone_id=ids; filters.zone_name=text; }
       else if (selectorHidden==='.branch_id')  { filters.branch_id=ids; filters.branch_name=text; }
       else if (selectorHidden==='.company_id') { filters.company_id=ids; filters.company_name=text; }
       else if (selectorHidden==='.vendor_id')  { filters.vendor_id=ids; filters.vendor_name=text; }
@@ -392,12 +433,12 @@ $(document).ready(function () {
       loadAllChartData(); renderSummary();
     });
   }
-  $('.zone_id').on('click',    function () { setupMultiSelect('.zone-search-input', '.zone_id'); });
-  $('.branch_id').on('click',  function () { setupMultiSelect('.branch-search-input', '.branch_id'); });
-  $('.company_id').on('click', function () { setupMultiSelect('.company-search-input', '.company_id'); });
-  $('.vendor_id').on('click',  function () { setupMultiSelect('.vendor-search-input', '.vendor_id'); });
-  $('.state_id').on('click',   function () { setupMultiSelect('.state-search-input', '.state_id'); });
-  $('.nature_id').on('click',  function () { setupMultiSelect('.nature-search-input', '.nature_id'); });
+  setupMultiSelect('.zone-search-input',    '.zone_id');
+  setupMultiSelect('.branch-search-input',  '.branch_id');
+  setupMultiSelect('.company-search-input', '.company_id');
+  setupMultiSelect('.vendor-search-input',  '.vendor_id');
+  setupMultiSelect('.state-search-input',   '.state_id');
+  setupMultiSelect('.nature-search-input',  '.nature_id');
 
   $('.universal_search').on('keyup', function () { filters.universal_search=$(this).val(); loadAllChartData(); renderSummary(); });
   $('.data_values').on('change', function () {
@@ -466,11 +507,28 @@ $(document).ready(function () {
     });
     expenseChart = new Chart(document.getElementById('expenseChart').getContext('2d'), {
       type:'doughnut', data:{ labels:[], datasets:[{ label:'Expenses', data:[], backgroundColor:chartColors, borderColor:'#fff', borderWidth:2, hoverOffset:10 }] },
-      options:{ cutout:'70%', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false},
-          tooltip:{ backgroundColor:'rgba(0,0,0,.8)', callbacks:{label:c=>`${c.label}: ₹${fmtIN(c.raw)} (${((c.raw/c.dataset.data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)`} }
+      options:{ cutout:'65%', responsive:true, maintainAspectRatio:false,
+        layout: { padding: 40 },
+        plugins:{
+          legend:{display:false},
+          tooltip:{ backgroundColor:'rgba(0,0,0,.8)', callbacks:{label:c=>`${c.label}: ₹${fmtIN(c.raw)} (${((c.raw/c.dataset.data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)`} },
+          datalabels:{
+            display: true,
+            anchor: 'end',
+            align: 'end',
+            offset: 8,
+            formatter: (value, ctx) => {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+              if (!total || value === 0) return '';
+              const pct = (value / total) * 100;
+              return pct >= 10 ? pct.toFixed(1) + '%' : '';
+            },
+            color: '#374151',
+            font: { weight: 'bold', size: 11 },
+          }
         }
-      }
+      },
+      plugins: [ChartDataLabels]
     });
   }
 
@@ -483,6 +541,17 @@ $(document).ready(function () {
         updateBarChart(res.income_vs_expense);
         updateExpenseChart(res.top_expenses);
         updateExpenseList(res.top_expenses);
+        if (res.stats) {
+          $.each(res.stats, function(key, val) {
+            var $el = $('[data-stat-key="' + key + '"]');
+            if (key === 'total_bills') {
+              $el.text(val);
+            } else {
+              var prefix = parseFloat(val) < 0 ? '-₹' : '₹';
+              $el.text(prefix + fmtIN(Math.abs(val)));
+            }
+          });
+        }
       },
       error: function () { toastr.error("Failed to load chart data"); }
     });
@@ -520,17 +589,24 @@ $(document).ready(function () {
     if (!data) return;
     let expenses = [];
     if (data.labels && data.values) {
-      expenses = data.labels.map((label,i) => ({ account:label, total_amount:data.values[i]||0, color:chartColors[i%chartColors.length] }));
+      expenses = data.labels.map((label,i) => ({ account:label, total_amount:parseFloat(data.values[i])||0, color:chartColors[i%chartColors.length] }));
     }
     expenses.sort((a,b)=>b.total_amount-a.total_amount);
+    const grandTotal = expenses.reduce((s,e)=>s+e.total_amount,0);
     let html = '';
-    expenses.forEach((e,i) => {
-      html += `<div class="rm-expense-item" data-type="${e.account}" style="border-left-color:${e.color};">
+    expenses.forEach((e) => {
+      const pct = grandTotal > 0 ? ((e.total_amount / grandTotal) * 100).toFixed(1) : '0.0';
+      const isSmall = parseFloat(pct) < 10;
+      html += `<div class="rm-expense-item" data-type="${e.account}" style="border-left-color:${e.color};${isSmall ? 'opacity:0.75;' : ''}">
         <div class="rm-expense-left">
           <div class="rm-expense-dot" style="background:${e.color};"></div>
           <span class="rm-expense-label">${e.account}</span>
+          ${isSmall ? '<span style="font-size:10px;color:#9ca3af;margin-left:4px;">(in chart: grouped)</span>' : ''}
         </div>
-        <span class="rm-expense-amount">₹${fmtIN(e.total_amount)}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:#6b7280;">${pct}%</span>
+          <span class="rm-expense-amount">₹${fmtIN(e.total_amount)}</span>
+        </div>
       </div>`;
     });
     $('#expenseListContainer').html(html || '<div class="text-center text-muted py-3">No data</div>');

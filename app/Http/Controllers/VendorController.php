@@ -1954,6 +1954,9 @@ public function statementprint(Request $request, $id)
             'tax_amount' => $this->cleanCurrency($request->tax_amount),
             'export_name' => $request->export_name,
             'export_amount' => $request->export_amount,
+            'timeline_date' => $request->timeline_date,
+            'loading_unloading_name' => $request->loading_unloading_name,
+            'loading_unloading_amount' => $request->loading_unloading_amount,
             'esi_type' => $request->esi_type,
             'esi_value' => $request->esi_value,
             'pf_type' => $request->pf_type,
@@ -2230,20 +2233,21 @@ public function statementprint(Request $request, $id)
                 // ->orWhere('company_name', 'like', "%{$search}%");
             });
         }
+        // Stats calculated from filtered query (before stat_filter is applied)
+        $filteredAssetQuery = clone $query;
+        $stats = [
+            'total'        => (clone $filteredAssetQuery)->count(),
+            'save'         => (clone $filteredAssetQuery)->where('status', 'save')->count(),
+            'draft'        => (clone $filteredAssetQuery)->where('status', 'draft')->count(),
+            'total_amount' => (clone $filteredAssetQuery)->sum('grand_total_amount'),
+        ];
+
         $billlist = $query->paginate($perPage)->appends($request->all());
 
         if ($request->ajax()) {
-            return view('vendor.partials.table.bill_rows', compact('billlist','perPage'))->render();
+            $html = view('vendor.partials.table.bill_rows', compact('billlist','perPage'))->render();
+            return response()->json(['html' => $html, 'stats' => $stats]);
         }
-
-        // Stats for Asset dashboard
-        $assetBase = Tblbill::where('delete_status', 0)->where('asset_status', 1);
-        $stats = [
-            'total'        => (clone $assetBase)->count(),
-            'save'         => (clone $assetBase)->where('status', 'save')->count(),
-            'draft'        => (clone $assetBase)->where('status', 'draft')->count(),
-            'total_amount' => (clone $assetBase)->sum('grand_total_amount'),
-        ];
 
         return view('vendor.asset_dashboard', [
             'admin'         => $admin,
@@ -3156,6 +3160,10 @@ public function getpurchaseorder(Request $request)
             'tax_rate' => $request->tcs_tax_selected ?: $request->tds_tax_selected,
             'tax_amount' => $this->cleanCurrency($request->tax_amount),
             'export_name' => $request->export_name,
+            'export_amount' => $request->export_amount,
+            'loading_unloading_name' => $request->loading_unloading_name,
+            'loading_unloading_amount' => $request->loading_unloading_amount,
+            'timeline_date' => $request->timeline_date,
             'esi_type' => $request->esi_type,
             'esi_value' => $request->esi_value,
             'pf_type' => $request->pf_type,
@@ -4501,6 +4509,9 @@ public function getquotation(Request $request)
             'tax_amount' => $this->cleanCurrency($request->tax_amount),
             'export_name' => $request->export_name,
             'export_amount' => $request->export_amount,
+            'loading_unloading_name' => $request->loading_unloading_name,
+            'loading_unloading_amount' => $request->loading_unloading_amount,
+            'timeline_date' => $request->timeline_date,
              'esi_type' => $request->esi_type,
             'esi_value' => $request->esi_value,
             'pf_type' => $request->pf_type,
@@ -5018,6 +5029,15 @@ public function getgrndashboard(Request $request)
                 ->orWhere('due_date', 'like', "%{$search}%");
             });
         }
+        // Stats calculated from filtered query BEFORE stat_filter is applied
+        $filteredQuery = clone $query;
+        $stats = [
+            'total'    => (clone $filteredQuery)->count(),
+            'approved' => (clone $filteredQuery)->where('approval_status', 1)->count(),
+            'pending'  => (clone $filteredQuery)->where('approval_status', 0)->where('reject_status', 0)->count(),
+            'rejected' => (clone $filteredQuery)->where('reject_status', 1)->count(),
+        ];
+
         if ($request->filled('stat_filter')) {
             $sf = $request->stat_filter;
             if ($sf === 'approved') {
@@ -5028,20 +5048,13 @@ public function getgrndashboard(Request $request)
                 $query->where('reject_status', 1);
             }
         }
+
         $grnlist = $query->paginate($perPage)->appends($request->all());
 
         if ($request->ajax()) {
-            return view('vendor.partials.table.grn_rows', compact('grnlist','perPage'))->render();
+            $html = view('vendor.partials.table.grn_rows', compact('grnlist','perPage'))->render();
+            return response()->json(['html' => $html, 'stats' => $stats]);
         }
-
-        // Stats
-        $statsQuery = Tblgrn::query();
-        $stats = [
-            'total'    => $statsQuery->count(),
-            'approved' => Tblgrn::where('approval_status', 1)->count(),
-            'pending'  => Tblgrn::where('approval_status', 0)->count(),
-            'rejected' => Tblgrn::where('reject_status', 1)->count(),
-        ];
 
         return view('vendor.grn_bashboard', [
             'admin'         => $admin,
@@ -5734,7 +5747,8 @@ public function gettdssummary(Request $request)
 
         $billlist = $query->paginate($perPage)->appends($request->all());
         if ($request->ajax()) {
-            return view('vendor.partials.table.tds_summary_rows', compact('billlist','perPage','tdsSummaryCalculation'))->render();
+            $html = view('vendor.partials.table.tds_summary_rows', compact('billlist','perPage','tdsSummaryCalculation'))->render();
+            return response()->json(['html' => $html, 'stats' => $tdsSummaryCalculation]);
         }
 
         return view('vendor.tds_summary', ['admin' => $admin,'locations' => $locations,'billlist' => $billlist,'perPage' => $perPage,'TblZonesModel' => $TblZonesModel,'Tbltdssection' => $Tbltdssection,'Tblvendor' => $Tblvendor,'Tblcompany' => $Tblcompany,'tdsSummaryCalculation' => $tdsSummaryCalculation]);
@@ -5905,7 +5919,8 @@ public function gettdsreport(Request $request)
 
         $billlist = $query->where('delete_status',0)->where('tds_paid_status','Paid')->where('tax_amount', '>', 0)->paginate($perPage)->appends($request->all());
         if ($request->ajax()) {
-            return view('vendor.partials.table.tds_report_rows', compact('billlist','perPage','tdsSummaryCalculation'))->render();
+            $html = view('vendor.partials.table.tds_report_rows', compact('billlist','perPage','tdsSummaryCalculation'))->render();
+            return response()->json(['html' => $html, 'stats' => $tdsSummaryCalculation]);
         }
 
         return view('vendor.tds_report', ['admin' => $admin,'locations' => $locations,'billlist' => $billlist,'perPage' => $perPage,'TblZonesModel' => $TblZonesModel,'Tbltdssection' => $Tbltdssection,'Tblvendor' => $Tblvendor,'Tblcompany' => $Tblcompany,'tdsSummaryCalculation' => $tdsSummaryCalculation]);
@@ -6091,7 +6106,8 @@ public function getgstsummary(Request $request)
 
         $billlist = $query->paginate($perPage)->appends($request->all());
         if ($request->ajax()) {
-            return view('vendor.partials.table.gst_summary_rows', compact('billlist','perPage','gstSummaryCalculation'))->render();
+            $html = view('vendor.partials.table.gst_summary_rows', compact('billlist','perPage','gstSummaryCalculation'))->render();
+            return response()->json(['html' => $html, 'stats' => $gstSummaryCalculation]);
         }
 
         return view('vendor.gst_summary', ['admin' => $admin,'locations' => $locations,'billlist' => $billlist,'perPage' => $perPage,'TblZonesModel' => $TblZonesModel,'Tbltdssection' => $Tbltdssection,'Tblvendor' => $Tblvendor,'Tblcompany' => $Tblcompany,'gstSummaryCalculation' => $gstSummaryCalculation]);
@@ -6500,12 +6516,10 @@ public function getvendortypesave(Request $request)
     $totalGST = 0;
 
     foreach ($details as $bill) {
-        $totalTDS += $bill->tds_amount ?? 0; // TDS from TblBill
+        $totalTDS           += $bill->tds_amount ?? 0;
         $totalInvoiceAmount += $bill->sub_total_amount ?? 0;
-        $totalFinalAmount += $bill->grand_total_amount ?? 0;
-        foreach ($bill->BillLines as $line) {
-            $totalGST += $line->gst_amount ?? 0; // GST from TblBillLines
-        }
+        $totalFinalAmount   += $bill->grand_total_amount ?? 0;
+        $totalGST           += $bill->tax_amount ?? 0; // GST from bill header (tax_amount)
     }
 
     // ---------- Handle Exports ----------
@@ -6751,6 +6765,199 @@ public function vendorSummary(Request $request)
         return response()->json(['html' => $html]);
     }
 
+
+// ─────────────────────────────────────────────────────────────
+// Zone / Branch Payment-Type Chart  (page + AJAX data)
+// ─────────────────────────────────────────────────────────────
+public function getZonePaymentChart(Request $request)
+{
+    $admin         = auth()->user();
+    $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
+    $Tblcompany    = Tblcompany::orderBy('id', 'asc')->paginate(10);
+    $Tblvendor     = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
+    $locations     = TblLocationModel::orderBy('id', 'asc')->get();
+
+    return view('vendor.report_zone_chart', compact(
+        'admin', 'TblZonesModel', 'Tblcompany', 'Tblvendor', 'locations'
+    ));
+}
+
+public function getZonePaymentChartData(Request $request)
+{
+    // ── Date range ──────────────────────────────────────────
+    if ($request->filled('date_from') && $request->filled('date_to')) {
+        $from = Carbon::createFromFormat('d/m/Y', $request->date_from)->startOfDay();
+        $to   = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
+    } else {
+        $now = Carbon::now();
+        if ($now->month >= 4) {
+            $from = Carbon::create($now->year, 4, 1)->startOfDay();
+            $to   = Carbon::create($now->year + 1, 3, 31)->endOfDay();
+        } else {
+            $from = Carbon::create($now->year - 1, 4, 1)->startOfDay();
+            $to   = Carbon::create($now->year, 3, 31)->endOfDay();
+        }
+    }
+
+    // ── Base query on billing_list ───────────────────────────
+    $baseQuery = BillingListModel::select(
+        'location_name',
+        'paymenttype',
+        DB::raw('SUM(amt) as total')
+    )
+    ->whereBetween(
+        DB::raw("STR_TO_DATE(billing_list.billdate, '%Y%m%d%H:%i:%s')"),
+        [$from, $to]
+    )
+    ->whereNotNull('paymenttype')
+    ->where('paymenttype', '!=', '')
+    ->groupBy('location_name', 'paymenttype');
+
+    // ── Optional filters ─────────────────────────────────────
+    if ($request->filled('state_id')) {
+        $state_ids = explode(',', $request->state_id);
+        $locations = [];
+        $zoneMap = ['1'=>['2','4','6','7','8','9'],'2'=>['3'],'3'=>['5'],'4'=>['10']];
+        $branchMap = ['5'=>['30']];
+        foreach ($state_ids as $sid) {
+            if (isset($zoneMap[$sid])) {
+                $zids = $zoneMap[$sid];
+                $locs = TblLocationModel::whereIn('zone_id', $zids)->pluck('name')->toArray();
+                $locations = array_merge($locations, $locs);
+            }
+            if (isset($branchMap[$sid])) {
+                $locs = TblLocationModel::whereIn('id', $branchMap[$sid])->pluck('name')->toArray();
+                $locations = array_merge($locations, $locs);
+            }
+        }
+        if (!empty($locations)) {
+            $baseQuery->whereIn('location_name', array_unique($locations));
+        }
+    }
+    if ($request->filled('zone_id')) {
+        $zoneIds = explode(',', $request->zone_id);
+        $locNames = TblLocationModel::whereIn('zone_id', $zoneIds)->pluck('name')->toArray();
+        if (!empty($locNames)) {
+            $baseQuery->whereIn('location_name', $locNames);
+        }
+    }
+    if ($request->filled('branch_id')) {
+        $branchIds = explode(',', $request->branch_id);
+        $locNames = TblLocationModel::whereIn('id', $branchIds)->pluck('name')->toArray();
+        if (!empty($locNames)) {
+            $baseQuery->whereIn('location_name', $locNames);
+        }
+    }
+
+    $rows = $baseQuery->get();
+
+    // ── All distinct payment types (for consistent colours) ──
+    $allPayTypes = $rows->pluck('paymenttype')->unique()->sort()->values()->toArray();
+
+    // ─── Zone-wise aggregation ────────────────────────────────
+    $zones      = TblZonesModel::orderBy('id')->get();
+    $locations  = TblLocationModel::all()->keyBy('name');
+
+    $zoneData = [];
+    foreach ($rows as $row) {
+        $loc    = $locations->get($row->location_name);
+        $zoneId = $loc ? $loc->zone_id : null;
+        if (!$zoneId) continue;
+        $zone   = $zones->firstWhere('id', $zoneId);
+        $zoneName = $zone ? $zone->name : 'Unknown';
+        $zoneData[$zoneName][$row->paymenttype] = ($zoneData[$zoneName][$row->paymenttype] ?? 0) + $row->total;
+    }
+
+    // ─── Branch-wise aggregation ──────────────────────────────
+    $branchData = [];
+    foreach ($rows as $row) {
+        $loc = $locations->get($row->location_name);
+        $branchName = $loc ? $loc->name : $row->location_name;
+        $branchData[$branchName][$row->paymenttype] = ($branchData[$branchName][$row->paymenttype] ?? 0) + $row->total;
+    }
+
+    // Sort branches by total descending
+    uasort($branchData, function($a, $b) {
+        return array_sum($b) - array_sum($a);
+    });
+
+    // ── Build datasets per payment type ─────────────────────
+    // Each entry uses a clearly distinct hue — no two should look similar
+    $paymentColors = [
+        'card'            => '#1a56db', // Bold blue
+        'cash'            => '#0e9f6e', // Emerald green
+        'cheque'          => '#9061f9', // Violet/purple
+        'neft'            => '#ff5a1f', // Deep orange
+        'upi'             => '#e02424', // Bright red
+        'savedforcounter' => '#0694a2', // Teal/cyan
+        'online'          => '#c27803', // Amber/gold
+        'dd'              => '#d61f69', // Hot pink
+        'imps'            => '#4d7c0f', // Olive green
+        'rtgs'            => '#3730a3', // Indigo
+        'cash counter'    => '#92400e', // Brown
+        'other'           => '#6b7280', // Gray
+    ];
+
+    // Fallback palette — all maximally distinct from each other and from above
+    $defaults = [
+        '#1a56db','#0e9f6e','#9061f9','#ff5a1f','#e02424',
+        '#0694a2','#c27803','#d61f69','#4d7c0f','#3730a3',
+        '#92400e','#6b7280','#0f766e','#b45309','#7c3aed',
+    ];
+
+    $buildDatasets = function ($groupData, $payTypes) use ($paymentColors, $defaults) {
+        $labels   = array_keys($groupData);
+        $datasets = [];
+        foreach ($payTypes as $idx => $pt) {
+            $key   = strtolower(trim($pt));
+            $color = $paymentColors[$key] ?? $defaults[$idx % count($defaults)];
+            $data = [];
+            foreach ($labels as $label) {
+                $data[] = round($groupData[$label][$pt] ?? 0, 2);
+            }
+            $datasets[] = [
+                'label'           => $pt,
+                'data'            => $data,
+                'backgroundColor' => $color . 'cc',
+                'borderColor'     => $color,
+                'borderWidth'     => 1,
+            ];
+        }
+        // Totals per label
+        $totals = [];
+        foreach ($labels as $label) {
+            $totals[$label] = array_sum(array_values($groupData[$label]));
+        }
+        return ['labels' => $labels, 'datasets' => $datasets, 'totals' => $totals];
+    };
+
+    // Build a color map for each payment type (same logic as $buildDatasets)
+    $typeColors = [];
+    foreach ($allPayTypes as $idx => $pt) {
+        $key = strtolower(trim($pt));
+        $typeColors[$pt] = $paymentColors[$key] ?? $defaults[$idx % count($defaults)];
+    }
+
+    // Grand totals per payment type (across all zones/branches)
+    $paymentTotals = [];
+    $grandTotal    = 0;
+    foreach ($rows as $row) {
+        $paymentTotals[$row->paymenttype] = ($paymentTotals[$row->paymenttype] ?? 0) + $row->total;
+        $grandTotal += $row->total;
+    }
+    // Sort by value descending
+    arsort($paymentTotals);
+
+    return response()->json([
+        'payment_types'  => $allPayTypes,
+        'type_colors'    => $typeColors,          // exact color per payment type
+        'zone_chart'     => $buildDatasets($zoneData, $allPayTypes),
+        'branch_chart'   => $buildDatasets($branchData, $allPayTypes),
+        'date_range'     => $from->format('d/m/Y') . ' – ' . $to->format('d/m/Y'),
+        'payment_totals' => $paymentTotals,
+        'grand_total'    => round($grandTotal, 2),
+    ]);
+}
 
 public function getAllCharts(Request $request)
 {
@@ -7143,16 +7350,29 @@ public function getAllCharts(Request $request)
         $months[] = $cursor->month;   // numeric month
         $cursor->addMonth();
     }
+    $totalIncome  = $monthlyIncome->sum('income');
+    $totalExpense = $monthlyExpense->sum('expense');
+
+    // Total bills count using same filters
+    $billsCountQuery = TblBill::where('delete_status', 0);
+    if ($from !== null && $to !== null) {
+        $billsCountQuery->whereRaw("STR_TO_DATE(bill_date, '%d/%m/%Y') BETWEEN ? AND ?", [$from, $to]);
+    }
+    if ($request->filled('zone_id')) {
+        $billsCountQuery->whereIn('zone_id', explode(',', $request->zone_id));
+    }
+    if ($request->filled('branch_id')) {
+        $billsCountQuery->whereIn('branch_id', explode(',', $request->branch_id));
+    }
+    if ($request->filled('vendor_id')) {
+        $billsCountQuery->whereIn('vendor_id', explode(',', $request->vendor_id));
+    }
+    if ($request->filled('company_id')) {
+        $billsCountQuery->whereIn('company_id', explode(',', $request->company_id));
+    }
+    $totalBills = $billsCountQuery->count();
+
     return response()->json([
-        // 'monthly_income' => [
-        //     'months' => $monthlyIncome->pluck('month'),
-        //     'income' => $monthlyIncome->pluck('income'),
-        // ],
-        // 'income_vs_expense' => [
-        //     'months' => range(1, 12),
-        //     'income' => $monthlyIncome->pluck('income', 'month'),
-        //     'expense' => $monthlyExpense->pluck('expense', 'month'),
-        // ],
         'monthly_income' => [
             'months' => $months,
             'income' => $monthlyIncome->pluck('income', 'month'),
@@ -7172,7 +7392,13 @@ public function getAllCharts(Request $request)
             'list' => $topExpenses->map(function ($item) {
                 return ['account' => $item->account, 'total_amount' => number_format($item->total_amount, 2)];
             }),
-        ]
+        ],
+        'stats' => [
+            'total_income'  => round($totalIncome, 2),
+            'total_expense' => round($totalExpense, 2),
+            'net_amount'    => round($totalIncome - $totalExpense, 2),
+            'total_bills'   => $totalBills,
+        ],
     ]);
 }
 
@@ -7402,7 +7628,8 @@ public function getprofessionalsummary(Request $request)
     $billlist = $query->paginate($perPage)->appends($request->all());
 
     if ($request->ajax()) {
-        return view('vendor.partials.table.professional_summary_rows', compact('billlist','perPage','invoiceSummaryCalculation'))->render();
+        $html = view('vendor.partials.table.professional_summary_rows', compact('billlist','perPage','invoiceSummaryCalculation'))->render();
+        return response()->json(['html' => $html, 'stats' => $invoiceSummaryCalculation]);
     }
 
     return view('vendor.professional_summary', [

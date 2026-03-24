@@ -481,6 +481,8 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('/superadmin/reports/details/{type}', [VendorController::class, 'showExpenseDetails'])->name('superadmin.reportdetails');
     Route::get('/superadmin/vendor-monthly-summary', [VendorController::class, 'getVendorMonthlySummary'])->name('superadmin.vendorMonthlySummary');
     Route::get('/superadmin/getAllCharts', [VendorController::class, 'getAllCharts'])->name('superadmin.getAllCharts');
+    Route::get('/superadmin/reports/zone-chart', [VendorController::class, 'getZonePaymentChart'])->name('superadmin.zonePaymentChart');
+    Route::get('/superadmin/reports/zone-chart-data', [VendorController::class, 'getZonePaymentChartData'])->name('superadmin.zonePaymentChartData');
 
     //vendor summary
     Route::get('/superadmin/vendor-summary', [VendorController::class, 'vendorSummary'])->name('superadmin.vendorSummary');

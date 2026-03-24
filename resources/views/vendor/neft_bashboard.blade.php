@@ -2526,65 +2526,35 @@ $(document).ready(function () {
 
             // =================== MULTI-SELECT CHANGE LISTENER ===================
             function setupMultiSelect(selectorInput, selectorHidden) {
-                $(document).on('click', selectorHidden, function () {
-                  console.log("21323423");
-                  console.log(selectorHidden);
-
-                    const selectedIds = $(this).val(); // comma-separated
+                var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+                $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
+                    const selectedIds = $(this).val();
                     const selectedText = $(selectorInput).val();
-                  console.log(selectedText,'selectedText');
-
                     if (selectorHidden === '.zone_id') {
-                      console.log("true");
-
-                        filters.zone_id = selectedIds;
-                        filters.zone_name = selectedText;
+                        filters.zone_id = selectedIds; filters.zone_name = selectedText;
                     } else if (selectorHidden === '.branch_id') {
-                        filters.branch_id = selectedIds;
-                        filters.branch_name = selectedText;
+                        filters.branch_id = selectedIds; filters.branch_name = selectedText;
                     } else if (selectorHidden === '.company_id') {
-                        filters.company_id = selectedIds;
-                        filters.company_name = selectedText;
+                        filters.company_id = selectedIds; filters.company_name = selectedText;
                     } else if (selectorHidden === '.vendor_id') {
-                        filters.vendor_id = selectedIds;
-                        filters.vendor_name = selectedText;
+                        filters.vendor_id = selectedIds; filters.vendor_name = selectedText;
                     } else if (selectorHidden === '.nature_id') {
-                        filters.nature_id = selectedIds;
-                        filters.nature_name = selectedText;
+                        filters.nature_id = selectedIds; filters.nature_name = selectedText;
                     } else if (selectorHidden === '.status_id') {
-                        filters.status_id = selectedIds;
-                        filters.status_name = selectedText;
-                    }else if (selectorHidden === '.state_id') {
-                        filters.state_id = selectedIds;
-                        filters.state_name = selectedText;
+                        filters.status_id = selectedIds; filters.status_name = selectedText;
+                    } else if (selectorHidden === '.state_id') {
+                        filters.state_id = selectedIds; filters.state_name = selectedText;
                     }
                     loadNEFT();
                 });
             }
-            $('.zone_id').on('click', function () {
-              setupMultiSelect('.zone-search-input', '.zone_id');
-            });
-            $('.branch_id').on('click', function () {
-              setupMultiSelect('.branch-search-input', '.branch_id');
-            });
-            $('.company_id').on('click', function () {
-              setupMultiSelect('.company-search-input', '.company_id');
-            });
-            $('.vendor_id').on('click', function () {
-              setupMultiSelect('.vendor-search-input', '.vendor_id');
-            });
-            $('.vendor_id').on('click', function () {
-              setupMultiSelect('.vendor-search-input', '.vendor_id');
-            });
-            $('.nature_id').on('click', function () {
-              setupMultiSelect('.nature-search-input', '.nature_id');
-            });
-            $('.status_id').on('click', function () {
-              setupMultiSelect('.status-search-input', '.status_id');
-            });
-            $('.state_id').on('click', function () {
-              setupMultiSelect('.state-search-input', '.state_id');
-            });
+            setupMultiSelect('.zone-search-input', '.zone_id');
+            setupMultiSelect('.branch-search-input', '.branch_id');
+            setupMultiSelect('.company-search-input', '.company_id');
+            setupMultiSelect('.vendor-search-input', '.vendor_id');
+            setupMultiSelect('.nature-search-input', '.nature_id');
+            setupMultiSelect('.status-search-input', '.status_id');
+            setupMultiSelect('.state-search-input', '.state_id');
             $('.universal_search').on('keyup', function () {
               filters.universal_search=  $('.universal_search').val();
               loadNEFT();

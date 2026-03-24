@@ -67,35 +67,27 @@
             <div class="qd-stat-icon"><i class="bi bi-receipt-cutoff"></i></div>
             <div class="qd-stat-body">
               <div class="qd-stat-label">Total TDS Amount</div>
-              <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['total_tds'] ?? 0, 2) }}</div>
+              <div class="qd-stat-value" data-stat-key="total_tds">₹{{ number_format($tdsSummaryCalculation['total_tds'] ?? 0, 2) }}</div>
               <div class="qd-stat-sub">All TDS records</div>
-                                  </div>
-                                  </div>
+            </div>
+          </div>
           <div class="qd-stat-card qd-stat-orange" data-stat-filter="month" title="Filter: This Month">
             <div class="qd-stat-icon"><i class="bi bi-calendar-month"></i></div>
             <div class="qd-stat-body">
               <div class="qd-stat-label">This Month TDS</div>
-              <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['this_month_tds'] ?? 0, 2) }}</div>
+              <div class="qd-stat-value" data-stat-key="this_month_tds">₹{{ number_format($tdsSummaryCalculation['this_month_tds'] ?? 0, 2) }}</div>
               <div class="qd-stat-sub">Current month</div>
-                              </div>
-                          </div>
-          <!-- <div class="qd-stat-card qd-stat-red" data-stat-filter="pending" title="Filter: Not Paid">
-            <div class="qd-stat-icon"><i class="bi bi-clock-history"></i></div>
-            <div class="qd-stat-body">
-              <div class="qd-stat-label">Pending TDS</div>
-              <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['pending_tds'] ?? 0, 2) }}</div>
-              <div class="qd-stat-sub">Not Paid</div>
-                      </div>
-          </div> -->
+            </div>
+          </div>
           <div class="qd-stat-card qd-stat-green" data-stat-filter="paid" title="Filter: Paid TDS">
             <div class="qd-stat-icon"><i class="bi bi-check-circle"></i></div>
             <div class="qd-stat-body">
               <div class="qd-stat-label">Paid TDS</div>
-              <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['paid_tds'] ?? 0, 2) }}</div>
+              <div class="qd-stat-value" data-stat-key="paid_tds">₹{{ number_format($tdsSummaryCalculation['paid_tds'] ?? 0, 2) }}</div>
               <div class="qd-stat-sub">Fully paid</div>
-                              </div>
-                          </div>
-                      </div>
+            </div>
+          </div>
+        </div>
 
         {{-- ── Filters ── --}}
         <div class="qd-filters" id="filtersSection">
@@ -593,8 +585,8 @@
     $('#filter-summary').html(html);
               }
 
-              function loadTds(page = 1, perPage = $('#per_page').val()) {
-                appliedFilters = {
+  function loadTds(page = 1, perPage = $('#per_page').val()) {
+    appliedFilters = {
       per_page: perPage, page,
       date_from: filters.date_from, date_to: filters.date_to,
       zone_id: filters.zone_id, branch_id: filters.branch_id,
@@ -603,36 +595,49 @@
       financial_name: filters.financial_name, quarter_name: filters.quarter_name,
       universal_search: filters.universal_search,
       stat_filter: statFilter
-                };
-                  $.ajax({
+    };
+    $.ajax({
       url: '{{ route("superadmin.gettdsreport") }}', type: 'GET', data: appliedFilters,
-      success: function (data) { $('#tds-body').html(data); renderSummary(); }
+      success: function (data) {
+        if (data && typeof data === 'object' && data.html !== undefined) {
+          $('#tds-body').html(data.html);
+          if (data.stats) {
+            $.each(data.stats, function(key, val) {
+              $('[data-stat-key="' + key + '"]').text('₹' + parseFloat(val || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+            });
+          }
+        } else {
+          $('#tds-body').html(data);
+        }
+        renderSummary();
+      }
     });
   }
 
-              function setupMultiSelect(selectorInput, selectorHidden) {
-                  $(document).on('click', selectorHidden, function () {
+  function setupMultiSelect(selectorInput, selectorHidden) {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const ids  = $(this).val();
       const text = $(selectorInput).val();
-      if      (selectorHidden === '.zone_id')            { filters.zone_id       = ids; filters.zone_name       = text; }
-      else if (selectorHidden === '.branch_id')          { filters.branch_id     = ids; filters.branch_name     = text; }
-      else if (selectorHidden === '.company_id')         { filters.company_id    = ids; filters.company_name    = text; }
-      else if (selectorHidden === '.vendor_id')          { filters.vendor_id     = ids; filters.vendor_name     = text; }
-      else if (selectorHidden === '.tds_section_id')     { filters.section_id    = ids; filters.section_name    = text; }
-      else if (selectorHidden === '.state_id')           { filters.state_id      = ids; filters.state_name      = text; }
-      else if (selectorHidden === '.financial_year_id')  { filters.financial_name= ids; filters.financial_display= text; }
-      else if (selectorHidden === '.quarter_id')         { filters.quarter_name  = ids; filters.quarter_display = text; }
-                      loadTds();
-                  });
-              }
-  $('.zone_id').on('click',           function () { setupMultiSelect('.zone-search-input',           '.zone_id'); });
-  $('.branch_id').on('click',         function () { setupMultiSelect('.branch-search-input',         '.branch_id'); });
-  $('.company_id').on('click',        function () { setupMultiSelect('.company-search-input',        '.company_id'); });
-  $('.vendor_id').on('click',         function () { setupMultiSelect('.vendor-search-input',         '.vendor_id'); });
-  $('.tds_section_id').on('click',    function () { setupMultiSelect('.tds-section-input',           '.tds_section_id'); });
-  $('.state_id').on('click',          function () { setupMultiSelect('.state-search-input',          '.state_id'); });
-  $('.financial_year_id').on('click', function () { setupMultiSelect('.financial-year-search-input', '.financial_year_id'); });
-  $('.quarter_id').on('click',        function () { setupMultiSelect('.quarter-search-input',        '.quarter_id'); });
+      if      (selectorHidden === '.zone_id')            { filters.zone_id        = ids; filters.zone_name        = text; }
+      else if (selectorHidden === '.branch_id')          { filters.branch_id      = ids; filters.branch_name      = text; }
+      else if (selectorHidden === '.company_id')         { filters.company_id     = ids; filters.company_name     = text; }
+      else if (selectorHidden === '.vendor_id')          { filters.vendor_id      = ids; filters.vendor_name      = text; }
+      else if (selectorHidden === '.tds_section_id')     { filters.section_id     = ids; filters.section_name     = text; }
+      else if (selectorHidden === '.state_id')           { filters.state_id       = ids; filters.state_name       = text; }
+      else if (selectorHidden === '.financial_year_id')  { filters.financial_name = ids; filters.financial_display = text; }
+      else if (selectorHidden === '.quarter_id')         { filters.quarter_name   = ids; filters.quarter_display  = text; }
+      loadTds();
+    });
+  }
+  setupMultiSelect('.zone-search-input',           '.zone_id');
+  setupMultiSelect('.branch-search-input',         '.branch_id');
+  setupMultiSelect('.company-search-input',        '.company_id');
+  setupMultiSelect('.vendor-search-input',         '.vendor_id');
+  setupMultiSelect('.tds-section-input',           '.tds_section_id');
+  setupMultiSelect('.state-search-input',          '.state_id');
+  setupMultiSelect('.financial-year-search-input', '.financial_year_id');
+  setupMultiSelect('.quarter-search-input',        '.quarter_id');
 
   $('.universal_search').on('keyup', function () { filters.universal_search = $(this).val(); loadTds(); });
 

@@ -816,7 +816,8 @@ $(document).ready(function () {
                 detail += '<div class="col-12 mt-1"><div class="detail-label mb-1">Extra Data (JSON)</div><pre>' + esc(edStr) + '</pre></div>';
             }
             if (!detail) detail = '<div class="col-12 text-muted">No extra detail.</div>';
-
+            // console.log(r.created_at);
+            
             var dateStr = r.created_at ? r.created_at.replace('T',' ').substring(0,19) : '—';
             var displayIp = r.ip_address || '—';
 

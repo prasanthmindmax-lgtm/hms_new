@@ -433,12 +433,6 @@
                                                                 <input type="text" class="billing-field" name="billing_phone" autocomplete="off" autocorrect="off" value={{$vendor->billingAddress->phone}} >
                                                             </div>
                                                         </div>
-                                                        <div class="form-group row align-items-center mb-3">
-                                                            <label class="col-md-4 col-form-label">Fax Number</label>
-                                                            <div class="col-md-8">
-                                                                <input type="text" class="billing-field" name="billing_fax" autocomplete="off" autocorrect="off" value={{$vendor->billingAddress->fax}} >
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -507,12 +501,6 @@
                                                                 <input type="text" class="shipping-field" name="shipping_phone" autocomplete="off" autocorrect="off" value={{$vendor->shippingAddress->phone}}>
                                                             </div>
                                                         </div>
-                                                        <div class="form-group row align-items-center mb-3">
-                                                            <label class="col-md-4 col-form-label">Fax Number</label>
-                                                            <div class="col-md-8">
-                                                                <input type="text" class="shipping-field" name="shipping_fax" autocomplete="off" autocorrect="off" value={{$vendor->shippingAddress->fax}}>
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -557,7 +545,7 @@
                                                 <div class="row form-section">
                                                     <div class="col-12 col-md-6 row align-items-center mb-3">
                                                         <div class="section-title col-md-4">
-                                                            <span>Tds Tax</span>
+                                                            <span>Tds Percentage</span>
                                                         </div>
                                                         <div class="tax-dropdown-wrapper tds-tax-section" style="width:340px;">
                                                             <input type="text" class="form-control tax-search-input" name="tds_tax_name" placeholder="Select a Tax" autocomplete="off" autocorrect="off" value="{{ $vendor->tds_tax_name }}"  readonly>
@@ -572,7 +560,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div class="row form-section">
+                                                <!-- <div class="row form-section">
                                                     <div class="col-12 col-md-6 row align-items-center mb-3">
                                                         <div class="section-title col-md-4">
                                                             <span>Tds Amount</span>
@@ -581,7 +569,7 @@
                                                             <input type="number" placeholder="INR" name="tds_amount" autocomplete="off" autocorrect="off" value={{$vendor->tds_amount}}>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </div> -->
                                             </div>
                                         </div>
 
@@ -658,11 +646,11 @@
                             </div>
 
                             <div class="row customer-form-section">
-                                <div class="customer-section-title">Company Name</div>
+                                <div class="customer-section-title">Company Name <span style="color:red;">*</span></div>
                                 <div class="col-12 col-md-6">
                                     <div class="customer-form-group">
                                         <input type="text" class="customer-display-name-input" id="company_name" placeholder="Select or type to add" autocomplete="off" autocorrect="off" name="company_name" >
-
+                                        <span class="error_company_name" style="color:red"></span>
                                     </div>
                                 </div>
                             </div>
@@ -729,7 +717,7 @@
                                 <div class="row form-section">
                                     <div class="col-12 col-md-6 row align-items-center mb-3">
                                         <div class="section-title col-md-4">
-                                            <span>PAN</span>
+                                            <span>PAN <span style="color:red;">*</span></span>
                                         </div>
                                         <div class="form-group col-md-8">
                                             <input type="text" name="pan" id="pan_number" autocomplete="off" autocorrect="off">
@@ -764,7 +752,7 @@
                                 <div class="row form-section">
                                     <div class="col-12 col-md-6 row align-items-center mb-3">
                                         <div class="section-title col-md-4">
-                                            <span>GST</span>
+                                            <span>GST <span style="color:red;">*</span></span>
                                         </div>
                                         <div class="form-group col-md-8">
                                             <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off">
@@ -1017,12 +1005,6 @@
                                                     <input type="text" class="billing-field" name="billing_phone" autocomplete="off" autocorrect="off">
                                                 </div>
                                             </div>
-                                            <div class="form-group row align-items-center mb-3">
-                                                <label class="col-md-4 col-form-label">Fax Number</label>
-                                                <div class="col-md-8">
-                                                    <input type="text" class="billing-field" name="billing_fax" autocomplete="off" autocorrect="off">
-                                                </div>
-                                            </div>
                                         </div>
                                     </div>
 
@@ -1090,12 +1072,6 @@
                                                 <label class="col-md-4 col-form-label">phone</label>
                                                 <div class="col-md-8">
                                                     <input type="text" class="shipping-field" name="shipping_phone" autocomplete="off" autocorrect="off">
-                                                </div>
-                                            </div>
-                                            <div class="form-group row align-items-center mb-3">
-                                                <label class="col-md-4 col-form-label">Fax Number</label>
-                                                <div class="col-md-8">
-                                                    <input type="text" class="shipping-field" name="shipping_fax" autocomplete="off" autocorrect="off">
                                                 </div>
                                             </div>
                                         </div>
@@ -1196,7 +1172,7 @@
                                          <div class="row form-section">
                                             <div class="col-12 col-md-6 row align-items-center mb-3">
                                                 <div class="section-title col-md-4">
-                                                    <span>Tds Tax</span>
+                                                    <span>Tds Percentage</span>
                                                 </div>
                                                 <div class="tax-dropdown-wrapper tds-tax-section" style="width:340px;">
                                                     <input type="text" class="form-control tax-search-input" name="tds_tax_name" autocomplete="off" autocorrect="off" placeholder="Select a Tax" readonly>
@@ -1211,7 +1187,7 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row form-section">
+                                        <!-- <div class="row form-section">
                                             <div class="col-12 col-md-6 row align-items-center mb-3">
                                                 <div class="section-title col-md-4">
                                                     <span>Tds Amount</span>
@@ -1220,7 +1196,7 @@
                                                     <input type="number" placeholder="INR" name="tds_amount" >
                                                 </div>
                                             </div>
-                                        </div>
+                                        </div> -->
                                     </div>
                                 </div>
 
@@ -1639,8 +1615,8 @@
 
                         $('#bank-container').append(bankSection);
                     });
-                } else {
-                    // Edit mode but no bank details yet — add one empty section so user can enter bank details
+                } else if ($('#bank-container .bank-section').length === 0) {
+                    // Only add empty bank section if none exists yet (edit mode with no bank data)
                     const emptyBankSection = $(`
                         <div class="bank-section col-12 col-md-6" data-index="0">
                             <div class="form-group row align-items-center mb-3">
@@ -2406,6 +2382,34 @@
                         $('.error_display_name').text('Enter the Display Name');
                         isValid = false;
                     }
+                    if ($('#company_name').val() === "") {
+                        $('.error_company_name').text('Company Name is required');
+                        isValid = false;
+                    } else {
+                        $('.error_company_name').text('');
+                    }
+                    if ($('#pan_number').val().trim() === "") {
+                        $('.error_pan_number').text('PAN Number is required');
+                        isValid = false;
+                    } else {
+                        $('.error_pan_number').text('');
+                    }
+                    if ($('#gst_number').val().trim() === "") {
+                        $('.error_gst_number').text('GST Number is required');
+                        isValid = false;
+                    } else {
+                        $('.error_gst_number').text('');
+                    }
+                    let bankAccountValid = true;
+                    $('input[name*="[account_number]"]').each(function() {
+                        if ($(this).val().trim() === "") {
+                            bankAccountValid = false;
+                        }
+                    });
+                    
+                    if (!isValid) {
+                        return;
+                    }
                     // let email = $('#email').val().trim();
                     // let emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -2446,10 +2450,6 @@
                     //     isValid = false;
                     // } else {
                     //     $('.error_pan_number').text('');
-                    // }
-
-                    // if (!isValid) {
-                    //     return;
                     // }
 
                 // Append all form data

@@ -87,7 +87,7 @@
           <div class="qd-stat-icon"><i class="bi bi-receipt-cutoff"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Total TDS Amount</div>
-            <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['total_tds'] ?? 0, 2) }}</div>
+            <div class="qd-stat-value" data-stat-key="total_tds">₹{{ number_format($tdsSummaryCalculation['total_tds'] ?? 0, 2) }}</div>
             <div class="qd-stat-sub">All bills with TDS</div>
           </div>
         </div>
@@ -95,7 +95,7 @@
           <div class="qd-stat-icon"><i class="bi bi-calendar-month"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">This Month TDS</div>
-            <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['this_month_tds'] ?? 0, 2) }}</div>
+            <div class="qd-stat-value" data-stat-key="this_month_tds">₹{{ number_format($tdsSummaryCalculation['this_month_tds'] ?? 0, 2) }}</div>
             <div class="qd-stat-sub">Current month pending</div>
           </div>
         </div>
@@ -103,7 +103,7 @@
           <div class="qd-stat-icon"><i class="bi bi-clock-history"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Pending TDS</div>
-            <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['pending_tds'] ?? 0, 2) }}</div>
+            <div class="qd-stat-value" data-stat-key="pending_tds">₹{{ number_format($tdsSummaryCalculation['pending_tds'] ?? 0, 2) }}</div>
             <div class="qd-stat-sub">Not yet paid</div>
           </div>
         </div>
@@ -111,7 +111,7 @@
           <div class="qd-stat-icon"><i class="bi bi-check-circle"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Paid TDS</div>
-            <div class="qd-stat-value">₹{{ number_format($tdsSummaryCalculation['paid_tds'] ?? 0, 2) }}</div>
+            <div class="qd-stat-value" data-stat-key="paid_tds">₹{{ number_format($tdsSummaryCalculation['paid_tds'] ?? 0, 2) }}</div>
             <div class="qd-stat-sub">Remitted to govt</div>
           </div>
         </div>
@@ -612,7 +612,17 @@ $(document).ready(function () {
       type: 'GET',
       data: appliedFilters,
       success: function (data) {
-        $('#tds-body').html(data);
+        if (data && typeof data === 'object' && data.html !== undefined) {
+          $('#tds-body').html(data.html);
+          // Update stat cards
+          if (data.stats) {
+            $.each(data.stats, function(key, val) {
+              $('[data-stat-key="' + key + '"]').text('₹' + parseFloat(val || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+            });
+          }
+        } else {
+          $('#tds-body').html(data);
+        }
         renderSummary();
       }
     });
@@ -620,24 +630,25 @@ $(document).ready(function () {
 
   // ── Multiselect → filter wire-up ──
   function setupMultiSelect(selectorInput, selectorHidden) {
-    $(document).on('click', selectorHidden, function () {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const selectedIds  = $(this).val();
       const selectedText = $(selectorInput).val();
-      if (selectorHidden === '.zone_id')         { filters.zone_id    = selectedIds; filters.zone_name    = selectedText; }
-      else if (selectorHidden === '.branch_id')  { filters.branch_id  = selectedIds; filters.branch_name  = selectedText; }
-      else if (selectorHidden === '.company_id') { filters.company_id = selectedIds; filters.company_name = selectedText; }
-      else if (selectorHidden === '.vendor_id')  { filters.vendor_id  = selectedIds; filters.vendor_name  = selectedText; }
+      if (selectorHidden === '.zone_id')             { filters.zone_id    = selectedIds; filters.zone_name    = selectedText; }
+      else if (selectorHidden === '.branch_id')      { filters.branch_id  = selectedIds; filters.branch_name  = selectedText; }
+      else if (selectorHidden === '.company_id')     { filters.company_id = selectedIds; filters.company_name = selectedText; }
+      else if (selectorHidden === '.vendor_id')      { filters.vendor_id  = selectedIds; filters.vendor_name  = selectedText; }
       else if (selectorHidden === '.tds_section_id') { filters.section_id = selectedIds; filters.section_name = selectedText; }
-      else if (selectorHidden === '.state_id')   { filters.state_id   = selectedIds; filters.state_name   = selectedText; }
+      else if (selectorHidden === '.state_id')       { filters.state_id   = selectedIds; filters.state_name   = selectedText; }
       loadTds();
     });
   }
-  $('.zone_id').on('click',        function () { setupMultiSelect('.zone-search-input',    '.zone_id'); });
-  $('.branch_id').on('click',      function () { setupMultiSelect('.branch-search-input',  '.branch_id'); });
-  $('.company_id').on('click',     function () { setupMultiSelect('.company-search-input', '.company_id'); });
-  $('.vendor_id').on('click',      function () { setupMultiSelect('.vendor-search-input',  '.vendor_id'); });
-  $('.tds_section_id').on('click', function () { setupMultiSelect('.tds-section-input',    '.tds_section_id'); });
-  $('.state_id').on('click',       function () { setupMultiSelect('.state-search-input',   '.state_id'); });
+  setupMultiSelect('.zone-search-input',    '.zone_id');
+  setupMultiSelect('.branch-search-input',  '.branch_id');
+  setupMultiSelect('.company-search-input', '.company_id');
+  setupMultiSelect('.vendor-search-input',  '.vendor_id');
+  setupMultiSelect('.tds-section-input',    '.tds_section_id');
+  setupMultiSelect('.state-search-input',   '.state_id');
 
   $('.universal_search').on('keyup', function () {
     filters.universal_search = $(this).val();

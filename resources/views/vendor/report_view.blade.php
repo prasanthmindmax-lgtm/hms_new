@@ -360,29 +360,30 @@ $(document).ready(function () {
     $.ajax({
       url: "{{ route('superadmin.reportdetails', ['type' => '__TYPE__']) }}".replace('__TYPE__', encodeURIComponent(getType())),
       type:'GET',
-      data: { per_page:perPage, page, date_from:filters.date_from, date_to:filters.date_to, zone_id:filters.zone_id, branch_id:filters.branch_id, company_id:filters.company_id, vendor_id:filters.vendor_id, nature_id:filters.nature_id, state_name:filters.state_name, universal_search:filters.universal_search },
+      data: { per_page:perPage, page, date_from:filters.date_from, date_to:filters.date_to, zone_id:filters.zone_id, branch_id:filters.branch_id, company_id:filters.company_id, vendor_id:filters.vendor_id, nature_id:filters.nature_id, state_id:filters.state_id, universal_search:filters.universal_search },
       success: function (data) { $('#report-body').html(data); renderSummary(); }
     });
   }
 
   function setupMultiSelect(selectorInput, selectorHidden) {
-    $(document).on('click', selectorHidden, function () {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const ids = $(this).val(), text = $(selectorInput).val();
-      if (selectorHidden==='.zone_id')    { filters.zone_id=ids; filters.zone_name=text; }
+      if (selectorHidden==='.zone_id')         { filters.zone_id=ids; filters.zone_name=text; }
       else if (selectorHidden==='.branch_id')  { filters.branch_id=ids; filters.branch_name=text; }
       else if (selectorHidden==='.company_id') { filters.company_id=ids; filters.company_name=text; }
       else if (selectorHidden==='.vendor_id')  { filters.vendor_id=ids; filters.vendor_name=text; }
       else if (selectorHidden==='.state_id')   { filters.state_id=ids; filters.state_name=text; }
       else if (selectorHidden==='.nature_id')  { filters.nature_id=ids; filters.nature_name=text; }
-      loadData();
+      loadData(); renderSummary();
     });
   }
-  $('.zone_id').on('click',    function () { setupMultiSelect('.zone-search-input', '.zone_id'); });
-  $('.branch_id').on('click',  function () { setupMultiSelect('.branch-search-input', '.branch_id'); });
-  $('.company_id').on('click', function () { setupMultiSelect('.company-search-input', '.company_id'); });
-  $('.vendor_id').on('click',  function () { setupMultiSelect('.vendor-search-input', '.vendor_id'); });
-  $('.state_id').on('click',   function () { setupMultiSelect('.state-search-input', '.state_id'); });
-  $('.nature_id').on('click',  function () { setupMultiSelect('.nature-search-input', '.nature_id'); });
+  setupMultiSelect('.zone-search-input',    '.zone_id');
+  setupMultiSelect('.branch-search-input',  '.branch_id');
+  setupMultiSelect('.company-search-input', '.company_id');
+  setupMultiSelect('.vendor-search-input',  '.vendor_id');
+  setupMultiSelect('.state-search-input',   '.state_id');
+  setupMultiSelect('.nature-search-input',  '.nature_id');
 
   $('.universal_search').on('keyup', function () { filters.universal_search=$(this).val(); loadData(); });
   $('.data_values').on('change', function () {

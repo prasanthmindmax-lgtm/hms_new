@@ -117,15 +117,15 @@ input[type="file"] { display: none; }
           <div class="qd-stat-icon"><i class="bi bi-boxes"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Total Assets</div>
-            <div class="qd-stat-value">{{ $stats['total'] }}</div>
+            <div class="qd-stat-value" data-stat-key="total">{{ $stats['total'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
-                </div>
+          </div>
         </div>
         <div class="qd-stat-card qd-stat-green" data-stat-filter="save" title="Filter: Saved">
           <div class="qd-stat-icon"><i class="bi bi-check2-circle"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Saved</div>
-            <div class="qd-stat-value">{{ $stats['save'] }}</div>
+            <div class="qd-stat-value" data-stat-key="save">{{ $stats['save'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -133,7 +133,7 @@ input[type="file"] { display: none; }
           <div class="qd-stat-icon"><i class="bi bi-file-earmark-text"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Draft</div>
-            <div class="qd-stat-value">{{ $stats['draft'] }}</div>
+            <div class="qd-stat-value" data-stat-key="draft">{{ $stats['draft'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -141,11 +141,11 @@ input[type="file"] { display: none; }
           <div class="qd-stat-icon"><i class="bi bi-currency-rupee"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Total Value</div>
-            <div class="qd-stat-value">₹{{ number_format($stats['total_amount'], 0) }}</div>
+            <div class="qd-stat-value" data-stat-key="total_amount">₹{{ number_format($stats['total_amount'], 0) }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
-                            </div>
-                        </div>
-                    </div>
+          </div>
+        </div>
+      </div>
 
       {{-- ── Filters ── --}}
       <div class="qd-filters" id="filtersSection">
@@ -858,7 +858,21 @@ input[type="file"] { display: none; }
         stat_filter: statFilter
       },
       success: function (data) {
-        $('#bill-body').html(data);
+        if (typeof data === 'object' && data.html !== undefined) {
+          $('#bill-body').html(data.html);
+          if (data.stats) {
+            $.each(data.stats, function(key, val) {
+              var $el = $('[data-stat-key="' + key + '"]');
+              if (key === 'total_amount') {
+                $el.text('₹' + parseFloat(val).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}));
+              } else {
+                $el.text(val);
+              }
+            });
+          }
+        } else {
+          $('#bill-body').html(data);
+        }
         renderSummary();
       }
     });
@@ -866,10 +880,11 @@ input[type="file"] { display: none; }
 
   // ── Multiselect → filter wire-up (same pattern as quotation dashboard) ──
   function setupMultiSelect(selectorInput, selectorHidden) {
-    $(document).on('click', selectorHidden, function () {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const selectedIds  = $(this).val();
       const selectedText = $(selectorInput).val();
-      if (selectorHidden === '.zone_id')    { filters.zone_id = selectedIds; filters.zone_name = selectedText; }
+      if (selectorHidden === '.zone_id')         { filters.zone_id = selectedIds; filters.zone_name = selectedText; }
       else if (selectorHidden === '.branch_id')  { filters.branch_id = selectedIds; filters.branch_name = selectedText; }
       else if (selectorHidden === '.company_id') { filters.company_id = selectedIds; filters.company_name = selectedText; }
       else if (selectorHidden === '.vendor_id')  { filters.vendor_id = selectedIds; filters.vendor_name = selectedText; }
@@ -878,12 +893,12 @@ input[type="file"] { display: none; }
       loadBill();
     });
   }
-  $('.zone_id').on('click', function () { setupMultiSelect('.zone-search-input', '.zone_id'); });
-  $('.branch_id').on('click', function () { setupMultiSelect('.branch-search-input', '.branch_id'); });
-  $('.company_id').on('click', function () { setupMultiSelect('.company-search-input', '.company_id'); });
-  $('.vendor_id').on('click', function () { setupMultiSelect('.vendor-search-input', '.vendor_id'); });
-  $('.nature_id').on('click', function () { setupMultiSelect('.nature-search-input', '.nature_id'); });
-  $('.status_id').on('click', function () { setupMultiSelect('.status-search-input', '.status_id'); });
+  setupMultiSelect('.zone-search-input', '.zone_id');
+  setupMultiSelect('.branch-search-input', '.branch_id');
+  setupMultiSelect('.company-search-input', '.company_id');
+  setupMultiSelect('.vendor-search-input', '.vendor_id');
+  setupMultiSelect('.nature-search-input', '.nature_id');
+  setupMultiSelect('.status-search-input', '.status_id');
 
   $('.universal_search').on('keyup', function () {
     filters.universal_search = $(this).val();

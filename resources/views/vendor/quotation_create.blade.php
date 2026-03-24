@@ -60,7 +60,7 @@
                     <!-- Vendor Name -->
                     <div class="col-md-6">
                         <div class="row mb-2 align-items-start">
-                            <label for="vendor-search" class="col-md-4  fw-semibold">Vendor Name*</label>
+                            <label for="vendor-search" class="col-md-4  fw-semibold">Vendor Name<span style="color:red;">*</span></label>
 
                             <input type="hidden" name="id" id="id">
                             <div class="col-md-8">
@@ -123,17 +123,17 @@
                     </div>
 
                 </div>
-                <!-- Row 2: Bill#, Order Number -->
+                <!-- Row 2: Vendor Quotation No -->
                 <div class="row mb-3">
-                    <label for="quotation_no" class="col-md-2 ">Quotation no*</label>
+                    <label for="quotation_no" class="col-md-2 ">Vendor Quotation No<span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="quotation_no" name="quotation_no" autocomplete="off" autocorrect="off" required>
                         <span class="error_quotation" style="color:red"></span>
                     </div>
 
                 </div>
-                <!-- Row 3: Bill#, Order Number -->
-                <div class="row mb-3">
+                <!-- Row 3: Order Number (hidden) -->
+                <div class="row mb-3" style="display:none;">
                     <label for="order_number" class="col-md-2 ">Order Number</label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="order_number" name="order_number" autocomplete="off" autocorrect="off">
@@ -141,18 +141,18 @@
                     </div>
                 </div>
 
-                <!-- Row 4: Bill Date, Due Date -->
+                <!-- Row 4: Vendor Quotation Date, Quotation Validity -->
                 <div class="row mb-3">
-                    <label for="bill_date" class="col-md-2 ">Bill Date*</label>
+                    <label for="bill_date" class="col-md-2 ">Vendor Quotation Date<span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control datepicker" autocomplete="off" autocorrect="off" id="bill_date" name="bill_date" placeholder="dd/MM/yyyy" required>
                         <span class="error_bill_date" style="color:red"></span>
                     </div>
                 </div>
 
-                <!-- Row 5: Payment Terms -->
+                <!-- Row 5: Quotation Validity + Payment Terms -->
                 <div class="row mb-3">
-                    <label for="due_date" class="col-md-2 ">Due Date</label>
+                    <label for="due_date" class="col-md-2 ">Quotation Validity<span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control datepicker" id="due_date" name="due_date" autocomplete="off" autocorrect="off">
                         <span class="error_due_date" style="color:red"></span>
@@ -170,10 +170,9 @@
                 </div>
                 <!-- Row 5: Payment Terms -->
                 <div class="row mb-3">
-                    <label for="zone" class="col-md-2 ">Zones</label>
+                    <label for="zone" class="col-md-2 ">Zones<span style="color:red;">*</span></label>
                     <div class="col-md-4">
-                        {{-- <input type="text" class="form-control datepicker" id="due_date" name="due_date" > --}}
-                      <div class="tax-dropdown-wrapper account-section" style="width:343px">
+                      <div class="tax-dropdown-wrapper account-section" style="width:300px">
                           <input type="text" class="form-control zone-search-input" autocomplete="off" autocorrect="off" name="zone" placeholder="Select a Zones" readonly>
                           <input type="hidden" name="zone_id" class="zone_id">
                           <div class="dropdown-menu tax-dropdown">
@@ -184,10 +183,9 @@
                         </div>
                     </div>
 
-                    <label for="branch" class="col-md-2 ">Branch</label>
+                    <label for="branch" class="col-md-2 ">Branch<span style="color:red;">*</span></label>
                     <div class="col-md-4">
-                        {{-- <input type="text" class="form-control datepicker" id="due_date" name="due_date" > --}}
-                      <div class="tax-dropdown-wrapper account-section" style="width:343px">
+                      <div class="tax-dropdown-wrapper account-section" style="width:300px">
                           <input type="text" class="form-control branch-search-input" autocomplete="off" autocorrect="off" name="branch" placeholder="Select a branch" readonly>
                           <input type="hidden" name="branch_id" class="branch_id">
                           <div class="dropdown-menu tax-dropdown">
@@ -199,26 +197,30 @@
                     </div>
                 </div>
                 <div class="row mb-3">
-                    <label for="zone" class="col-md-2 ">Company</label>
+                    <label for="zone" class="col-md-2 ">Group of Company<span style="color:red;">*</span></label>
                     <div class="col-md-4">
-                        {{-- <input type="text" class="form-control datepicker" id="due_date" name="due_date" > --}}
-                      <div class="tax-dropdown-wrapper company-section" style="width:343px">
+                      <div class="tax-dropdown-wrapper company-section"style="width:300px" >
                           <input type="text" class="form-control company-search-input" autocomplete="off" autocorrect="off" name="company_name" placeholder="Select a Company" readonly>
                           <input type="hidden" name="company_id" class="company_id">
                           <div class="dropdown-menu tax-dropdown">
                             <div class="company-list">
                             </div>
                           </div>
-                          <span class="error_zone" style="color:red"></span>
+                          <span class="error_company" style="color:red"></span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Row 6: Subject -->
+                <!-- Row 6: Subject + Timeline -->
                 <div class="row mb-3">
                     <label for="subject" class="col-md-2 ">Subject</label>
                     <div class="col-md-4">
                         <textarea class="form-control" id="subject" name="subject" autocomplete="off" autocorrect="off" placeholder="Enter a subject within 250 characters" rows="2" maxlength="250"></textarea>
+                    </div>
+                    <label for="timeline_date" class="col-md-2 ">Timeline<span style="color:red;">*</span></label>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control datepicker" id="timeline_date" name="timeline_date" autocomplete="off" autocorrect="off" placeholder="dd/MM/yyyy">
+                        <span class="error_timeline" style="color:red"></span>
                     </div>
                 </div>
             </div>
@@ -365,30 +367,21 @@
                       <div class=""></div>
                     </div>
                     <!-- Adjustment -->
-                    <div class="gst_calculate_show">
+                    <div class="gst_calculate_show" style="display:none;"></div>
 
-                    </div>
-
-                   <!-- Radio selector -->
+                   <!-- TDS -->
                     <div class="form-row tax-row">
                       <label><input type="radio" name="tax_type" value="TDS" checked> TDS</label>
-                      {{-- <label><input type="radio" name="tax_type" value="TCS"> TCS</label> --}}
-
-                      <!-- TDS TAX SELECT -->
                       <div class="tax-dropdown-wrapper tds-tax-section">
                         <input type="text" class="form-control tax-search-input" autocomplete="off" autocorrect="off" name="tds_tax_name" placeholder="Select a Tax" readonly>
                         <input type="hidden" name="tds_tax_selected" class="selected-tds-tax" id="tds_tax_value">
                         <input type="hidden" name="tds_tax_id" class="tds-tax-id">
                         <div class="dropdown-menu tax-dropdown">
-                          <div class="tax-list">
-
-                          </div>
+                          <div class="tax-list"></div>
                           <div class="manage-tds-link">⚙️ Manage TDS</div>
                         </div>
                       </div>
-
-                      <!-- TCS TAX SELECT -->
-                      <div class="tax-dropdown-wrapper tcs-tax-section" >
+                      <div class="tax-dropdown-wrapper tcs-tax-section">
                         <input type="text" class="form-control tax-tcs-search-input" autocomplete="off" autocorrect="off" name="tcs_tax_name" placeholder="Select a Tax" readonly>
                         <input type="hidden" name="tcs_tax_selected" class="selected-tcs-tax">
                         <input type="hidden" name="tcs_tax_id" class="tcs-tax-id">
@@ -396,9 +389,7 @@
                           <div class="inner-search-container">
                             <input type="text" class="tax-inner-search" placeholder="Search...">
                           </div>
-                          <div class="tax-tcs-list">
-
-                          </div>
+                          <div class="tax-tcs-list"></div>
                           <div class="manage-tcs-link">⚙️ Manage TCS</div>
                         </div>
                       </div>
@@ -406,14 +397,27 @@
                         <div class="tax-amount" id="tax-amount" style="width: 80px;">0.00</div>
                       </div>
                     </div>
-                    <div class="export_chargers">
-                      <div class="export_chargers">
-                        <input type="text" name="export_name" class="export_name" placeholder="Export chargers Name">
-                        <input type="text" name="export_amount" class="export_amount" placeholder="Enter Amount">
-                      </div>
-                       <div>
-                        <div class="export-amount" id="export-amount" style="width: 80px;">0.00</div>
-                      </div>
+                    
+                    <!-- Transport Charges -->
+                    <div class="form-row" style="margin-bottom:8px;gap:6px;">
+                      <input type="text" name="export_name" class="export_name"
+                             placeholder="Transport Charges Name"
+                             style="flex:1;min-width:0;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+                      <input type="number" name="export_amount" class="export_amount"
+                             placeholder="0.00" min="0" step="0.01"
+                             style="width:90px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+                      <div class="export-amount" id="export-amount" style="flex:0 0 70px;text-align:right;font-size:13px;">₹0.00</div>
+                    </div>
+
+                    <!-- Loading / Unloading Charges -->
+                    <div class="form-row" style="margin-bottom:8px;gap:6px;">
+                      <input type="text" name="loading_unloading_name" class="loading_unloading_name"
+                             placeholder="Loading / Unloading Charges Name"
+                             style="flex:1;min-width:0;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+                      <input type="number" name="loading_unloading_amount" class="loading_unloading_amount"
+                             placeholder="0.00" min="0" step="0.01"
+                             style="width:90px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+                      <div class="loading-unloading-amount" id="loading-unloading-amount" style="flex:0 0 70px;text-align:right;font-size:13px;">₹0.00</div>
                     </div>
                     {{-- <div class="form-row tax-row">
                       <label><input type="radio" name="gst_type" value="GST" checked> GST</label>
@@ -453,29 +457,22 @@
                       </div>
                     </div> --}}
 
-                    <div class="esi-row tax_show_single" >
+                    <div class="esi-row tax_show_single" style="display:none !important;">
                         <label>ESI</label>
                         <div class="esi-display-amount">₹0.00</div>
                     </div>
 
-                    <div class="pf-row tax_show_single" >
+                    <div class="pf-row tax_show_single" style="display:none !important;">
                         <label>PF</label>
                         <div class="pf-display-amount">₹0.00</div>
                     </div>
 
-                    <div class="other-row tax_show_single" >
+                    <div class="other-row tax_show_single" style="display:none !important;">
                         <label>Other</label>
                         <div class="other-display-amount">₹0.00</div>
                     </div>
 
-                    {{-- <div class="other-reason-row tax_show_single" style="display:none;">
-                        <label>Reason</label>
-                        <div class="other-reason-display"></div>
-                    </div> --}}
-
-
-                    <span class="open-other-charges"
-                          style="color:#007bff; cursor:pointer; font-size: 9px; margin-top:6px; display:inline-block;">
+                    <span class="open-other-charges" style="display:none;">
                         Add ESI / PF / Others
                     </span>
                     <hr>
@@ -1014,7 +1011,7 @@
 
           </form>
             <div class="action-buttons">
-              <button type="button" id="saveDraftBtn" class="btn draft-btn">Save as Draft</button>
+              <button type="button" id="saveDraftBtn" class="btn draft-btn" style="display:none;">Save as Draft</button>
               <button type="button" id="saveOpenBtn" class="btn open-btn">Save as Open</button>
               <button type="button" class="btn cancel-btn">Cancel</button>
             </div>
@@ -1116,15 +1113,8 @@
         gstcalculate();
       });
 
-      $(document).on('input', '.export_amount', function() {
-        var name = $('.export_name').val().trim();
-
-        if (name === '') {
-            toastr.error('Export Name is required');
-            $('.export_name').focus();
-            $(this).val(''); // clear amount until name entered
-            return false;
-        }
+      $(document).on('input', '.export_amount, .loading_unloading_amount', function() {
+        calculateFinalTotals();
       });
   function gstcalculate(changedRow) {
 
@@ -1169,8 +1159,8 @@
 
         const gst_amount = (amount * gst_percent) / 100;
 
-        // STEP 4 — GST Split
-        if (gst_type === 'GST') {
+        // STEP 4 — GST Split (only when GST % is actually selected)
+        if (gst_percent > 0 && gst_type === 'GST') {
             const cgst_amount = gst_amount / 2;
             const sgst_amount = gst_amount / 2;
 
@@ -1183,7 +1173,7 @@
             summary[keyC] = (summary[keyC] || 0) + cgst_amount;
             summary[keyS] = (summary[keyS] || 0) + sgst_amount;
         }
-        else if (gst_type === 'IGST') {
+        else if (gst_percent > 0 && gst_type === 'IGST') {
             if (row.find('.cgst_amount').length) row.find('.cgst_amount').val('0.00');
             if (row.find('.sgst_amount').length) row.find('.sgst_amount').val('0.00');
 
@@ -1191,6 +1181,7 @@
             summary[keyI] = (summary[keyI] || 0) + gst_amount;
         }
         else {
+            // No GST selected — clear split amounts
             if (row.find('.cgst_amount').length) row.find('.cgst_amount').val('0.00');
             if (row.find('.sgst_amount').length) row.find('.sgst_amount').val('0.00');
         }
@@ -1210,16 +1201,21 @@
         return parseFloat(pctA) - parseFloat(pctB);
     });
 
-    orderedKeys.forEach(key => {
-        const [type, percent] = key.split('_');
-        const amount = summary[key] || 0;
-        $container.append(`
-            <div class="tax_show" data-type="${type}" data-percent="${percent}">
-              <label>${type} [${percent}%]</label>
-              <div class="${type.toLowerCase()}-amount">₹ ${Number(amount).toFixed(2)}</div>
-            </div>
-        `);
-    });
+    if (orderedKeys.length > 0) {
+        $container.show();
+        orderedKeys.forEach(key => {
+            const [type, percent] = key.split('_');
+            const amount = summary[key] || 0;
+            $container.append(`
+                <div class="tax_show" data-type="${type}" data-percent="${percent}">
+                  <label>${type} [${percent}%]</label>
+                  <div class="${type.toLowerCase()}-amount">₹ ${Number(amount).toFixed(2)}</div>
+                </div>
+            `);
+        });
+    } else {
+        $container.hide();
+    }
 }
   function calculateSubTotal() {
     let subTotal = 0;
@@ -1366,6 +1362,7 @@ function calculateFinalTotals() {
     const discountPercent = parseFloat($('.discount-percent').val()) || 0;
     const discountType = $('.discount_type').val();
     const exportamount = parseFloat($('.export_amount').val()) || 0;
+    const loadingAmount = parseFloat($('.loading_unloading_amount').val()) || 0;
     const esiAmt = parseFloat($('.esi-row').attr('data-esi')) || 0;
     const pfAmt = parseFloat($('.pf-row').attr('data-pf')) || 0;
     const otherAmt = parseFloat($('.other-row').attr('data-other')) || 0;
@@ -1431,19 +1428,18 @@ function calculateFinalTotals() {
                     + adjustment
                     + total_gst
                     + exportamount
+                    + loadingAmount
                     - esiAmt
                     - pfAmt
                     - otherAmt;
-    // if (vendor.tds_amount !== null && vendor.tds_amount !== 0) {
-    //  }else{
-    //    $('#tax-amount').text('₹0.00');
-    //  }
-    $('.discount-amount').text('₹' + discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    $('#tax-amount').text(taxLabel + taxDisplayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    $('.adjustment-amount').text('₹' + adjustment.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    $('.export-amount').text('₹' + exportamount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    $('.grand-total-amount').text('₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
+    const fmt = (n) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $('.discount-amount').text(fmt(discountAmount));
+    $('#tax-amount').text(taxLabel + taxDisplayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    $('.adjustment-amount').text(fmt(adjustment));
+    $('.export-amount').text(fmt(exportamount));
+    $('.loading-unloading-amount').text(fmt(loadingAmount));
+    $('.grand-total-amount').text(fmt(grandTotal));
   }
 </script>
  <script>
@@ -1524,15 +1520,8 @@ function calculateFinalTotals() {
 
         calculateFinalTotals();
     });
-  $(document).on('input', '.export_amount', function() {
-    var name = $('.export_name').val().trim();
-
-    if (name === '') {
-        toastr.error('Export Name is required');
-        $('.export_name').focus();
-        $(this).val(''); // clear amount until name entered
-        return false;
-    }
+  $(document).on('input', '.export_amount, .loading_unloading_amount', function() {
+    calculateFinalTotals();
   });
 
 
@@ -1701,7 +1690,7 @@ function calculateFinalTotals() {
 
                   // Fill input
                   $searchInput.val(`${vendor.display_name}`);
-                  $('#selected-vendor-id').val(vendorId);
+                  $('#selected-vendor-id').val(vendorId).trigger('change');
                   $dropdown.removeClass('show');
                   $(this).addClass('selected');
                   // Fill billing address
@@ -1794,7 +1783,7 @@ function calculateFinalTotals() {
                   });
 
                   // Calculate when discount or tax changes
-                  $('.discount-percent, .discount_type, .tax-select, .adjustment-value,.selected-tds-tax,.selected-tcs-tax,.discount_type,.export_amount').on('input change', function () {
+                  $('.discount-percent, .discount_type, .tax-select, .adjustment-value,.selected-tds-tax,.selected-tcs-tax,.discount_type,.export_amount,.loading_unloading_amount').on('input change', function () {
                     calculateFinalTotals();
                   });
                   $('.discount-percent, .discount_type').on('input change', function () {
@@ -2229,7 +2218,7 @@ function calculateFinalTotals() {
                           return;
                       }
                       wrapper.find('.branch-search-input').val(selectedText);
-                      wrapper.find('.branch_id').val(selectedid);
+                      wrapper.find('.branch_id').val(selectedid).trigger('change');
 
                       $dropdown.hide();
                   });
@@ -2277,7 +2266,7 @@ function calculateFinalTotals() {
                           return;
                       }
                       wrapper.find('.company-search-input').val(selectedText);
-                      wrapper.find('.company_id').val(selectedid);
+                      wrapper.find('.company_id').val(selectedid).trigger('change');
                       $dropdown.hide();
                   });
 
@@ -3083,40 +3072,85 @@ function calculateFinalTotals() {
 
               $(document).ready(function () {
 
+                function checkRequiredFields() {
+                    const vendorFilled   = ($('#selected-vendor-id').val() || '').trim() !== '';
+                    const quotNoFilled   = $('#quotation_no').val().trim() !== '';
+                    const billDateFilled = $('#bill_date').val().trim() !== '';
+                    const dueDateFilled  = $('#due_date').val().trim() !== '';
+                    const zoneFilled     = ($('.zone_id').val() || '').trim() !== '';
+                    const branchFilled   = ($('.branch_id').val() || '').trim() !== '';
+                    const companyFilled  = ($('.company_id').val() || '').trim() !== '';
+                    const timelineFilled = $('#timeline_date').val().trim() !== '';
+
+                    const allFilled = vendorFilled && quotNoFilled && billDateFilled &&
+                                      dueDateFilled && zoneFilled && branchFilled &&
+                                      companyFilled && timelineFilled;
+
+                    if (allFilled) {
+                        $('#saveOpenBtn').prop('disabled', false).css({'opacity': '1', 'cursor': 'pointer'});
+                    } 
+                    
+                }
+
                 function submitBillForm(saveStatus, $btn) {
-                    $btn.prop('disabled', true);
                     let isValid = true;
-                    if ($('.search-input').val() === "") {
-                        $('.error_vendor_name').text('Vendor Required');
+
+                    if (($('#selected-vendor-id').val() || '').trim() === '') {
+                        $('.error_vendor_name').text('Vendor is required');
                         isValid = false;
+                    } else {
+                        $('.error_vendor_name').text('');
                     }
-                    if ($('.delivery-search-input').val() === "") {
-                        $('.error_delivery').text('Delivery Address Required');
+                    if ($('#quotation_no').val().trim() === '') {
+                        $('.error_quotation').text('Vendor Quotation No is required');
                         isValid = false;
+                    } else {
+                        $('.error_quotation').text('');
                     }
-                    if ($('#order_number').val() === "") {
-                        $('.error_order_no').text('Enter Order No ');
+                    if ($('#bill_date').val().trim() === '') {
+                        $('.error_bill_date').text('Vendor Quotation Date is required');
                         isValid = false;
+                    } else {
+                        $('.error_bill_date').text('');
                     }
-                    if ($('#bill_date').val() === "") {
-                        $('.error_bill_date').text('Bill Date Required');
+                    if ($('#due_date').val().trim() === '') {
+                        $('.error_due_date').text('Quotation Validity is required');
                         isValid = false;
+                    } else {
+                        $('.error_due_date').text('');
                     }
-                    if ($('#due_date').val() === "") {
-                        $('.error_due_date').text('Due Date Required');
+                    if (($('.zone_id').val() || '').trim() === '') {
+                        $('.error_zone').text('Zone is required');
                         isValid = false;
+                    } else {
+                        $('.error_zone').text('');
                     }
-                    if ($('.zone-search-input').val() === "") {
-                        $('.error_zone').text('Zone Required');
+                    if (($('.branch_id').val() || '').trim() === '') {
+                        $('.error_branch').text('Branch is required');
                         isValid = false;
+                    } else {
+                        $('.error_branch').text('');
                     }
-                    if ($('.branch-search-input').val() === "") {
-                        $('.error_branch').text('Branch Required');
+                    if (($('.company_id').val() || '').trim() === '') {
+                        $('.error_company').text('Group of Company is required');
                         isValid = false;
+                    } else {
+                        $('.error_company').text('');
                     }
+                    if ($('#timeline_date').val().trim() === '') {
+                        $('.error_timeline').text('Timeline is required');
+                        isValid = false;
+                    } else {
+                        $('.error_timeline').text('');
+                    }
+
                     if (!isValid) {
+                        // Disable button until all required fields are filled
+                        $btn.prop('disabled', true).css({'opacity': '0.5', 'cursor': 'not-allowed'});
                         return;
                     }
+
+                    $btn.prop('disabled', true);
 
                     // Save original button text
                     let originalText = $btn.html();
@@ -3203,6 +3237,44 @@ function calculateFinalTotals() {
                 $('.cancel-btn').on('click', function () {
                     window.location.href = "{{ route('superadmin.getquotation') }}";
                 });
+
+                // Real-time check: text inputs and datepickers
+                $(document).on('input change', '#quotation_no', function () {
+                    if ($(this).val().trim() !== '') $('.error_quotation').text('');
+                    checkRequiredFields();
+                });
+                $(document).on('change', '#bill_date', function () {
+                    if ($(this).val().trim() !== '') $('.error_bill_date').text('');
+                    checkRequiredFields();
+                });
+                $(document).on('change', '#due_date', function () {
+                    if ($(this).val().trim() !== '') $('.error_due_date').text('');
+                    checkRequiredFields();
+                });
+                $(document).on('change', '#timeline_date', function () {
+                    if ($(this).val().trim() !== '') $('.error_timeline').text('');
+                    checkRequiredFields();
+                });
+                // Vendor hidden field
+                $(document).on('change', '#selected-vendor-id', function () {
+                    if ($(this).val().trim() !== '') $('.error_vendor_name').text('');
+                    checkRequiredFields();
+                });
+                // Zone / Branch / Company hidden fields — triggered after selection
+                $(document).on('change click', '.zone_id', function () {
+                    if ($(this).val().trim() !== '') $('.error_zone').text('');
+                    checkRequiredFields();
+                });
+                $(document).on('change', '.branch_id', function () {
+                    if ($(this).val().trim() !== '') $('.error_branch').text('');
+                    checkRequiredFields();
+                });
+                $(document).on('change', '.company_id', function () {
+                    if ($(this).val().trim() !== '') $('.error_company').text('');
+                    checkRequiredFields();
+                });
+                // Run once on load (handles pre-filled edit mode)
+                checkRequiredFields();
             });
 
 
@@ -3285,12 +3357,13 @@ function calculateFinalTotals() {
           $('#due_date').val(quotation_header[0].due_date);
           $('#payment_terms').val(quotation_header[0].payment_terms);
           $('#subject').val(quotation_header[0].subject);
+          $('#timeline_date').val(quotation_header[0].timeline_date);
           $('.zone-search-input').val(quotation_header[0].zone_name);
-          $('.zone_id').val(quotation_header[0].zone_id);
+          $('.zone_id').val(quotation_header[0].zone_id).trigger('change');
           $('.branch-search-input').val(quotation_header[0].branch_name);
-          $('.branch_id').val(quotation_header[0].branch_id);
+          $('.branch_id').val(quotation_header[0].branch_id).trigger('change');
           $('.company-search-input').val(quotation_header[0].company_name);
-          $('.company_id').val(quotation_header[0].company_id);
+          $('.company_id').val(quotation_header[0].company_id).trigger('change');
           $('.discount_type').val(quotation_header[0].discount_type);
           $('.delivery-search-input').val(quotation_header[0].delivery_address);
           $('.delivery_id').val(quotation_header[0].delivery_id);
@@ -3351,6 +3424,11 @@ function calculateFinalTotals() {
             $('.adjustment-reason').val(qh.adjustment_reason);
             $('.export_name').val(qh.export_name);
             $('.export_amount').val(qh.export_amount);
+            $('.loading_unloading_name').val(qh.loading_unloading_name);
+            $('.loading_unloading_amount').val(qh.loading_unloading_amount);
+            const fmtAmt = (n) => '₹' + (parseFloat(n)||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            $('.export-amount').text(fmtAmt(qh.export_amount));
+            $('.loading-unloading-amount').text(fmtAmt(qh.loading_unloading_amount));
             $('.tax-amount').text(formatCurrency(qh.tax_amount));
             $('.grand-total-amount').text(formatCurrency(qh.grand_total_amount));
             $('.adjustment-value').val(qh.adjustment_value).trigger('change');
@@ -3363,6 +3441,7 @@ function calculateFinalTotals() {
             }
           }
         }, 100);
+        // ESI / PF / Others: store values for submission but keep rows hidden
         $('.esi_value').val(quotation_header[0].esi_value);
         $('.esi_type').val(quotation_header[0].esi_type);
         $('.pf_value').val(quotation_header[0].pf_value);
@@ -3373,10 +3452,10 @@ function calculateFinalTotals() {
         $('.esi-display-amount').text(formatCurrency(quotation_header[0].esi_amount));
         $('.pf-display-amount').text(formatCurrency(quotation_header[0].pf_amount));
         $('.other-display-amount').text(formatCurrency(quotation_header[0].other_amount));
-        if(quotation_header[0].esi_amount !==null){
-          $('.tax_show_single').css('display','block');
-        }
+        // ESI/PF/Others rows always stay hidden
         $('#notes').val(quotation_header[0].note);
+        // Re-check required fields after data is populated
+        setTimeout(function() { if(typeof checkRequiredFields==='function') checkRequiredFields(); }, 300);
 
           // From server
           window.existingFiles = JSON.parse(quotation_header[0].documents); // array of strings
@@ -3463,12 +3542,13 @@ function calculateFinalTotals() {
           $('#bill_date').val(quotation_header[0].bill_date);
           $('#due_date').val(quotation_header[0].due_date);
           $('#payment_terms').val(quotation_header[0].payment_terms);
+          $('#timeline_date').val(quotation_header[0].timeline_date);
           $('.zone-search-input').val(quotation_header[0].zone_name);
-          $('.zone_id').val(quotation_header[0].zone_id);
+          $('.zone_id').val(quotation_header[0].zone_id).trigger('change');
           $('.branch-search-input').val(quotation_header[0].branch_name);
-          $('.branch_id').val(quotation_header[0].branch_id);
+          $('.branch_id').val(quotation_header[0].branch_id).trigger('change');
           $('.company-search-input').val(quotation_header[0].company_name);
-          $('.company_id').val(quotation_header[0].company_id);
+          $('.company_id').val(quotation_header[0].company_id).trigger('change');
           $('.discount_type').val(quotation_header[0].discount_type);
           $('.delivery-search-input').val(quotation_header[0].delivery_address);
           $('.delivery_id').val(quotation_header[0].delivery_id);
@@ -3525,6 +3605,11 @@ function calculateFinalTotals() {
             $('.adjustment-reason').val(qh.adjustment_reason);
             $('.export_name').val(qh.export_name);
             $('.export_amount').val(qh.export_amount);
+            $('.loading_unloading_name').val(qh.loading_unloading_name);
+            $('.loading_unloading_amount').val(qh.loading_unloading_amount);
+            const fmtAmt = (n) => '₹' + (parseFloat(n)||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            $('.export-amount').text(fmtAmt(qh.export_amount));
+            $('.loading-unloading-amount').text(fmtAmt(qh.loading_unloading_amount));
             $('.tax-amount').text(formatCurrency(qh.tax_amount));
             $('.grand-total-amount').text(formatCurrency(qh.grand_total_amount));
             $('.adjustment-value').val(qh.adjustment_value).trigger('change');
@@ -3537,6 +3622,7 @@ function calculateFinalTotals() {
             }
           }
         }, 100);
+        // ESI / PF / Others: store values for submission but keep rows hidden
         $('.esi_value').val(quotation_header[0].esi_value);
         $('.esi_type').val(quotation_header[0].esi_type);
         $('.pf_value').val(quotation_header[0].pf_value);
@@ -3547,10 +3633,10 @@ function calculateFinalTotals() {
         $('.esi-display-amount').text(formatCurrency(quotation_header[0].esi_amount));
         $('.pf-display-amount').text(formatCurrency(quotation_header[0].pf_amount));
         $('.other-display-amount').text(formatCurrency(quotation_header[0].other_amount));
-        if(quotation_header[0].esi_amount !==null){
-          $('.tax_show_single').css('display','block');
-        }
+        // ESI/PF/Others rows always stay hidden
         $('#notes').val(quotation_header[0].note);
+        // Re-check required fields after data is populated
+        setTimeout(function() { if(typeof checkRequiredFields==='function') checkRequiredFields(); }, 300);
 
           // From server
           window.existingFiles = JSON.parse(quotation_header[0].documents); // array of strings

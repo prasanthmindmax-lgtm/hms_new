@@ -109,7 +109,7 @@
           <div class="qd-stat-icon"><i class="bi bi-box-seam"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Total GRN</div>
-            <div class="qd-stat-value">{{ $stats['total'] }}</div>
+            <div class="qd-stat-value" data-stat-key="total">{{ $stats['total'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -117,7 +117,7 @@
           <div class="qd-stat-icon"><i class="bi bi-check-circle"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Approved</div>
-            <div class="qd-stat-value">{{ $stats['approved'] }}</div>
+            <div class="qd-stat-value" data-stat-key="approved">{{ $stats['approved'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -125,7 +125,7 @@
           <div class="qd-stat-icon"><i class="bi bi-clock"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Pending</div>
-            <div class="qd-stat-value">{{ $stats['pending'] }}</div>
+            <div class="qd-stat-value" data-stat-key="pending">{{ $stats['pending'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -133,7 +133,7 @@
           <div class="qd-stat-icon"><i class="bi bi-x-circle"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Rejected</div>
-            <div class="qd-stat-value">{{ $stats['rejected'] }}</div>
+            <div class="qd-stat-value" data-stat-key="rejected">{{ $stats['rejected'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -581,7 +581,16 @@ $(document).ready(function () {
         stat_filter: statFilter
       },
       success: function (data) {
-        $('#grn-body').html(data);
+        if (typeof data === 'object' && data.html !== undefined) {
+          $('#grn-body').html(data.html);
+          if (data.stats) {
+            $.each(data.stats, function(key, val) {
+              $('[data-stat-key="' + key + '"]').text(val);
+            });
+          }
+        } else {
+          $('#grn-body').html(data);
+        }
         renderSummary();
       }
     });
@@ -589,10 +598,11 @@ $(document).ready(function () {
 
   // ── Multiselect → filter wire-up (same pattern as quotation dashboard) ──
   function setupMultiSelect(selectorInput, selectorHidden) {
-    $(document).on('click', selectorHidden, function () {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const selectedIds  = $(this).val();
       const selectedText = $(selectorInput).val();
-      if (selectorHidden === '.zone_id')    { filters.zone_id = selectedIds; filters.zone_name = selectedText; }
+      if (selectorHidden === '.zone_id')         { filters.zone_id = selectedIds; filters.zone_name = selectedText; }
       else if (selectorHidden === '.branch_id')  { filters.branch_id = selectedIds; filters.branch_name = selectedText; }
       else if (selectorHidden === '.company_id') { filters.company_id = selectedIds; filters.company_name = selectedText; }
       else if (selectorHidden === '.vendor_id')  { filters.vendor_id = selectedIds; filters.vendor_name = selectedText; }
@@ -600,11 +610,11 @@ $(document).ready(function () {
       loadGrn();
     });
   }
-  $('.zone_id').on('click', function () { setupMultiSelect('.zone-search-input', '.zone_id'); });
-  $('.branch_id').on('click', function () { setupMultiSelect('.branch-search-input', '.branch_id'); });
-  $('.company_id').on('click', function () { setupMultiSelect('.company-search-input', '.company_id'); });
-  $('.vendor_id').on('click', function () { setupMultiSelect('.vendor-search-input', '.vendor_id'); });
-  $('.state_id').on('click', function () { setupMultiSelect('.state-search-input', '.state_id'); });
+  setupMultiSelect('.zone-search-input', '.zone_id');
+  setupMultiSelect('.branch-search-input', '.branch_id');
+  setupMultiSelect('.company-search-input', '.company_id');
+  setupMultiSelect('.vendor-search-input', '.vendor_id');
+  setupMultiSelect('.state-search-input', '.state_id');
 
   $('.universal_search').on('keyup', function () {
     filters.universal_search = $(this).val();

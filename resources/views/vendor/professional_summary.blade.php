@@ -55,43 +55,43 @@
           <div class="qd-stat-icon"><i class="bi bi-receipt"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Total Invoice</div>
-            <div class="qd-stat-value">{{ $invoiceSummaryCalculation['totalInvoice'] ?? '₹0' }}</div>
+            <div class="qd-stat-value" data-stat-key="totalInvoice">{{ $invoiceSummaryCalculation['totalInvoice'] ?? '₹0' }}</div>
             <div class="qd-stat-sub">Sub total of all bills</div>
-                                  </div>
-                                  </div>
+          </div>
+        </div>
         <div class="qd-stat-card qd-stat-purple" data-stat-filter="" title="Total Final Invoice">
           <div class="qd-stat-icon"><i class="bi bi-file-earmark-check"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Total Final Invoice</div>
-            <div class="qd-stat-value">{{ $invoiceSummaryCalculation['totalFullinvoice'] ?? '₹0' }}</div>
+            <div class="qd-stat-value" data-stat-key="totalFullinvoice">{{ $invoiceSummaryCalculation['totalFullinvoice'] ?? '₹0' }}</div>
             <div class="qd-stat-sub">Grand total of all bills</div>
-                              </div>
-                          </div>
+          </div>
+        </div>
         <div class="qd-stat-card qd-stat-red" data-stat-filter="pending" title="Filter: Pending (Due to Pay)">
           <div class="qd-stat-icon"><i class="bi bi-clock-history"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Pending Invoice</div>
-            <div class="qd-stat-value">{{ $invoiceSummaryCalculation['pendingInvoice'] ?? '₹0' }}</div>
+            <div class="qd-stat-value" data-stat-key="pendingInvoice">{{ $invoiceSummaryCalculation['pendingInvoice'] ?? '₹0' }}</div>
             <div class="qd-stat-sub">Due to Pay</div>
-                      </div>
-                              </div>
+          </div>
+        </div>
         <div class="qd-stat-card qd-stat-green" data-stat-filter="paid" title="Filter: Paid invoices">
           <div class="qd-stat-icon"><i class="bi bi-check-circle"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Paid Invoice</div>
-            <div class="qd-stat-value">{{ $invoiceSummaryCalculation['paidInvoice'] ?? '₹0' }}</div>
+            <div class="qd-stat-value" data-stat-key="paidInvoice">{{ $invoiceSummaryCalculation['paidInvoice'] ?? '₹0' }}</div>
             <div class="qd-stat-sub">Fully paid</div>
-                              </div>
-                            </div>
+          </div>
+        </div>
         <div class="qd-stat-card qd-stat-orange" data-stat-filter="" title="Total Tax + GST">
           <div class="qd-stat-icon"><i class="bi bi-calculator"></i></div>
           <div class="qd-stat-body">
             <div class="qd-stat-label">Taxable Amount</div>
-            <div class="qd-stat-value">{{ $invoiceSummaryCalculation['totalTaxAndGst'] ?? '₹0' }}</div>
+            <div class="qd-stat-value" data-stat-key="totalTaxAndGst">{{ $invoiceSummaryCalculation['totalTaxAndGst'] ?? '₹0' }}</div>
             <div class="qd-stat-sub">TDS + GST</div>
-                          </div>
-                      </div>
-                              </div>
+          </div>
+        </div>
+      </div>
 
       {{-- ── Filters ── --}}
       <div class="qd-filters" id="filtersSection">
@@ -481,7 +481,7 @@
   }
 
   function loadData(page = 1, perPage = $('#per_page').val()) {
-                appliedFilters = {
+    appliedFilters = {
       per_page: perPage, page,
       date_from: filters.date_from, date_to: filters.date_to,
       zone_id: filters.zone_id, branch_id: filters.branch_id,
@@ -489,15 +489,29 @@
       nature_id: filters.nature_id, state_name: filters.state_name,
       universal_search: filters.universal_search,
       stat_filter: statFilter
-                };
-                  $.ajax({
+    };
+    $.ajax({
       url: '{{ route("superadmin.getprofessionalsummary") }}', type: 'GET', data: appliedFilters,
-      success: function (data) { $('#tds-body').html(data); renderSummary(); }
+      success: function (data) {
+        if (data && typeof data === 'object' && data.html !== undefined) {
+          $('#tds-body').html(data.html);
+          if (data.stats) {
+            $.each(data.stats, function(key, val) {
+              // Professional stats are already formatted strings (₹ formatted)
+              $('[data-stat-key="' + key + '"]').text(val);
+            });
+          }
+        } else {
+          $('#tds-body').html(data);
+        }
+        renderSummary();
+      }
     });
   }
 
-              function setupMultiSelect(selectorInput, selectorHidden) {
-                  $(document).on('click', selectorHidden, function () {
+  function setupMultiSelect(selectorInput, selectorHidden) {
+    var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
+    $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
       const ids  = $(this).val();
       const text = $(selectorInput).val();
       if      (selectorHidden === '.zone_id')    { filters.zone_id    = ids; filters.zone_name    = text; }
@@ -509,12 +523,12 @@
       loadData();
     });
   }
-  $('.zone_id').on('click',    function () { setupMultiSelect('.zone-search-input',    '.zone_id'); });
-  $('.branch_id').on('click',  function () { setupMultiSelect('.branch-search-input',  '.branch_id'); });
-  $('.company_id').on('click', function () { setupMultiSelect('.company-search-input', '.company_id'); });
-  $('.vendor_id').on('click',  function () { setupMultiSelect('.vendor-search-input',  '.vendor_id'); });
-  $('.state_id').on('click',   function () { setupMultiSelect('.state-search-input',   '.state_id'); });
-  $('.nature_id').on('click',  function () { setupMultiSelect('.nature-search-input',  '.nature_id'); });
+  setupMultiSelect('.zone-search-input',    '.zone_id');
+  setupMultiSelect('.branch-search-input',  '.branch_id');
+  setupMultiSelect('.company-search-input', '.company_id');
+  setupMultiSelect('.vendor-search-input',  '.vendor_id');
+  setupMultiSelect('.state-search-input',   '.state_id');
+  setupMultiSelect('.nature-search-input',  '.nature_id');
 
   $('.universal_search').on('keyup', function () { filters.universal_search = $(this).val(); loadData(); });
 
