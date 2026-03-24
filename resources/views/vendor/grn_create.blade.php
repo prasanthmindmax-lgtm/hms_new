@@ -112,7 +112,7 @@
                 @endif --}}
                 <!-- Row 3: Bill#, Order Number -->
                 <div class="row mb-3">
-                    <label for="order_number" class="col-md-2 ">Order Number</label>
+                    <label for="order_number" class="col-md-2 ">Invoice No / Bill No</label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="order_number" name="order_number" autocomplete="off" autocorrect="off">
                     </div>
@@ -162,7 +162,7 @@
                     </div>
                 </div>
                 <div class="row mb-3">
-                    <label for="zone" class="col-md-2 ">Company</label>
+                    <label for="zone" class="col-md-2 ">Group of Company</label>
                     <div class="col-md-4">
                         {{-- <input type="text" class="form-control datepicker" id="due_date" name="due_date" > --}}
                       <div class="tax-dropdown-wrapper company-section" style="width:343px">
@@ -199,19 +199,40 @@
                     </div>
                 </div>
 
-                <!-- Row 6: Subject -->
                 <div class="row mb-3">
-                    <label for="subject" class="col-md-2 ">Subject</label>
-                    <div class="col-md-4">
-                        <textarea class="form-control" id="subject" name="subject" autocomplete="off" autocorrect="off" placeholder="Enter a subject within 250 characters" rows="2" maxlength="250"></textarea>
-                    </div>
-                    <label for="qc_ststus" class="col-md-2 ">QC Status</label>
+                <label for="qc_ststus" class="col-md-2 ">QC Status</label>
                     <div class="col-md-4">
                         <select class="form-select" id="qc_ststus" name="qc_ststus" autocomplete="off" autocorrect="off">
                             <option value="Checked" selected>Checked</option>
                             <option value="Un Checked">Un Checked</option>
                         </select>
                     </div>
+                <label for="qc_checked_by" class="col-md-2 ">QC Checked By</label>
+                <div class="col-md-4">
+                    <select class="form-select" id="qc_checked_by" name="qc_checked_by" autocomplete="off" autocorrect="off">
+                        <option value="">Select User</option>
+                        @foreach($users as $user)
+                            <option value="{{ $user->id }}">
+                                {{ $user->user_fullname }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+                <!-- Row 6: Subject -->
+                <div class="row mb-3">
+                    <label for="subject" class="col-md-2 ">Subject</label>
+                    <div class="col-md-4">
+                        <textarea class="form-control" id="subject" name="subject" autocomplete="off" autocorrect="off" placeholder="Enter a subject within 250 characters" rows="2" maxlength="250"></textarea>
+                    </div>
+                    {{-- <label for="qc_ststus" class="col-md-2 ">QC Status</label>
+                    <div class="col-md-4">
+                        <select class="form-select" id="qc_ststus" name="qc_ststus" autocomplete="off" autocorrect="off">
+                            <option value="Checked" selected>Checked</option>
+                            <option value="Un Checked">Un Checked</option>
+                        </select>
+                    </div> --}}
                 </div>
             </div>
             <div class="card">
@@ -327,7 +348,7 @@
           </div>
           </form>
             <div class="action-buttons">
-              <button type="button" id="saveDraftBtn" class="btn draft-btn">Save as Draft</button>
+              {{-- <button type="button" id="saveDraftBtn" class="btn draft-btn">Save as Draft</button> --}}
               <button type="button" id="saveOpenBtn" class="btn open-btn">Save as Open</button>
               <button type="button" class="btn cancel-btn">Cancel</button>
             </div>
@@ -1068,6 +1089,7 @@ $(document).ready(function () {
     <script>
       $(document).ready(function () {
                       const grnedit_header = @json($grnedit);
+
                       console.log("grnedit_header",grnedit_header);
 
                       const grnedit_lines = @json($grnedit[0]->BillLines);
@@ -1088,6 +1110,8 @@ $(document).ready(function () {
                       $('#bill_date').val(grnedit_header[0].bill_date);
                       $('#due_date').val(grnedit_header[0].due_date);
                       $('#payment_terms').val(grnedit_header[0].payment_terms);
+                      $('#qc_checked_by').val(grnedit_header[0].qc_checked_by.id);
+                      $('#qc_ststus').val(grnedit_header[0].qc_ststus);
                       $('#subject').val(grnedit_header[0].subject);
                       $('#bill_id').val(grnedit_header[0].bill_id);
                       $('#purchase_id').val(grnedit_header[0].purchase_id);

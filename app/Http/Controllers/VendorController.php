@@ -71,6 +71,7 @@ use App\Models\TicketModel;
 use App\Models\User;
 use App\Models\UserDepartments;
 use App\Models\UserDesignations;
+use App\Models\usermanagementdetails;
 use App\Models\UserProfile;
 use App\Providers\RouteServiceProvider;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -5140,6 +5141,7 @@ public function getgrncreate()
     $TblQuotation = TblQuotation::with(['BillLines','Tblvendor','TblBilling'])
         ->where('approval_status', 1)->where('po_status', 0)->where('delete_status',0)
         ->orderBy('id', 'desc')->paginate(10);
+    $users = usermanagementdetails::orderBy('id')->get();
 
     $grndata = null;
     $grnedit = null;
@@ -5158,7 +5160,7 @@ public function getgrncreate()
                         ->first();
         }
         else{
-            $grnedit = Tblgrn::with(['TblBilling', 'BillLines', 'Tblvendor'])->where('id',$id)->get();
+            $grnedit = Tblgrn::with(['TblBilling', 'BillLines', 'Tblvendor', 'QcCheckedBy'])->where('id',$id)->get();
         }
     }
 
@@ -5178,7 +5180,8 @@ public function getgrncreate()
         'grndata' => $grndata,
         'type' => $type,
         'Tblcompany' => $Tblcompany,
-        'gsttax' => $gsttax
+        'gsttax' => $gsttax,
+        'users' => $users,
     ]);
 }
 public function savegrn(Request $request)
@@ -5210,6 +5213,7 @@ public function savegrn(Request $request)
             'save_status' => $request->save_status,
             'note' => $request->note,
             'qc_ststus' => $request->qc_ststus,
+            'qc_checked_by' => $request->qc_checked_by,
             'created_at' => $now,
         ];
         if (!$isUpdate) {
@@ -6634,6 +6638,7 @@ public function vendorSummary(Request $request)
             'Purchase.quotation',
             'billPayments'
         ])->orderBy('id', 'desc');
+        // dd($billsQuery);
 
         // Apply filters if available
         if ($request->filled('date_from') && $request->filled('date_to')) {

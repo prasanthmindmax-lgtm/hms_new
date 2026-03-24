@@ -704,7 +704,12 @@ $(document).ready(function () {
     $('body').css('overflow','auto');
   }
   $('#closeGrnPanel, #grnPanelBackdrop').on('click', closePanel);
-  $('#grnDetailPanel').on('click', function (e) { e.stopPropagation(); });
+//   $('#grnDetailPanel').on('click', function (e) { e.stopPropagation(); });
+  $('#grnDetailPanel').on('click', function (e) {
+        if (!$(e.target).closest('button, a').length) {
+            e.stopPropagation();
+        }
+    });
   $(document).on('keyup', function (e) { if (e.key === 'Escape') closePanel(); });
 
   function populatePanel(d) {

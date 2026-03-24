@@ -35,6 +35,7 @@ class Tblgrn extends Authenticatable
         'payment_terms',
         'note',
         'qc_ststus',
+        'qc_checked_by',
         'documents',
         'status',
     ];
@@ -53,6 +54,10 @@ class Tblgrn extends Authenticatable
     public function TblCompany()
     {
         return $this->belongsTo(Tblcompany::class, 'company_id');
+    }
+    public function QcCheckedBy()
+    {
+        return $this->belongsTo(usermanagementdetails::class, 'qc_checked_by');
     }
 
 }

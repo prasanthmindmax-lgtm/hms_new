@@ -12,7 +12,7 @@
         .swal-on-top {
             z-index: 99999 !important;
         }
-        
+
         #tableLoadingOverlay {
             position: absolute;
             top: 0;
@@ -25,17 +25,17 @@
             justify-content: center;
             z-index: 1000;
         }
-        
+
         #tableLoadingOverlay.active {
             display: flex;
         }
-        
+
         .spinner-border {
             width: 3rem;
             height: 3rem;
             border-width: 0.3em;
         }
-        
+
         .acknowledgement-section {
             background: #fff3cd;
             border: 2px solid #ffc107;
@@ -43,20 +43,20 @@
             padding: 20px;
             margin-top: 20px;
         }
-        
+
         .acknowledgement-checkbox {
             display: flex;
             align-items: flex-start;
             gap: 10px;
         }
-        
+
         .acknowledgement-checkbox input[type="checkbox"] {
             margin-top: 5px;
             width: 20px;
             height: 20px;
             cursor: pointer;
         }
-        
+
         .acknowledgement-checkbox label {
             flex: 1;
             font-size: 14px;
@@ -146,7 +146,7 @@
                             <p>Total Reports</p>
                         </div>
                     </div>
-                    
+
                     <div class="stat-card gradient-green">
                         <div class="stat-icon">
                             <i class="fas fa-calendar-day"></i>
@@ -156,7 +156,7 @@
                             <p>Today's Reports</p>
                         </div>
                     </div>
-                    
+
                     <div class="stat-card gradient-purple">
                         <div class="stat-icon">
                             <i class="fas fa-calendar-alt"></i>
@@ -166,7 +166,7 @@
                             <p>This Month</p>
                         </div>
                     </div>
-                    
+
                     <div class="stat-card gradient-teal">
                         <div class="stat-icon">
                             <i class="fas fa-money-bill-wave"></i>
@@ -176,7 +176,7 @@
                             <p>Total Radiant</p>
                         </div>
                     </div>
-                    
+
                     <div class="stat-card gradient-pink">
                         <div class="stat-icon">
                             <i class="fas fa-university"></i>
@@ -187,7 +187,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Header with New Button -->
                 <div class="page-header">
                     <h2><i class="fas fa-chart-line"></i> Branch Financial Reports</h2>
@@ -195,7 +195,7 @@
                         <i class="fas fa-plus"></i> New Report
                     </button>
                 </div>
-                
+
                 <!-- Table Container with Loading Overlay -->
                 <div style="position: relative;">
                     <div id="tableLoadingOverlay">
@@ -207,7 +207,7 @@
                         @include('branch.partials.financial-table', ['reports' => $reports])
                     </div>
                 </div>
-                
+
             </div>
 
             <!-- Modal -->
@@ -221,16 +221,16 @@
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    
+
                     <div class="modal-body">
                         <form id="reportForm">
                             @csrf
                             <input type="hidden" id="reportId" name="report_id">
-                            
+
                             <!-- Hidden inputs for date range -->
                             <input type="hidden" name="radiant_collection_from_date" id="radiant_collection_from_date">
                             <input type="hidden" name="radiant_collection_to_date" id="radiant_collection_to_date">
-                            
+
                             <!-- Basic Info Section -->
                             <div class="form-section">
                                 <h4 class="section-title">
@@ -241,7 +241,7 @@
                                         <label>Report Date <span class="required">*</span></label>
                                         <input type="date" name="report_date" id="report_date" class="form-control" required>
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Zone <span class="required">*</span></label>
                                         <select name="zone_id" id="zone_id" class="form-control" required>
@@ -252,13 +252,13 @@
                                         </select>
                                         <input type="hidden" name="zone_name" id="zone_name">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Branch <span class="required">*</span></label>
                                         <select name="branch_id" id="branch_id" class="form-control" required>
                                             <option value="">Select Branch</option>
                                             @foreach($locations as $location)
-                                            <option value="{{ $location->id }}" 
+                                            <option value="{{ $location->id }}"
                                                     data-zone="{{ $location->zone_id }}"
                                                     data-name="{{ $location->name }}">{{ $location->name }}</option>
                                             @endforeach
@@ -267,13 +267,13 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Radiant Cash Collection (UPDATED) -->
                             <div class="form-section gradient-section blue">
                                 <h4 class="section-title">
                                     <i class="fas fa-wallet"></i> Radiant Cash Collection
                                 </h4>
-                                
+
                                 <!-- Checkbox for Radiant Not Collected -->
                                 <div class="form-group full-width" style="margin-bottom: 15px;">
                                     <div class="custom-checkbox-wrapper">
@@ -283,28 +283,28 @@
                                         </label>
                                     </div>
                                 </div>
-                                
+
                                 <!-- Remarks Textarea (Hidden by default) -->
                                 <div class="form-group full-width" id="radiantRemarksContainer" style="display: none; margin-bottom: 15px;">
                                     <label>Remarks for Not Collecting <span class="required">*</span></label>
                                     <textarea name="radiant_not_collected_remarks" id="radiant_not_collected_remarks" class="form-control" rows="3" placeholder="Please explain why radiant was not collected..."></textarea>
                                 </div>
-                                
+
                                 <div class="form-grid">
                                     <!-- Hidden Collection Date (Still saves to DB) -->
                                     <input type="hidden" name="radiant_collected_date" id="radiant_collected_date">
-                                    
+
                                     <!-- Date Range Picker -->
                                     <div class="form-group">
                                         <label>Collection Date Range</label>
                                         <input type="text" name="radiant_date_range" id="radiant_date_range" class="form-control" placeholder="Select date range" readonly>
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Collection Amount</label>
                                         <input type="number" step="0.01" name="radiant_collection_amount" id="radiant_collection_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="radiant_collection_files[]" id="radiant_collection_files" class="form-control file-input" multiple>
@@ -323,12 +323,12 @@
                                         <label>Deposit Date</label>
                                         <input type="date" name="deposit_date" id="deposit_date" class="form-control">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Deposit Amount</label>
                                         <input type="number" step="0.01" name="deposit_amount" id="deposit_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="deposit_files[]" id="deposit_files" class="form-control file-input" multiple>
@@ -336,7 +336,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Actual Card Amount -->
                             <div class="form-section gradient-section green">
                                 <h4 class="section-title">
@@ -347,7 +347,7 @@
                                         <label>Actual Card Amount</label>
                                         <input type="number" step="0.01" name="actual_card_amount" id="actual_card_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="actual_card_files[]" id="actual_card_files" class="form-control file-input" multiple>
@@ -355,7 +355,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- UPI Section (NEW) -->
                             <div class="form-section gradient-section yellow">
                                 <h4 class="section-title">
@@ -366,7 +366,7 @@
                                         <label>UPI Amount</label>
                                         <input type="number" step="0.01" name="upi_amount" id="upi_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="upi_files[]" id="upi_files" class="form-control file-input" multiple>
@@ -375,8 +375,8 @@
                                 </div>
                             </div>
 
-                            
-                            
+
+
                             <!-- Direct Bank Deposit -->
                             <div class="form-section gradient-section purple">
                                 <h4 class="section-title">
@@ -387,7 +387,7 @@
                                         <label>Bank Deposit Amount</label>
                                         <input type="number" step="0.01" name="bank_deposit_amount" id="bank_deposit_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="bank_deposit_files[]" id="bank_deposit_files" class="form-control file-input" multiple>
@@ -395,7 +395,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Cashier Info -->
                             <div class="form-section gradient-section orange">
                                 <h4 class="section-title">
@@ -406,22 +406,22 @@
                                         <label>Placed By Whom</label>
                                         <input type="text" name="placed_by_whom" id="placed_by_whom" class="form-control" placeholder="eg.12345 emp no">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Locker By Whom</label>
                                         <input type="text" name="locker_by_whom" id="locker_by_whom" class="form-control" placeholder="eg.12345 emp no">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Who Gave Radiant Cash</label>
                                         <input type="text" name="who_gave_radiant_cash" id="who_gave_radiant_cash" class="form-control" placeholder="eg.12345 emp no">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Cash in Drawer</label>
                                         <input type="number" step="0.01" name="cash_in_drawer" id="cash_in_drawer" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="cashier_info_files[]" id="cashier_info_files" class="form-control file-input" multiple>
@@ -429,7 +429,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Additional Amounts -->
                             <div class="form-section gradient-section teal">
                                 <h4 class="section-title">
@@ -440,22 +440,22 @@
                                         <label>Today's Discount Amount</label>
                                         <input type="number" step="0.01" name="today_discount_amount" id="today_discount_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Cancel Bill Amount</label>
                                         <input type="number" step="0.01" name="cancel_bill_amount" id="cancel_bill_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>Refund Bill Amount</label>
                                         <input type="number" step="0.01" name="refund_bill_amount" id="refund_bill_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group">
                                         <label>POS Refund</label>
                                         <input type="number" step="0.01" name="pos_refund_amount" id="pos_refund_amount" class="form-control" placeholder="0.00">
                                     </div>
-                                    
+
                                     <div class="form-group full-width">
                                         <label>Attachments</label>
                                         <input type="file" name="additional_amounts_files[]" id="additional_amounts_files" class="form-control file-input" multiple>
@@ -463,7 +463,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Acknowledgement Section -->
                             <div class="acknowledgement-section">
                                 <h4 class="section-title">
@@ -476,10 +476,10 @@
                                     </label>
                                 </div>
                             </div>
-                            
+
                         </form>
                     </div>
-                    
+
                     <div class="modal-footer">
                         <button type="button" class="btn-cancel" id="cancelBtn">Cancel</button>
                         <button type="button" class="btn-submit" id="submitBtn">
@@ -518,7 +518,7 @@
     const showRoute = "{{ route('branch-financial.show', ':id') }}";
     const destroyRoute = "{{ route('branch-financial.destroy', ':id') }}";
     const indexRoute = "{{ route('branch-financial.index') }}";
-    
+
     // Current pagination state
     let currentPage = 1;
     let currentPerPage = {{ request('per_page', 10) }};
@@ -532,13 +532,13 @@
     // ================================================
     $(document).on('click', '.pagination-links .pagination a', function(e) {
         e.preventDefault();
-        
+
         const url = $(this).attr('href');
         const page = new URL(url).searchParams.get('page');
-        
+
         loadReports(page, currentPerPage);
     });
-    
+
     // ================================================
     // PER PAGE CHANGE HANDLER
     // ================================================
@@ -546,16 +546,16 @@
         currentPerPage = $(this).val();
         loadReports(1, currentPerPage);
     });
-    
+
     // ================================================
     // LOAD REPORTS VIA AJAX
     // ================================================
     function loadReports(page = 1, perPage = 10) {
         currentPage = page;
         currentPerPage = perPage;
-        
+
         $('#tableLoadingOverlay').addClass('active');
-        
+
         $.ajax({
             url: indexRoute,
             type: 'GET',
@@ -569,7 +569,7 @@
             success: function(response) {
                 $('#tableContainer').html(response);
                 $('#tableLoadingOverlay').removeClass('active');
-                
+
                 $('html, body').animate({
                     scrollTop: $('#tableContainer').offset().top - 100
                 }, 300);
@@ -577,7 +577,7 @@
             error: function(xhr, status, error) {
                 console.error('Error loading reports:', error);
                 $('#tableLoadingOverlay').removeClass('active');
-                
+
                 if (window.toastr) {
                     toastr.error('Failed to load reports. Please try again.');
                 } else {
@@ -586,14 +586,14 @@
             }
         });
     }
-    
+
     // ================================================
     // RELOAD TABLE AFTER SAVE/UPDATE/DELETE
     // ================================================
     function reloadTable() {
         loadReports(currentPage, currentPerPage);
     }
-    
+
     $(document).ready(function() {
         $(document).on('ajaxSuccess', function(event, xhr, settings) {
             if (settings.url === storeRoute || settings.url.includes('/branch-financial/')) {
@@ -602,6 +602,47 @@
                 }, 500);
             }
         });
+    });
+
+    function checkAmountFile(amountId, fileId, label) {
+        let amount = parseFloat($(amountId).val() || 0);
+        let files = $(fileId)[0].files.length;
+
+        if (amount > 0 && files === 0) {
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: label + " file upload required",
+                confirmButtonText: "OK"
+            });
+            return false;
+        }
+        return true;
+    }
+
+    $(document).on("click", "#submitBtn", function (e) {
+        let ok = true;
+
+        if (!checkAmountFile( "#radiant_collection_amount","#radiant_collection_files","Radiant Collection"
+        )) ok = false;
+
+        if (!checkAmountFile("#deposit_amount","#deposit_files","Deposit"
+        )) ok = false;
+
+        if (!checkAmountFile("#actual_card_amount","#actual_card_files","Actual Card"
+        )) ok = false;
+
+        if (!checkAmountFile("#upi_amount","#upi_files","UPI"
+        )) ok = false;
+
+        if (!checkAmountFile("#bank_deposit_amount","#bank_deposit_files","Bank Deposit"
+        )) ok = false;
+
+        if (!ok) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return false;
+        }
     });
     </script>
 

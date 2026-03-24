@@ -513,7 +513,14 @@ var TYPE_LABELS = {
     bank_neft: 'Actual NEFT',
     mespos_upi: 'Actual UPI',
     bank_others: 'Actual Other',
-    actual_total: 'Actual Total'
+    actual_total: 'Actual Total',
+    diff_cash: 'Difference Cash',
+    diff_card: 'Difference Card',
+    diff_neft: 'Difference NEFT',
+    diff_upi: 'Difference UPI',
+    diff_other: 'Difference Other',
+    diff_upicard: 'Difference UPI/Card',
+    diff_total: 'Difference Total'
 };
 
 var TYPE_TO_FILE_FIELD_MONTHLY = {
@@ -603,12 +610,57 @@ $(document).on('click', '.stat-click', function () {
     var type = $(this).data('type');
     if (!type) return;
     var daily = window.dailyDataForMonthly || [];
-    var filtered = daily.filter(function (row) {
-        var amt = parseFloat(row[type] || 0);
-        return amt > 0;
-    });
-    buildMocdocTableMonthly(filtered, type);
-    $('#mocdocModal').modal('show');
+    // var filtered = daily.filter(function (row) {
+    //     var amt = parseFloat(row[type] || 0);
+    //     return amt > 0;
+    // });
+    // buildMocdocTableMonthly(filtered, type);
+    // $('#mocdocModal').modal('show');
+    let map = {
+        diff_cash: ["deposite_amount", "moc_cash_amt"],
+        diff_card: ["mespos_card", "moc_card_amt"],
+        diff_upi: ["mespos_upi", "moc_upi_amt"],
+        diff_neft: ["bank_neft", "moc_neft_amt"],
+        diff_other: ["bank_others", "moc_other_amt"],
+        diff_total: ["actual_total", "moc_overall_total"]
+    };
+
+    let rows = [];
+    if (map[type]) {
+
+        let actualField = map[type][0];
+        let mocField = map[type][1];
+
+        rows = daily.map(function (row) {
+
+            let actual = parseFloat(row[actualField] || 0);
+            let moc = parseFloat(row[mocField] || 0);
+
+            return {...row,[type]: actual - moc};
+        }).filter(r => Math.abs(r[type]) > 0);
+
+        buildMocdocTableMonthly(rows, type);
+    }
+
+    else if (type === "diff_upicard") {
+        rows = daily.map(function (row) {
+
+            let actual = parseFloat(row.bank_chargers || 0) + parseFloat(row.bank_upi_card || 0);
+            let moc = parseFloat(row.moc_upi_amt || 0) + parseFloat(row.moc_card_amt || 0);
+            return { ...row, diff_upicard: actual - moc};
+
+        }).filter(r => Math.abs(r.diff_upicard) > 0);
+
+        buildMocdocTableMonthly(rows, type);
+    }
+    else {
+        rows = daily.filter(function (row) {
+            return parseFloat(row[type] || 0) > 0;
+        });
+
+        buildMocdocTableMonthly(rows, type);
+    }
+    $("#mocdocModal").modal("show");
 });
 
 function zoneLoc(row) {

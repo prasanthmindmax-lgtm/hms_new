@@ -34,7 +34,7 @@
             <div class="container-box">
                 <div class="header-bar d-flex justify-content-between align-items-center">
                   <div class="converter">
-                    <button id="po-convert" class="btn btn-outline-primary btn-sm me-2">PO Convert</button>
+                    {{-- <button id="po-convert" class="btn btn-outline-primary btn-sm me-2">PO Convert</button> --}}
                     <button id="bill-convert" class="btn btn-outline-secondary btn-sm">Bill Convert</button>
                   </div>
 
