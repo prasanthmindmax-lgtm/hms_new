@@ -96,14 +96,14 @@
                             <div class="qd-stat-sub">&nbsp;</div>
                         </div>
                     </div>
-                    <div class="qd-stat-card qd-stat-purple" data-stat-filter="draft" title="Filter: Draft">
+                    {{-- <div class="qd-stat-card qd-stat-purple" data-stat-filter="draft" title="Filter: Draft">
                         <div class="qd-stat-icon"><i class="bi bi-pencil-square"></i></div>
                         <div class="qd-stat-body">
                             <div class="qd-stat-label">Draft</div>
                             <div class="qd-stat-value">{{ $stats['draft'] }}</div>
                             <div class="qd-stat-sub">&nbsp;</div>
                         </div>
-                    </div>
+                    </div> --}}
                 </div>
 
                 {{-- ── Filters ── --}}
@@ -1976,7 +1976,7 @@ $(document).ready(function () {
           loadPurchase(1, $(this).val());
       });
     });
- 
+
 
 
 });
