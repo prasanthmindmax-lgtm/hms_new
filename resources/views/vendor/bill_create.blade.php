@@ -126,7 +126,7 @@
                 </div>
                 <!-- Row 3: Bill#, Order Number -->
                 <div class="row mb-3">
-                    <label for="bill_number" class="col-md-2 ">Bill Number</label>
+                    <label for="bill_number" class="col-md-2 ">Vendor Bill Number <span style="color:red">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="bill_number" autocomplete="off" autocorrect="off" name="bill_number">
                         <span class="error_bill_no" style="color:red"></span>
@@ -134,7 +134,7 @@
                 </div>
                 <!-- Row 3: Bill#, Order Number -->
                 <div class="row mb-3">
-                    <label for="order_number" class="col-md-2 ">PO Number</label>
+                    <label for="order_number" class="col-md-2 ">PO Number <span style="color:red">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="order_number" name="order_number" autocomplete="off" autocorrect="off">
                         <span class="error_order_no" style="color:red"></span>
@@ -207,7 +207,7 @@
                           <span class="error_company" style="color:red;font-size:12px;"></span>
                         </div>
                     </div>
-                    <label for="bill_category" class="col-md-2">Category</label>
+                    <label for="bill_category" class="col-md-2">Category <span style="color:red">*</span></label>
                     <div class="col-md-4">
                         <select class="form-select" name="bill_category" id="bill_category">
                             <option value="">Select Category</option>

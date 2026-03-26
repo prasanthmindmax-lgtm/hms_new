@@ -665,7 +665,7 @@
                             </div>
 
                             <div class="row customer-form-section">
-                                <div class="customer-section-title">Email Address</div>
+                                <div class="customer-section-title">Email Address <span style="color:red;">*</span></div>
                                 <div class="col-12 col-md-6">
                                     <div class="customer-form-group">
                                         <input type="email" id="email" class="customer-form-input" autocomplete="off" autocorrect="off" name="email" >
@@ -2406,7 +2406,7 @@
                             bankAccountValid = false;
                         }
                     });
-                    
+
                     if (!isValid) {
                         return;
                     }

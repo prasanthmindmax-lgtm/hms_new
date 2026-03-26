@@ -120,7 +120,7 @@
                 </div>
                 <!-- Row 2: Purchase Order -->
                 <div class="row mb-3">
-                    <label for="purchase_order" class="col-md-2 ">Purchase order#<span style="color:red;">*</span></label>
+                    <label for="purchase_order" class="col-md-2 ">Purchase order# <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="purchase_order" autocomplete="off" autocorrect="off" name="purchase_order">
                         <span class="error_purchase_order" style="color:red;font-size:12px;"></span>
@@ -138,7 +138,7 @@
 
                 <!-- Row 4: Purchase Date -->
                 <div class="row mb-3">
-                    <label for="bill_date" class="col-md-2 ">Purchase Date<span style="color:red;">*</span></label>
+                    <label for="bill_date" class="col-md-2 ">Purchase Date <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control datepicker" id="bill_date" name="bill_date" autocomplete="off" autocorrect="off" placeholder="dd/MM/yyyy">
                         <span class="error_bill_date" style="color:red;font-size:12px;"></span>
@@ -148,7 +148,7 @@
                 <!-- Row 5: Purchase Validity + Payment Terms -->
                 <div class="row mb-3">
 
-                    <label for="due_date" class="col-md-2 ">Purchase Validity<span style="color:red;">*</span></label>
+                    <label for="due_date" class="col-md-2 ">Purchase Validity <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control datepicker" id="due_date" autocomplete="off" autocorrect="off" name="due_date">
                         <span class="error_due_date" style="color:red;font-size:12px;"></span>
@@ -158,6 +158,8 @@
                     <div class="col-md-4">
                         <select class="form-select" id="payment_terms" autocomplete="off" autocorrect="off" name="payment_terms">
                             <option value="Due on Receipt" selected>Due on Receipt</option>
+                            <option value="50% Along with Purchase Order">50% Along with Purchase Order</option>
+                            <option value="100% Along with Purchase Order">100% Along with Purchase Order</option>
                             <option value="Net 15">Net 15</option>
                             <option value="Net 30">Net 30</option>
                             <option value="Net 60">Net 60</option>
@@ -166,7 +168,7 @@
                 </div>
                 <!-- Row 5: Payment Terms -->
                 <div class="row mb-3">
-                    <label for="zone" class="col-md-2 ">Zones<span style="color:red;">*</span></label>
+                    <label for="zone" class="col-md-2 ">Zones <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                       <div class="tax-dropdown-wrapper account-section" style="width:300px">
                           <input type="text" class="form-control zone-search-input" name="zone" autocomplete="off" autocorrect="off" placeholder="Select a Zones" readonly>
@@ -178,7 +180,7 @@
                         </div>
                     </div>
 
-                    <label for="branch" class="col-md-2 ">Branch<span style="color:red;">*</span></label>
+                    <label for="branch" class="col-md-2 ">Branch <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                       <div class="tax-dropdown-wrapper account-section" style="width:300px">
                           <input type="text" class="form-control branch-search-input" autocomplete="off" autocorrect="off" name="branch" placeholder="Select a branch" readonly>
@@ -191,7 +193,7 @@
                     </div>
                 </div>
                 <div class="row mb-3">
-                    <label for="zone" class="col-md-2 ">Group of Company<span style="color:red;">*</span></label>
+                    <label for="zone" class="col-md-2 ">Group of Company <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                       <div class="tax-dropdown-wrapper company-section" style="width:300px">
                           <input type="text" class="form-control company-search-input" name="company_name" autocomplete="off" autocorrect="off" placeholder="Select a Company" readonly>
@@ -209,7 +211,7 @@
                     <div class="col-md-4">
                         <textarea class="form-control" id="subject" name="subject" autocomplete="off" autocorrect="off" placeholder="Enter a subject within 250 characters" rows="2" maxlength="250"></textarea>
                     </div>
-                    <label for="timeline_date" class="col-md-2 ">Timeline<span style="color:red;">*</span></label>
+                    <label for="timeline_date" class="col-md-2 ">Timeline <span style="color:red;">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control datepicker" id="timeline_date" name="timeline_date" autocomplete="off" autocorrect="off" placeholder="dd/MM/yyyy">
                         <span class="error_timeline" style="color:red;font-size:12px;"></span>
