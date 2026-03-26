@@ -10,6 +10,7 @@ class Kernel extends ConsoleKernel
 	protected $commands = [
 			Commands\CheckInCron::class,
       Commands\BilllistApi::class,
+      Commands\SendDeadlineNotifications::class,
 		];
     /**
      * Define the application's command schedule.
@@ -20,6 +21,8 @@ class Kernel extends ConsoleKernel
       // $schedule->command('fetch:api-data')->dailyAt('10:55');
        $schedule->command('fetch:api-data')->dailyAt('10:11')->timezone('Asia/Kolkata')->withoutOverlapping();
        $schedule->command('fetch:api-data-new')->dailyAt('15:14')->timezone('Asia/Kolkata')->withoutOverlapping();
+       $schedule->command('notify:deadlines')->dailyAt('14:47')->timezone('Asia/Kolkata')->withoutOverlapping()
+             ->appendOutputTo(storage_path('logs/deadline-notifications.log'));
     }
 
     /**

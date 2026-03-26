@@ -75,7 +75,8 @@
         </div>
         </li>
     </ul>
-    </div>
+</div>
+@include('components.notification-bell')
 
     </div>
 </header>

@@ -15,6 +15,8 @@ use App\Http\Controllers\FinancialReportController;
 use App\Http\Controllers\BankStatementController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\BillingStatsController;
+use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\MenuMasterController;
 
 use App\Exports\QuotationTemplateExport;
 use Maatwebsite\Excel\Facades\Excel;
@@ -706,6 +708,18 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     // Bill Category routes
     Route::get('superadmin/bill_category', [VendorController::class, 'getBillCategory'])->name('superadmin.billcategory.index');
     Route::post('superadmin/bill_category', [VendorController::class, 'storeBillCategory'])->name('superadmin.billcategory.store');
+
+    Route::get('/notifications/unread',    [WebNotificationController::class, 'unread'])->name('notifications.unread');
+    Route::post('/notifications/{id}/read',[WebNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [WebNotificationController::class, 'markAllRead'])->name('notifications.readAll');
+
+    // Menu Master
+    Route::get( 'superadmin/menu-master',           [MenuMasterController::class, 'index']  )->name('superadmin.menumaster.index');
+    Route::get( 'superadmin/menu-master/list',      [MenuMasterController::class, 'list']   )->name('superadmin.menumaster.list');
+    Route::post('superadmin/menu-master',           [MenuMasterController::class, 'store']  )->name('superadmin.menumaster.store');
+    Route::get( 'superadmin/menu-master/{id}',      [MenuMasterController::class, 'show']   )->name('superadmin.menumaster.show');
+    Route::put( 'superadmin/menu-master/{id}',      [MenuMasterController::class, 'update'] )->name('superadmin.menumaster.update');
+    Route::delete('superadmin/menu-master/{id}',    [MenuMasterController::class, 'destroy'])->name('superadmin.menumaster.destroy');
 });
 
 

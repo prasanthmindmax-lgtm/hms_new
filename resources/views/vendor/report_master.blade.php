@@ -483,7 +483,11 @@ $(document).ready(function () {
         { label:'Expense', data:[], borderColor:'rgb(255,99,132)', backgroundColor:'rgba(255,99,132,.1)', tension:.3, fill:true, borderWidth:3 }
       ]},
       options: { responsive:true, maintainAspectRatio:true,
-        plugins: { legend:{display:true,position:'top'}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ₹${fmtIN(c.parsed.y)}`}} },
+        plugins: {
+          legend:{display:true,position:'top'},
+          tooltip:{callbacks:{label:c=>`${c.dataset.label}: ₹${fmtIN(c.parsed.y)}`}},
+          datalabels: { display: false }
+        },
         scales: { y:{ beginAtZero:true, ticks:{callback:v=>'₹'+fmtIN(v)} } },
         interaction: { intersect:false, mode:'index' }
       }
@@ -491,7 +495,11 @@ $(document).ready(function () {
     paymentTypeBarChart = new Chart(document.getElementById('paymentTypeBarChart').getContext('2d'), {
       type:'bar', data:{ labels:[], datasets:[{ label:'Income (₹)', data:[], backgroundColor:chartColors.slice(0,6).map(c=>c+'bb'), borderWidth:1 }] },
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:true,position:'top'}, tooltip:{callbacks:{label:c=>`₹${fmtIN(c.parsed.y)}`}} },
+        plugins:{
+          legend:{display:true,position:'top'},
+          tooltip:{callbacks:{label:c=>`₹${fmtIN(c.parsed.y)}`}},
+          datalabels: { display: false }
+        },
         scales:{ y:{ beginAtZero:true, ticks:{callback:v=>'₹'+fmtIN(v)} } }
       }
     });
@@ -501,7 +509,11 @@ $(document).ready(function () {
         { label:'Expense', data:[], backgroundColor:'rgba(255,99,132,.7)', borderColor:'rgba(255,99,132,1)', borderWidth:1 }
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:true,position:'top'}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ₹${fmtIN(c.parsed.y)}`}} },
+        plugins:{
+          legend:{display:true,position:'top'},
+          tooltip:{callbacks:{label:c=>`${c.dataset.label}: ₹${fmtIN(c.parsed.y)}`}},
+          datalabels: { display: false }
+        },
         scales:{ y:{ beginAtZero:true, ticks:{callback:v=>'₹'+fmtIN(v)} } }
       }
     });
@@ -521,7 +533,8 @@ $(document).ready(function () {
               const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
               if (!total || value === 0) return '';
               const pct = (value / total) * 100;
-              return pct >= 10 ? pct.toFixed(1) + '%' : '';
+              // All slices in chart are >= 3%; show their percentage
+              return pct >= 1 ? pct.toFixed(1) + '%' : '';
             },
             color: '#374151',
             font: { weight: 'bold', size: 11 },
@@ -581,8 +594,33 @@ $(document).ready(function () {
   }
   function updateExpenseChart(data) {
     if (!data?.labels) return;
-    expenseChart.data.labels = data.labels;
-    expenseChart.data.datasets[0].data = data.values;
+    const total = (data.values || []).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+    if (!total) {
+      expenseChart.data.labels = [];
+      expenseChart.data.datasets[0].data = [];
+      expenseChart.data.datasets[0].backgroundColor = [];
+      expenseChart.update(); return;
+    }
+    const chartLabels = [], chartValues = [], chartBg = [];
+    let othersTotal = 0;
+    data.labels.forEach((label, i) => {
+      const val = parseFloat(data.values[i]) || 0;
+      if ((val / total) * 100 >= 3) {
+        chartLabels.push(label);
+        chartValues.push(val);
+        chartBg.push(chartColors[i % chartColors.length]);
+      } else {
+        othersTotal += val;
+      }
+    });
+    if (othersTotal > 0) {
+      chartLabels.push('Others');
+      chartValues.push(othersTotal);
+      chartBg.push('#9ca3af');
+    }
+    expenseChart.data.labels = chartLabels;
+    expenseChart.data.datasets[0].data = chartValues;
+    expenseChart.data.datasets[0].backgroundColor = chartBg;
     expenseChart.update();
   }
   function updateExpenseList(data) {
@@ -596,12 +634,12 @@ $(document).ready(function () {
     let html = '';
     expenses.forEach((e) => {
       const pct = grandTotal > 0 ? ((e.total_amount / grandTotal) * 100).toFixed(1) : '0.0';
-      const isSmall = parseFloat(pct) < 10;
-      html += `<div class="rm-expense-item" data-type="${e.account}" style="border-left-color:${e.color};${isSmall ? 'opacity:0.75;' : ''}">
+      const isGrouped = parseFloat(pct) < 3;
+      html += `<div class="rm-expense-item" data-type="${e.account}" style="border-left-color:${e.color};">
         <div class="rm-expense-left">
           <div class="rm-expense-dot" style="background:${e.color};"></div>
           <span class="rm-expense-label">${e.account}</span>
-          ${isSmall ? '<span style="font-size:10px;color:#9ca3af;margin-left:4px;">(in chart: grouped)</span>' : ''}
+          ${isGrouped ? '<span style="font-size:10px;color:#9ca3af;margin-left:4px;background:#f3f4f6;padding:1px 5px;border-radius:4px;">in Others</span>' : ''}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:11px;color:#6b7280;">${pct}%</span>
