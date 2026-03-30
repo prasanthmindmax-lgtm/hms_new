@@ -179,15 +179,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-12 col-md-6 row align-items-center mb-3">
-                                            <div class="section-title col-md-4">
-                                                <span>GST</span>
-                                            </div>
-                                            <div class="form-group col-md-8">
-                                                <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off" value={{$vendor->gst_number}}>
-                                                <span class="error_gst_number" style="color:red"></span>
-                                            </div>
-                                        </div>
                                         <div class="row form-section">
                                             <div class="col-12 col-md-6 row align-items-center mb-3">
                                                 <div class="section-title col-md-4">
@@ -206,7 +197,15 @@
                                                 </div>
                                             </div>
                                         </div>
-
+                                        <div class="col-12 col-md-6 row align-items-center mb-3">
+                                            <div class="section-title col-md-4">
+                                                <span>GST</span>
+                                            </div>
+                                            <div class="form-group col-md-8">
+                                                <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off" value={{$vendor->gst_number}}>
+                                                <span class="error_gst_number" style="color:red"></span>
+                                            </div>
+                                        </div>
 
                                         {{-- <div class="row form-section">
                                             <div class="col-12 col-md-6 row align-items-center mb-3">
@@ -752,18 +751,7 @@
                                 <div class="row form-section">
                                     <div class="col-12 col-md-6 row align-items-center mb-3">
                                         <div class="section-title col-md-4">
-                                            <span>GST <span style="color:red;">*</span></span>
-                                        </div>
-                                        <div class="form-group col-md-8">
-                                            <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off">
-                                            <span class="error_gst_number" style="color:red"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row form-section">
-                                    <div class="col-12 col-md-6 row align-items-center mb-3">
-                                        <div class="section-title col-md-4">
-                                            <span>Vendor Type</span>
+                                            <span>Vendor Type <span style="color:red;">*</span></span>
                                         </div>
                                         <div class="tax-dropdown-wrapper tds-tax-section" style="width:340px;">
                                             <input type="text" class="form-control vendor-search-input" name="tds_tax_name" autocomplete="off" autocorrect="off" placeholder="Select a Vendor Type"  readonly>
@@ -775,6 +763,17 @@
                                             </div>
                                             {{-- <div class="manage-tds-link">⚙️ Manage TDS</div> --}}
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row form-section">
+                                    <div class="col-12 col-md-6 row align-items-center mb-3">
+                                        <div class="section-title col-md-4">
+                                            <span>GST <span class="" style="color:red;">*</span></span>
+                                        </div>
+                                        <div class="form-group col-md-8">
+                                            <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off">
+                                            <span class="error_gst_number" style="color:red"></span>
                                         </div>
                                     </div>
                                 </div>
@@ -2394,9 +2393,16 @@
                     } else {
                         $('.error_pan_number').text('');
                     }
-                    if ($('#gst_number').val().trim() === "") {
-                        $('.error_gst_number').text('GST Number is required');
-                        isValid = false;
+                    let vendorType = $('#vendor_type_name').val();
+                    let gst = $('#gst_number').val().trim();
+
+                    if (vendorType === 'GST Registered Party') {
+                        if (gst === "") {
+                            $('.error_gst_number').text('GST Number is required');
+                            isValid = false;
+                        } else {
+                            $('.error_gst_number').text('');
+                        }
                     } else {
                         $('.error_gst_number').text('');
                     }
@@ -2852,6 +2858,21 @@
                         wrapper.find('.vendor_type_name').val(selecteddata);
                     }
                     wrapper.find('.vendor_type_id').val(selectedid);
+
+                    let gstLabel = $('#gst_number').closest('.col-md-6')
+                        .find('.section-title span')
+                        .first();
+
+                    if (selecteddata === 'GST Registered Party') {
+                        if (gstLabel.find('span').length === 0) {
+                            gstLabel.append(' <span style="color:red;">*</span>');
+                        }
+                        $('#gst_number').prop('required', true);
+
+                    } else {
+                        gstLabel.find('span').remove();
+                        $('#gst_number').prop('required', false);
+                    }
 
                     $dropdown.hide();
                 });
