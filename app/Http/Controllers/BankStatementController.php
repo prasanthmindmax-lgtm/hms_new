@@ -232,11 +232,14 @@ class BankStatementController extends Controller
                 'bs.*',
                 'matched_user.user_fullname as matched_by_name',
                 'matched_user.username as matched_by_username',
+                'income_user.user_fullname as income_matched_by_name',
+                'income_user.username as income_matched_by_username',
                 'bill.bill_number',
                 'bill.vendor_name',
                 'bill.grand_total_amount as bill_amount'
             )
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
+            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
             ->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
             ->orderBy('bs.transaction_date', 'desc')
             ->orderBy('bs.id', 'desc');
@@ -305,6 +308,19 @@ class BankStatementController extends Controller
         if ($request->filled('match_status')) {
             $query->where('bs.match_status', $request->match_status);
         }
+
+        // Income Match Status
+        if ($request->filled('income_match')) {
+            $val = $request->income_match;
+            if ($val === 'income_matched') {
+                $query->where('bs.income_match_status', 'income_matched');
+            } elseif ($val === 'income_unmatched') {
+                $query->where(function ($q) {
+                    $q->where('bs.income_match_status', 'income_unmatched')
+                      ->orWhereNull('bs.income_match_status');
+                });
+            }
+        }
         
         // Reference Number
         if ($request->filled('reference_number')) {
@@ -332,19 +348,32 @@ class BankStatementController extends Controller
      */
     private function getStatistics()
     {
-        $total = DB::table('bank_statements')->count();
-        $matched = DB::table('bank_statements')->where('match_status', 'matched')->count();
+        $total    = DB::table('bank_statements')->count();
+        $matched  = DB::table('bank_statements')->where('match_status', 'matched')->count();
         $unmatched = DB::table('bank_statements')->where('match_status', 'unmatched')->count();
-        
+
         $totalWithdrawal = DB::table('bank_statements')->sum('withdrawal');
-        $totalDeposit = DB::table('bank_statements')->sum('deposit');
-        
+        $totalDeposit    = DB::table('bank_statements')->sum('deposit');
+
+        // Income reconciliation match stats (only if the column exists — safe for older DBs)
+        $incomeMatched   = 0;
+        $incomeUnmatched = 0;
+        if (Schema::hasColumn('bank_statements', 'income_match_status')) {
+            $incomeMatched   = DB::table('bank_statements')->where('income_match_status', 'income_matched')->count();
+            $incomeUnmatched = DB::table('bank_statements')->where(function ($q) {
+                $q->where('income_match_status', 'income_unmatched')
+                  ->orWhereNull('income_match_status');
+            })->count();
+        }
+
         return response()->json([
-            'total' => $total,
-            'matched' => $matched,
-            'unmatched' => $unmatched,
-            'partially_matched' => $total - $matched - $unmatched,
-            'total_amount' => $totalWithdrawal + $totalDeposit
+            'total'              => $total,
+            'matched'            => $matched,
+            'unmatched'          => $unmatched,
+            'partially_matched'  => $total - $matched - $unmatched,
+            'total_amount'       => $totalWithdrawal + $totalDeposit,
+            'income_matched'     => $incomeMatched,
+            'income_unmatched'   => $incomeUnmatched,
         ]);
     }
     
@@ -1055,6 +1084,36 @@ class BankStatementController extends Controller
     /**
      * Delete bank statement
      */
+    /**
+     * Return a single bank statement row with matched user info,
+     * used by the income reconciliation page when a bank ref number is clicked.
+     */
+    public function getBankStatementById($id)
+    {
+        $stmt = DB::table('bank_statements as bs')
+            ->select(
+                'bs.*',
+                'matched_user.user_fullname as matched_by_name',
+                'matched_user.username as matched_by_username',
+                'income_user.user_fullname as income_matched_by_name',
+                'income_user.username as income_matched_by_username',
+                'bill.bill_number',
+                'bill.vendor_name',
+                'bill.grand_total_amount as bill_amount'
+            )
+            ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
+            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
+            ->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
+            ->where('bs.id', $id)
+            ->first();
+
+        if (!$stmt) {
+            return response()->json(['success' => false, 'message' => 'Statement not found'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => $stmt]);
+    }
+
     public function destroy($id)
     {
         try {
@@ -1330,5 +1389,709 @@ class BankStatementController extends Controller
             }
             DB::table($neftLinesTable)->insert($lineData);
         }
+    }
+
+    // ============================================================
+    // INCOME TAG - link a bank statement to income_reconciliation_table
+    // ============================================================
+
+    /**
+     * Fetch zones for Income Tag dropdown
+     */
+    public function incomeTagZones()
+    {
+        $zones = DB::table('tblzones')->select('id', 'name')->orderBy('name')->get();
+        return response()->json($zones);
+    }
+
+    /**
+     * Fetch branches for a given zone_id (mirrors VendorController::getbranchfetch)
+     */
+    public function incomeTagBranches(Request $request)
+    {
+        $zoneId = $request->input('zone_id');
+        $branches = DB::table('tbl_locations')
+            ->where('zone_id', $zoneId)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+        return response()->json($branches);
+    }
+
+    /**
+     * Parse a bank statement description and resolve to branch / zone / mode.
+     *
+     * Patterns handled:
+     *   CASH  → "BY CASH -DHARMAPURI 6057 ..."   → mode=cash,  branch resolved by name
+     *   MESPOS→ "FT-MESPOS SET 10XX123558 310126" → mode=card,  branch resolved by MOC code suffix
+     *   NEFT  → "NEFT-..."                        → mode=neft
+     *   UPI   → "UPI-..." / "UPI/"                → mode=upi
+     */
+    public function incomeTagResolveDescription(Request $request)
+    {
+        $description = strtoupper(trim($request->input('description', '')));
+        $txnDate     = $request->input('txn_date', ''); // Y-m-d format
+
+        $mode        = null;
+        $branchId    = null;
+        $branchName  = null;
+        $zoneId      = null;
+        $zoneName    = null;
+        $date        = null; // collection date = txn date - 1 day
+
+        // ---- Derive collection date (one day before transaction date) ----
+        if ($txnDate) {
+            try {
+                $date = \Carbon\Carbon::parse($txnDate)->subDay()->format('d/m/Y');
+            } catch (\Exception $e) {
+                $date = null;
+            }
+        }
+
+        // ---- MOC DOC branch code map: last-6-digits-of-code => location_id in tbl_locations ----
+        // Codes from image (100000000XXXXXX → location id)
+        $mocCodeMap = [
+            '118961' => 23,  // ELECTRONIC CITY (Bengaluru)
+            '118991' => 37,  // HEBBAL (Bengaluru)
+            '118992' => 43,  // DASARAHALLI (Bengaluru)
+            '118988' => 27,  // KONANAKUNTE (Bengaluru)
+            '118958' => 30,  // TIRUPATHI
+            '119008' => 10,   // CALICUT (Kerala - Kozhikode)
+            '119001' => 11,   // PALAKADU (Kerala - Palakkad)
+            '119109' => 8,   // ERODE
+            '110737' => 7,  // TIRUPPUR
+            '119064' => 18,  // GANAPATHY (Coimbatore)
+            '119101' => 33,  // THUDIYALUR (Coimbatore)
+            '119067' => 19,  // SUNDARAPURAM (Coimbatore)
+            '119088' => 22,  // POLLACHI
+            '118824' => 35,  // KALLAKURICHI
+            '118815' => 9,  // SALEM
+            '118825' => 5,  // HOSUR
+            '118829' => 28,  // HARUR
+            '118828' => 50,  // ATTUR
+            '118843' => 51,  // NAMAKKAL
+            '177476' => 46,  // TIRUPATTUR
+            '119040' => 20,  // TRICHY
+            '119051' => 21,  // THANJAVUR
+            '119033' => 25,  // MADURAI
+            '277463' => 48,  // SIVAKASI
+            '288923' => 45,  // NAGAPATINAM
+            '118921' => 17,  // THIRUVALLUR
+            '118938' => 4,  // KANCHIPURAM
+            '118877' => 1,  // SHOLINGANALLUR & KARAPAKKAM
+            '118888' => 3,  // URAPAKKAM
+            '118909' => 2,  // MADIPAKKAM
+            '118918' => 24,  // TAMBARAM
+            '123561' => 47,  // CHENGALPET
+            '123558' => 41,  // VADAPALANI
+            '118955' => 39,  // VELLORE
+            '358644' => 58,  // KRISHNAKIRI
+            '358635' => 29,  // KARUR
+        ];
+
+        // =========================================================
+        // 1. CASH — "BY CASH -BRANCHNAME ..."
+        // =========================================================
+        if (preg_match('/BY\s+CASH\s*[-–]\s*([A-Z]+)/i', $description, $m)) {
+            $mode       = 'cash';
+            $branchKeyword = $m[1];
+
+            $loc = DB::table('tbl_locations')
+                ->whereRaw('UPPER(name) LIKE ?', ['%' . $branchKeyword . '%'])
+                ->select('id', 'name', 'zone_id')
+                ->first();
+
+            if ($loc) {
+                $branchId   = $loc->id;
+                $branchName = $loc->name;
+                $zoneId     = $loc->zone_id;
+                $zone       = DB::table('tblzones')->where('id', $zoneId)->first();
+                $zoneName   = $zone ? $zone->name : null;
+            }
+        }
+
+        // =========================================================
+        // 2. MESPOS — "FT-MESPOS SET 10XXNNNNNN" / "MESPOS 10XXNNNNNN"
+        //    10XX<6+digits> → full code = 100000000<suffix>
+        //    MESPOS collects both Card and UPI — select both modes
+        // =========================================================
+        elseif (preg_match('/MESPOS/i', $description)) {
+            $mode = ['card', 'upi']; // MESPOS handles both card & UPI
+
+            // Extract the 10XX code pattern: "10" + at least 4 digits (last 6 are the suffix)
+            if (preg_match('/10[X0]+([0-9]{6,})/i', $description, $m)) {
+                $suffix = substr($m[1], -6); // take last 6 digits
+                // dd($suffix);
+                if (isset($mocCodeMap[$suffix])) {
+                    $locId = $mocCodeMap[$suffix];
+                    // dd($locId);
+                    $loc   = DB::table('tbl_locations')
+                        ->where('id', $locId)
+                        ->select('id', 'name', 'zone_id')
+                        ->first();
+                    if ($loc) {
+                        $branchId   = $loc->id;
+                        $branchName = $loc->name;
+                        $zoneId     = $loc->zone_id;
+                        $zone       = DB::table('tblzones')->where('id', $zoneId)->first();
+                        $zoneName   = $zone ? $zone->name : null;
+                    }
+                }
+            }
+        }
+
+        // =========================================================
+        // 3. NEFT
+        // =========================================================
+        elseif (preg_match('/\bNEFT\b/i', $description)) {
+            $mode = 'neft';
+        }
+
+        // =========================================================
+        // 4. UPI
+        // =========================================================
+        elseif (preg_match('/\bUPI\b/i', $description)) {
+            $mode = 'upi';
+        }
+
+        return response()->json([
+            'resolved'    => !empty($mode),
+            'mode'        => $mode,
+            'zone_id'     => $zoneId,
+            'zone_name'   => $zoneName,
+            'branch_id'   => $branchId,
+            'branch_name' => $branchName,
+            'date'        => $date,
+        ]);
+    }
+
+    /**
+     * Apply income tag: link this bank statement to the income_reconciliation_table row
+     * for the chosen branch + date + mode. If no row exists, create one with MOC DOC data.
+     *
+     * Field mapping (mirrors storeRadiant in IncomeController):
+     *   Cash  → collection_amount (MOC cash), deposite_amount (bank deposit), cash_diff
+     *   UPI/Card → mespos_upi (MOC upi), mespos_card (MOC card), bank_upi_card (bank), card_upi_diff
+     *   NEFT  → bank_neft (bank), neft_others_diff
+     *   Other → bank_others (bank), neft_others_diff
+     *   radiant_diff = overall moc_total vs bank_total
+     */
+    public function applyIncomeTag(Request $request)
+    {
+        $request->validate([
+            'bank_statement_id' => 'required|integer',
+            'zone'              => 'required|string',
+            'branch'            => 'required|string',
+            'date'              => 'required|string',
+            'mode'              => 'required|in:cash,card,upi,neft,other',
+        ]);
+
+        // --- 1. Load the bank statement ---
+        $stmt = DB::table('bank_statements')->find($request->bank_statement_id);
+        if (!$stmt) {
+            return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+        }
+
+        // --- 2. Parse date (income_reconciliation_table stores d/m/Y) ---
+        try {
+            $dateObj = Carbon::createFromFormat('Y-m-d', $request->date);
+        } catch (\Exception $e) {
+            $dateObj = Carbon::parse($request->date);
+        }
+        $dateFormatted = $dateObj->format('d/m/Y');
+
+        // --- 3. Mode → bank-ref column names ---
+        $mode = $request->mode;
+        if ($mode === 'card' || $mode === 'upi') {
+            $bankIdCol  = 'card_upi_bank_id';
+            $bankRefCol = 'card_upi_bank_ref_no';
+        } elseif ($mode === 'neft') {
+            $bankIdCol  = 'neft_bank_id';
+            $bankRefCol = 'neft_bank_ref_no';
+        } elseif ($mode === 'other') {
+            $bankIdCol  = 'other_bank_id';
+            $bankRefCol = 'other_bank_ref_no';
+        } else {
+            $bankIdCol  = 'cash_bank_id';
+            $bankRefCol = 'cash_bank_ref_no';
+        }
+
+        $amount = $stmt->withdrawal > 0 ? (float)$stmt->withdrawal : (float)$stmt->deposit;
+
+        // Format transaction date as d/m/Y (bank statements may store d/M/Y like "25/Mar/2026")
+        try {
+            $txnDate = Carbon::createFromFormat('d/M/Y', $stmt->transaction_date)->format('d/m/Y');
+        } catch (\Exception $e) {
+            try {
+                $txnDate = Carbon::parse($stmt->transaction_date)->format('d/m/Y');
+            } catch (\Exception $e2) {
+                $txnDate = $stmt->transaction_date;
+            }
+        }
+
+        $refNo = $stmt->reference_number ?: $stmt->transaction_id;
+
+        // --- 4. Find existing income_reconciliation_table row for this branch + date ---
+        $existing = DB::table('income_reconciliation_table')
+            ->where('location_name', $request->branch)
+            ->whereRaw("STR_TO_DATE(date_range, '%d/%m/%Y') = STR_TO_DATE(?, '%d/%m/%Y')", [$dateFormatted])
+            ->first();
+
+        $incomeReconId = null;
+
+        if ($existing) {
+            // ===== UPDATE path =====
+            // Read current values so we can recalculate diffs correctly
+            $curMocCash    = (float)($existing->moc_cash_amt    ?? 0);
+            $curMocCard    = (float)($existing->moc_card_amt    ?? 0);
+            $curMocUpi     = (float)($existing->moc_upi_amt     ?? 0);
+            $curMocNeft    = (float)($existing->moc_neft_amt    ?? 0);
+            $curMocOther   = (float)($existing->moc_other_amt   ?? 0);
+            $curMocOverall = (float)($existing->moc_overall_total ?? 0);
+
+            $curCollect  = (float)($existing->collection_amount ?? 0);
+            $curDeposite = (float)($existing->deposite_amount   ?? 0);
+            $curMesCard  = (float)($existing->mespos_card       ?? 0);
+            $curMesUpi   = (float)($existing->mespos_upi        ?? 0);
+            $curBankUpi  = (float)($existing->bank_upi_card     ?? 0);
+            $curBankNeft = (float)($existing->bank_neft         ?? 0);
+            $curBankOth  = (float)($existing->bank_others       ?? 0);
+
+            $updateData = [
+                $bankIdCol   => $stmt->id,
+                $bankRefCol  => $refNo,
+                'updated_at' => now(),
+            ];
+
+            if ($mode === 'cash') {
+                // Cash bank deposit fills deposite_amount; MOC cash fills collection_amount
+                $updateData['date_collection']   = $txnDate;
+                $updateData['collection_amount'] = $curMocCash ?: $amount; // prefer MOC cash; fallback to bank amount
+                $updateData['date_deposited']    = $txnDate;
+                $updateData['deposite_amount']   = $amount;
+                $updateData['cash_utr_number']   = $refNo;
+                $curDeposite = $amount;
+                $curCollect  = $updateData['collection_amount'];
+
+            } elseif ($mode === 'card' || $mode === 'upi') {
+                // MOC card+upi → mespos_card / mespos_upi; bank combined → bank_upi_card
+                $updateData['date_settlement'] = $txnDate;
+                $updateData['mespos_card']     = $curMocCard;
+                $updateData['mespos_upi']      = $curMocUpi;
+                $updateData['bank_upi_card']   = $amount;
+                $updateData['bank_upi_card_utr']   = $refNo;
+                $updateData['moc_total_upi_card'] = $curMocCard + $curMocUpi;
+                $curMesCard = $curMocCard;
+                $curMesUpi  = $curMocUpi;
+                $curBankUpi = $amount;
+
+            } elseif ($mode === 'neft') {
+                $updateData['date_settlement'] = $txnDate;
+                $updateData['bank_neft']       = $amount;
+                $updateData['bank_neft_utr']   = $refNo;
+                $curBankNeft = $amount;
+
+            } elseif ($mode === 'other') {
+                $updateData['date_settlement'] = $txnDate;
+                $updateData['bank_others']     = $amount;
+                $updateData['bank_other_utr']   = $refNo;
+                $curBankOth = $amount;
+            }
+
+            // Recalculate all difference fields after updating the relevant values
+            $diffs = $this->calcIncomeDiffs(
+                $curMocCash, $curMocCard, $curMocUpi, $curMocNeft, $curMocOther, $curMocOverall,
+                $curCollect, $curDeposite,
+                $curMesCard, $curMesUpi,
+                $curBankUpi, $curBankNeft, $curBankOth
+            );
+            $updateData = array_merge($updateData, $diffs);
+            DB::table('income_reconciliation_table')
+                ->where('id', $existing->id)
+                ->update($updateData);
+
+            $incomeReconId = $existing->id;
+            $action        = 'updated';
+            $message       = 'Income record updated with bank reference and differences recalculated';
+
+        } else {
+            // ===== INSERT path — fetch MOC DOC data first =====
+            $mocData = $this->fetchMocDocForBranch($request->branch, $dateObj->format('Ymd'));
+            // dd($mocData);
+            $mocCash    = (float)($mocData['cash']  ?? 0);
+            $mocCard    = (float)($mocData['card']  ?? 0);
+            $mocUpi     = (float)($mocData['upi']   ?? 0);
+            $mocNeft    = (float)($mocData['neft']  ?? 0);
+            $mocOther   = (float)($mocData['other'] ?? 0);
+            $mocOverall = array_sum($mocData);
+
+            // Bank amount fields — only the current mode is populated; others are 0
+            $collectAmt = 0;
+            $depositeAmt = 0;
+            $mesposCard = $mocCard; // MOC card always goes into mespos_card
+            $mesposUpi  = $mocUpi;  // MOC upi  always goes into mespos_upi
+            $bankUpiCard = 0;
+            $bankNeft    = 0;
+            $bankOthers  = 0;
+
+            $insertData = [
+                'zone_name'          => $request->zone,
+                'location_name'      => $request->branch,
+                'date_range'         => $dateFormatted,
+
+                // MOC DOC totals
+                'moc_cash_amt'       => $mocCash,
+                'moc_card_amt'       => $mocCard,
+                'moc_upi_amt'        => $mocUpi,
+                'moc_total_upi_card' => $mocCard + $mocUpi,
+                'moc_neft_amt'       => $mocNeft,
+                'moc_other_amt'      => $mocOther,
+                'moc_overall_total'  => $mocOverall,
+
+                // MESPOS machine amounts = MOC card/upi (same source in bank-recon context)
+                'mespos_card'        => $mocCard,
+                'mespos_upi'         => $mocUpi,
+
+                // Bank reference
+                $bankIdCol  => $stmt->id,
+                $bankRefCol => $refNo,
+
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            // Fill bank amount + date fields per mode
+            if ($mode === 'cash') {
+                $collectAmt  = $mocCash ?: $amount;
+                $depositeAmt = $amount;
+                $insertData['date_collection']   = $txnDate;
+                $insertData['collection_amount'] = $collectAmt;
+                $insertData['date_deposited']    = $txnDate;
+                $insertData['deposite_amount']   = $depositeAmt;
+                $insertData['cash_utr_number']   = $refNo;
+
+            } elseif ($mode === 'card' || $mode === 'upi') {
+                $bankUpiCard = $amount;
+                $insertData['date_settlement'] = $txnDate;
+                $insertData['bank_upi_card']   = $bankUpiCard;
+                $insertData['bank_upi_card_utr']   = $refNo;
+
+            } elseif ($mode === 'neft') {
+                $bankNeft = $amount;
+                $insertData['date_settlement'] = $txnDate;
+                $insertData['bank_neft']       = $bankNeft;
+                $insertData['bank_neft_utr']   = $refNo;
+
+            } elseif ($mode === 'other') {
+                $bankOthers = $amount;
+                $insertData['date_settlement'] = $txnDate;
+                $insertData['bank_others']     = $bankOthers;
+                $insertData['bank_other_utr']   = $refNo;
+
+            } else {
+                $insertData['date_settlement'] = $txnDate;
+            }
+            // dd($insertData);
+            // Calculate differences
+            $diffs = $this->calcIncomeDiffs(
+                $mocCash, $mocCard, $mocUpi, $mocNeft, $mocOther, $mocOverall,
+                $collectAmt, $depositeAmt,
+                $mesposCard, $mesposUpi,
+                $bankUpiCard, $bankNeft, $bankOthers
+            );
+            $insertData = array_merge($insertData, $diffs);
+            // dd($insertData);
+            $incomeReconId = DB::table('income_reconciliation_table')->insertGetId($insertData);
+            $action        = 'created';
+            $message       = 'New income record created with MOC DOC data and differences';
+        }
+
+        // --- 5. Mark bank_statements row as income-matched ---
+        $userId = Auth::id();
+        $incomeUpdate = [
+            'income_match_status'      => 'income_matched',
+            'income_reconciliation_id' => $incomeReconId,
+            'income_matched_branch'    => $request->branch,
+            'income_matched_date'      => $dateFormatted,
+            'income_matched_by'        => $userId,
+            'income_matched_at'        => now(),
+            'updated_at'               => now(),
+        ];
+        $safeUpdate = [];
+        foreach ($incomeUpdate as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safeUpdate[$col] = $val;
+            }
+        }
+        if (!empty($safeUpdate)) {
+            DB::table('bank_statements')->where('id', $stmt->id)->update($safeUpdate);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'action'  => $action,
+        ]);
+    }
+
+    /**
+     * Remove income tag from a bank statement.
+     * Clears the bank-ref and bank-amount columns that this statement filled in
+     * on the linked income_reconciliation_table row, recalculates diffs,
+     * and resets the bank_statements income match tracking columns.
+     */
+    public function unmatchIncome($id)
+    {
+        DB::beginTransaction();
+        try {
+            $stmt = DB::table('bank_statements')->find($id);
+            if (!$stmt) {
+                return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+            }
+
+            if (($stmt->income_match_status ?? '') !== 'income_matched') {
+                return response()->json(['success' => false, 'message' => 'This statement has no income tag to remove'], 400);
+            }
+
+            // --- Find the linked income reconciliation row ---
+            $reconId = $stmt->income_reconciliation_id ?? null;
+            $recon   = $reconId ? DB::table('income_reconciliation_table')->find($reconId) : null;
+
+            if ($recon) {
+                // Determine which bank-ref columns this statement owns and clear them
+                $clearData = ['updated_at' => now()];
+
+                if ((int)($recon->cash_bank_id ?? 0) === (int)$id) {
+                    $clearData['cash_bank_id']        = null;
+                    $clearData['cash_bank_ref_no']    = null;
+                    $clearData['collection_amount']   = 0;
+                    $clearData['deposite_amount']     = 0;
+                    $clearData['date_collection']     = null;
+                    $clearData['date_deposited']      = null;
+                }
+                if ((int)($recon->card_upi_bank_id ?? 0) === (int)$id) {
+                    $clearData['card_upi_bank_id']    = null;
+                    $clearData['card_upi_bank_ref_no']= null;
+                    $clearData['bank_upi_card']       = 0;
+                    $clearData['mespos_card']         = 0;
+                    $clearData['mespos_upi']          = 0;
+                    $clearData['date_settlement']     = null;
+                }
+                if ((int)($recon->neft_bank_id ?? 0) === (int)$id) {
+                    $clearData['neft_bank_id']        = null;
+                    $clearData['neft_bank_ref_no']    = null;
+                    $clearData['bank_neft']           = 0;
+                }
+                if ((int)($recon->other_bank_id ?? 0) === (int)$id) {
+                    $clearData['other_bank_id']       = null;
+                    $clearData['other_bank_ref_no']   = null;
+                    $clearData['bank_others']         = 0;
+                }
+
+                // Merge cleared values with existing to recalculate diffs
+                $merged = array_merge((array)$recon, $clearData);
+
+                $diffs = $this->calcIncomeDiffs(
+                    (float)($merged['moc_cash_amt']    ?? 0),
+                    (float)($merged['moc_card_amt']    ?? 0),
+                    (float)($merged['moc_upi_amt']     ?? 0),
+                    (float)($merged['moc_neft_amt']    ?? 0),
+                    (float)($merged['moc_other_amt']   ?? 0),
+                    (float)($merged['moc_overall_total']?? 0),
+                    (float)($merged['collection_amount']?? 0),
+                    (float)($merged['deposite_amount'] ?? 0),
+                    (float)($merged['mespos_card']     ?? 0),
+                    (float)($merged['mespos_upi']      ?? 0),
+                    (float)($merged['bank_upi_card']   ?? 0),
+                    (float)($merged['bank_neft']       ?? 0),
+                    (float)($merged['bank_others']     ?? 0)
+                );
+
+                DB::table('income_reconciliation_table')
+                    ->where('id', $recon->id)
+                    ->update(array_merge($clearData, $diffs));
+            }
+
+            // --- Reset bank_statements income tracking columns ---
+            $resetUpdate = [
+                'income_match_status'      => 'income_unmatched',
+                'income_reconciliation_id' => null,
+                'income_matched_branch'    => null,
+                'income_matched_date'      => null,
+                'income_matched_by'        => null,
+                'income_matched_at'        => null,
+                'updated_at'               => now(),
+            ];
+            $safeReset = [];
+            foreach ($resetUpdate as $col => $val) {
+                if (Schema::hasColumn('bank_statements', $col)) {
+                    $safeReset[$col] = $val;
+                }
+            }
+            DB::table('bank_statements')->where('id', $id)->update($safeReset);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Income tag removed and reconciliation record cleared',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error removing income tag: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate all income reconciliation difference fields.
+     *
+     *   cash_diff        = collection_amount (MOC cash) - deposite_amount (bank deposit)
+     *   card_upi_diff    = (mespos_card + mespos_upi) - bank_upi_card
+     *   neft_others_diff = (moc_neft + moc_other) - (bank_neft + bank_others)
+     *   radiant_diff     = moc_overall_total - (deposite_amount + bank_upi_card + bank_neft + bank_others)
+     */
+    private function calcIncomeDiffs(
+        float $mocCash, float $mocCard, float $mocUpi,
+        float $mocNeft, float $mocOther, float $mocOverall,
+        float $collectAmt, float $depositeAmt,
+        float $mesposCard, float $mesposUpi,
+        float $bankUpiCard, float $bankNeft, float $bankOthers
+    ): array {
+        $mocTotalUpiCard = $mocCard + $mocUpi;
+        $cashDiff        = $collectAmt - $depositeAmt;
+        $cardUpiDiff     = ($mesposCard + $mesposUpi) - $bankUpiCard;
+        $neftOthersDiff  = ($mocNeft + $mocOther) - ($bankNeft + $bankOthers);
+        $bankTotal       = $depositeAmt + $bankUpiCard + $bankNeft + $bankOthers;
+        $radiantDiff     = $mocOverall - $bankTotal;
+
+        return [
+            'moc_total_upi_card' => $mocTotalUpiCard,
+            'cash_diff'          => $cashDiff,
+            'card_upi_diff'      => $cardUpiDiff,
+            'neft_others_diff'   => $neftOthersDiff,
+            'radiant_diff'       => $radiantDiff,
+        ];
+    }
+
+    /**
+     * Fetch MOC DOC totals (cash, card, upi, neft, other) for a given branch and date.
+     * Uses the same MOC DOC API as IncomeReconciliationController.
+     */
+    private function fetchMocDocForBranch(string $branchName, string $dateYmd): array
+    {
+        $totals = ['cash' => 0.0, 'card' => 0.0, 'upi' => 0.0, 'neft' => 0.0, 'other' => 0.0];
+
+        $cityArray   = $this->incomeCityArray();
+        $locationKey = array_search($branchName, $cityArray);
+
+        if ($locationKey === false) {
+            \Log::warning("fetchMocDocForBranch: branch '{$branchName}' not found in cityArray");
+            return $totals;
+        }
+
+        // Match exact format used by SuperAdminController::postCurlApi for the billing list API
+        $url         = 'https://mocdoc.in/api/get/billlist/draravinds-ivf';
+        $postFields  = "date={$dateYmd}&entitylocation={$locationKey}";
+        $headFields  = [
+            'md-authorization: MD 7b40af0edaf0ad75:0yAJg5vPzhav8JdUyBmFq8sQvy8=',
+            'Date: Fri, 07 Mar 2025 10:07:52 GMT',
+            'Content-Type: application/x-www-form-urlencoded',
+            'Cookie: SRV=s1',
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $postFields,
+            CURLOPT_HTTPHEADER     => $headFields,
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (!$response || $httpCode !== 200) {
+            \Log::warning("fetchMocDocForBranch: API returned HTTP {$httpCode} for branch '{$branchName}' date {$dateYmd}");
+            return $totals;
+        }
+
+        $data = json_decode($response, true);
+
+        // API returns individual billing records (same as incomereportAPI / saveCurlData)
+        // Each record has 'paymenttype' (Cash/Card/UPI/Neft/...) and 'amt'
+        if (!empty($data['billinglist']) && is_array($data['billinglist'])) {
+            foreach ($data['billinglist'] as $bill) {
+                $payType = strtolower(trim($bill['paymenttype'] ?? ''));
+                $amt     = floatval($bill['amt'] ?? 0);
+
+                switch ($payType) {
+                    case 'cash': $totals['cash']  += $amt; break;
+                    case 'card': $totals['card']  += $amt; break;
+                    case 'upi':  $totals['upi']   += $amt; break;
+                    case 'neft': $totals['neft']  += $amt; break;
+                    default:     $totals['other'] += $amt; break;
+                }
+            }
+        } else {
+            \Log::info("fetchMocDocForBranch: no billinglist for branch '{$branchName}' date {$dateYmd}", [
+                'locationKey' => $locationKey,
+                'response'    => $data,
+            ]);
+        }
+
+        return $totals;
+    }
+
+    /**
+     * MOC DOC location key → branch name mapping (mirrors IncomeReconciliationController)
+     */
+    private function incomeCityArray(): array
+    {
+        // Keep in sync with SuperAdminController::cityArray()
+        return [
+            "location1"  => "Kerala - Palakkad",
+            "location7"  => "Erode",
+            "location14" => "Tiruppur",
+            "location6"  => "Kerala - Kozhikode",
+            "location20" => "Coimbatore - Ganapathy",
+            "location21" => "Hosur",
+            "location22" => "Chennai - Sholinganallur",
+            "location23" => "Chennai - Urapakkam",
+            "location24" => "Chennai - Madipakkam",
+            "location26" => "Kanchipuram",
+            "location27" => "Coimbatore - Sundarapuram",
+            "location28" => "Trichy",
+            "location29" => "Thiruvallur",
+            "location30" => "Pollachi",
+            "location31" => "Bengaluru - Electronic City",
+            "location32" => "Bengaluru - Konanakunte",
+            "location33" => "Chennai - Tambaram",
+            "location34" => "Tanjore",
+            "location36" => "Harur",
+            "location39" => "Coimbatore - Thudiyalur",
+            "location40" => "Madurai",
+            "location41" => "Bengaluru - Hebbal",
+            "location42" => "Kallakurichi",
+            "location43" => "Vellore",
+            "location44" => "Tirupati",
+            "location45" => "Aathur",
+            "location46" => "Namakal",
+            "location47" => "Bengaluru - Dasarahalli",
+            "location48" => "Chengalpattu",
+            "location49" => "Chennai - Vadapalani",
+            "location50" => "Pennagaram",
+            "location51" => "Thirupathur",
+            "location52" => "Sivakasi",
+            "location13" => "Salem",
+            "location54" => "Nagapattinam",
+            "location56" => "Krishnagiri",
+            "location57" => "Karur",
+        ];
     }
 }

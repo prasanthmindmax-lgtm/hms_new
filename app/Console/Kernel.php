@@ -21,7 +21,7 @@ class Kernel extends ConsoleKernel
       // $schedule->command('fetch:api-data')->dailyAt('10:55');
        $schedule->command('fetch:api-data')->dailyAt('10:11')->timezone('Asia/Kolkata')->withoutOverlapping();
        $schedule->command('fetch:api-data-new')->dailyAt('15:14')->timezone('Asia/Kolkata')->withoutOverlapping();
-       $schedule->command('notify:deadlines')->dailyAt('14:47')->timezone('Asia/Kolkata')->withoutOverlapping()
+       $schedule->command('notify:deadlines')->dailyAt('18:03')->timezone('Asia/Kolkata')->withoutOverlapping()
              ->appendOutputTo(storage_path('logs/deadline-notifications.log'));
     }
 

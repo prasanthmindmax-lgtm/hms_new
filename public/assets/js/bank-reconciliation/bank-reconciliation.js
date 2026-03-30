@@ -83,6 +83,7 @@ $(document).ready(function() {
     function clearAllFilters() {
         currentFilters = {};
         $('#filterMatchStatus').val('');
+        $('#filterIncomeMatch').val('');
         $('#filterAmountMin').val('');
         $('#filterAmountMax').val('');
         $('#filterReference').val('');
@@ -109,11 +110,12 @@ $(document).ready(function() {
     // ============================================
     $('#applyFiltersBtn').on('click', function() {
         currentFilters = {
-            match_status: $('#filterMatchStatus').val(),
-            amount_min: $('#filterAmountMin').val(),
-            amount_max: $('#filterAmountMax').val(),
-            reference_number: $('#filterReference').val(),
-            search: $('#filterDescription').val()
+            match_status:    $('#filterMatchStatus').val(),
+            income_match:    $('#filterIncomeMatch').val(),
+            amount_min:      $('#filterAmountMin').val(),
+            amount_max:      $('#filterAmountMax').val(),
+            reference_number:$('#filterReference').val(),
+            search:          $('#filterDescription').val()
         };
         if (window.bankReconDateFrom) currentFilters.date_from = window.bankReconDateFrom;
         if (window.bankReconDateTo) currentFilters.date_to = window.bankReconDateTo;
@@ -307,6 +309,25 @@ $(document).ready(function() {
                     </div>
                 `;
             }
+
+            // Income reconciliation tag details
+            const incomeTagged = stmt.income_match_status === 'income_matched';
+            let incomeTagCell = '<span class="text-muted small"><i class="bi bi-dash"></i> Not tagged</span>';
+            if (incomeTagged) {
+                const taggedAt = stmt.income_matched_at
+                    ? formatDate(stmt.income_matched_at.substring(0, 10))
+                    : '';
+                incomeTagCell = `
+                    <div>
+                        <span class="badge bg-info text-white mb-1">
+                            <i class="bi bi-arrow-left-right me-1"></i>Income Tagged
+                        </span><br>
+                        <small class="text-dark fw-semibold">${stmt.income_matched_branch || ''}</small><br>
+                        <small class="text-muted">${stmt.income_matched_date || ''}</small><br>
+                        <small class="text-muted">By: <strong>${stmt.income_matched_by_name || ''}</strong></small>
+                        ${taggedAt ? '<br><small class="text-muted">' + taggedAt + '</small>' : ''}
+                    </div>`;
+            }
             
             const row = `
                 <tr class="statement-row-clickable ${stmt.match_status}" 
@@ -355,19 +376,27 @@ $(document).ready(function() {
                         ${matchedbyInfo}
                     </td>
                     <td>
+                        ${incomeTagCell}
+                    </td>
+                    <td>
                         <div class="action-buttons">
-                            ${stmt.match_status === 'unmatched' ? `
-                                <button class="btn btn-sm btn-success btn-match" data-id="${stmt.id}">
+                            ${!incomeTagged ? (stmt.match_status === 'unmatched' ? `
+                                <button class="btn btn-sm btn-success btn-match" data-id="${stmt.id}" title="Match Bill">
                                     <i class="bi bi-link-45deg"></i>
                                 </button>
                             ` : `
-                                <button class="btn btn-sm btn-warning btn-unmatch" data-id="${stmt.id}">
+                                <button class="btn btn-sm btn-warning btn-unmatch" data-id="${stmt.id}" title="Unmatch Bill">
                                     <i class="bi bi-x-circle"></i>
                                 </button>
-                            `}
+                            `) : ''}
+                            ${incomeTagged ? `
+                                <button class="btn btn-sm btn-outline-danger btn-income-unmatch mt-1" data-id="${stmt.id}" title="Remove Income Tag">
+                                    <i class="bi bi-tag-x"></i>Unmatch Income
+                                </button>
+                            ` : ''}
                             <button class="btn btn-sm btn-danger btn-delete" style="display:none;" data-id="${stmt.id}">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                                    <i class="bi bi-trash"></i>
+                                </button>
                         </div>
                     </td>
                 </tr>
@@ -737,6 +766,45 @@ $(document).ready(function() {
     }
     
     // ============================================
+    // INCOME UNMATCH BUTTON
+    // ============================================
+    $(document).on('click', '.btn-income-unmatch', function(e) {
+        e.stopPropagation();
+        const id = $(this).data('id');
+        Swal.fire({
+            title: 'Remove Income Tag?',
+            text: 'This will clear the bank reference and recalculate differences in the income reconciliation record.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Remove Tag'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const url = routes.incomeUnmatch.replace(':id', id);
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: { _token: $('meta[name="csrf-token"]').attr('content') },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success('Income tag removed successfully');
+                            loadStatements(currentPage);
+                            updateStatistics();
+                        } else {
+                            toastr.error(response.message || 'Failed to remove income tag');
+                        }
+                    },
+                    error: function(xhr) {
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Error removing income tag';
+                        toastr.error(msg);
+                    }
+                });
+            }
+        });
+    });
+
+    // ============================================
     // DELETE BUTTON
     // ============================================
     $(document).on('click', '.btn-delete', function(e) {
@@ -799,9 +867,13 @@ $(document).ready(function() {
                     $('#totalStatements').text(response.total || 0);
                     $('#matchedStatements').text(response.matched || 0);
                     $('#unmatchedStatements').text(response.unmatched || 0);
-                    
+
                     const totalAmount = response.total_amount || 0;
                     $('#totalAmount').text('₹' + formatNumber(totalAmount));
+
+                    // Income reconciliation stats
+                    $('#incomeMatchedCount').text(response.income_matched || 0);
+                    $('#incomeUnmatchedCount').text(response.income_unmatched || 0);
                 }
             }
         });
@@ -892,5 +964,319 @@ $(document).ready(function() {
         "positionClass": "toast-top-right",
         "timeOut": "3000"
     };
-    
+
+    // ============================================
+    // INCOME TAG — zone → branch (by zone_id) + date picker + multi-mode
+    // ============================================
+
+    var incomeTagSelectedModes = new Set();
+    var incomeTagFp = null; // flatpickr instance for income tag date
+
+    // ---- Initialize when modal opens — Income Tag tab is active by default ----
+    $('#matchTransactionModal').on('shown.bs.modal', function () {
+        loadIncomeTagZones();
+        initIncomeTagFlatpickr();
+        updateIncomeTagSummary();
+
+        // Auto-resolve description immediately (no need to click the tab)
+        if (currentTxnData.description) {
+            autoResolveIncomeTagFromDescription(currentTxnData.description, currentTxnData.date);
+        } else if (currentTxnData.date && incomeTagFp && !incomeTagFp.selectedDates.length) {
+            incomeTagFp.setDate(currentTxnData.date, true, 'Y-m-d');
+        }
+    });
+
+    // ---- Readonly lock / unlock helpers for auto-resolved selects ----
+    function lockIncomeTagSelects() {
+        $('#incomeTagZone, #incomeTagBranch').css({
+            'pointer-events': 'none',
+            'background-color': '#f1f5f9',
+            'opacity': '1',
+            'border-color': '#cbd5e1',
+            'cursor': 'not-allowed'
+        }).attr('data-auto-locked', '1');
+    }
+    function unlockIncomeTagSelects() {
+        $('#incomeTagZone, #incomeTagBranch').css({
+            'pointer-events': '',
+            'background-color': '',
+            'opacity': '',
+            'border-color': '',
+            'cursor': ''
+        }).removeAttr('data-auto-locked');
+    }
+
+    // ---- Reset when modal closes ----
+    $('#matchTransactionModal').on('hidden.bs.modal', function () {
+        incomeTagSelectedModes.clear();
+        incomeTagInFlight = false; // reset guard so next open works cleanly
+        $('#incomeTagZone').val('');
+        $('#incomeTagZoneName').val('');
+        $('#incomeTagBranch').html('<option value="">Select zone first...</option>').prop('disabled', true);
+        $('#incomeTagBranchName').val('');
+        if (incomeTagFp) incomeTagFp.clear();
+        $('.income-tag-mode-btn').removeClass('selected');
+        unlockIncomeTagSelects();
+        updateIncomeTagSummary();
+    });
+
+    // ---- When Income Tag tab becomes active (user switches manually) ----
+    $('#categorize-tab').on('shown.bs.tab', function () {
+        updateIncomeTagSummary();
+    });
+
+    /**
+     * Call the resolve-description endpoint and auto-populate zone/branch/mode/date.
+     * Only fills fields that are currently empty (so manual edits are not overwritten).
+     */
+    function autoResolveIncomeTagFromDescription(description, txnDate) {
+        $.ajax({
+            url: routes.incomeTagResolve,
+            type: 'GET',
+            data: { description: description, txn_date: txnDate },
+            success: function (res) {
+                // ---- DATE: always set collection date (txn date - 1 day) ----
+                if (res.date && incomeTagFp) {
+                    incomeTagFp.setDate(res.date, true, 'd/m/Y');
+                } else if (txnDate && incomeTagFp && !incomeTagFp.selectedDates.length) {
+                    incomeTagFp.setDate(txnDate, true, 'Y-m-d');
+                }
+
+                // ---- MODE: auto-select detected mode button(s) — may be array ----
+                if (res.mode) {
+                    var modes = Array.isArray(res.mode) ? res.mode : [res.mode];
+                    modes.forEach(function (m) {
+                        var $modeBtn = $('.income-tag-mode-btn[data-mode="' + m + '"]');
+                        if ($modeBtn.length && !$modeBtn.hasClass('selected')) {
+                            $modeBtn.trigger('click');
+                        }
+                    });
+                }
+
+                if (!res.zone_id || !res.branch_id) {
+                    updateIncomeTagSummary();
+                    return; // branch not resolved — user fills manually
+                }
+
+                // ---- ZONE: set dropdown + hidden name field ----
+                // Zones might not be loaded yet; wait until loaded then set
+                function applyZoneAndBranch() {
+                    var $zone = $('#incomeTagZone');
+                    if ($zone.find('option[value="' + res.zone_id + '"]').length) {
+                        $zone.val(res.zone_id).trigger('change');
+                        $('#incomeTagZoneName').val(res.zone_name || '');
+
+                        // ---- BRANCH: fetch branches for zone then set ----
+                        $.ajax({
+                            url: routes.incomeTagBranches,
+                            type: 'GET',
+                            data: { zone_id: res.zone_id },
+                            success: function (branches) {
+                                var opts = '<option value="">Select branch...</option>';
+                                (branches || []).forEach(function (b) {
+                                    opts += '<option value="' + b.id + '" data-name="' + b.name + '">' + b.name + '</option>';
+                                });
+                                var $branch = $('#incomeTagBranch');
+                                $branch.html(opts).prop('disabled', false);
+
+                                // Select the resolved branch
+                                $branch.val(res.branch_id);
+                                if ($branch.val() == res.branch_id) {
+                                    $('#incomeTagBranchName').val(res.branch_name || '');
+                                }
+
+                                // Lock both dropdowns as readonly
+                                lockIncomeTagSelects();
+                                updateIncomeTagSummary();
+                            }
+                        });
+                    } else {
+                        // Zone options not rendered yet — retry after short delay
+                        setTimeout(applyZoneAndBranch, 300);
+                    }
+                }
+                applyZoneAndBranch();
+            },
+            error: function () {
+                // Fallback: just set the date
+                if (txnDate && incomeTagFp && !incomeTagFp.selectedDates.length) {
+                    incomeTagFp.setDate(txnDate, true, 'Y-m-d');
+                }
+                updateIncomeTagSummary();
+            }
+        });
+    }
+
+    function initIncomeTagFlatpickr() {
+        var el = document.getElementById('incomeTagDate');
+        if (!el || el._flatpickr) return;
+        incomeTagFp = flatpickr(el, {
+            dateFormat: 'd/m/Y',
+            maxDate: 'today',
+            onChange: function () { updateIncomeTagSummary(); }
+        });
+    }
+
+    // ---- Load zones (once) — value = zone_id, text = zone name ----
+    function loadIncomeTagZones() {
+        if ($('#incomeTagZone option').length > 1) return;
+        $.get(routes.incomeTagZones, function (zones) {
+            var opts = '<option value="">Select zone...</option>';
+            (zones || []).forEach(function (z) {
+                opts += '<option value="' + z.id + '" data-name="' + z.name + '">' + z.name + '</option>';
+            });
+            $('#incomeTagZone').html(opts);
+        });
+    }
+
+    // ---- Zone change → fetch branches by zone_id (VendorController pattern) ----
+    $(document).on('change', '#incomeTagZone', function () {
+        var zoneId   = $(this).val();
+        var zoneName = $(this).find('option:selected').data('name') || '';
+        $('#incomeTagZoneName').val(zoneName);
+
+        $('#incomeTagBranch')
+            .html('<option value="">Loading branches...</option>')
+            .prop('disabled', true);
+        $('#incomeTagBranchName').val('');
+
+        if (!zoneId) {
+            $('#incomeTagBranch').html('<option value="">Select zone first...</option>');
+            updateIncomeTagSummary();
+            return;
+        }
+
+        // Use the same endpoint as VendorController's getbranchfetch
+        $.ajax({
+            url: routes.incomeTagBranches,
+            type: 'GET',
+            data: { zone_id: zoneId },
+            success: function (branches) {
+                var opts = '<option value="">Select branch...</option>';
+                (branches || []).forEach(function (b) {
+                    opts += '<option value="' + b.id + '" data-name="' + b.name + '">' + b.name + '</option>';
+                });
+                $('#incomeTagBranch').html(opts).prop('disabled', false);
+            },
+            error: function () {
+                $('#incomeTagBranch').html('<option value="">Failed to load</option>');
+                toastr.error('Could not load branches');
+            }
+        });
+        updateIncomeTagSummary();
+    });
+
+    // ---- Branch change → store name ----
+    $(document).on('change', '#incomeTagBranch', function () {
+        var branchName = $(this).find('option:selected').data('name') || '';
+        $('#incomeTagBranchName').val(branchName);
+        updateIncomeTagSummary();
+    });
+
+    // ---- Mode buttons: toggle multi-select ----
+    $(document).on('click', '.income-tag-mode-btn', function () {
+        var mode = $(this).data('mode');
+        if (incomeTagSelectedModes.has(mode)) {
+            incomeTagSelectedModes.delete(mode);
+            $(this).removeClass('selected');
+        } else {
+            incomeTagSelectedModes.add(mode);
+            $(this).addClass('selected');
+        }
+        updateIncomeTagSummary();
+    });
+
+    // ---- Summary line ----
+    function updateIncomeTagSummary() {
+        var zoneName   = $('#incomeTagZoneName').val() || $('#incomeTagZone option:selected').data('name') || '';
+        var branchName = $('#incomeTagBranchName').val() || '';
+        var dateStr    = (incomeTagFp && incomeTagFp.selectedDates.length)
+                            ? incomeTagFp.input.value : '';
+        var modes      = incomeTagSelectedModes.size
+                            ? Array.from(incomeTagSelectedModes).map(function(m){ return m.toUpperCase(); }).join(', ')
+                            : '';
+
+        var parts = [];
+        if (zoneName)   parts.push('Zone: ' + zoneName);
+        if (branchName) parts.push('Branch: ' + branchName);
+        if (dateStr)    parts.push('Date: ' + dateStr);
+        if (modes)      parts.push('Mode: ' + modes);
+
+        $('#incomeTagFilterSummary').text(parts.length ? parts.join(' | ') : 'No filters applied yet');
+    }
+
+    // ---- Apply Income Tag ----
+    // Use a flag to prevent double-submit (e.g. fast double-click)
+    var incomeTagInFlight = false;
+
+    $(document).on('click', '#applyIncomeTagBtn', function () {
+        if (incomeTagInFlight) return; // guard against double-click
+
+        var zoneName   = $('#incomeTagZoneName').val();
+        var branchName = $('#incomeTagBranchName').val();
+        var modes      = Array.from(incomeTagSelectedModes);
+
+        // Date: prefer picker selection, fall back to transaction date
+        var date = currentTxnData.date;
+        if (incomeTagFp && incomeTagFp.selectedDates.length) {
+            date = moment(incomeTagFp.selectedDates[0]).format('YYYY-MM-DD');
+        }
+
+        if (!zoneName)            { toastr.warning('Please select a Zone'); return; }
+        if (!branchName)          { toastr.warning('Please select a Branch'); return; }
+        if (!date)                { toastr.warning('No date selected'); return; }
+        if (!modes.length)        { toastr.warning('Please select at least one Mode of Collection'); return; }
+        if (!currentStatementId)  { toastr.warning('No bank statement selected'); return; }
+
+        var $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Applying...');
+        incomeTagInFlight = true;
+
+        // ---- Fire requests SEQUENTIALLY (one after another) ----
+        // Parallel firing causes a race condition: both card+upi requests see no
+        // existing row at the same time and both INSERT, creating duplicates.
+        // Sequential ensures the first mode creates the row; subsequent modes UPDATE it.
+        var results = [];
+
+        function fireNext(idx) {
+            if (idx >= modes.length) {
+                // All modes done — show result and refresh
+                var created = results.filter(function (r) { return r && r.action === 'created'; }).length;
+                var updated = results.filter(function (r) { return r && r.action === 'updated'; }).length;
+                var msg = '';
+                if (created) msg += created + ' record(s) created. ';
+                if (updated) msg += updated + ' record(s) updated.';
+                toastr.success((msg || 'Income tag applied — ') + 'Linked for: ' + modes.map(function (m) { return m.toUpperCase(); }).join(', '));
+                $('#matchTransactionModal').modal('hide');
+                loadStatements(currentPage);
+                updateStatistics();
+                incomeTagInFlight = false;
+                return;
+            }
+
+            $.ajax({
+                url:  routes.incomeTag,
+                type: 'POST',
+                data: {
+                    _token:            $('meta[name="csrf-token"]').attr('content'),
+                    bank_statement_id: currentStatementId,
+                    zone:              zoneName,
+                    branch:            branchName,
+                    date:              date,
+                    mode:              modes[idx]
+                }
+            }).done(function (r) {
+                results.push(r);
+                fireNext(idx + 1); // next mode only after this one completes
+            }).fail(function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Error applying income tag';
+                toastr.error(msg);
+                $btn.prop('disabled', false).html('<i class="bi bi-tag me-1"></i>Apply Income Tag');
+                incomeTagInFlight = false;
+            });
+        }
+
+        fireNext(0);
+    });
+
 });

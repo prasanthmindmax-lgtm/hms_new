@@ -1053,7 +1053,7 @@
 
 
       // Process each file type
-      documents.forEach(filename => generatePreviewHtml(filename, '../public/uploads/vendor/bill/', '#documentPreviewContainer'));
+        documents.forEach(filename => generatePreviewHtml(filename, '{{ asset("uploads/vendor/bill") }}/', '#documentPreviewContainer'));
   });
     $(document).on('click', '.customer-row', function (e) {
         // Don't trigger if clicking on checkbox
@@ -1486,7 +1486,7 @@
           }
           $('.upload_doc').empty();
           // Process each file type
-          documents.forEach(filename => generatePreviewHtml(filename, '../public/uploads/vendor/bill/', '.upload_doc','Upload Document'));
+          documents.forEach(filename => generatePreviewHtml(filename, '{{ asset("uploads/vendor/bill") }}/', '.upload_doc','Upload Document'));
 
     }
     function numberToWords(num) {
@@ -1600,18 +1600,17 @@ $(document).ready(function () {
     let views = '';
     fileArray.forEach(file => {
       const fileName = file.split('/').pop().trim();
-      views += `<button style="font-size: 11px;" type="button" class="btn btn-primary pdf-btn" data-filepath="${file}">${fileName}</button>`;
+      views += `<button style="font-size: 11px;" type="button" class="btn btn-primary doc-view-btn mb-1" data-filepath="${file}">${fileName}</button>`;
     });
 
     $('#image_pdfs').html(views);
   });
 
-  // Global handler for pdf buttons
-  $(document).on('click', '.pdf-btn', function () {
-    $('.pdf-btn').removeClass('active');
+  // Document viewer navigation buttons (renamed to avoid conflict with .pdf-btn PDF download)
+  $(document).on('click', '.doc-view-btn', function () {
+    $('.doc-view-btn').removeClass('active');
     $(this).addClass('active');
-    const filePath = $(this).data('filepath');
-    $('#pdfmain').attr('src', filePath);
+    $('#pdfmain').attr('src', $(this).data('filepath'));
   });
 });
 

@@ -665,11 +665,12 @@
       if (Array.isArray(docs) && docs.length) {
         docs.forEach(f => {
           const ext = f.split('.').pop().toLowerCase();
+          const billBase = '{{ asset("uploads/vendor/bill") }}/';
           const icon = ['jpg','jpeg','png','gif','webp'].includes(ext)
-            ? `../public/uploads/vendor/bill/${f}`
+            ? `${billBase}${f}`
             : ext === 'pdf' ? 'https://cdn-icons-png.flaticon.com/512/337/337946.png'
                             : 'https://cdn-icons-png.flaticon.com/512/564/564619.png';
-          const fa = JSON.stringify([`../public/uploads/vendor/bill/${f}`]);
+          const fa = JSON.stringify([`${billBase}${f}`]);
           docsHtml += `<div class="preview-card documentclk" data-filetype="documents" data-files='${fa}'>`
                     + `<img src="${icon}" style="height:50px;"><div>${f}</div></div>`;
         });
@@ -684,7 +685,7 @@
   // PDF / Print
   $('#gp-pdf-btn').on('click', function () {
     const id = $('#gstDetailPanel').data('bill-id');
-    $.ajax({ url:'{{ route("superadmin.getpurchasepdf") }}', method:'GET', data:{id}, xhrFields:{responseType:'blob'},
+    $.ajax({ url:'{{ route("superadmin.getbillpdf") }}', method:'GET', data:{id}, xhrFields:{responseType:'blob'},
       success: function(data) {
         const link = document.createElement('a');
         link.href = URL.createObjectURL(new Blob([data],{type:'application/pdf'}));
@@ -694,10 +695,16 @@
   });
   $('#gp-print-btn').on('click', function () {
     const id = $('#gstDetailPanel').data('bill-id');
-    $.ajax({ url:'{{ route("superadmin.getpurchaseprint") }}', method:'GET', data:{id}, xhrFields:{responseType:'blob'},
-      success: function(r) { window.open(URL.createObjectURL(new Blob([r],{type:'application/pdf'})),'_blank'); }
-              });
-          });
+    $.ajax({ url:'{{ route("superadmin.getbillprint") }}', method:'GET', data:{id}, xhrFields:{responseType:'blob'},
+      success: function(r) { $('#pdfFrame').attr('src', URL.createObjectURL(new Blob([r],{type:'application/pdf'}))); $('#pdfPreviewModal').modal('show'); }
+    });
+  });
+  $(document).on('click', '.modal-close-fallback', function(e) {
+    e.preventDefault();
+    try { if (typeof bootstrap !== 'undefined') { var m = bootstrap.Modal.getInstance(document.getElementById('pdfPreviewModal')) || new bootstrap.Modal(document.getElementById('pdfPreviewModal')); m.hide(); return; } } catch(err){}
+    if ($.fn && $.fn.modal) { $('#pdfPreviewModal').modal('hide'); return; }
+    $('#pdfPreviewModal').hide(); $('.modal-backdrop').remove(); $('body').removeClass('modal-open');
+  });
 
   // Document viewer
   $(document).on('click', '.documentclk', function (e) {
@@ -742,6 +749,22 @@ function cb(start, end, label) {
     $('.data_values').trigger('change');
 }
 </script>
+
+{{-- PDF Preview Modal --}}
+<div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl" role="document" style="max-width:90%;">
+    <div class="modal-content">
+      <div class="modal-header position-relative">
+        <h5 class="modal-title">Bill Preview</h5>
+        <button type="button" class="modal-close-fallback" aria-label="Close preview"
+          style="position:absolute;right:1rem;top:0.6rem;font-size:1.4rem;background:none;border:0;">&times;</button>
+      </div>
+      <div class="modal-body p-0">
+        <iframe id="pdfFrame" src="" width="100%" height="600px" style="border:none;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
 
 @include('superadmin.superadminfooter')
 </body>

@@ -121,19 +121,19 @@ input[type="file"] { display: none; }
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
-        <div class="qd-stat-card qd-stat-green" data-stat-filter="save" title="Filter: Saved">
+        <div class="qd-stat-card qd-stat-green" data-stat-filter="paid" title="Filter: Paid" style="cursor:pointer;">
           <div class="qd-stat-icon"><i class="bi bi-check2-circle"></i></div>
           <div class="qd-stat-body">
-            <div class="qd-stat-label">Saved</div>
-            <div class="qd-stat-value" data-stat-key="save">{{ $stats['save'] }}</div>
+            <div class="qd-stat-label">Paid</div>
+            <div class="qd-stat-value" data-stat-key="paid">{{ $stats['paid'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
-        <div class="qd-stat-card qd-stat-orange" data-stat-filter="draft" title="Filter: Draft">
-          <div class="qd-stat-icon"><i class="bi bi-file-earmark-text"></i></div>
+        <div class="qd-stat-card qd-stat-orange" data-stat-filter="pending" title="Filter: Pending" style="cursor:pointer;">
+          <div class="qd-stat-icon"><i class="bi bi-hourglass-split"></i></div>
           <div class="qd-stat-body">
-            <div class="qd-stat-label">Draft</div>
-            <div class="qd-stat-value" data-stat-key="draft">{{ $stats['draft'] }}</div>
+            <div class="qd-stat-label">Pending</div>
+            <div class="qd-stat-value" data-stat-key="pending">{{ $stats['pending'] }}</div>
             <div class="qd-stat-sub">&nbsp;</div>
           </div>
         </div>
@@ -288,7 +288,6 @@ input[type="file"] { display: none; }
       <span class="qd-badge qd-badge-default" id="ap-paid-badge">—</span>
                       </div>
     <div class="asset-panel-actions">
-      <button class="btn btn-sm btn-outline-secondary edit-btn"><i class="bi bi-pencil me-1"></i>Edit</button>
       <button class="btn btn-sm btn-outline-primary print-btn"><i class="bi bi-printer me-1"></i>Print</button>
       <button class="btn btn-sm btn-outline-danger pdf-btn"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
       <button class="asset-close-btn" id="closeAssetPanel"><i class="bi bi-x-lg"></i></button>
@@ -1083,7 +1082,7 @@ input[type="file"] { display: none; }
     $('.upload_doc').empty();
     if (d.allbill && d.allbill.documents) {
       try {
-        JSON.parse(d.allbill.documents).forEach(fn => addDocPreview(fn, '../public/uploads/vendor/bill/', '.upload_doc'));
+        JSON.parse(d.allbill.documents).forEach(fn => addDocPreview(fn, '{{ asset("uploads/vendor/bill") }}/', '.upload_doc'));
       } catch(e) {}
     }
 
@@ -1131,10 +1130,7 @@ input[type="file"] { display: none; }
     $(this).toggleClass('active');
   });
 
-  // Edit / PDF / Print buttons from panel
-  $(document).on('click', '.edit-btn', function () {
-    window.location.href = "{{ route('superadmin.getbillcreate') }}" + "?id=" + $('#assetDetailPanel').data('bill-id');
-  });
+  // PDF / Print buttons from panel
   $(document).on('click', '.pdf-btn', function () {
     const id = $('#assetDetailPanel').data('bill-id');
     $.ajax({ url:'{{ route("superadmin.getbillpdf") }}', method:'GET', data:{id}, xhrFields:{responseType:'blob'},

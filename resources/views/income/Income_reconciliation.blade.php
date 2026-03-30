@@ -989,9 +989,10 @@
                                         <th colspan="2">Radiant cash collection</th>
                                         <th colspan="3">Cash Bank Statement</th>
                                         <th colspan="2">MESPOS ORANGE</th>
-                                        <th colspan="6">BANK Deposit</th>
+                                        <th colspan="7">BANK Deposit</th>
                                         <th colspan="5">DIFFERENCE</th>
                                         <th colspan="1">Uploads</th>
+                                        <th rowspan="2" style="min-width:200px;background:#1e293b;color:#fff;">Bank Ref &amp; Actual vs Diff</th>
                                         {{-- <th colspan="3">UPI</th>
                                         <th colspan="3">Bank Statement</th>
                                         <th colspan="3">NEFT</th> --}}
@@ -1003,6 +1004,7 @@
                                         <th>Date of Deposit</th> <th>Deposit amount</th><th>UTR/Transcation Ids</th>
                                         <th>Card</th> <th>UPI</th>
                                         <th>Date of Settlement</th> <th>Bank Charges </br> UPI/Card </th> <th>UPI / CARD</th> <th>NEFT</th> <th>OTHERS</th><th>UTR/Transcation Ids</th>
+                                        <th style="min-width:170px;background:#0f172a;color:#fff;">Bank Ref No.<br><small style="font-weight:400;color:#94a3b8;">Actual &amp; Diff</small></th>
                                         <th>Radiant Deposit</th> <th>Cash Deposit</th> <th>UPI CARD BANK CHARGES</th> <th>Others / NEFT</th> <th>Remarks</th>
                                         <th>Files</th>
                                         {{-- <th>Moc doc</th> <th>Orange</th> <th>Diff</th>
@@ -1383,6 +1385,30 @@
 </div>
 
 
+{{-- ============================================================
+     BANK STATEMENT DETAIL MODAL
+     Opens when a bank ref number is clicked in the recon table
+============================================================ --}}
+<div class="modal fade" id="bankStmtDetailModal" tabindex="-1" style="z-index:999999;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#1e293b,#334155);color:#fff;border:none;">
+                <div>
+                    <h5 class="mb-0"><i class="bi bi-bank me-2"></i>Bank Statement Detail</h5>
+                    <small class="text-white-50" id="bsdmSubtitle"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="bsdmBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade " id="rowUploadModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -1596,6 +1622,7 @@
 	const incomeradiantfetch = "{{ route('superadmin.incomeradiantfetch') }}";
 	const incomeuploadFile = "{{ route('superadmin.incomeuploadFile') }}";
 	const incomedatecheck = "{{ route('superadmin.recon.check') }}";
+    const bankStatementShowUrl = "{{ route('bank-reconciliation.statement.show', ':id') }}";
     window.APP_BASE_URL = "{{ url('/') }}";
     var filterTriggerTimer = null;
 

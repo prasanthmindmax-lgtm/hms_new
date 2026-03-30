@@ -2238,10 +2238,24 @@ public function statementprint(Request $request, $id)
         $filteredAssetQuery = clone $query;
         $stats = [
             'total'        => (clone $filteredAssetQuery)->count(),
-            'save'         => (clone $filteredAssetQuery)->where('status', 'save')->count(),
-            'draft'        => (clone $filteredAssetQuery)->where('status', 'draft')->count(),
+            'paid'         => (clone $filteredAssetQuery)->where('bill_status', 'paid')->count(),
+            'pending'      => (clone $filteredAssetQuery)->where(function ($q) {
+                                  $q->where('bill_status', '!=', 'paid')->orWhereNull('bill_status');
+                              })->count(),
             'total_amount' => (clone $filteredAssetQuery)->sum('grand_total_amount'),
         ];
+
+        // Apply stat_filter AFTER stats calculation
+        if ($request->filled('stat_filter')) {
+            $sf = $request->stat_filter;
+            if ($sf === 'paid') {
+                $query->where('bill_status', 'paid');
+            } elseif ($sf === 'pending') {
+                $query->where(function ($q) {
+                    $q->where('bill_status', '!=', 'paid')->orWhereNull('bill_status');
+                });
+            }
+        }
 
         $billlist = $query->paginate($perPage)->appends($request->all());
 

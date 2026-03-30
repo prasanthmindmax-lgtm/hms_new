@@ -17,7 +17,7 @@ use App\Http\Controllers\LogController;
 use App\Http\Controllers\BillingStatsController;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\MenuMasterController;
-
+use App\Http\Controllers\RadiantCashPickupController;
 use App\Exports\QuotationTemplateExport;
 use Maatwebsite\Excel\Facades\Excel;
 /*
@@ -699,6 +699,16 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::delete('/destroy/{id}', [BankStatementController::class, 'destroy'])->name('destroy');
         // Delete batch
         Route::post('/delete-batch', [BankStatementController::class, 'deleteBatch'])->name('delete-batch');
+        // Income Tag - apply bank statement to income reconciliation record
+        Route::post('/income-tag', [BankStatementController::class, 'applyIncomeTag'])->name('income-tag');
+        // Income Tag - remove income tag from a bank statement
+        Route::post('/income-unmatch/{id}', [BankStatementController::class, 'unmatchIncome'])->name('income-unmatch');
+        // Fetch single bank statement by ID (for income recon ref-number click)
+        Route::get('/statement/{id}', [BankStatementController::class, 'getBankStatementById'])->name('statement.show');
+        // Income Tag supporting dropdowns
+        Route::get('/income-tag/zones', [BankStatementController::class, 'incomeTagZones'])->name('income-tag.zones');
+        Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');
+        Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
     });
 
     //income new stats
@@ -712,6 +722,13 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('/notifications/unread',    [WebNotificationController::class, 'unread'])->name('notifications.unread');
     Route::post('/notifications/{id}/read',[WebNotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [WebNotificationController::class, 'markAllRead'])->name('notifications.readAll');
+
+    Route::get('/radiant-cash-pickup',         [RadiantCashPickupController::class, 'index'])->name('superadmin.radiantcash.index');
+    Route::get('/radiant-cash-pickup/data',    [RadiantCashPickupController::class, 'data'])->name('superadmin.radiantcash.data');
+    Route::post('/radiant-cash-pickup/upload', [RadiantCashPickupController::class, 'upload'])->name('superadmin.radiantcash.upload');
+    Route::post('/radiant-cash-pickup/delete-batch', [RadiantCashPickupController::class, 'deleteBatch'])->name('superadmin.radiantcash.deletebatch');
+    Route::get('/radiant-cash-pickup/stats',   [RadiantCashPickupController::class, 'stats'])->name('superadmin.radiantcash.stats');
+     
 
     // Menu Master
     Route::get( 'superadmin/menu-master',           [MenuMasterController::class, 'index']  )->name('superadmin.menumaster.index');

@@ -1558,6 +1558,26 @@
   </div>
 </div>
 
+<!-- Bank Statement Detail Modal -->
+<div class="modal fade" id="bankStmtDetailModal" tabindex="-1" style="z-index:999999;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#1e293b,#334155);color:#fff;border:none;">
+                <div>
+                    <h5 class="mb-0"><i class="bi bi-bank me-2"></i>Bank Statement Detail</h5>
+                    <small class="text-white-50" id="bsdmSubtitle"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="bsdmBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="{{ asset('/assets/js/plugins/dropzone-amd-module.min.js') }}"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
@@ -1578,6 +1598,7 @@
 	const incomeuploadFile = "{{ route('superadmin.incomeuploadFile') }}";
 	const incomedatecheck = "{{ route('superadmin.recon.check') }}";
     const downloadIncomeUrl = "{{ route('income.downloadIncomeRconciliationNew') }}";
+    const bankStatementShowUrl = "{{ route('bank-reconciliation.statement.show', ':id') }}";
     window.APP_BASE_URL = "{{ url('/') }}";
     var filterTriggerTimer = null;
 

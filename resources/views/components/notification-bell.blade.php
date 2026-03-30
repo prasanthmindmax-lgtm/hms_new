@@ -144,7 +144,7 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 <script>
-$(function() {
+$(document).ready(function() {
     // Explicitly set the base path with /public
     var basePath = '/hms_new/public';
     
@@ -301,5 +301,5 @@ $(function() {
     // ── Start polling ─────────────────────────────────────────────────────────
     fetchNotifications();
     setInterval(fetchNotifications, POLL_INTERVAL);
-})();
+});
 </script>

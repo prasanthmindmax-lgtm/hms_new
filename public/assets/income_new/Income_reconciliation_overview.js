@@ -726,17 +726,29 @@ function buildMocdocTable(filtered, type, showBranchTotals) {
         bank_chargers: "bank_upi_card_utr",
         bank_upi_card: "bank_upi_card_utr"
     };
-    const utrColumnKey = obj[type] || null;
+    // Mapping from actual type to bank reference number field + bank id field
+    const bankRefObj = {
+        deposite_amount: { ref: "cash_bank_ref_no",     id: "cash_bank_id"    },
+        mespos_card:     { ref: "card_upi_bank_ref_no", id: "card_upi_bank_id" },
+        mespos_upi:      { ref: "card_upi_bank_ref_no", id: "card_upi_bank_id" },
+        bank_neft:       { ref: "neft_bank_ref_no",     id: "neft_bank_id"    },
+        bank_others:     { ref: "other_bank_ref_no",    id: "other_bank_id"   },
+        bank_chargers:   { ref: "card_upi_bank_ref_no", id: "card_upi_bank_id" },
+        bank_upi_card:   { ref: "card_upi_bank_ref_no", id: "card_upi_bank_id" }
+    };
+    const utrColumnKey   = obj[type] || null;
+    const bankRefMapping = bankRefObj[type] || null;
 
     if (Object.keys(obj).includes(type)) {
 
         Title = `Actual ${type.replace(/_/g, " ").toUpperCase()} – Date Wise`;
 
         columns = [
-            { key: "date_range", label: "Date", align: "center" },
-            { key: "zone_location", label: "Zone/Location", align: "center" },
-            { key: obj[type], label: "UTR/Transaction ID", align: "center" },
-            { key: type, label: "Amount", align: "end" }
+            { key: "date_range",    label: "Date",              align: "center" },
+            { key: "zone_location", label: "Zone/Location",     align: "center" },
+            { key: obj[type],       label: "UTR/Transaction ID",align: "center" },
+            { key: "__bank_ref__",  label: "Bank Ref No.",       align: "center" },
+            { key: type,            label: "Amount",             align: "end"    }
         ];
     }
 
@@ -842,9 +854,26 @@ function buildMocdocTable(filtered, type, showBranchTotals) {
                             const utrVal = row[col.key] ?? "-";
                             return `<td class="${utrClass}"${utrData}>${utrVal}</td>`;
                         }
-                        if (col.key === "zone_location") {
-                            const zoneLoc = [row.zone_name, row.location_name].filter(Boolean).join(' / ') || '-';
-                            return `<td class="text-${col.align}">${zoneLoc}</td>`;
+                        if (col.key === "__bank_ref__") {
+                            if (!bankRefMapping) return `<td class="text-center">—</td>`;
+                            const refNo  = row[bankRefMapping.ref];
+                            const bankId = row[bankRefMapping.id];
+                            const hasRef = refNo && String(refNo).trim() !== '' && String(refNo) !== '0';
+                            const hasId  = bankId && parseInt(bankId) > 0;
+                            if (hasRef && hasId) {
+                                return `<td class="text-center">
+                                    <span class="brc-ref mocdoc-bank-ref"
+                                        data-bank-id="${bankId}"
+                                        data-ref="${refNo}"
+                                        title="View bank statement"
+                                        style="font-size:12px;font-weight:700;color:#4f46e5;cursor:pointer;text-decoration:underline;">
+                                        ${refNo}
+                                    </span>
+                                </td>`;
+                            } else if (hasRef) {
+                                return `<td class="text-center"><span style="font-size:12px;color:#64748b;">${refNo}</span></td>`;
+                            }
+                            return `<td class="text-center text-muted">—</td>`;
                         }
                         return `<td class="text-${col.align}">${row[col.key] ?? "-"}</td>`;
                     }).join("")}
@@ -2824,6 +2853,143 @@ $(document).on("click",".remark-preview-icon, .preview-file, .file-item, .file-l
         $("#filePreviewModal").modal("show");
     }
 );
+
+/* ========================================================================
+   BANK STATEMENT DETAIL MODAL – shared opener
+   ======================================================================== */
+function openBankStmtModal(bankId, refNo) {
+    if (!bankId) {
+        Swal.fire('Info', 'No bank statement ID linked to this reference.', 'info');
+        return;
+    }
+
+    const modal = $('#bankStmtDetailModal');
+    const body  = $('#bsdmBody');
+
+    body.html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Loading…</p></div>');
+    $('#bsdmSubtitle').text(refNo ? 'Ref: ' + refNo : 'Bank ID: ' + bankId);
+    modal.modal('show');
+
+    const url = (typeof bankStatementShowUrl !== 'undefined')
+        ? bankStatementShowUrl.replace(':id', bankId)
+        : '/statement/' + bankId;
+
+    $.get(url, function (res) {
+        if (!res.success || !res.data) {
+            body.html('<div class="alert alert-danger m-3">Statement not found.</div>');
+            return;
+        }
+        const s = res.data;
+        const fmt = v => v ? '₹' + parseFloat(v).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—';
+
+        const row = (label, val) => val && val !== '—'
+            ? `<div class="bsdm-row"><span class="bsdm-label">${label}</span><span class="bsdm-val">${val}</span></div>`
+            : '';
+
+        const incomeTag = (s.income_matched_by_name || s.income_matched_branch || s.income_matched_date)
+            ? `<div class="bsdm-section">
+                <div class="bsdm-sec-title"><i class="bi bi-tags me-1"></i>Income Tag</div>
+                ${row('Matched By', s.income_matched_by_name || s.income_matched_by_username)}
+                ${row('Branch', s.income_matched_branch)}
+                ${row('Date', s.income_matched_date)}
+                ${row('Status', s.income_match_status)}
+               </div>` : '';
+
+        const billSection = s.bill_number
+            ? `<div class="bsdm-section">
+                <div class="bsdm-sec-title"><i class="bi bi-receipt me-1"></i>Matched Bill</div>
+                ${row('Bill No.', s.bill_number)}
+                ${row('Vendor', s.vendor_name)}
+                ${row('Bill Amount', fmt(s.bill_amount))}
+               </div>` : '';
+
+        // Determine deposit or withdrawal amount
+        const isDebit   = parseFloat(s.withdrawal || 0) > 0;
+        const txnAmount = isDebit ? s.withdrawal : s.deposit;
+        const amtLabel  = isDebit ? 'Withdrawal' : 'Deposit';
+        const amtColor  = isDebit ? '#dc2626' : '#16a34a';
+
+        body.html(`
+            <div style="padding:20px;">
+                <div class="bsdm-hero" style="background:linear-gradient(135deg,${isDebit ? '#fef2f2,#fee2e2' : '#f0fdf4,#dcfce7'});">
+                    <div class="bsdm-hero-label" style="color:#64748b;">${amtLabel}</div>
+                    <div class="bsdm-hero-amt" style="color:${amtColor};">${fmt(txnAmount || s.amount || s.credit_amount)}</div>
+                    <div class="bsdm-hero-ref" style="color:#94a3b8;font-size:13px;">${s.reference_number || s.utr_number || refNo || ''}</div>
+                    ${s.transaction_id ? `<div style="color:#94a3b8;font-size:12px;">Txn ID: ${s.transaction_id}</div>` : ''}
+                </div>
+                <div class="bsdm-section">
+                    <div class="bsdm-sec-title"><i class="bi bi-info-circle me-1"></i>Transaction Details</div>
+                    ${row('Date', s.transaction_date || s.value_date)}
+                    ${row('Transaction ID', s.transaction_id)}
+                    ${row('Reference No.', s.reference_number)}
+                    ${row('Amount', fmt(txnAmount || s.amount || s.credit_amount))}
+                    ${row('Bank', s.bank_name)}
+                    ${row('Account No.', s.account_number)}
+                    ${row('Branch', s.branch || s.bank_branch)}
+                    ${row('Description', s.description || s.narration)}
+                    ${row('Mode', s.payment_mode || s.mode)}
+                    ${row('Status', s.status)}
+                </div>
+                ${billSection}
+                ${incomeTag}
+            </div>
+        `);
+    }).fail(function () {
+        body.html('<div class="alert alert-danger m-3">Failed to load statement details.</div>');
+    });
+}
+
+/* --- Bank Ref No. links inside stat-click modal (.mocdoc-bank-ref) --- */
+$(document).on('click', '.mocdoc-bank-ref', function (e) {
+    e.stopPropagation();
+    openBankStmtModal($(this).data('bank-id'), $(this).data('ref'));
+});
+
+
+/* ========================================================================
+   BRC / BSDM CSS (injected once)
+   ======================================================================== */
+if (!document.getElementById('brc-styles-ov')) {
+    const style = document.createElement('style');
+    style.id = 'brc-styles-ov';
+    style.textContent = `
+        /* ===== BANK REF INLINE COLUMN (after UTR) ===== */
+        .brc-stack { display:flex; flex-direction:column; gap:4px; }
+        .brc-chip  { display:flex; align-items:stretch; border-radius:7px; overflow:hidden;
+                     box-shadow:0 1px 3px rgba(0,0,0,.10); background:#fff; }
+        .brc-mode  { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg);
+                     font-size:8px; font-weight:800; letter-spacing:.5px; color:#fff;
+                     padding:5px 3px; display:flex; align-items:center; justify-content:center;
+                     min-width:20px; text-transform:uppercase; }
+        .brc-body  { flex:1; padding:3px 7px; display:flex; flex-direction:column; gap:1px; }
+        .brc-ref   { font-size:11px; font-weight:700; color:#4f46e5; cursor:pointer;
+                     text-decoration:underline; line-height:1.4; }
+        .brc-ref:hover   { color:#3730a3; }
+        .brc-empty { color:#94a3b8; font-size:11px; cursor:default; text-decoration:none; }
+        .brc-amounts { display:flex; gap:6px; align-items:center; }
+        .brc-actual  { font-size:10px; color:#475569; }
+        .brc-diff    { font-size:10px; font-weight:700; border-radius:4px; padding:0 4px; }
+        .brc-neg  { color:#dc2626; background:#fef2f2; }
+        .brc-pos  { color:#16a34a; background:#f0fdf4; }
+        .brc-zero { color:#94a3b8; }
+        /* ===== BANK STMT DETAIL MODAL ===== */
+        .bsdm-hero { background:linear-gradient(135deg,#1e3a5f,#2563eb); color:#fff;
+                     border-radius:12px; padding:20px; text-align:center; margin-bottom:16px; }
+        .bsdm-hero-label { font-size:11px; letter-spacing:1px; opacity:.8; text-transform:uppercase; }
+        .bsdm-hero-amt   { font-size:28px; font-weight:800; margin:6px 0 4px; }
+        .bsdm-hero-ref   { font-size:12px; opacity:.75; }
+        .bsdm-section    { background:#f8fafc; border-radius:10px; padding:14px 16px; margin-bottom:12px;
+                           border:1px solid #e2e8f0; }
+        .bsdm-sec-title  { font-size:11px; font-weight:700; color:#64748b; letter-spacing:.8px;
+                           text-transform:uppercase; margin-bottom:10px; }
+        .bsdm-row        { display:flex; justify-content:space-between; padding:5px 0;
+                           border-bottom:1px solid #f1f5f9; font-size:13px; }
+        .bsdm-row:last-child { border-bottom:none; }
+        .bsdm-label { color:#64748b; font-weight:500; }
+        .bsdm-val   { color:#1e293b; font-weight:600; text-align:right; max-width:60%; }
+    `;
+    document.head.appendChild(style);
+}
 
 
 });

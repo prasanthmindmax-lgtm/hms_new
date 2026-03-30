@@ -856,6 +856,12 @@ function ticketData(pageData, body) {
                     title="Upload Documents" >
                     </i>
             </td>
+            <td class="tdview bank-ref-splitup" style="min-width:200px;padding:6px;">
+                <div class="brs-inner">
+                    <!-- populated by loadRadiantValues -->
+                    <span class="text-muted" style="font-size:11px;">—</span>
+                </div>
+            </td>
             <td>
                 <button class="edit-btn">Edit</button>
                 <button class="back-btn" style="display:none">Back</button>
@@ -1467,6 +1473,45 @@ function loadRadiantValues(tr) {
             tr.find(".bank_upi_card .edit-text").text(clean(d.bank_upi_card));
             tr.find(".bank_neft .edit-text").text(clean(d.bank_neft));
             tr.find(".bank_others .edit-text").text(clean(d.bank_others));
+
+            /* ================= BANK REF SPLIT-UP CARD ================= */
+            (function buildBankRefSplitup() {
+                const clean = v => (parseFloat(v) || 0).toFixed(2);
+                const diffClass = v => parseFloat(v) < 0 ? 'brs-neg' : (parseFloat(v) > 0 ? 'brs-pos' : 'brs-zero');
+
+                // Helper: build one mode row with ref number (clickable) + actual + diff
+                function modeRow(label, color, refNo, bankId, actualAmt, diffAmt) {
+                    const hasRef  = refNo && String(refNo).trim() !== '' && String(refNo) !== '0';
+                    const hasId   = bankId && parseInt(bankId) > 0;
+                    const refHtml = hasRef
+                        ? `<span class="brs-ref-link"
+                                style="color:${color};font-weight:700;cursor:pointer;text-decoration:underline;"
+                                data-bank-id="${hasId ? bankId : ''}"
+                                data-ref="${refNo}"
+                                title="Click to view bank statement">${refNo}</span>`
+                        : `<span class="text-muted" style="font-size:10px;">—</span>`;
+                    const dc = diffClass(diffAmt);
+                    return `
+                        <div class="brs-row">
+                            <span class="brs-label" style="background:${color};">${label}</span>
+                            <div class="brs-values">
+                                <div class="brs-ref">${refHtml}</div>
+                                <div class="brs-actual">Actual: <strong>₹${clean(actualAmt)}</strong></div>
+                                <div class="brs-diff ${dc}">Diff: <strong>${clean(diffAmt)}</strong></div>
+                            </div>
+                        </div>`;
+                }
+
+                const html = `
+                    <div class="brs-card">
+                        ${modeRow('CASH',    '#0ea5e9', d.cash_bank_ref_no,    d.cash_bank_id,    d.deposite_amount, d.cash_diff)}
+                        ${modeRow('UPI/CARD','#8b5cf6', d.card_upi_bank_ref_no, d.card_upi_bank_id, d.bank_upi_card,  d.card_upi_diff)}
+                        ${modeRow('NEFT',    '#10b981', d.neft_bank_ref_no,    d.neft_bank_id,    d.bank_neft,       d.neft_others_diff)}
+                        ${modeRow('OTHERS',  '#f59e0b', d.other_bank_ref_no,   d.other_bank_id,   d.bank_others,     '')}
+                    </div>`;
+
+                tr.find('.bank-ref-splitup .brs-inner').html(html);
+            })();
 
             /* ================= CLICK → FILE PREVIEW ================= */
             bindClickPreview(tr.find(".collection_amount"), d.collection_amount_files);
@@ -2339,6 +2384,156 @@ $(document).ready(function() {
     // ============================================
     // MODAL CLOSE - DON'T CLEAR FILES
     // ============================================
+
+    // Far-right split-up column links — show bank statement detail modal
+    $(document).on('click', '.brs-ref-link', function (e) {
+        e.stopPropagation();
+        const bankId = $(this).data('bank-id');
+        const refNo  = $(this).data('ref');
+
+        if (!bankId) {
+            Swal.fire('Info', 'No bank statement ID linked to this reference.', 'info');
+            return;
+        }
+
+        const url = bankStatementShowUrl.replace(':id', bankId);
+        const $modal = $('#bankStmtDetailModal');
+
+        $('#bsdmSubtitle').text('Ref: ' + refNo);
+        $('#bsdmBody').html(`
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading bank statement…</p>
+            </div>`);
+        $modal.modal('show');
+
+        $.ajax({
+            url: url,
+            type: 'GET',
+            success: function (res) {
+                if (!res.success || !res.data) {
+                    $('#bsdmBody').html('<div class="alert alert-danger m-3">Statement not found.</div>');
+                    return;
+                }
+                const d = res.data;
+                const fmtAmt = v => parseFloat(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const fmtDate = s => {
+                    if (!s) return '—';
+                    const m = moment(s, ['DD/MMM/YYYY','YYYY-MM-DD','DD/MM/YYYY'], true);
+                    return m.isValid() ? m.format('DD MMM YYYY') : s;
+                };
+                const badge = (label, cls) => `<span class="badge ${cls}">${label}</span>`;
+
+                const isDebit  = parseFloat(d.withdrawal || 0) > 0;
+                const amount   = isDebit ? d.withdrawal : d.deposit;
+                const amtLabel = isDebit ? 'Withdrawal' : 'Deposit';
+
+                let billSection = '';
+                if (d.bill_number) {
+                    billSection = `
+                    <div class="bsdm-section">
+                        <div class="bsdm-section-title"><i class="bi bi-receipt me-1"></i>Matched Bill</div>
+                        <div class="bsdm-grid">
+                            <div class="bsdm-item"><span class="bsdm-key">Bill No.</span><span class="bsdm-val">${d.bill_number}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Vendor</span><span class="bsdm-val">${d.vendor_name || '—'}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Bill Amount</span><span class="bsdm-val">₹${fmtAmt(d.bill_amount)}</span></div>
+                        </div>
+                    </div>`;
+                }
+
+                let incomeSection = '';
+                if (d.income_match_status === 'income_matched') {
+                    incomeSection = `
+                    <div class="bsdm-section bsdm-income">
+                        <div class="bsdm-section-title"><i class="bi bi-arrow-left-right me-1"></i>Income Tag</div>
+                        <div class="bsdm-grid">
+                            <div class="bsdm-item"><span class="bsdm-key">Branch</span><span class="bsdm-val">${d.income_matched_branch || '—'}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Date</span><span class="bsdm-val">${d.income_matched_date || '—'}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Tagged By</span><span class="bsdm-val">${d.income_matched_by_name || '—'}</span></div>
+                        </div>
+                    </div>`;
+                }
+
+                $('#bsdmSubtitle').text('Ref: ' + (d.reference_number || refNo) + ' · ' + fmtDate(d.transaction_date));
+                $('#bsdmBody').html(`
+                <div class="bsdm-wrap">
+                    <div class="bsdm-hero ${isDebit ? 'bsdm-debit' : 'bsdm-credit'}">
+                        <div class="bsdm-hero-label">${amtLabel}</div>
+                        <div class="bsdm-hero-amount">₹${fmtAmt(amount)}</div>
+                        <div class="bsdm-hero-sub">${fmtDate(d.transaction_date)}</div>
+                    </div>
+                    <div class="bsdm-section">
+                        <div class="bsdm-section-title"><i class="bi bi-info-circle me-1"></i>Transaction Details</div>
+                        <div class="bsdm-grid">
+                            <div class="bsdm-item"><span class="bsdm-key">Date</span><span class="bsdm-val">${fmtDate(d.transaction_date)}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Value Date</span><span class="bsdm-val">${fmtDate(d.value_date)}</span></div>
+                            <div class="bsdm-item bsdm-span2"><span class="bsdm-key">Description</span><span class="bsdm-val">${d.description || '—'}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Reference No.</span><span class="bsdm-val bsdm-mono">${d.reference_number || '—'}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Transaction ID</span><span class="bsdm-val bsdm-mono">${d.transaction_id || '—'}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Balance</span><span class="bsdm-val">₹${fmtAmt(d.balance)}</span></div>
+                            <div class="bsdm-item"><span class="bsdm-key">Bill Match Status</span>
+                                <span class="bsdm-val">
+                                    ${d.match_status === 'matched'
+                                        ? badge('Matched','bg-success')
+                                        : d.match_status === 'partially_matched'
+                                            ? badge('Partial','bg-info')
+                                            : badge('Unmatched','bg-warning text-dark')}
+                                </span>
+                            </div>
+                            ${d.matched_by_name ? `<div class="bsdm-item"><span class="bsdm-key">Bill Matched By</span><span class="bsdm-val">${d.matched_by_name}</span></div>` : ''}
+                        </div>
+                    </div>
+                    ${billSection}
+                    ${incomeSection}
+                </div>`);
+            },
+            error: function (xhr) {
+                const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Error loading bank statement';
+                $('#bsdmBody').html(`<div class="alert alert-danger m-3">${msg}</div>`);
+            }
+        });
+    });
+
+    // Inject split-up card CSS once
+    if (!document.getElementById('brs-styles')) {
+        const style = document.createElement('style');
+        style.id = 'brs-styles';
+        style.textContent = `
+        /* ===== BANK REF SPLIT-UP CARD (far-right) ===== */
+        .brs-card { display:flex; flex-direction:column; gap:5px; }
+        .brs-row { display:flex; align-items:stretch; border-radius:8px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.08); background:#fff; }
+        .brs-label { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); font-size:9px; font-weight:700; letter-spacing:.5px; color:#fff; padding:6px 4px; display:flex; align-items:center; justify-content:center; min-width:22px; }
+        .brs-values { flex:1; padding:4px 8px; display:flex; flex-direction:column; gap:1px; }
+        .brs-ref { font-size:11px; line-height:1.4; }
+        .brs-actual { font-size:10px; color:#475569; }
+        .brs-diff { font-size:10px; font-weight:600; }
+        .brs-neg { color:#ef4444; }
+        .brs-pos { color:#10b981; }
+        .brs-zero { color:#94a3b8; }
+        .brs-ref-link:hover { opacity:.8; }
+
+        /* ===== BANK STATEMENT DETAIL MODAL ===== */
+        .bsdm-wrap { padding:0; }
+        .bsdm-hero { padding:24px 28px; text-align:center; }
+        .bsdm-debit  { background:linear-gradient(135deg,#fef2f2,#fee2e2); }
+        .bsdm-credit { background:linear-gradient(135deg,#f0fdf4,#dcfce7); }
+        .bsdm-hero-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; margin-bottom:4px; }
+        .bsdm-debit  .bsdm-hero-amount { color:#dc2626; font-size:32px; font-weight:800; }
+        .bsdm-credit .bsdm-hero-amount { color:#16a34a; font-size:32px; font-weight:800; }
+        .bsdm-hero-sub { font-size:12px; color:#94a3b8; margin-top:4px; }
+        .bsdm-section { padding:16px 24px; border-top:1px solid #f1f5f9; }
+        .bsdm-income  { background:#f0f9ff; }
+        .bsdm-section-title { font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:#64748b; margin-bottom:12px; }
+        .bsdm-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .bsdm-span2 { grid-column:span 2; }
+        .bsdm-item { display:flex; flex-direction:column; gap:2px; }
+        .bsdm-key { font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; }
+        .bsdm-val { font-size:13px; color:#1e293b; font-weight:500; }
+        .bsdm-mono { font-family:monospace; font-size:12px; }
+        `;
+        document.head.appendChild(style);
+    }
+
     $('#rowUploadModal').on('hidden.bs.modal', function() {
         // Don't clear files when modal closes
         // Files are only cleared after successful save

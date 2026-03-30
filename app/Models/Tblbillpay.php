@@ -83,6 +83,10 @@ class Tblbillpay extends Authenticatable
         return $this->belongsTo(BankStatement::class, 'bank_statement_id', 'id')
                     ->select('id', 'description');
     }
+    public function TblCompany()
+    {
+        return $this->belongsTo(Tblcompany::class, 'company_id');
+    }
 
   
 

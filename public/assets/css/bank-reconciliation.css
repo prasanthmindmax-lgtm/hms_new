@@ -582,7 +582,7 @@ body {
 
 .modal.right .modal-body {
     overflow-y: auto;
-    max-height: calc(100vh - 200px);
+    /* max-height: calc(100vh - 200px); */
 }
 
 /* Modal backdrop - allow left side access */

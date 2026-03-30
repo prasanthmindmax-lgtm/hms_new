@@ -136,7 +136,7 @@
             <div class="branch-financial-container">
 
                 <!-- Statistics Cards -->
-                <div class="statistics-grid">
+                <!-- <div class="statistics-grid">
                     <div class="stat-card gradient-blue">
                         <div class="stat-icon">
                             <i class="fas fa-file-alt"></i>
@@ -186,7 +186,7 @@
                             <p>Total Bank Deposit</p>
                         </div>
                     </div>
-                </div>
+                </div> -->
 
                 <!-- Header with New Button -->
                 <div class="page-header">
