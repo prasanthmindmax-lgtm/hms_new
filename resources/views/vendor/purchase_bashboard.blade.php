@@ -54,9 +54,9 @@
                                 <li><a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importbillModal">
                                     <i class="bi bi-upload me-2"></i>Import Purchase Order
                                 </a></li>
-                                <li><a href="#" class="dropdown-item" id="emailopen">
+                                <!-- <li><a href="#" class="dropdown-item" id="emailopen">
                                     <i class="bi bi-envelope me-2"></i>Email
-                                </a></li>
+                                </a></li> -->
                             </ul>
                         </div>
                     </div>

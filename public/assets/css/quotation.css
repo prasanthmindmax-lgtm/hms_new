@@ -800,6 +800,7 @@
     z-index: 1050;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     opacity: 0;
     visibility: hidden;
     transition: opacity .25s, transform .25s, visibility .25s;
@@ -808,6 +809,13 @@
     opacity: 1;
     visibility: visible;
     transform: translate(-50%, -50%);
+}
+.qdt-history-popup-inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 .qdt-history-popup-header {
     display: flex;
@@ -835,8 +843,11 @@
 
 .qdt-history-popup-body {
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px 18px;
     flex: 1;
+    min-height: 0;
+    max-height: calc(80vh - 56px);
 }
 .qdt-history-empty {
     text-align: center;

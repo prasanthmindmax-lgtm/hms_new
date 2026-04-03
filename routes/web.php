@@ -18,6 +18,9 @@ use App\Http\Controllers\BillingStatsController;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\MenuMasterController;
 use App\Http\Controllers\RadiantCashPickupController;
+use App\Http\Controllers\RadiantMismatchAlertController;
+use App\Http\Controllers\LocationMasterController;
+use App\Http\Controllers\EmailMasterController;
 use App\Exports\QuotationTemplateExport;
 use Maatwebsite\Excel\Facades\Excel;
 /*
@@ -723,11 +726,14 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('/notifications/{id}/read',[WebNotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [WebNotificationController::class, 'markAllRead'])->name('notifications.readAll');
 
-    Route::get('/radiant-cash-pickup',         [RadiantCashPickupController::class, 'index'])->name('superadmin.radiantcash.index');
-    Route::get('/radiant-cash-pickup/data',    [RadiantCashPickupController::class, 'data'])->name('superadmin.radiantcash.data');
-    Route::post('/radiant-cash-pickup/upload', [RadiantCashPickupController::class, 'upload'])->name('superadmin.radiantcash.upload');
-    Route::post('/radiant-cash-pickup/delete-batch', [RadiantCashPickupController::class, 'deleteBatch'])->name('superadmin.radiantcash.deletebatch');
-    Route::get('/radiant-cash-pickup/stats',   [RadiantCashPickupController::class, 'stats'])->name('superadmin.radiantcash.stats');
+    Route::get('/radiant-cash-pickup',                 [RadiantCashPickupController::class, 'index'])->name('superadmin.radiantcash.index');
+    Route::get('/radiant-cash-pickup/data',            [RadiantCashPickupController::class, 'data'])->name('superadmin.radiantcash.data');
+    Route::get('/radiant-cash-pickup/filter-options',  [RadiantCashPickupController::class, 'getFilterOptions'])->name('superadmin.radiantcash.filteroptions');
+    Route::post('/radiant-cash-pickup/upload',         [RadiantCashPickupController::class, 'upload'])->name('superadmin.radiantcash.upload');
+    Route::post('/radiant-cash-pickup/delete-batch',   [RadiantCashPickupController::class, 'deleteBatch'])->name('superadmin.radiantcash.deletebatch');
+    Route::get('/radiant-cash-pickup/stats',           [RadiantCashPickupController::class, 'stats'])->name('superadmin.radiantcash.stats');
+    Route::get('/radiant-cash-pickup/{id}/compare',    [RadiantCashPickupController::class, 'compare'])->name('superadmin.radiantcash.compare');
+    Route::post('/radiant-cash-pickup/mismatch-alert', [RadiantMismatchAlertController::class, 'sendAlert'])->name('superadmin.radiantcash.mismatchalert');
      
 
     // Menu Master
@@ -737,6 +743,23 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get( 'superadmin/menu-master/{id}',      [MenuMasterController::class, 'show']   )->name('superadmin.menumaster.show');
     Route::put( 'superadmin/menu-master/{id}',      [MenuMasterController::class, 'update'] )->name('superadmin.menumaster.update');
     Route::delete('superadmin/menu-master/{id}',    [MenuMasterController::class, 'destroy'])->name('superadmin.menumaster.destroy');
+
+    // Location Master — zones (tblzones) + branches (tbl_locations.zone_id); same data as VendorController bill/branch dropdowns
+    Route::get('superadmin/location-master', [LocationMasterController::class, 'index'])->name('superadmin.locationmaster.index');
+    Route::get('superadmin/location-master/locations-list', [LocationMasterController::class, 'locationsList'])->name('superadmin.locationmaster.locations.list');
+    Route::post('superadmin/location-master/zones', [LocationMasterController::class, 'storeZone'])->name('superadmin.locationmaster.zones.store');
+    Route::put('superadmin/location-master/zones/{id}', [LocationMasterController::class, 'updateZone'])->name('superadmin.locationmaster.zones.update');
+    Route::delete('superadmin/location-master/zones/{id}', [LocationMasterController::class, 'destroyZone'])->name('superadmin.locationmaster.zones.destroy');
+    Route::post('superadmin/location-master/locations', [LocationMasterController::class, 'storeLocation'])->name('superadmin.locationmaster.locations.store');
+    Route::get('superadmin/location-master/locations/{id}', [LocationMasterController::class, 'showLocation'])->name('superadmin.locationmaster.locations.show');
+    Route::put('superadmin/location-master/locations/{id}', [LocationMasterController::class, 'updateLocation'])->name('superadmin.locationmaster.locations.update');
+    Route::delete('superadmin/location-master/locations/{id}', [LocationMasterController::class, 'destroyLocation'])->name('superadmin.locationmaster.locations.destroy');
+
+    // Email Master
+    Route::get('superadmin/email-master', [EmailMasterController::class, 'index'])->name('superadmin.emailmaster.index');
+    Route::post('superadmin/email-master/store', [EmailMasterController::class, 'store'])->name('superadmin.emailmaster.store');
+    Route::delete('superadmin/email-master/{id}', [EmailMasterController::class, 'destroy'])->name('superadmin.emailmaster.destroy');
+    Route::patch('superadmin/email-master/{id}/toggle', [EmailMasterController::class, 'toggleStatus'])->name('superadmin.emailmaster.toggle');
 });
 
 

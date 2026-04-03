@@ -76,7 +76,9 @@
         </li>
     </ul>
 </div>
-@include('components.notification-bell')
+@if($admin->access_limits==1 || $admin->access_limits==4)
+    @include('components.notification-bell')
+@endif
 
     </div>
 </header>

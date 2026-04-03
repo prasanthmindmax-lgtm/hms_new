@@ -1160,7 +1160,7 @@
     // Reindex all rows to maintain consecutive numbering
     function reindexRows() {
       $('.item-row').each(function(index) {
-        $(this).find('input, select').each(function() {
+        $(this).find('input, select, textarea').each(function() {
           const name = $(this).attr('name');
           if (name) {
             $(this).attr('name', name.replace(/\[\d+\]/, '[' + index + ']'));
@@ -3758,53 +3758,7 @@ function calculateFinalTotals() {
                           maximumFractionDigits: 2
                         });
                       }
-                       setTimeout(() => {
-                      if (purchase_header.length > 0) {
-                        const qh = purchase_header[0];
-                        if(qh.discount_tax === 'Apply After Tax'){
-                          $('.discount-toggle').trigger('click');
-                        }
-                        $('.discount-percent').val(qh.discount_percent).trigger('change');
-                        $('.discount-amount').text(formatCurrency(qh.discount_amount));
-                        $('.adjustment-amount').text(formatCurrency(qh.adjustment_value));
-                        $('.tax-amount').text(formatCurrency(qh.tax_amount));
-                        $('.adjustment-value').val(qh.adjustment_value).trigger('change');
-                        $('.adjustment-reason').val(qh.adjustment_reason);
-                        $('.export_name').val(qh.export_name);
-                        $('.export_amount').val(qh.export_amount);
-                        $('.loading_unloading_name').val(qh.loading_unloading_name);
-                        $('.loading_unloading_amount').val(qh.loading_unloading_amount);
-                        $('#timeline_date').val(qh.timeline_date);
-                        const fmtAmt = (n) => '₹' + (parseFloat(n)||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        $('.export-amount').text(fmtAmt(qh.export_amount));
-                        $('.loading-unloading-amount').text(fmtAmt(qh.loading_unloading_amount));
-                        if (qh.tax_type === "TDS") {
-                          $('input[name="tax_type"][value="TDS"]').prop('checked', true).trigger('change');
-                          $('.tax-search-input').val(qh.tax_name);
-                          $('.selected-tds-tax').val(qh.tax_rate).trigger('change');
-                          $('.tds-tax-id').val(qh.tds_tax_id);
-                        }
-                        $('.grand-total-amount').text(formatCurrency(qh.grand_total_amount));
-                      }
-                    }, 100); // Adjust delay if needed
-                    // $('.discount-amount').text(formatCurrency(purchase_header[0].discount_amount));
-                    // $('.adjustment-amount').text(formatCurrency(purchase_header[0].adjustment_value));
-                    // $('.tax-amount').text(formatCurrency(purchase_header[0].tax_amount));
-                    // $('.grand-total-amount').text(formatCurrency(purchase_header[0].grand_total_amount));
-
-                    // $('.adjustment-value').val(purchase_header[0].adjustment_value).trigger('change');
-                    // if(purchase_header[0].tax_type =="TDS"){
-                    //   $('input[name="tax_type"][value="' + purchase_header[0].tax_type + '"]').prop('checked', true).trigger('change');
-                    //   $('.tax-search-input').val(purchase_header[0].tax_name);
-                    //   $('.selected-tds-tax').val(purchase_header[0].tax_rate).trigger('change');
-                    //   $('.tds-tax-id').val(purchase_header[0].tds_tax_id);
-                    // }
-                    // else{
-                    //   $('input[name="tax_type"][value="' + purchase_header[0].tax_type + '"]').prop('checked', true).trigger('change');
-                    //   $('.tax-tcs-search-input').val(purchase_header[0].tax_name);
-                    //   $('.selected-tcs-tax').val(purchase_header[0].tax_rate).trigger('change');
-                    //   $('.tcs-tax-id').val(purchase_header[0].tcs_tax_id);
-                    // }
+                    // ESI/PF/Other inputs set synchronously so they are ready at 300ms recalc
                     $('.esi_value').val(purchase_header[0].esi_value);
                     $('.esi_type').val(purchase_header[0].esi_type);
                     $('.pf_value').val(purchase_header[0].pf_value);
@@ -3812,15 +3766,73 @@ function calculateFinalTotals() {
                     $('.other_value').val(purchase_header[0].other_value);
                     $('.other_type').val(purchase_header[0].other_type);
                     $('.other_reason').val(purchase_header[0].other_reason);
-                    $('.esi-display-amount').text(formatCurrency(purchase_header[0].esi_amount));
-                    $('.pf-display-amount').text(formatCurrency(purchase_header[0].pf_amount));
-                    $('.other-display-amount').text(formatCurrency(purchase_header[0].other_amount));
                     if(purchase_header[0].Tax_in_ex === 'TAX INCLUSIVE'){
                       $('#taxModeBadge').trigger('click');
                     }
+
+                    // 150ms: set discount/tax/adjustment/export/loading from DB
+                    setTimeout(() => {
+                      if (purchase_header.length > 0) {
+                        const qh = purchase_header[0];
+                        if(qh.discount_tax === 'Apply After Tax'){
+                          $('.discount-toggle').trigger('click');
+                        }
+                        $('.discount-percent').val(qh.discount_percent).trigger('change');
+                        $('.discount_type').val(qh.discount_type);
+                        $('.adjustment-value').val(qh.adjustment_value).trigger('change');
+                        $('.adjustment-reason').val(qh.adjustment_reason);
+                        $('.export_name').val(qh.export_name);
+                        $('.export_amount').val(qh.export_amount);
+                        $('.loading_unloading_name').val(qh.loading_unloading_name);
+                        $('.loading_unloading_amount').val(qh.loading_unloading_amount);
+                        $('#timeline_date').val(qh.timeline_date);
+                        if (qh.tax_type === "TDS") {
+                          $('input[name="tax_type"][value="TDS"]').prop('checked', true).trigger('change');
+                          $('.tax-search-input').val(qh.tax_name);
+                          $('.selected-tds-tax').val(qh.tax_rate).trigger('change');
+                          $('.tds-tax-id').val(qh.tds_tax_id);
+                        } else if (qh.tax_type === "TCS") {
+                          $('input[name="tax_type"][value="TCS"]').prop('checked', true).trigger('change');
+                          $('.tax-tcs-search-input').val(qh.tax_name);
+                          $('.selected-tcs-tax').val(qh.tax_rate).trigger('change');
+                          $('.tcs-tax-id').val(qh.tcs_tax_id);
+                        }
+                        if (typeof checkRequiredFields === 'function') checkRequiredFields();
+                      }
+                    }, 150);
+
+                    // 300ms: recalculate all totals AFTER rows + discount/tax are set
+                    setTimeout(() => {
+                      const qh = purchase_header[0];
+                      // Compute ESI/PF/Other amounts from stored values + current sub-total
+                      const subTotalNow = (typeof calculateSubTotal === 'function') ? (calculateSubTotal() || 0) : 0;
+                      const esiVal  = parseFloat(qh.esi_value)  || 0;
+                      const esiType = qh.esi_type  || 'fixed';
+                      const pfVal   = parseFloat(qh.pf_value)   || 0;
+                      const pfType  = qh.pf_type   || 'fixed';
+                      const otherVal = parseFloat(qh.other_value) || 0;
+                      const otherType = qh.other_type || 'fixed';
+                      const esiAmt   = (esiType === 'percent')   ? (subTotalNow * esiVal / 100)   : esiVal;
+                      const pfAmt    = (pfType  === 'percent')   ? (subTotalNow * pfVal  / 100)   : pfVal;
+                      const otherAmt = (otherType === 'percent') ? (subTotalNow * otherVal / 100) : otherVal;
+                      // Set data attributes so calculateFinalTotals() picks them up
+                      $('.esi-row').attr('data-esi', esiAmt);
+                      $('.pf-row').attr('data-pf', pfAmt);
+                      $('.other-row').attr('data-other', otherAmt);
+                      // Display stored amounts
+                      const fmtAmt = (n) => '₹' + (parseFloat(n)||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      if (esiAmt > 0) { $('.esi-row').show(); $('.esi-display-amount').text(fmtAmt(esiAmt)); }
+                      if (pfAmt  > 0) { $('.pf-row').show();  $('.pf-display-amount').text(fmtAmt(pfAmt)); }
+                      if (otherAmt > 0) { $('.other-row').show(); $('.other-display-amount').text(fmtAmt(otherAmt)); }
+                      // Trigger GST recalculation then recompute grand total
+                      if (typeof gstcalculate === 'function') gstcalculate($('.item-row:first'));
+                      if (typeof calculateFinalTotals === 'function') calculateFinalTotals();
+                    }, 300);
                     $('#notes').val(purchase_header[0].note);
                       // From server
-                      window.existingFiles = JSON.parse(purchase_header[0].documents); // array of strings
+                      try {
+                        window.existingFiles = JSON.parse(purchase_header[0].documents || '[]') || [];
+                      } catch(e) { window.existingFiles = []; }
                       window.selectedFiles = []; // New files chosen
                       $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                       // Render existing files

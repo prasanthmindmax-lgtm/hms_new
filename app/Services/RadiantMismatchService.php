@@ -1,0 +1,380 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\BranchFinancialReport;
+use App\Models\RadiantCashPickup;
+use App\Models\TblLocationModel;
+use App\Models\TblPoEmail;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+
+class RadiantMismatchService
+{
+    private const MATCH_PCT = 0.01;  // ≤1%  → Match
+    private const CLOSE_PCT = 0.10;  // ≤10% → Close
+
+    private const LOG_CHANNEL = 'radiant_mismatch';
+
+    /** @param array<string, mixed> $context */
+    private function log(string $level, string $message, array $context = []): void
+    {
+        Log::channel(self::LOG_CHANNEL)->log($level, '[RadiantMismatch] ' . $message, $context);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PUBLIC: run comparison for one date, send email if needed
+       Returns result array usable in both AJAX response & upload.
+    ══════════════════════════════════════════════════════ */
+    public function checkAndAlert(string $date, string $triggeredBy = 'System'): array
+    {
+        $parsedDate = Carbon::parse($date)->toDateString();
+
+        $this->log('info', 'check_and_alert.start', [
+            'date'         => $parsedDate,
+            'triggered_by' => $triggeredBy,
+        ]);
+
+        /* 1 — Fetch all pickups for the date */
+        $pickups = RadiantCashPickup::whereDate('pickup_date_parsed', $parsedDate)
+            ->orderBy('location')
+            ->get();
+
+        if ($pickups->isEmpty()) {
+            $this->log('info', 'check_and_alert.no_pickups', ['date' => $parsedDate]);
+
+            return [
+                'date'         => $parsedDate,
+                'found'        => false,
+                'total'        => 0,
+                'matched'      => 0,
+                'mismatch'     => 0,
+                'email_sent'   => false,
+                'recipients'   => 0,
+                'message'      => "No pickup records for {$parsedDate}.",
+                'all_matched'  => false,
+            ];
+        }
+
+        /* 2 — Run per-row comparison */
+        $mismatches   = [];
+        $matchedCount = 0;
+
+        foreach ($pickups as $pickup) {
+            $row = $this->compareOne($pickup, $parsedDate);
+            if ($row['has_mismatch']) {
+                $mismatches[] = $row;
+            } else {
+                $matchedCount++;
+            }
+        }
+        $this->log('info', 'mismatch data', ['mismatches' => $mismatches]);
+
+        $total         = $pickups->count();
+        $mismatchCount = count($mismatches);
+
+        $this->log('info', 'check_and_alert.comparison_done', [
+            'date'            => $parsedDate,
+            'triggered_by'    => $triggeredBy,
+            'total_pickups'   => $total,
+            'matched'         => $matchedCount,
+            'mismatch_count'  => $mismatchCount,
+            'mismatch_sample' => array_slice(array_map(function ($m) {
+                return [
+                    'pickup_id'   => $m['pickup_id'],
+                    'location'    => $m['location'],
+                    'bfr_status'  => $m['bfr_status'],
+                    'bank_status' => $m['bank_status'],
+                    'rcp_amount'  => $m['rcp_amount'],
+                ];
+            }, $mismatches), 0, 25),
+        ]);
+
+        /* 3 — All matched — no email */
+        if (empty($mismatches)) {
+            $this->log('info', 'check_and_alert.all_matched_no_email', [
+                'date'  => $parsedDate,
+                'total' => $total,
+            ]);
+
+            return [
+                'date'        => $parsedDate,
+                'found'       => true,
+                'total'       => $total,
+                'matched'     => $matchedCount,
+                'mismatch'    => 0,
+                'email_sent'  => false,
+                'recipients'  => 0,
+                'all_matched' => true,
+                'message'     => "✓ {$parsedDate}: All {$total} records matched — no alert email sent.",
+            ];
+        }
+
+        /* 4 — Resolve recipients */
+        [$toEmails, $ccEmails] = $this->resolveRecipients();
+
+        $this->log('info', 'check_and_alert.recipients_resolved', [
+            'date'        => $parsedDate,
+            'to_count'    => count($toEmails),
+            'cc_count'    => count($ccEmails),
+            'to_domains'  => $this->maskEmailsForLog($toEmails),
+        ]);
+
+        if (empty($toEmails)) {
+            $this->log('warning', 'check_and_alert.no_recipients', [
+                'date'           => $parsedDate,
+                'mismatch_count' => $mismatchCount,
+            ]);
+
+            return [
+                'date'        => $parsedDate,
+                'found'       => true,
+                'total'       => $total,
+                'matched'     => $matchedCount,
+                'mismatch'    => $mismatchCount,
+                'email_sent'  => false,
+                'recipients'  => 0,
+                'all_matched' => false,
+                'message'     => "⚠ {$parsedDate}: {$mismatchCount} mismatch(es) found but no email recipients configured.",
+            ];
+        }
+
+        /* 5 — Send email */
+        $emailSent = false;
+        try {
+            Mail::send(
+                'emails.radiant_mismatch_alert',
+                [
+                    'mismatches'    => $mismatches,
+                    'date'          => $parsedDate,
+                    'totalCount'    => $total,
+                    'matchedCount'  => $matchedCount,
+                    'mismatchCount' => $mismatchCount,
+                    'sentBy'        => $triggeredBy,
+                ],
+                function ($m) use ($toEmails, $ccEmails, $parsedDate, $mismatchCount) {
+                    $label = $mismatchCount > 1 ? 'mismatches' : 'mismatch';
+                    $m->to($toEmails)
+                      ->subject("⚠ Radiant Cash Mismatch Alert – {$parsedDate} ({$mismatchCount} {$label})");
+                    if (!empty($ccEmails)) {
+                        $m->cc($ccEmails);
+                    }
+                }
+            );
+            $emailSent = true;
+
+            $this->log('info', 'check_and_alert.email_sent', [
+                'date'           => $parsedDate,
+                'mismatch_count' => $mismatchCount,
+                'to_count'       => count($toEmails),
+                'cc_count'       => count($ccEmails),
+            ]);
+        } catch (\Exception $e) {
+            $this->log('error', 'check_and_alert.email_failed', [
+                'date'           => $parsedDate,
+                'mismatch_count' => $mismatchCount,
+                'exception'      => $e->getMessage(),
+                'file'           => $e->getFile(),
+                'line'           => $e->getLine(),
+            ]);
+
+            // Return failure info but don't throw — caller decides how to handle
+            return [
+                'date'        => $parsedDate,
+                'found'       => true,
+                'total'       => $total,
+                'matched'     => $matchedCount,
+                'mismatch'    => $mismatchCount,
+                'email_sent'  => false,
+                'email_error' => $e->getMessage(),
+                'recipients'  => count($toEmails),
+                'all_matched' => false,
+                'message'     => "⚠ {$parsedDate}: {$mismatchCount} mismatch(es) found but email failed: " . $e->getMessage(),
+            ];
+        }
+
+        $out = [
+            'date'        => $parsedDate,
+            'found'       => true,
+            'total'       => $total,
+            'matched'     => $matchedCount,
+            'mismatch'    => $mismatchCount,
+            'email_sent'  => $emailSent,
+            'recipients'  => count($toEmails),
+            'all_matched' => false,
+            'message'     => "✓ {$parsedDate}: Alert sent to " . count($toEmails)
+                           . " recipient(s) — {$mismatchCount} mismatch(es) in {$total} records.",
+        ];
+
+        $this->log('info', 'check_and_alert.complete', [
+            'date'        => $parsedDate,
+            'email_sent'  => $emailSent,
+            'mismatch'    => $mismatchCount,
+            'matched'     => $matchedCount,
+            'total'       => $total,
+        ]);
+
+        return $out;
+    }
+
+    /** Redact local-part of emails for logs (keeps domain for debugging). */
+    private function maskEmailsForLog(array $emails): array
+    {
+        return array_values(array_map(function ($email) {
+            $email = strtolower(trim((string) $email));
+            if ($email === '' || !str_contains($email, '@')) {
+                return '(invalid)';
+            }
+            [$local, $domain] = explode('@', $email, 2);
+
+            return (strlen($local) > 0 ? '*' . substr($local, -1) : '*') . '@' . $domain;
+        }, $emails));
+    }
+
+    /* ══════════════════════════════════════════════════════
+       Compare one pickup row vs BFR + Bank
+    ══════════════════════════════════════════════════════ */
+    public function compareOne(RadiantCashPickup $pickup, string $date): array
+    {
+        $locationName = trim($pickup->location ?? '');
+        $rcpAmount    = (float) ($pickup->pickup_amount ?? 0);
+
+        /* Match TblLocation */
+        $tblLocation = $this->findLocation($locationName);
+
+        /* Branch Financial Report */
+        $bfrAmount  = 0;
+        $bfrRecords = 0;
+        $bfrStatus  = 'no_data';
+
+        if ($tblLocation) {
+            $reports = BranchFinancialReport::where('branch_id', $tblLocation->id)
+                ->whereDate('report_date', $date)
+                ->get();
+
+            if ($reports->isNotEmpty()) {
+                $bfrAmount  = (float) $reports->sum('radiant_collection_amount');
+                $bfrRecords = $reports->count();
+                $bfrStatus  = $this->matchStatus($rcpAmount, $bfrAmount);
+            }
+        }
+
+        /* Bank Statement */
+        $bankAmount  = 0;
+        $bankEntries = 0;
+        $bankStatus  = 'no_data';
+
+        if ($locationName) {
+            $pd     = Carbon::parse($date);
+            $bkFrom = $pd->copy()->subDay()->toDateString();
+            $bkTo   = $pd->copy()->addDay()->toDateString();
+
+            $rows = DB::table('bank_statements')
+                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo])
+                ->where(function ($q) use ($locationName) {
+                    $q->where('description', 'like', '%BY CASH%' . $locationName . '%')
+                      ->orWhere('description', 'like', '%BYCASH%' . $locationName . '%');
+                })
+                ->get();
+
+            if ($rows->isNotEmpty()) {
+                $bankAmount  = (float) $rows->sum('deposit');
+                $bankEntries = $rows->count();
+                $bankStatus  = $this->matchStatus($rcpAmount, $bankAmount);
+            }
+        }
+
+        $hasMismatch = in_array('mismatch', [$bfrStatus, $bankStatus])
+                    || in_array('no_data',  [$bfrStatus, $bankStatus]);
+
+        return [
+            'has_mismatch'    => $hasMismatch,
+            'pickup_id'       => $pickup->id,
+            'date'            => $pickup->pickup_date,
+            'location'        => $locationName,
+            'region'          => $pickup->region,
+            'state'           => $pickup->state_name,
+            'hci_slip'        => $pickup->hci_slip_no,
+            'deposit_mode'    => $pickup->deposit_mode,
+            'rcp_amount'      => $rcpAmount,
+            'bfr_amount'      => $bfrAmount,
+            'bfr_records'     => $bfrRecords,
+            'bfr_status'      => $bfrStatus,
+            'bfr_location'    => $tblLocation ? $tblLocation->name : null,
+            'bfr_zone'        => $tblLocation ? optional($tblLocation->zone)->name : null,
+            'bank_amount'     => $bankAmount,
+            'bank_entries'    => $bankEntries,
+            'bank_status'     => $bankStatus,
+            'difference_bfr'  => $rcpAmount - $bfrAmount,
+            'difference_bank' => $rcpAmount - $bankAmount,
+        ];
+    }
+
+    /* ── Fuzzy location match ── */
+    public function findLocation(string $name): ?TblLocationModel
+    {
+        if (!$name) return null;
+
+        $loc = TblLocationModel::whereRaw('LOWER(TRIM(name)) = LOWER(?)', [$name])->first();
+        if (!$loc) {
+            $loc = TblLocationModel::whereRaw(
+                'LOWER(TRIM(?)) LIKE CONCAT(\'%\', LOWER(TRIM(name)), \'%\')', [$name]
+            )->first();
+        }
+        if (!$loc) {
+            $loc = TblLocationModel::where('name', 'like', '%' . $name . '%')->first();
+        }
+        if (!$loc) {
+            $first = explode(' ', $name)[0];
+            if (strlen($first) > 3) {
+                $loc = TblLocationModel::where('name', 'like', '%' . $first . '%')->first();
+            }
+        }
+
+        return $loc;
+    }
+
+    /* ── Amount status ── */
+    public function matchStatus(float $rcp, float $other): string
+    {
+        if ($rcp == 0 && $other == 0) return 'match';
+        if ($other == 0)              return 'no_data';
+
+        $pct = $rcp > 0 ? abs($rcp - $other) / $rcp : 1;
+
+        if ($pct <= self::MATCH_PCT) return 'match';
+        if ($pct <= self::CLOSE_PCT) return 'close';
+
+        return 'mismatch';
+    }
+
+    /* ── Email recipients from Email Master ── */
+    private function resolveRecipients(): array
+    {
+        $configs = TblPoEmail::where('status', 1)
+            ->where(function ($q) {
+                $q->where('menu_type', 'like', '%Radiant%')
+                  ->orWhere('menu_type', 'like', '%radiant%');
+            })
+            ->get();
+
+        if ($configs->isEmpty()) {
+            $configs = TblPoEmail::where('status', 1)->get();
+        }
+
+        $toEmails = $configs
+            ->map(fn ($r) => $r->to_email ?: $r->email)
+            ->filter()->unique()->values()->toArray();
+
+        $ccEmails = $configs
+            ->flatMap(function ($r) {
+                $cc = is_string($r->cc_emails) ? json_decode($r->cc_emails, true) : ($r->cc_emails ?? []);
+                return is_array($cc) ? $cc : [];
+            })
+            ->filter()->unique()->values()->toArray();
+
+        return [$toEmails, $ccEmails];
+    }
+}

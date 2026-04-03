@@ -1255,43 +1255,48 @@ public function downloadIncomeRconciliation(Request $request)
 }
 public function downloadIncomeRconciliationNew(Request $request)
 {
-    // $format = $request->get('format', 'xlsx'); // default to xlsx
-    $format = 'csv'; // default to xlsx
+    $format  = $request->get('format', 'xlsx');
+    $zones   = array_filter($request->input('zones', []));
+    $branches = array_filter($request->input('branches', []));
 
     if ($format === 'csv') {
-        $fileName = 'Income_Reconciliation_'.now()->format('Y_m_d_His').'.csv';
+        $fileName   = 'Income_Reconciliation_' . now()->format('Y_m_d_His') . '.csv';
         $exportType = \Maatwebsite\Excel\Excel::CSV;
     } else {
-        $fileName = 'Income_Reconciliation_'.now()->format('Y_m_d_His').'.xlsx';
+        $fileName   = 'Income_Reconciliation_' . now()->format('Y_m_d_His') . '.xlsx';
         $exportType = \Maatwebsite\Excel\Excel::XLSX;
     }
 
     return Excel::download(
         new IncomeReconciliationExportnew(
             $request->datefiltervalue,
-            $request->filterRemoveData
+            array_values($zones),
+            array_values($branches)
         ),
         $fileName,
         $exportType
     );
 }
+
 public function downloadincome_montly_report(Request $request)
 {
-    // $format = $request->get('format', 'xlsx'); // default to xlsx
-    $format = 'csv'; // default to xlsx
+    $format   = $request->get('format', 'xlsx');
+    $zones    = array_filter($request->input('zones', []));
+    $branches = array_filter($request->input('branches', []));
 
     if ($format === 'csv') {
-        $fileName = 'Income_Monthly_Report_'.now()->format('Y_m_d_His').'.csv';
+        $fileName   = 'Income_Monthly_Report_' . now()->format('Y_m_d_His') . '.csv';
         $exportType = \Maatwebsite\Excel\Excel::CSV;
     } else {
-        $fileName = 'Income_Monthly_Report_'.now()->format('Y_m_d_His').'.xlsx';
+        $fileName   = 'Income_Monthly_Report_' . now()->format('Y_m_d_His') . '.xlsx';
         $exportType = \Maatwebsite\Excel\Excel::XLSX;
     }
 
     return Excel::download(
         new IncomeReconciliationMonthlyExport(
-            $request->filterRemoveData,
-            $request->datefiltervalue
+            $request->datefiltervalue,
+            array_values($zones),
+            array_values($branches)
         ),
         $fileName,
         $exportType

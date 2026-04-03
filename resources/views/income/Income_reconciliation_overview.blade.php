@@ -1353,9 +1353,23 @@
 
 
                     <div class="col-xl-2">
-                         <a href="#" id="downloadExcelBtn" class="btn btn-success">
-                            <i class="fa fa-file-excel"></i> Download Excel
-                        </a>
+                        <div class="dropdown">
+                            <button class="btn btn-success btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fa fa-download me-1"></i> Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a href="#" id="downloadExcelBtn" class="dropdown-item">
+                                        <i class="fa fa-file-excel text-success me-2"></i> Download XLSX
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#" id="downloadCsvBtn" class="dropdown-item">
+                                        <i class="fa fa-file-csv text-primary me-2"></i> Download CSV
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
                 <p style="margin-top: -9px;" class="text-muted f-12 mb-0"><span class="text-truncate w-100"><span id="dcounts">0</span> Rows for <span id="dateallviews">Last 30 days</span></span>

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\BillingListModel;
+use App\Models\TblZonesModel;
+use App\Models\TblLocationModel;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -27,17 +29,17 @@ class BillingStatsController extends Controller
             return response()->json($this->buildTable($request));
         }
 
-        // ── Full page load: just pass dropdown options ─────────────
-        $locations    = BillingListModel::select('location_id', 'location_name')
-                            ->distinct()->orderBy('location_name')->get();
-        $branches     = BillingListModel::select('location_id', 'location_name')
-                            ->distinct()->orderBy('location_name')->get(); // same table; adjust if branches live elsewhere
+        // ── Full page load: pass dropdown options ─────────────
+        // Zones and branches from master tables (same reference as VendorController)
+        $zones    = TblZonesModel::orderBy('name')->get();
+        $branches = TblLocationModel::orderBy('name')->get();
+
         $types        = BillingListModel::select('type')
                             ->distinct()->whereNotNull('type')->orderBy('type')->pluck('type');
         $paymentTypes = BillingListModel::select('paymenttype')
                             ->distinct()->whereNotNull('paymenttype')->orderBy('paymenttype')->pluck('paymenttype');
 
-        return view('mocdoc_income.billing_stats', compact('locations', 'branches', 'types', 'paymentTypes','admin'));
+        return view('mocdoc_income.billing_stats', compact('zones', 'branches', 'types', 'paymentTypes', 'admin'));
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -141,20 +143,27 @@ class BillingStatsController extends Controller
                 $query->whereRaw("LEFT(billdate,8) <= ?", [$dateTo]);
             } catch (\Exception $e) {}
         }
-        // Zone multi-select: location_ids[] array
-        if ($request->filled('location_ids') && is_array($request->location_ids)) {
-            $query->whereIn('location_id', $request->location_ids);
+        // Zone multi-select: zone_ids[] → find matching tbl_locations → filter by location_id
+        if ($request->filled('zone_ids') && is_array($request->zone_ids)) {
+            $locationIds = TblLocationModel::whereIn('zone_id', $request->zone_ids)
+                ->pluck('id')->toArray();
+            if (!empty($locationIds)) {
+                $query->whereIn('location_id', $locationIds);
+            } else {
+                $query->whereRaw('1 = 0'); // selected zones have no branches
+            }
         }
-        // Branch multi-select: branch_ids[] array
-        // If branches share location_id column, use whereIn too; adjust column if different
+        // Branch multi-select: branch_ids[] → tbl_locations.id = billing_list.location_id
         if ($request->filled('branch_ids') && is_array($request->branch_ids)) {
             $query->whereIn('location_id', $request->branch_ids);
         }
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
+        // Type multi-select
+        if ($request->filled('type_vals') && is_array($request->type_vals)) {
+            $query->whereIn('type', $request->type_vals);
         }
-        if ($request->filled('paymenttype')) {
-            $query->where('paymenttype', $request->paymenttype);
+        // Payment type multi-select
+        if ($request->filled('payment_vals') && is_array($request->payment_vals)) {
+            $query->whereIn('paymenttype', $request->payment_vals);
         }
         if ($request->filled('search')) {
             $s = $request->search;

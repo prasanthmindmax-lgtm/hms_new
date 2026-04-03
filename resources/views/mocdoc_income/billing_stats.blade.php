@@ -297,9 +297,9 @@
             </div>
           </div>
 
-          {{-- Zone multi-select --}}
+          {{-- Zone multi-select (from tblzones master table) --}}
           <div class="col-md-2 col-sm-6">
-            <label class="form-label">Zone / Location</label>
+            <label class="form-label">Zone</label>
             <div class="ms-wrap" id="ms-zone-wrap">
               <div class="ms-trigger" id="ms-zone-trigger">
                 <span class="ms-trigger-text ph" id="ms-zone-label">All Zones</span>
@@ -315,9 +315,9 @@
                   <span class="ms-act clr" data-ms="zone" data-action="clear">Clear</span>
                 </div>
                 <div class="ms-list" id="ms-zone-list">
-                  @foreach($locations as $loc)
-                    <div class="ms-opt" data-ms="zone" data-value="{{ $loc->location_id }}" data-label="{{ $loc->location_name }}">
-                      <span class="ms-cb"><i class="bi bi-check"></i></span>{{ $loc->location_name }}
+                  @foreach($zones as $z)
+                    <div class="ms-opt" data-ms="zone" data-value="{{ $z->id }}" data-label="{{ $z->name }}">
+                      <span class="ms-cb"><i class="bi bi-check"></i></span>{{ $z->name }}
                     </div>
                   @endforeach
                 </div>
@@ -325,7 +325,7 @@
             </div>
           </div>
 
-          {{-- Branch multi-select --}}
+          {{-- Branch multi-select (from tbl_locations, cascades by zone) --}}
           <div class="col-md-2 col-sm-6">
             <label class="form-label">Branch</label>
             <div class="ms-wrap" id="ms-branch-wrap">
@@ -344,8 +344,8 @@
                 </div>
                 <div class="ms-list" id="ms-branch-list">
                   @foreach($branches as $br)
-                    <div class="ms-opt" data-ms="branch" data-value="{{ $br->location_id }}" data-label="{{ $br->location_name }}">
-                      <span class="ms-cb"><i class="bi bi-check"></i></span>{{ $br->location_name }}
+                    <div class="ms-opt" data-ms="branch" data-value="{{ $br->id }}" data-label="{{ $br->name }}" data-zone="{{ $br->zone_id }}">
+                      <span class="ms-cb"><i class="bi bi-check"></i></span>{{ $br->name }}
                     </div>
                   @endforeach
                 </div>
@@ -353,26 +353,60 @@
             </div>
           </div>
 
-          {{-- Type --}}
+          {{-- Type multi-select --}}
           <div class="col-md-2 col-sm-6">
             <label class="form-label">Type</label>
-            <select id="f_type" class="form-select">
-              <option value="">All Types</option>
-              @foreach($types as $t)
-                <option value="{{ $t }}">{{ $t }}</option>
-              @endforeach
-            </select>
+            <div class="ms-wrap" id="ms-type-wrap">
+              <div class="ms-trigger" id="ms-type-trigger">
+                <span class="ms-trigger-text ph" id="ms-type-label">All Types</span>
+                <span class="ms-count" id="ms-type-count" style="display:none;"></span>
+                <i class="bi bi-chevron-down ms-trigger-arrow"></i>
+              </div>
+              <div class="ms-dropdown" id="ms-type-dropdown">
+                <div class="ms-search-row">
+                  <input type="text" class="ms-search" id="ms-type-search" placeholder="Search type…">
+                </div>
+                <div class="ms-action-row">
+                  <span class="ms-act" data-ms="type" data-action="all">Select All</span>
+                  <span class="ms-act clr" data-ms="type" data-action="clear">Clear</span>
+                </div>
+                <div class="ms-list" id="ms-type-list">
+                  @foreach($types as $t)
+                    <div class="ms-opt" data-ms="type" data-value="{{ $t }}" data-label="{{ $t }}">
+                      <span class="ms-cb"><i class="bi bi-check"></i></span>{{ $t }}
+                    </div>
+                  @endforeach
+                </div>
+              </div>
+            </div>
           </div>
 
-          {{-- Payment Type --}}
+          {{-- Payment Type multi-select --}}
           <div class="col-md-2 col-sm-6">
             <label class="form-label">Payment Type</label>
-            <select id="f_paymenttype" class="form-select">
-              <option value="">All Payments</option>
-              @foreach($paymentTypes as $pt)
-                <option value="{{ $pt }}">{{ $pt }}</option>
-              @endforeach
-            </select>
+            <div class="ms-wrap" id="ms-pay-wrap">
+              <div class="ms-trigger" id="ms-pay-trigger">
+                <span class="ms-trigger-text ph" id="ms-pay-label">All Payments</span>
+                <span class="ms-count" id="ms-pay-count" style="display:none;"></span>
+                <i class="bi bi-chevron-down ms-trigger-arrow"></i>
+              </div>
+              <div class="ms-dropdown" id="ms-pay-dropdown">
+                <div class="ms-search-row">
+                  <input type="text" class="ms-search" id="ms-pay-search" placeholder="Search payment…">
+                </div>
+                <div class="ms-action-row">
+                  <span class="ms-act" data-ms="pay" data-action="all">Select All</span>
+                  <span class="ms-act clr" data-ms="pay" data-action="clear">Clear</span>
+                </div>
+                <div class="ms-list" id="ms-pay-list">
+                  @foreach($paymentTypes as $pt)
+                    <div class="ms-opt" data-ms="pay" data-value="{{ $pt }}" data-label="{{ $pt }}">
+                      <span class="ms-cb"><i class="bi bi-check"></i></span>{{ $pt }}
+                    </div>
+                  @endforeach
+                </div>
+              </div>
+            </div>
           </div>
 
           {{-- Search --}}
@@ -517,10 +551,10 @@ $(function () {
     var S = {
         date_from:    '',
         date_to:      '',
-        location_ids: [],
-        branch_ids:   [],
-        type:         '',
-        paymenttype:  '',
+        zone_ids:     [],   // IDs from tblzones
+        branch_ids:   [],   // IDs from tbl_locations
+        type_vals:    [],   // multi-select types
+        payment_vals: [],   // multi-select payment types
         search:       '',
         page:         1
     };
@@ -530,6 +564,9 @@ $(function () {
 
     var BASE_URL   = '{{ route("superadmin.billingstats") }}';
     var EXPORT_URL = '{{ route("superadmin.billingexport") }}';
+
+    /* ── ALL BRANCHES (for zone→branch cascade) ─────────────────── */
+    var allBranches = @json($branches->map(fn($b) => ['id' => $b->id, 'name' => $b->name, 'zone_id' => $b->zone_id]));
 
     /* ── FLATPICKR ─────────────────────────────────────────────── */
     var fpFrom = flatpickr('#f_date_from', {
@@ -547,9 +584,32 @@ $(function () {
 
     /* ── MULTI-SELECT WIDGET ───────────────────────────────────── */
     var msCfg = {
-        zone:   { key:'location_ids', ph:'All Zones',    label:'zone'   },
-        branch: { key:'branch_ids',   ph:'All Branches', label:'branch' }
+        zone:   { key:'zone_ids',     ph:'All Zones',     label:'zone'    },
+        branch: { key:'branch_ids',   ph:'All Branches',  label:'branch'  },
+        type:   { key:'type_vals',    ph:'All Types',     label:'type'    },
+        pay:    { key:'payment_vals', ph:'All Payments',  label:'payment' }
     };
+
+    /* Rebuild branch list based on selected zones (cascade) */
+    function refreshBranchList() {
+        var selectedZones = S.zone_ids.map(String);
+        var filtered = selectedZones.length === 0
+            ? allBranches
+            : allBranches.filter(function(b){ return selectedZones.indexOf(String(b.zone_id)) > -1; });
+
+        var $list = $('#ms-branch-list');
+        $list.empty();
+        filtered.forEach(function(b){
+            $list.append(
+                '<div class="ms-opt" data-ms="branch" data-value="'+b.id+'" data-label="'+b.name+'" data-zone="'+b.zone_id+'">' +
+                '<span class="ms-cb"><i class="bi bi-check"></i></span>'+b.name+'</div>'
+            );
+        });
+        // Drop branch selections that are no longer in the filtered list
+        var validIds = filtered.map(function(b){ return String(b.id); });
+        S.branch_ids = S.branch_ids.filter(function(id){ return validIds.indexOf(String(id)) > -1; });
+        msSync('branch');
+    }
 
     function msSync(name){
         var vals = S[msCfg[name].key].map(String);
@@ -598,6 +658,7 @@ $(function () {
         if (idx > -1) arr.splice(idx,1); else arr.push(val);
         S[msCfg[name].key] = arr;
         msSync(name);
+        if (name === 'zone') refreshBranchList();
     });
 
     /* select all / clear */
@@ -612,6 +673,7 @@ $(function () {
             S[msCfg[name].key] = [];
         }
         msSync(name);
+        if (name === 'zone') refreshBranchList();
     });
 
     /* inline search */
@@ -645,10 +707,8 @@ $(function () {
 
     /* ── APPLY FILTERS ─────────────────────────────────────────── */
     $('#applyBtn').on('click', function(){
-        S.type        = $('#f_type').val();
-        S.paymenttype = $('#f_paymenttype').val();
-        S.search      = $('#f_search').val().trim();
-        S.page        = 1;
+        S.search = $('#f_search').val().trim();
+        S.page   = 1;
         fetchAll();
         filterOpen = false;
         $('#filterPanel').removeClass('open');
@@ -658,11 +718,11 @@ $(function () {
 
     /* ── RESET ─────────────────────────────────────────────────── */
     $('#resetBtn').on('click', function(){
-        S = { date_from:'', date_to:'', location_ids:[], branch_ids:[], type:'', paymenttype:'', search:'', page:1 };
-        $('#f_type, #f_paymenttype').val('');
+        S = { date_from:'', date_to:'', zone_ids:[], branch_ids:[], type_vals:[], payment_vals:[], search:'', page:1 };
         $('#f_search').val('');
         fpFrom.clear(); fpTo.clear();
-        msSync('zone'); msSync('branch');
+        msSync('zone'); msSync('type'); msSync('pay');
+        refreshBranchList();
         fetchAll();
     });
 
@@ -677,21 +737,22 @@ $(function () {
     $(document).on('click', '.remove', function(){
         var p = $(this).data('param');
         S.page = 1;
-        if      (p === 'location_ids'){ S.location_ids = []; msSync('zone'); }
-        else if (p === 'branch_ids')  { S.branch_ids   = []; msSync('branch'); }
-        else if (p === 'date_from')   { S.date_from = ''; fpFrom.clear(); }
-        else if (p === 'date_to')     { S.date_to   = ''; fpTo.clear(); }
-        else if (p === 'search')      { S.search    = ''; $('#f_search').val(''); }
-        else if (p === 'type')        { S.type      = ''; $('#f_type').val(''); }
-        else if (p === 'paymenttype') { S.paymenttype = ''; $('#f_paymenttype').val(''); }
+        if      (p === 'zone_ids')     { S.zone_ids = []; msSync('zone'); refreshBranchList(); }
+        else if (p === 'branch_ids')   { S.branch_ids = []; msSync('branch'); }
+        else if (p === 'type_vals')    { S.type_vals = []; msSync('type'); }
+        else if (p === 'payment_vals') { S.payment_vals = []; msSync('pay'); }
+        else if (p === 'date_from')    { S.date_from = ''; fpFrom.clear(); }
+        else if (p === 'date_to')      { S.date_to   = ''; fpTo.clear(); }
+        else if (p === 'search')       { S.search    = ''; $('#f_search').val(''); }
         fetchAll();
     });
 
     $(document).on('click', '#clearAllChip', function(){
-        S = { date_from:'', date_to:'', location_ids:[], branch_ids:[], type:'', paymenttype:'', search:'', page:1 };
-        $('#f_type, #f_paymenttype').val(''); $('#f_search').val('');
+        S = { date_from:'', date_to:'', zone_ids:[], branch_ids:[], type_vals:[], payment_vals:[], search:'', page:1 };
+        $('#f_search').val('');
         fpFrom.clear(); fpTo.clear();
-        msSync('zone'); msSync('branch');
+        msSync('zone'); msSync('type'); msSync('pay');
+        refreshBranchList();
         fetchAll();
     });
 
@@ -705,10 +766,10 @@ $(function () {
         var p = {};
         if (S.date_from)           p.date_from    = S.date_from;
         if (S.date_to)             p.date_to      = S.date_to;
-        if (S.location_ids.length) p.location_ids = S.location_ids;
+        if (S.zone_ids.length)     p.zone_ids     = S.zone_ids;
         if (S.branch_ids.length)   p.branch_ids   = S.branch_ids;
-        if (S.type)                p.type         = S.type;
-        if (S.paymenttype)         p.paymenttype  = S.paymenttype;
+        if (S.type_vals.length)    p.type_vals    = S.type_vals;
+        if (S.payment_vals.length) p.payment_vals = S.payment_vals;
         if (S.search)              p.search       = S.search;
         if (S.page > 1)            p.page         = S.page;
         return p;
@@ -880,11 +941,11 @@ $(function () {
 
         if (S.date_from) addChip('date_from','From: '+S.date_from);
         if (S.date_to)   addChip('date_to',  'To: '+S.date_to);
-        if (S.location_ids.length){
-            var zl = S.location_ids.length===1
-                ? ($('#ms-zone-list .ms-opt[data-value="'+S.location_ids[0]+'"]').data('label')||S.location_ids[0])
-                : S.location_ids.length+' zones';
-            addChip('location_ids','Zone: '+zl);
+        if (S.zone_ids.length){
+            var zl = S.zone_ids.length===1
+                ? ($('#ms-zone-list .ms-opt[data-value="'+S.zone_ids[0]+'"]').data('label')||S.zone_ids[0])
+                : S.zone_ids.length+' zones';
+            addChip('zone_ids','Zone: '+zl);
         }
         if (S.branch_ids.length){
             var bl = S.branch_ids.length===1
@@ -892,17 +953,23 @@ $(function () {
                 : S.branch_ids.length+' branches';
             addChip('branch_ids','Branch: '+bl);
         }
-        if (S.type)        addChip('type',       'Type: '+S.type);
-        if (S.paymenttype) addChip('paymenttype','Payment: '+S.paymenttype);
-        if (S.search)      addChip('search',     'Search: '+S.search);
+        if (S.type_vals.length){
+            var tl = S.type_vals.length===1 ? S.type_vals[0] : S.type_vals.length+' types';
+            addChip('type_vals','Type: '+tl);
+        }
+        if (S.payment_vals.length){
+            var pl = S.payment_vals.length===1 ? S.payment_vals[0] : S.payment_vals.length+' payments';
+            addChip('payment_vals','Payment: '+pl);
+        }
+        if (S.search)      addChip('search','Search: '+S.search);
 
         if (n>0) $c.append('<span class="filter-chip clear-chip" id="clearAllChip">Clear All ×</span>');
     }
 
     function updateBadge(){
         var n=0;
-        if(S.date_from)n++; if(S.date_to)n++; if(S.location_ids.length)n++;
-        if(S.branch_ids.length)n++; if(S.type)n++; if(S.paymenttype)n++; if(S.search)n++;
+        if(S.date_from)n++; if(S.date_to)n++; if(S.zone_ids.length)n++;
+        if(S.branch_ids.length)n++; if(S.type_vals.length)n++; if(S.payment_vals.length)n++; if(S.search)n++;
         n>0 ? $('#filterBadge').text(n).show() : $('#filterBadge').hide();
     }
 

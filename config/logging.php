@@ -123,6 +123,15 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        /* Radiant Cash Pickup — 3-way mismatch checks & alert emails */
+        'radiant_mismatch' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/radiant-mismatch.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

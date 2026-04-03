@@ -22,13 +22,15 @@ class IncomeReconciliationExportnew implements
     ShouldAutoSize
 {
     protected $dateRange;
-    protected $filter;
+    protected $zones;
+    protected $branches;
     protected $rows;
 
-    public function __construct($dateRange, $filter)
+    public function __construct($dateRange, array $zones = [], array $branches = [])
     {
         $this->dateRange = $dateRange;
-        $this->filter    = $filter;
+        $this->zones     = $zones;
+        $this->branches  = $branches;
     }
 
     // ======================================================
@@ -38,25 +40,24 @@ class IncomeReconciliationExportnew implements
     {
         $query = DB::table('income_reconciliation_table');
 
-        if ($this->dateRange) {
+        if ($this->dateRange && str_contains($this->dateRange, ' - ')) {
             [$from, $to] = explode(' - ', $this->dateRange);
-            $start = Carbon::createFromFormat('d/m/Y', trim($from))->startOfDay();
-            $end   = Carbon::createFromFormat('d/m/Y', trim($to))->endOfDay();
-
-            $query->whereBetween(
-                DB::raw("STR_TO_DATE(date_range,'%d/%m/%Y')"),
-                [$start, $end]
-            );
+            try {
+                $start = Carbon::createFromFormat('d/m/Y', trim($from))->startOfDay();
+                $end   = Carbon::createFromFormat('d/m/Y', trim($to))->endOfDay();
+                $query->whereBetween(
+                    DB::raw("STR_TO_DATE(date_range,'%d/%m/%Y')"),
+                    [$start, $end]
+                );
+            } catch (\Exception $e) {}
         }
 
-        preg_match("/tblzones\.name='([^']+)'/", $this->filter, $zone);
-        if (!empty($zone[1])) {
-            $query->where('zone_name', $zone[1]);
+        if (!empty($this->zones)) {
+            $query->whereIn('zone_name', $this->zones);
         }
 
-        preg_match("/tbl_locations\.name='([^']+)'/", $this->filter, $loc);
-        if (!empty($loc[1])) {
-            $query->where('location_name', $loc[1]);
+        if (!empty($this->branches)) {
+            $query->whereIn('location_name', $this->branches);
         }
 
         $this->rows = $query

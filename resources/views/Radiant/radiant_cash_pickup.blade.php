@@ -414,6 +414,234 @@ body{font-family:var(--font);background:#f1f5f9;}
     .fm-row{grid-template-columns:1fr;}
     .search-input{width:100%;}
 }
+
+/* ════════════════════════════════════════════
+   COMPARISON MODAL
+════════════════════════════════════════════ */
+.cmp-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.7);
+    backdrop-filter:blur(7px);z-index:2000;
+    display:none;align-items:center;justify-content:center;
+    animation:fadeIn .2s ease;
+}
+.cmp-overlay.show{display:flex;}
+.cmp-modal{
+    background:#fff;border-radius:22px;
+    width:100%;max-width:1100px;
+    max-height:92vh;overflow:hidden;
+    display:flex;flex-direction:column;
+    box-shadow:0 32px 80px rgba(0,0,0,.28);
+    animation:slideUp .28s cubic-bezier(.22,1,.36,1);
+}
+.cmp-header{
+    background:linear-gradient(135deg,#1e293b,#0f172a);
+    padding:20px 26px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.cmp-header-left{display:flex;align-items:center;gap:14px;}
+.cmp-hdr-icon{
+    width:44px;height:44px;
+    background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.35);
+    border-radius:13px;display:flex;align-items:center;justify-content:center;
+    font-size:1.3rem;
+}
+.cmp-hdr-title{font-size:1rem;font-weight:800;color:#fff;margin:0;}
+.cmp-hdr-sub{font-size:.72rem;color:rgba(255,255,255,.5);margin-top:2px;}
+.cmp-hdr-location{
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);
+    border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:700;
+    color:var(--amber);margin-top:4px;
+}
+.cmp-close-btn{
+    width:34px;height:34px;background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.18);border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .14s;color:rgba(255,255,255,.7);
+    font-size:.9rem;
+}
+.cmp-close-btn:hover{background:rgba(255,255,255,.22);}
+.cmp-match-bar{
+    flex-shrink:0;padding:12px 26px;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    border-bottom:1px solid #e2e8f0;background:#fafafa;
+}
+.cmp-match-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 13px;border-radius:20px;font-size:.73rem;font-weight:700;
+}
+.cmp-pill-match  {background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;}
+.cmp-pill-close  {background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+.cmp-pill-mismatch{background:#ffe4e6;color:#9f1239;border:1px solid #fda4af;}
+.cmp-pill-nodata {background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;}
+.cmp-body{
+    flex:1;overflow-y:auto;padding:22px 26px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+}
+.cmp-body::-webkit-scrollbar{width:5px;}
+.cmp-body::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:4px;}
+.cmp-panel{
+    border-radius:14px;border:1.5px solid #e2e8f0;
+    overflow:hidden;display:flex;flex-direction:column;
+    max-height:500px;
+}
+.cmp-panel-hdr{
+    padding:14px 16px;
+    display:flex;align-items:center;gap:10px;
+    flex-shrink:0;
+}
+.cmp-ph-icon{
+    width:36px;height:36px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;font-size:1rem;
+}
+.cph-amber {background:#fef3c7;color:#d97706;}
+.cph-blue  {background:#dbeafe;color:#1d4ed8;}
+.cph-green {background:#d1fae5;color:#059669;}
+.cmp-panel-hdr h6{font-size:.8rem;font-weight:800;color:#0f172a;margin:0;}
+.cmp-panel-hdr small{font-size:.67rem;color:#94a3b8;font-weight:600;margin-top:1px;}
+.cmp-panel-body{
+    flex:1;padding:14px 16px;
+    overflow-y:auto;
+    scrollbar-width:thin;scrollbar-color:#e2e8f0 transparent;
+}
+.cmp-panel-body::-webkit-scrollbar{width:4px;}
+.cmp-panel-body::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:4px;}
+.cmp-bfr-total{
+    display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,#1d4ed8,#3b82f6);
+    border-radius:10px;padding:10px 14px;margin-bottom:12px;color:#fff;
+}
+.cmp-bfr-total-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.75;}
+.cmp-bfr-total-amt{font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.cmp-bfr-window{
+    font-size:.67rem;font-weight:700;padding:4px 10px;border-radius:6px;
+    background:rgba(255,255,255,.18);color:#fff;
+}
+.cmp-amt{
+    font-size:1.5rem;font-weight:800;
+    font-family:'JetBrains Mono',monospace;
+    letter-spacing:-.5px;margin-bottom:4px;
+}
+.cmp-amt-sub{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:14px;}
+.cmp-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin-top:8px;}
+.cmp-k{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;white-space:nowrap;}
+.cmp-v{font-size:.77rem;font-weight:600;color:#334155;word-break:break-word;}
+.cmp-no-data{
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:32px 16px;text-align:center;
+}
+.cmp-no-data i{font-size:2rem;color:#cbd5e1;margin-bottom:8px;}
+.cmp-no-data p{font-size:.75rem;color:#94a3b8;margin:0;}
+.cmp-bank-row{
+    padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;
+    background:#fafafa;transition:background .12s;
+}
+.cmp-bank-row:hover{background:#f0f9ff;}
+.cmp-bank-desc{font-size:.73rem;font-weight:600;color:#334155;margin-bottom:4px;line-height:1.35;}
+.cmp-bank-amt{font-size:.9rem;font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace;}
+.cmp-bank-meta{font-size:.66rem;color:#94a3b8;margin-top:3px;}
+.cmp-spinner{
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;min-height:200px;gap:12px;
+}
+.cmp-spinner-ring{
+    width:40px;height:40px;border:3px solid #e2e8f0;
+    border-top-color:var(--amber);border-radius:50%;
+    animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cmp-branch-match-badge{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:4px 10px;border-radius:8px;font-size:.68rem;font-weight:700;margin-bottom:10px;
+}
+.cbmb-ok {background:#d1fae5;color:#065f46;}
+.cbmb-no {background:#ffe4e6;color:#9f1239;}
+@media(max-width:900px){
+    .cmp-body{grid-template-columns:1fr;}
+}
+
+/* ════════════════════════════════════════════
+   MISMATCH ALERT MODAL
+════════════════════════════════════════════ */
+.alert-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.7);
+    backdrop-filter:blur(7px);z-index:3000;
+    display:none;align-items:center;justify-content:center;
+    animation:fadeIn .2s ease;
+}
+.alert-overlay.show{display:flex;}
+.alert-modal{
+    background:#fff;border-radius:22px;
+    width:100%;max-width:520px;
+    box-shadow:0 32px 80px rgba(0,0,0,.28);
+    animation:slideUp .28s cubic-bezier(.22,1,.36,1);
+    overflow:hidden;
+}
+.alm-header{
+    background:linear-gradient(135deg,#0f172a,#1e3a5f);
+    padding:22px 26px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.alm-header-left{display:flex;align-items:center;gap:14px;}
+.alm-hdr-icon{
+    width:44px;height:44px;
+    background:rgba(244,63,94,.2);border:1px solid rgba(244,63,94,.4);
+    border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;
+}
+.alm-hdr-title{font-size:1rem;font-weight:800;color:#fff;margin:0;}
+.alm-hdr-sub{font-size:.72rem;color:rgba(255,255,255,.5);margin-top:2px;}
+.alm-close-btn{
+    width:34px;height:34px;background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.18);border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:background .14s;color:rgba(255,255,255,.7);font-size:.9rem;
+}
+.alm-close-btn:hover{background:rgba(255,255,255,.22);}
+.alm-body{padding:28px 26px;}
+.alm-field label{
+    display:block;font-size:.68rem;font-weight:800;text-transform:uppercase;
+    letter-spacing:.7px;color:var(--text3);margin-bottom:6px;
+}
+.alm-date-wrap{position:relative;}
+.alm-date-ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--rose);font-size:.95rem;pointer-events:none;}
+.alm-date-input{
+    padding: 10px 50px !important;
+    width:100%;padding:11px 14px 11px 38px;
+    border:1.5px solid var(--border);border-radius:var(--radius-sm);
+    font-size:.9rem;font-family:var(--font);color:var(--text);background:var(--surface2);
+    transition:border-color .15s,box-shadow .15s;
+}
+.alm-date-input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(244,63,94,.12);}
+.alm-info{
+    margin-top:16px;background:#fff5f5;border:1px solid #fda4af;border-radius:10px;
+    padding:12px 14px;display:flex;gap:8px;align-items:flex-start;
+}
+.alm-info i{color:var(--rose);font-size:.95rem;flex-shrink:0;margin-top:1px;}
+.alm-info p{font-size:.75rem;color:#9f1239;line-height:1.55;margin:0;}
+.alm-footer{padding:16px 26px 22px;display:flex;gap:10px;}
+.btn-send-alert{
+    flex:1;padding:12px;border-radius:10px;border:none;
+    background:linear-gradient(135deg,var(--rose),#e11d48);
+    color:#fff;font-family:var(--font);font-size:.87rem;font-weight:800;
+    cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;
+    box-shadow:0 4px 14px rgba(244,63,94,.35);
+}
+.btn-send-alert:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(244,63,94,.45);}
+.btn-send-alert:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.btn-alm-cancel{
+    padding:12px 20px;border-radius:10px;border:1.5px solid var(--border2);
+    background:var(--surface);color:var(--text2);
+    font-family:var(--font);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .14s;
+}
+.btn-alm-cancel:hover{border-color:var(--rose);color:var(--rose);}
+/* Result badge in modal */
+.alm-result{
+    margin-top:14px;padding:14px 16px;border-radius:10px;
+    font-size:.82rem;font-weight:700;display:none;
+}
+.alm-result.success{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;}
+.alm-result.warning{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+.alm-result.error{background:#ffe4e6;color:#9f1239;border:1px solid #fda4af;}
 </style>
 
 <body style="overflow-x:hidden;">
@@ -437,6 +665,9 @@ body{font-family:var(--font);background:#f1f5f9;}
     <div class="rcp-header-actions">
       <button type="button" class="hbtn hbtn-amber" id="rcpOpenUploadBtn">
         <i class="bi bi-cloud-upload-fill"></i> Upload Excel
+      </button>
+      <button type="button" class="hbtn hbtn-outline" id="rcpAlertBtn" title="Send mismatch alert email for a date">
+        <i class="bi bi-envelope-exclamation-fill"></i> Mismatch Alert
       </button>
       <button type="button" class="hbtn hbtn-outline" id="rcpRefreshBtn">
         <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -692,6 +923,162 @@ body{font-family:var(--font);background:#f1f5f9;}
   </div>
 </div>
 
+{{-- ══════════════════════════════════════════════════════════════════
+     MISMATCH ALERT MODAL
+══════════════════════════════════════════════════════════════════ --}}
+<div class="alert-overlay" id="alertOverlay">
+  <div class="alert-modal" id="alertModalInner">
+    <div class="alm-header">
+      <div class="alm-header-left">
+        <div class="alm-hdr-icon">⚠️</div>
+        <div>
+          <div class="alm-hdr-title">Send Mismatch Alert</div>
+          <div class="alm-hdr-sub">Compare &amp; email mismatches for a pickup date</div>
+        </div>
+      </div>
+      <div class="alm-close-btn" id="almCloseBtn"><i class="bi bi-x-lg"></i></div>
+    </div>
+
+    <div class="alm-body">
+      <div class="alm-field">
+        <label><i class="bi bi-calendar3"></i> &nbsp;Pickup Date to Check</label>
+        <div class="alm-date-wrap">
+          <i class="bi bi-calendar-event alm-date-ico"></i>
+          <input type="text" id="almDateInput" class="alm-date-input" 
+                 placeholder="Select date…" autocomplete="off" readonly>
+        </div>
+      </div>
+
+      <div class="alm-info">
+        <i class="bi bi-info-circle-fill"></i>
+        <p>
+          The system will compare <strong>every Radiant Cash Pickup</strong> for the selected date
+          against the <strong>Branch Financial Report</strong> and <strong>Bank Statement</strong>.
+          If any mismatch or missing data is found, a detailed alert email is sent to all
+          configured recipients in <strong>Email Master</strong>.
+        </p>
+      </div>
+
+      <div class="alm-result" id="almResult"></div>
+    </div>
+
+    <div class="alm-footer">
+      <button type="button" class="btn-alm-cancel" id="almCancelBtn">Cancel</button>
+      <button type="button" class="btn-send-alert" id="almSendBtn">
+        <i class="bi bi-envelope-exclamation-fill"></i> Run Check &amp; Send Alert
+      </button>
+    </div>
+  </div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════════════
+     COMPARISON MODAL
+══════════════════════════════════════════════════════════════════ --}}
+<div class="cmp-overlay" id="cmpOverlay">
+  <div class="cmp-modal" id="cmpModal">
+
+    {{-- Header --}}
+    <div class="cmp-header">
+      <div class="cmp-header-left">
+        <div class="cmp-hdr-icon">⚖️</div>
+        <div>
+          <div class="cmp-hdr-title">3-Way Cash Comparison</div>
+          <div class="cmp-hdr-sub">Radiant Pickup vs Branch Financial Report vs Bank Statement</div>
+          <div class="cmp-hdr-location" id="cmpLocationBadge">
+            <i class="bi bi-geo-alt-fill"></i> <span id="cmpLocationText">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="cmp-close-btn" id="cmpCloseBtn" role="button" tabindex="0">
+        <i class="bi bi-x-lg"></i>
+      </div>
+    </div>
+
+    {{-- Match status bar --}}
+    <div class="cmp-match-bar" id="cmpMatchBar">
+      <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;">Match Status:</span>
+      <span class="cmp-match-pill cmp-pill-nodata" id="cmpPillRCP">
+        <i class="bi bi-cash-stack"></i> RCP: —
+      </span>
+      <span class="cmp-match-pill cmp-pill-nodata" id="cmpPillBFR">
+        <i class="bi bi-file-bar-graph"></i> Branch Report: —
+      </span>
+      <span class="cmp-match-pill cmp-pill-nodata" id="cmpPillBank">
+        <i class="bi bi-bank2"></i> Bank Statement: —
+      </span>
+    </div>
+
+    {{-- 3-panel body --}}
+    <div class="cmp-body" id="cmpBody">
+      {{-- Loading spinner shown initially --}}
+      <div class="cmp-spinner" id="cmpSpinner" style="grid-column:1/-1;">
+        <div class="cmp-spinner-ring"></div>
+        <div style="font-size:.8rem;color:#94a3b8;font-weight:600;">Loading comparison data…</div>
+      </div>
+
+      {{-- Panel 1: Radiant Cash Pickup --}}
+      <div class="cmp-panel" id="cmpPanelRCP" style="display:none;">
+        <div class="cmp-panel-hdr" style="background:#fffbeb;border-bottom:1px solid #fde68a;">
+          <div class="cmp-ph-icon cph-amber"><i class="bi bi-cash-stack"></i></div>
+          <div>
+            <h6>Radiant Cash Pickup</h6>
+            <small id="cmpRCPDate"></small>
+          </div>
+        </div>
+        <div class="cmp-panel-body">
+          <div class="cmp-amt" id="cmpRCPAmt" style="color:#d97706;">—</div>
+          <div class="cmp-amt-sub">Pickup Amount</div>
+          <div class="cmp-kv">
+            <span class="cmp-k">Location</span><span class="cmp-v" id="cmpRCPLoc">—</span>
+            <span class="cmp-k">Region</span><span class="cmp-v" id="cmpRCPRegion">—</span>
+            <span class="cmp-k">State</span><span class="cmp-v" id="cmpRCPState">—</span>
+            <span class="cmp-k">HCI Slip</span><span class="cmp-v" id="cmpRCPSlip">—</span>
+            <span class="cmp-k">Deposit Mode</span><span class="cmp-v" id="cmpRCPMode">—</span>
+            <span class="cmp-k">Deposit Slip</span><span class="cmp-v" id="cmpRCPDSlip">—</span>
+            <span class="cmp-k">Difference</span><span class="cmp-v" id="cmpRCPDiff">—</span>
+            <span class="cmp-k">Remarks</span><span class="cmp-v" id="cmpRCPRemarks">—</span>
+          </div>
+        </div>
+      </div>
+
+      {{-- Panel 2: Branch Financial Report --}}
+      <div class="cmp-panel" id="cmpPanelBFR" style="display:none;">
+        <div class="cmp-panel-hdr" style="background:#eff6ff;border-bottom:1px solid #bfdbfe;">
+          <div class="cmp-ph-icon cph-blue"><i class="bi bi-file-bar-graph-fill"></i></div>
+          <div>
+            <h6>Branch Financial Report</h6>
+            <small>Radiant cash collection entry</small>
+          </div>
+        </div>
+        <div class="cmp-panel-body" id="cmpBFRBody">
+          <div class="cmp-no-data">
+            <i class="bi bi-file-earmark-x"></i>
+            <p>No branch report found<br>for this location &amp; date</p>
+          </div>
+        </div>
+      </div>
+
+      {{-- Panel 3: Bank Statement --}}
+      <div class="cmp-panel" id="cmpPanelBank" style="display:none;">
+        <div class="cmp-panel-hdr" style="background:#f0fdf4;border-bottom:1px solid #bbf7d0;">
+          <div class="cmp-ph-icon cph-green"><i class="bi bi-bank2"></i></div>
+          <div>
+            <h6>Bank Statement</h6>
+            <small>BY CASH — matching description</small>
+          </div>
+        </div>
+        <div class="cmp-panel-body" id="cmpBankBody">
+          <div class="cmp-no-data">
+            <i class="bi bi-search"></i>
+            <p>No bank entries matched<br>"BY CASH - {location}"</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 {{-- SCRIPTS --}}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -705,7 +1092,7 @@ body{font-family:var(--font);background:#f1f5f9;}
         data: @json(route('superadmin.radiantcash.data')),
         upload: @json(route('superadmin.radiantcash.upload')),
         index: @json(route('superadmin.radiantcash.index')),
-        branchFetch: @json(route('superadmin.getbranchfetch'))
+        filterOptions: @json(route('superadmin.radiantcash.filteroptions'))
     };
     var rcpCsrf = $('meta[name="csrf-token"]').attr('content');
     var rcpState = { page: {{ (int) $records->currentPage() }} };
@@ -747,22 +1134,39 @@ body{font-family:var(--font);background:#f1f5f9;}
         };
     }
 
-    function loadBranchesForZone(zoneId, selectedBranchId) {
-        var $br = $('#rcpBranchSelect');
-        $br.html('<option value="">All Branches</option>');
-        if (!zoneId) return;
+    function loadFilterOptions(opts) {
+        // opts: { state, zoneId, selectedZoneId, selectedBranchId, updateZones, updateBranches }
+        var params = {};
+        if (opts.state) params.state = opts.state;
+        if (opts.zoneId) params.zone_id = opts.zoneId;
+
         $.ajax({
-            url: rcpRoutes.branchFetch,
-            method: 'POST',
-            data: { _token: rcpCsrf, id: String(zoneId) },
+            url: rcpRoutes.filterOptions,
+            method: 'GET',
+            data: params,
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
         }).done(function (res) {
-            var list = res.branch || [];
-            list.forEach(function (b) {
-                var opt = $('<option></option>').attr('value', b.id).text(b.name);
-                if (selectedBranchId && String(b.id) === String(selectedBranchId)) opt.prop('selected', true);
-                $br.append(opt);
-            });
+            if (!res.success) return;
+
+            if (opts.updateZones) {
+                var $zn = $('#rcpZoneSelect');
+                $zn.html('<option value="">All Zones</option>');
+                (res.zones || []).forEach(function (z) {
+                    var opt = $('<option></option>').attr('value', z.id).text(z.name);
+                    if (opts.selectedZoneId && String(z.id) === String(opts.selectedZoneId)) opt.prop('selected', true);
+                    $zn.append(opt);
+                });
+            }
+
+            if (opts.updateBranches) {
+                var $br = $('#rcpBranchSelect');
+                $br.html('<option value="">All Branches</option>');
+                (res.branches || []).forEach(function (b) {
+                    var opt = $('<option></option>').attr('value', b.id).text(b.name);
+                    if (opts.selectedBranchId && String(b.id) === String(opts.selectedBranchId)) opt.prop('selected', true);
+                    $br.append(opt);
+                });
+            }
         });
     }
 
@@ -886,8 +1290,9 @@ body{font-family:var(--font);background:#f1f5f9;}
         clearFlatpickr('#fDateFrom');
         clearFlatpickr('#fDateTo');
         $('#rcpStateSelect').val('');
-        $('#rcpZoneSelect').val('');
         $('#rcpBranchSelect').html('<option value="">All Branches</option>');
+        // Reload all zones that have data (no state filter)
+        loadFilterOptions({ state: '', updateZones: true, updateBranches: false });
         $('#filterSearchInput, #searchInput').val('');
         $('#rcpPerPage').val('25');
         $('#filterFormPerPage').val('25');
@@ -895,14 +1300,22 @@ body{font-family:var(--font);background:#f1f5f9;}
     }
 
     function removeOneFilter(key) {
-        if (key === 'date_from') clearFlatpickr('#fDateFrom');
-        else if (key === 'date_to') clearFlatpickr('#fDateTo');
-        else if (key === 'state') $('#rcpStateSelect').val('');
-        else if (key === 'zone_id') {
+        if (key === 'date_from') {
+            clearFlatpickr('#fDateFrom');
+        } else if (key === 'date_to') {
+            clearFlatpickr('#fDateTo');
+        } else if (key === 'state') {
+            $('#rcpStateSelect').val('');
             $('#rcpZoneSelect').val('');
             $('#rcpBranchSelect').html('<option value="">All Branches</option>');
-        } else if (key === 'branch_id') $('#rcpBranchSelect').val('');
-        else if (key === 'search') {
+            // Reload zones without state restriction
+            loadFilterOptions({ state: '', updateZones: true, updateBranches: false });
+        } else if (key === 'zone_id') {
+            $('#rcpZoneSelect').val('');
+            $('#rcpBranchSelect').html('<option value="">All Branches</option>');
+        } else if (key === 'branch_id') {
+            $('#rcpBranchSelect').val('');
+        } else if (key === 'search') {
             $('#filterSearchInput, #searchInput').val('');
         }
         rcpLoad(1);
@@ -968,10 +1381,31 @@ body{font-family:var(--font);background:#f1f5f9;}
             }
         }).done(function (res) {
             if (res && res.success) {
-                toastr.success(res.message || 'Upload complete.');
                 closeUploadModal();
                 resetUploadFormState();
                 rcpLoad(1);
+
+                // Show upload success
+                toastr.success('File uploaded and rows imported successfully.', 'Upload Complete', { timeOut: 4000 });
+
+                // Show per-date alert results
+                var summaries = res.alert_summaries || [];
+                if (summaries.length === 0) {
+                    toastr.info('No mismatch check ran (no data rows found).', '', { timeOut: 4000 });
+                } else {
+                    var totalMismatch = summaries.reduce(function(s, r){ return s + (r.mismatch || 0); }, 0);
+                    summaries.forEach(function(r) {
+                        if (r.all_matched) {
+                            toastr.success(r.message, '✓ ' + r.date, { timeOut: 5000 });
+                        } else if (r.email_sent) {
+                            toastr.warning(r.message, '⚠ ' + r.date + ' — Alert Sent', { timeOut: 8000 });
+                        } else if (r.mismatch > 0) {
+                            toastr.error(r.message, '⚠ ' + r.date + ' — No Recipients', { timeOut: 8000 });
+                        } else if (!r.found) {
+                            toastr.info(r.message, r.date, { timeOut: 4000 });
+                        }
+                    });
+                }
             } else {
                 toastr.error((res && res.message) ? res.message : 'Upload failed.');
             }
@@ -1044,16 +1478,315 @@ body{font-family:var(--font);background:#f1f5f9;}
             closeUploadModal();
             resetUploadFormState();
             closeFilterModal();
+            closeCmpModal();
         }
     });
 
+    // State changes → reload zones (only those with data for that state), reset branch
+    $('#rcpStateSelect').on('change.rcp', function () {
+        var state = $(this).val();
+        $('#rcpZoneSelect').val('');
+        $('#rcpBranchSelect').html('<option value="">All Branches</option>');
+        loadFilterOptions({ state: state, updateZones: true, updateBranches: false });
+    });
+
+    // Zone changes → reload branches (only those with data for that zone + current state)
     $('#rcpZoneSelect').on('change.rcp', function () {
-        var zid = $(this).val();
-        $('#rcpBranchSelect').val('');
-        loadBranchesForZone(zid, '');
+        var zid   = $(this).val();
+        var state = $('#rcpStateSelect').val();
+        $('#rcpBranchSelect').html('<option value="">All Branches</option>');
+        if (zid) {
+            loadFilterOptions({ state: state, zoneId: zid, updateZones: false, updateBranches: true });
+        }
     });
 
     renderChips();
+
+    /* ════════════════════════════════════════
+       COMPARISON MODAL
+    ════════════════════════════════════════ */
+    var cmpRoute = @json(route('superadmin.radiantcash.compare', ['id' => '__ID__']));
+
+    function fmtINR2(n) {
+        if (!n && n !== 0) return '—';
+        return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function matchClass(a, b, tolerance) {
+        if (!a && !b) return 'cmp-pill-nodata';
+        if (!a || !b) return 'cmp-pill-mismatch';
+        var diff = Math.abs(a - b);
+        var pct  = (a > 0) ? (diff / a) : 1;
+        if (pct <= (tolerance || 0.01)) return 'cmp-pill-match';
+        if (pct <= 0.10) return 'cmp-pill-close';
+        return 'cmp-pill-mismatch';
+    }
+
+    function matchLabel(cls) {
+        return { 'cmp-pill-match':'✓ Match', 'cmp-pill-close':'~ Close', 'cmp-pill-mismatch':'✗ Mismatch', 'cmp-pill-nodata':'– No Data' }[cls] || '—';
+    }
+
+    function openCmpModal() {
+        $('#cmpOverlay').addClass('show');
+        $('body').css('overflow', 'hidden');
+    }
+
+    function closeCmpModal() {
+        $('#cmpOverlay').removeClass('show');
+        $('body').css('overflow', '');
+    }
+
+    function resetCmpModal() {
+        $('#cmpSpinner').show();
+        $('#cmpPanelRCP, #cmpPanelBFR, #cmpPanelBank').hide();
+        $('#cmpLocationText').text('—');
+        ['#cmpPillRCP','#cmpPillBFR','#cmpPillBank'].forEach(function(id) {
+            $(id).attr('class','cmp-match-pill cmp-pill-nodata');
+        });
+        $('#cmpPillRCP').html('<i class="bi bi-cash-stack"></i> RCP: —');
+        $('#cmpPillBFR').html('<i class="bi bi-file-bar-graph"></i> Branch Report: —');
+        $('#cmpPillBank').html('<i class="bi bi-bank2"></i> Bank Statement: —');
+    }
+
+    function renderCmpModal(res) {
+        var p   = res.pickup;
+        var bfr = res.branch_reports || [];
+        var bk  = res.bank_entries  || [];
+        var mb  = res.matched_branch;
+
+        /* ── Location badge ── */
+        $('#cmpLocationText').text((p.location || '—') + (mb ? '  →  ' + mb.name + ' [' + (mb.zone || '') + ']' : '  (no master match)'));
+
+        /* ── Panel 1: RCP ── */
+        $('#cmpRCPDate').text(p.pickup_date || '—');
+        $('#cmpRCPAmt').text(fmtINR2(p.pickup_amount));
+        $('#cmpRCPLoc').text(p.location || '—');
+        $('#cmpRCPRegion').text(p.region || '—');
+        $('#cmpRCPState').text(p.state_name || '—');
+        $('#cmpRCPSlip').text(p.hci_slip_no || '—');
+        $('#cmpRCPMode').text(p.deposit_mode || '—');
+        $('#cmpRCPDSlip').text(p.deposit_slip_no || '—');
+        var diffVal = p.difference || 0;
+        $('#cmpRCPDiff').html(diffVal != 0
+            ? '<span style="color:#f43f5e;font-weight:800;">' + fmtINR2(diffVal) + '</span>'
+            : '<span style="color:#059669;">0 (Matched)</span>');
+        $('#cmpRCPRemarks').text(p.remarks || '—');
+        $('#cmpPanelRCP').show();
+        $('#cmpPillRCP').html('<i class="bi bi-cash-stack"></i> RCP: ' + fmtINR2(p.pickup_amount));
+
+        /* ── Panel 2: Branch Financial Report ── */
+        var bfrTotalAmt = res.bfr_total_amount || 0;
+
+        if (bfr.length) {
+            var totalBar =
+                '<div class="cmp-bfr-total">' +
+                '<div><div class="cmp-bfr-total-label">Total Radiant Collection</div>' +
+                '<div class="cmp-bfr-total-amt">' + fmtINR2(bfrTotalAmt) + '</div></div>' +
+                '<div class="cmp-bfr-window">' + bfr.length + ' report' + (bfr.length > 1 ? 's' : '') + '</div>' +
+                '</div>';
+
+            var bfrHtml = totalBar;
+            bfr.forEach(function(r) {
+                var notCol = r.radiant_not_collected
+                    ? '<div style="color:#f43f5e;font-size:.7rem;font-weight:700;margin-top:4px;">⚠ Not Collected' +
+                      (r.radiant_not_collected_remarks ? ': ' + r.radiant_not_collected_remarks : '') + '</div>'
+                    : '';
+                bfrHtml +=
+                    '<div style="padding:10px 0;border-bottom:1px solid #e2e8f0;">' +
+                    '<div class="cmp-amt" style="color:#1d4ed8;font-size:1.25rem;">' + fmtINR2(r.radiant_collection_amount) + '</div>' +
+                    '<div class="cmp-amt-sub">Radiant Collection</div>' +
+                    '<div class="cmp-kv">' +
+                    '<span class="cmp-k">Report Date</span><span class="cmp-v">' + (r.report_date || '—') + '</span>' +
+                    '<span class="cmp-k">Branch</span><span class="cmp-v">' + (r.branch_name || '—') + '</span>' +
+                    '<span class="cmp-k">Zone</span><span class="cmp-v">' + (r.zone_name || '—') + '</span>' +
+                    '<span class="cmp-k">Collected Date</span><span class="cmp-v">' + (r.radiant_collected_date || '—') + '</span>' +
+                    '<span class="cmp-k">Status</span><span class="cmp-v">' + (r.overall_approval_label || '—') + '</span>' +
+                    '</div>' + notCol + '</div>';
+            });
+            $('#cmpBFRBody').html(bfrHtml);
+        } else {
+            var noDataMsg = mb
+                ? '<i class="bi bi-file-earmark-x"></i><p>No branch report found<br>for <strong>' + mb.name + '</strong></p>'
+                : '<i class="bi bi-exclamation-circle"></i><p>Branch not matched in<br>Location Master.<br>Cannot search reports.</p>';
+            $('#cmpBFRBody').html('<div class="cmp-no-data">' + noDataMsg + '</div>');
+        }
+        $('#cmpPanelBFR').show();
+
+        var bfrPillCls = bfr.length ? matchClass(p.pickup_amount, bfrTotalAmt) : 'cmp-pill-mismatch';
+        $('#cmpPillBFR').attr('class', 'cmp-match-pill ' + bfrPillCls)
+            .html('<i class="bi bi-file-bar-graph"></i> Branch: ' + (bfr.length ? fmtINR2(bfrTotalAmt) : 'No Data') + ' — ' + matchLabel(bfrPillCls));
+
+        /* ── Panel 3: Bank Statement ── */
+        var bankTotal = 0;
+        if (bk.length) {
+            bk.forEach(function(e){ bankTotal += e.deposit || 0; });
+            var bkTotalBar =
+                '<div style="background:linear-gradient(135deg,#059669,#10b981);border-radius:10px;' +
+                'padding:10px 14px;margin-bottom:12px;color:#fff;display:flex;align-items:center;justify-content:space-between;">' +
+                '<div><div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.75;">Total Deposit</div>' +
+                '<div style="font-size:1.1rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;">' + fmtINR2(bankTotal) + '</div></div>' +
+                '<div style="font-size:.67rem;font-weight:700;padding:4px 10px;border-radius:6px;background:rgba(255,255,255,.18);">' + bk.length + ' entr' + (bk.length > 1 ? 'ies' : 'y') + '</div>' +
+                '</div>';
+            var bkHtml = bkTotalBar;
+            bk.forEach(function(e) {
+                bkHtml +=
+                    '<div class="cmp-bank-row">' +
+                    '<div class="cmp-bank-desc">' + $('<div/>').text(e.description).html() + '</div>' +
+                    '<div class="cmp-bank-amt">+ ' + fmtINR2(e.deposit) + '</div>' +
+                    '<div class="cmp-bank-meta">' +
+                    '<i class="bi bi-calendar3"></i> ' + (e.transaction_date || '—') +
+                    (e.reference_number ? ' &nbsp;·&nbsp; Ref: ' + e.reference_number : '') +
+                    (e.match_status ? ' &nbsp;·&nbsp; <em>' + e.match_status + '</em>' : '') +
+                    '</div></div>';
+            });
+            $('#cmpBankBody').html(bkHtml);
+        } else {
+            $('#cmpBankBody').html(
+                '<div class="cmp-no-data">' +
+                '<i class="bi bi-search"></i>' +
+                '<p>No bank entries matched<br><em>"BY CASH — ' + $('<div/>').text(p.location || '').html() + '"</em><br>in ±1 day window</p>' +
+                '</div>'
+            );
+        }
+        $('#cmpPanelBank').show();
+
+        var bkPillCls = bk.length ? matchClass(p.pickup_amount, bankTotal) : 'cmp-pill-mismatch';
+        $('#cmpPillBank').attr('class', 'cmp-match-pill ' + bkPillCls)
+            .html('<i class="bi bi-bank2"></i> Bank: ' + (bk.length ? fmtINR2(bankTotal) : 'No Data') + ' — ' + matchLabel(bkPillCls));
+    }
+
+    function loadCompare(id) {
+        resetCmpModal();
+        openCmpModal();
+        var url = cmpRoute.replace('__ID__', id);
+        $.ajax({
+            url: url,
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).done(function(res) {
+            $('#cmpSpinner').hide();
+            if (res && res.success) {
+                renderCmpModal(res);
+            } else {
+                toastr.error('Could not load comparison data.');
+                closeCmpModal();
+            }
+        }).fail(function() {
+            $('#cmpSpinner').hide();
+            toastr.error('Failed to fetch comparison data.');
+            closeCmpModal();
+        });
+    }
+
+    /* Row click → open compare */
+    $(document).on('click.rcp', '.rcp-row-clickable', function() {
+        var id = $(this).data('id');
+        if (id) loadCompare(id);
+    });
+
+    /* Close buttons */
+    $('#cmpCloseBtn').on('click.rcp', closeCmpModal);
+    $('#cmpOverlay').on('click.rcp', function(e) {
+        if (e.target === this) closeCmpModal();
+    });
+
+    /* ════════════════════════════════════════
+       MISMATCH ALERT MODAL
+    ════════════════════════════════════════ */
+    var almRoute = @json(route('superadmin.radiantcash.mismatchalert'));
+
+    flatpickr('#almDateInput', {
+        dateFormat:  'Y-m-d',
+        altInput:    true,
+        altFormat:   'd M Y',
+        allowInput:  false,
+        maxDate:     'today',
+        onChange: function() {
+            // Clear previous result when date changes
+            $('#almResult').hide().removeClass('success warning error').text('');
+            $('#almSendBtn').prop('disabled', false)
+                .html('<i class="bi bi-envelope-exclamation-fill"></i> Run Check &amp; Send Alert');
+        }
+    });
+
+    function openAlertModal() {
+        $('#almResult').hide().removeClass('success warning error').text('');
+        $('#almSendBtn').prop('disabled', false)
+            .html('<i class="bi bi-envelope-exclamation-fill"></i> Run Check &amp; Send Alert');
+        $('#alertOverlay').addClass('show');
+        $('body').css('overflow', 'hidden');
+    }
+    function closeAlertModal() {
+        $('#alertOverlay').removeClass('show');
+        $('body').css('overflow', '');
+    }
+
+    $('#rcpAlertBtn').on('click.rcp', openAlertModal);
+    $('#almCloseBtn, #almCancelBtn').on('click.rcp', closeAlertModal);
+    $('#alertOverlay').on('click.rcp', function(e) {
+        if (e.target === this) closeAlertModal();
+    });
+    $('#alertModalInner').on('click.rcp', function(e) { e.stopPropagation(); });
+
+    $('#almSendBtn').on('click.rcp', function() {
+        var dt = document.getElementById('almDateInput');
+        var dateVal = dt && dt._flatpickr ? dt._flatpickr.input.value : $(dt).val();
+        if (!dateVal) {
+            toastr.warning('Please select a pickup date first.');
+            return;
+        }
+
+        var $btn = $(this);
+        $btn.prop('disabled', true)
+            .html('<i class="bi bi-hourglass-split"></i> Running comparison…');
+        $('#almResult').hide().removeClass('success warning error');
+
+        $.ajax({
+            url:     almRoute,
+            type:    'POST',
+            data:    { alert_date: dateVal, _token: rcpCsrf },
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).done(function(res) {
+            var $r = $('#almResult');
+            if (res.success) {
+                if (res.all_matched) {
+                    $r.addClass('success').text(res.message).show();
+                    toastr.success(res.message);
+                    $btn.html('<i class="bi bi-check-circle-fill"></i> All Matched!');
+                } else {
+                    $r.addClass('warning')
+                      .html('<i class="bi bi-envelope-check-fill"></i> ' + res.message).show();
+                    toastr.success(res.message);
+                    $btn.html('<i class="bi bi-check-circle-fill"></i> Alert Sent!');
+                }
+            } else {
+                $r.addClass('error')
+                  .html('<i class="bi bi-exclamation-triangle-fill"></i> ' + (res.message || 'Error')).show();
+                toastr.error(res.message || 'Something went wrong.');
+                $btn.prop('disabled', false)
+                    .html('<i class="bi bi-envelope-exclamation-fill"></i> Run Check &amp; Send Alert');
+            }
+        }).fail(function(xhr) {
+            var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                ? xhr.responseJSON.message : 'Server error. Please try again.';
+            $('#almResult').addClass('error')
+                .html('<i class="bi bi-exclamation-triangle-fill"></i> ' + msg).show();
+            toastr.error(msg);
+            $btn.prop('disabled', false)
+                .html('<i class="bi bi-envelope-exclamation-fill"></i> Run Check &amp; Send Alert');
+        });
+    });
+
+    /* Also close alert modal on Escape */
+    $(document).off('keydown.rcp').on('keydown.rcp', function(e) {
+        if (e.key === 'Escape') {
+            closeUploadModal();
+            resetUploadFormState();
+            closeFilterModal();
+            closeCmpModal();
+            closeAlertModal();
+        }
+    });
 })(window.jQuery);
 </script>
 

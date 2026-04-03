@@ -1,5 +1,10 @@
 @forelse($records as $r)
-<tr>
+<tr class="rcp-row-clickable"
+    data-id="{{ $r->id }}"
+    data-location="{{ e($r->location ?? '') }}"
+    data-date="{{ $r->pickup_date_parsed ? $r->pickup_date_parsed->format('Y-m-d') : '' }}"
+    style="cursor:pointer;"
+    title="Click to compare with Branch Report &amp; Bank Statement">
   <td class="sno-cell">{{ $r->sno ?? '—' }}</td>
   <td style="white-space:nowrap;">
     <span style="font-size:.78rem;font-weight:700;color:var(--text);">{{ $r->pickup_date ?? '—' }}</span>

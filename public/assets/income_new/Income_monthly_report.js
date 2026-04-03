@@ -1524,16 +1524,36 @@ $(document).on('mouseleave', '.custom-tooltip', function () {
     $(this).hide();
 });
 
+function buildDownloadParams() {
+    let params = new URLSearchParams();
+
+    // Date range
+    params.set('datefiltervalue', $('#dateallviews').text());
+
+    // Zone multi-select values (stored in jQuery data)
+    let zoneVals = $('#izone_views').data('values') || [];
+    if (!Array.isArray(zoneVals)) zoneVals = [];
+    zoneVals.forEach(function(z) { if (z) params.append('zones[]', z.trim()); });
+
+    // Branch multi-select values
+    let branchVals = $('#ibranch_views').data('values') || [];
+    if (!Array.isArray(branchVals)) branchVals = [];
+    branchVals.forEach(function(b) { if (b) params.append('branches[]', b.trim()); });
+
+    return params;
+}
+
 $('#downloadExcelBtn').on('click', function (e) {
     e.preventDefault();
+    let params = buildDownloadParams();
+    params.set('format', 'xlsx');
+    window.location.href = downloadIncomeUrl + "?" + params.toString();
+});
 
-    let datefiltervalue = $('#dateallviews').text();
-    let filterRemoveData = fitterremovedata;
-
-    let params = new URLSearchParams();
-    params.set('datefiltervalue', datefiltervalue);
-    params.set('filterRemoveData', filterRemoveData);
-
+$('#downloadCsvBtn').on('click', function (e) {
+    e.preventDefault();
+    let params = buildDownloadParams();
+    params.set('format', 'csv');
     window.location.href = downloadIncomeUrl + "?" + params.toString();
 });
 $(document).on("click",".remark-preview-icon, .preview-file, .file-item, .file-list li",function () {

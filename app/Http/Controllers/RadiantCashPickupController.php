@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BankStatement;
+use App\Models\BranchFinancialReport;
 use App\Models\RadiantCashPickup;
 use App\Models\TblLocationModel;
 use App\Models\TblZonesModel;
+use App\Services\RadiantMismatchService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,6 +40,37 @@ class RadiantCashPickupController extends Controller
         if ($request->filled('location')) {
             $query->where('location', $request->location);
         }
+
+        // Zone / Branch filters (from Location Master)
+        if ($request->filled('branch_id')) {
+            $branch = TblLocationModel::find((int) $request->branch_id);
+            if ($branch) {
+                $branchName = trim($branch->name);
+                $query->where(function ($q) use ($branchName) {
+                    $q->whereRaw('LOWER(TRIM(location)) = LOWER(?)', [$branchName])
+                      ->orWhere('location', 'like', '%' . $branchName . '%');
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        } elseif ($request->filled('zone_id')) {
+            $zid = (int) $request->zone_id;
+            if ($zid > 0) {
+                $branches = TblLocationModel::where('zone_id', $zid)->get();
+                if ($branches->count()) {
+                    $query->where(function ($q) use ($branches) {
+                        foreach ($branches as $b) {
+                            $bn = trim($b->name);
+                            $q->orWhereRaw('LOWER(TRIM(location)) = LOWER(?)', [$bn])
+                              ->orWhere('location', 'like', '%' . $bn . '%');
+                        }
+                    });
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            }
+        }
+
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -71,6 +105,71 @@ class RadiantCashPickupController extends Controller
         ];
     }
 
+    /**
+     * Return zones (and optionally branches) that have at least one matching
+     * record in radiant_cash_pickups, respecting optional state / zone_id context.
+     * Used both by index() and by the AJAX filter-options endpoint.
+     */
+    protected function zonesWithData(string $state = ''): \Illuminate\Support\Collection
+    {
+        $sql = "
+            SELECT DISTINCT z.id, z.name
+            FROM tblzones z
+            INNER JOIN tbl_locations l ON l.zone_id = z.id
+            INNER JOIN radiant_cash_pickups r ON (
+                LOWER(TRIM(r.location)) = LOWER(TRIM(l.name))
+                OR r.location LIKE CONCAT('%', l.name, '%')
+            )
+            " . ($state !== '' ? "WHERE r.state_name = ?" : "") . "
+            ORDER BY z.name
+        ";
+        $rows = $state !== ''
+            ? DB::select($sql, [$state])
+            : DB::select($sql);
+
+        return collect($rows);
+    }
+
+    protected function branchesWithData(int $zoneId, string $state = ''): \Illuminate\Support\Collection
+    {
+        $params = [$zoneId];
+        $stateClause = '';
+        if ($state !== '') {
+            $stateClause = 'AND r.state_name = ?';
+            $params[] = $state;
+        }
+        $sql = "
+            SELECT DISTINCT l.id, l.name
+            FROM tbl_locations l
+            INNER JOIN radiant_cash_pickups r ON (
+                LOWER(TRIM(r.location)) = LOWER(TRIM(l.name))
+                OR r.location LIKE CONCAT('%', l.name, '%')
+            )
+            WHERE l.zone_id = ? {$stateClause}
+            ORDER BY l.name
+        ";
+        return collect(DB::select($sql, $params));
+    }
+
+    /**
+     * AJAX: return filter option lists (zones / branches) based on actual table data.
+     * GET /radiant-cash-pickup/filter-options?state=X&zone_id=Y
+     */
+    public function getFilterOptions(Request $request)
+    {
+        $state  = trim($request->get('state', ''));
+        $zoneId = (int) $request->get('zone_id', 0);
+
+        $zones    = $this->zonesWithData($state);
+        $branches = $zoneId > 0 ? $this->branchesWithData($zoneId, $state) : collect();
+
+        return response()->json([
+            'success'  => true,
+            'zones'    => $zones->map(fn ($z) => ['id' => $z->id, 'name' => $z->name])->values(),
+            'branches' => $branches->map(fn ($b) => ['id' => $b->id, 'name' => $b->name])->values(),
+        ]);
+    }
+
     public function index(Request $request)
     {
         $admin = Auth::user();
@@ -87,25 +186,30 @@ class RadiantCashPickupController extends Controller
         $stats = $this->computeFilteredStats(clone $base);
 
         $states = RadiantCashPickup::distinct()->orderBy('state_name')->pluck('state_name')->filter()->values();
-        $zones = TblZonesModel::orderBy('name')->get();
+
+        // Only show zones that have actual matching records in the pickup table
+        $selectedState = trim($request->get('state', ''));
+        $zones = $this->zonesWithData($selectedState);
+
+        // Only show branches for the selected zone that have actual data
         $branchesForFilter = collect();
         if ($request->filled('zone_id')) {
             $zid = (int) $request->zone_id;
             if ($zid > 0) {
-                $branchesForFilter = TblLocationModel::where('zone_id', $zid)->orderBy('name')->get();
+                $branchesForFilter = $this->branchesWithData($zid, $selectedState);
             }
         }
 
         return view('Radiant.radiant_cash_pickup', [
-            'admin' => $admin,
-            'records' => $records,
-            'totalAmount' => $stats['total_amount'],
-            'totalRecords' => $stats['total_records'],
-            'totalBatches' => $stats['total_batches'],
-            'locationsCount' => $stats['locations_count'],
-            'states' => $states,
-            'zones' => $zones,
-            'branchesForFilter' => $branchesForFilter,
+            'admin'            => $admin,
+            'records'          => $records,
+            'totalAmount'      => $stats['total_amount'],
+            'totalRecords'     => $stats['total_records'],
+            'totalBatches'     => $stats['total_batches'],
+            'locationsCount'   => $stats['locations_count'],
+            'states'           => $states,
+            'zones'            => $zones,
+            'branchesForFilter'=> $branchesForFilter,
         ]);
     }
 
@@ -257,13 +361,187 @@ class RadiantCashPickupController extends Controller
             DB::table('radiant_cash_pickups')->insert($chunk);
         }
 
-        $message = "✓ Upload complete! {$inserted} rows inserted from \"{$fileName}\" (Batch: {$batchId}). {$skipped} rows skipped.";
+        $uploadMsg = "✓ Upload complete! {$inserted} rows inserted from \"{$fileName}\" (Batch: {$batchId}). {$skipped} rows skipped.";
+
+        /* ── Auto mismatch check for every unique date in this upload ── */
+        $alertSummaries = [];
+        if ($inserted > 0) {
+            // Collect distinct dates from the uploaded data (ignore nulls)
+            $uploadedDates = array_values(array_unique(array_filter(
+                array_column($dataRows, 'pickup_date_parsed')
+            )));
+
+            $triggeredBy = auth()->user()->user_fullname
+                        ?? auth()->user()->name
+                        ?? 'Upload';
+
+            $service = app(RadiantMismatchService::class);
+
+            foreach ($uploadedDates as $date) {
+                $alertSummaries[] = $service->checkAndAlert($date, $triggeredBy);
+            }
+        }
+
+        /* Build a combined message */
+        $alertMsg = '';
+        if (!empty($alertSummaries)) {
+            $totalMismatch = array_sum(array_column($alertSummaries, 'mismatch'));
+            $datesChecked  = count($alertSummaries);
+
+            if ($totalMismatch === 0) {
+                $alertMsg = " | ✓ Mismatch check: all records matched across {$datesChecked} date(s) — no alert sent.";
+            } else {
+                $emailsSent = count(array_filter($alertSummaries, fn ($r) => $r['email_sent']));
+                $alertMsg   = " | ⚠ {$totalMismatch} mismatch(es) found across {$datesChecked} date(s) — alert email sent ({$emailsSent} email(s) dispatched).";
+            }
+        }
+
+        $message = $uploadMsg . $alertMsg;
 
         if ($request->ajax() || $request->wantsJson()) {
-            return response()->json(['success' => true, 'message' => $message]);
+            return response()->json([
+                'success'         => true,
+                'message'         => $message,
+                'alert_summaries' => $alertSummaries,
+            ]);
         }
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * AJAX: Compare one pickup row against Branch Financial Report and Bank Statement.
+     */
+    public function compare(Request $request, int $id)
+    {
+        $pickup = RadiantCashPickup::find($id);
+        if (! $pickup) {
+            return response()->json(['success' => false, 'message' => 'Record not found.'], 404);
+        }
+
+        $locationName = trim($pickup->location ?? '');
+        $pickupDate   = $pickup->pickup_date_parsed; // Carbon date or null
+        // dd($locationName,$pickupDate);
+        // ── Find matching TblLocation using multiple strategies ──────────────
+        $tblLocation = null;
+        if ($locationName) {
+            // 1) Exact case-insensitive + trim
+            $tblLocation = TblLocationModel::whereRaw('LOWER(TRIM(name)) = LOWER(?)', [$locationName])->first();
+            // dd($tblLocation);
+            // 2) Pickup location LIKE '%branch_name%'
+            if (! $tblLocation) {
+                $tblLocation = TblLocationModel::whereRaw('LOWER(TRIM(?)) LIKE CONCAT(\'%\', LOWER(TRIM(name)), \'%\')', [$locationName])->first();
+            }
+
+            // 3) Branch name contains pickup location word
+            if (! $tblLocation) {
+                $tblLocation = TblLocationModel::where('name', 'like', '%' . $locationName . '%')->first();
+            }
+
+            // 4) Fuzzy: any branch whose name shares the first word with pickup location
+            if (! $tblLocation) {
+                $firstWord = explode(' ', $locationName)[0];
+                if (strlen($firstWord) > 3) {
+                    $tblLocation = TblLocationModel::where('name', 'like', '%' . $firstWord . '%')->first();
+                }
+            }
+        }
+        // dd($tblLocation,$pickupDate);
+        // ── Branch Financial Reports ─────────────────────────────────────────
+        // If pickup date falls on Monday, also pull Friday/Sat/Sun reports
+        // (weekend cash is handed to Radiant on Monday)
+        $branchReports = [];
+        $bfrDateFrom   = null;
+        $bfrDateTo     = null;
+        if ($tblLocation && $pickupDate) {
+            $pd          = Carbon::parse($pickupDate);
+            $bfrDateFrom = $pd->toDateString();
+            $bfrDateTo   = $pd->toDateString();
+
+            $branchReports = BranchFinancialReport::where('branch_id', $tblLocation->id)
+                ->whereBetween('report_date', [$bfrDateFrom, $bfrDateTo])
+                ->with(['branch', 'zone'])
+                ->orderBy('radiant_collected_date')
+                ->get()
+                ->map(function ($r) {
+                    return [
+                        'id'                            => $r->id,
+                        'report_date'                   => optional($r->report_date)->format('d-m-Y'),
+                        'branch_name'                   => optional($r->branch)->name,
+                        'zone_name'                     => optional($r->zone)->name,
+                        'radiant_collection_amount'     => (float) ($r->radiant_collection_amount ?? 0),
+                        'radiant_collected_date'        => optional($r->radiant_collected_date)->format('d-m-Y'),
+                        'radiant_not_collected'         => (bool) $r->radiant_not_collected,
+                        'radiant_not_collected_remarks' => $r->radiant_not_collected_remarks,
+                        'overall_approval_status'       => $r->overall_approval_status,
+                        'overall_approval_label'        => $r->overall_approval_status_label,
+                    ];
+                })
+                ->toArray();
+        }
+
+        // ── Bank Statement: description LIKE '%BY CASH%{location}%' ─────────
+        // transaction_date is stored as "04/Feb/2026" string — use STR_TO_DATE in raw SQL
+        // to avoid Carbon cast failures. We also skip Eloquent's date cast by using DB::table.
+        $bankEntries = [];
+        if ($locationName && $pickupDate) {
+            $pd      = Carbon::parse($pickupDate);
+            $bkFrom  = $pd->copy()->subDays(1)->toDateString();
+            $bkTo    = $pd->copy()->addDays(1)->toDateString();
+
+            $rows = DB::table('bank_statements')
+                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo])
+                ->where(function ($q) use ($locationName) {
+                    $q->where('description', 'like', '%BY CASH%' . $locationName . '%')
+                      ->orWhere('description', 'like', '%BYCASH%' . $locationName . '%');
+                })
+                ->orderBy('transaction_date')
+                ->get();
+
+            $bankEntries = $rows->map(function ($b) {
+                return [
+                    'id'               => $b->id,
+                    'transaction_date' => $b->transaction_date, // raw string e.g. "04/Feb/2026"
+                    'description'      => $b->description,
+                    'deposit'          => (float) ($b->deposit ?? 0),
+                    'withdrawal'       => (float) ($b->withdrawal ?? 0),
+                    'reference_number' => $b->reference_number ?? '',
+                    'match_status'     => $b->match_status ?? '',
+                ];
+            })->toArray();
+        }
+
+        $bfrTotalAmt = array_sum(array_column($branchReports, 'radiant_collection_amount'));
+
+        return response()->json([
+            'success'        => true,
+            'pickup'         => [
+                'id'             => $pickup->id,
+                'pickup_date'    => $pickup->pickup_date,
+                'location'       => $pickup->location,
+                'region'         => $pickup->region,
+                'state_name'     => $pickup->state_name,
+                'pickup_amount'  => (float) ($pickup->pickup_amount ?? 0),
+                'hci_slip_no'    => $pickup->hci_slip_no,
+                'deposit_mode'   => $pickup->deposit_mode,
+                'point_id'       => $pickup->point_id,
+                'deposit_slip_no'=> $pickup->deposit_slip_no,
+                'difference'     => (float) ($pickup->difference ?? 0),
+                'remarks'        => $pickup->remarks,
+            ],
+            'matched_branch' => $tblLocation ? [
+                'id'      => $tblLocation->id,
+                'name'    => $tblLocation->name,
+                'zone_id' => $tblLocation->zone_id,
+                'zone'    => optional($tblLocation->zone)->name,
+                'status'  => $tblLocation->status,
+            ] : null,
+            'bfr_date_from'    => $bfrDateFrom,
+            'bfr_date_to'      => $bfrDateTo,
+            'bfr_total_amount' => (float) $bfrTotalAmt,
+            'branch_reports' => $branchReports,
+            'bank_entries'   => $bankEntries,
+        ]);
     }
 
     public function deleteBatch(Request $request)

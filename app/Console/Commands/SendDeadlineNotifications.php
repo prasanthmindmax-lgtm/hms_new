@@ -299,7 +299,7 @@ class SendDeadlineNotifications extends Command
         Log::info("[DeadlineNotify][SMS] Sending to {$mobile}", [
             'type' => $type, 'number' => $number, 'template_msg' => $templateMsg,
         ]);
-
+        $this->info("finalUrl: ".$finalUrl);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $finalUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

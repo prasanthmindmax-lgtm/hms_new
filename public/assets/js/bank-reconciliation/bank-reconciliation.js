@@ -1247,10 +1247,11 @@ $(document).ready(function() {
                 if (created) msg += created + ' record(s) created. ';
                 if (updated) msg += updated + ' record(s) updated.';
                 toastr.success((msg || 'Income tag applied — ') + 'Linked for: ' + modes.map(function (m) { return m.toUpperCase(); }).join(', '));
+                $btn.prop('disabled', false).html('<i class="bi bi-tag me-1"></i>Apply Income Tag');
+                incomeTagInFlight = false;
                 $('#matchTransactionModal').modal('hide');
                 loadStatements(currentPage);
                 updateStatistics();
-                incomeTagInFlight = false;
                 return;
             }
 

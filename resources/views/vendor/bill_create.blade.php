@@ -1141,7 +1141,7 @@
       const newRow = $('.item-row:first').clone();
 
       // Update all names with new index
-      newRow.find('input, select').each(function() {
+      newRow.find('input, select, textarea').each(function() {
         const name = $(this).attr('name');
         if (name) {
           $(this).attr('name', name.replace(/\[\d+\]/, '[' + rowCount + ']'));
@@ -1184,7 +1184,7 @@
     // Reindex all rows to maintain consecutive numbering
     function reindexRows() {
       $('.item-row').each(function(index) {
-        $(this).find('input, select').each(function() {
+        $(this).find('input, select, textarea').each(function() {
           const name = $(this).attr('name');
           if (name) {
             $(this).attr('name', name.replace(/\[\d+\]/, '[' + index + ']'));
@@ -3624,9 +3624,11 @@ function calculateFinalTotals() {
                         $('#bill_category').val(bill_header[0].bill_category);
                         if (bill_header[0].quotation_id && bill_header[0].Quotation) {
                             $('#quotation_against_display').val(bill_header[0].Quotation.quotation_gen_no || bill_header[0].Quotation.quotation_no || '');
+                            $('#quotation_id').val(bill_header[0].quotation_id);
                         }
                         if (bill_header[0].purchase_id && bill_header[0].Purchase) {
                             $('#po_against_display').val(bill_header[0].Purchase.purchase_gen_order || bill_header[0].Purchase.purchase_order_number || '');
+                            $('#purchase_id').val(bill_header[0].purchase_id);
                         }
 
                         let isFirst = true;
@@ -3672,6 +3674,17 @@ function calculateFinalTotals() {
                               maximumFractionDigits: 2
                             });
                       }
+                      // ESI / PF / Others – set inputs synchronously so they are ready at 300ms
+                      const bh = bill_header[0];
+                      $('.esi_value').val(bh.esi_value);
+                      $('.esi_type').val(bh.esi_type);
+                      $('.pf_value').val(bh.pf_value);
+                      $('.pf_type').val(bh.pf_type);
+                      $('.other_value').val(bh.other_value);
+                      $('.other_type').val(bh.other_type);
+                      $('.other_reason').val(bh.other_reason);
+
+                      // 150ms: set discount/tax/adjustment/export/loading from DB
                       setTimeout(() => {
                         if (bill_header.length > 0) {
                           const qh = bill_header[0];
@@ -3679,14 +3692,12 @@ function calculateFinalTotals() {
                             $('.discount-toggle').trigger('click');
                           }
                           $('.discount-percent').val(qh.discount_percent).trigger('change');
-                          $('.discount-amount').text(formatCurrency(qh.discount_amount));
-                          $('.adjustment-amount').text(formatCurrency(qh.adjustment_value));
-                          $('.tax-amount').text(formatCurrency(qh.tax_amount));
-                          $('.grand-total-amount').text(formatCurrency(qh.grand_total_amount));
+                          $('.discount_type').val(qh.discount_type);
                           $('.adjustment-value').val(qh.adjustment_value).trigger('change');
                           $('.adjustment-reason').val(qh.adjustment_reason);
                           $('.export_name').val(qh.export_name);
                           $('.export_amount').val(qh.export_amount);
+                          const fmtAmt = (n) => '₹' + (parseFloat(n)||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                           $('.loading_unloading_name').val(qh.loading_unloading_name || '');
                           $('.loading_unloading_amount').val(qh.loading_unloading_amount || '');
                           if (qh.tax_type === "TDS") {
@@ -3694,15 +3705,46 @@ function calculateFinalTotals() {
                             $('.tax-search-input').val(qh.tax_name);
                             $('.selected-tds-tax').val(qh.tax_rate).trigger('change');
                             $('.tds-tax-id').val(qh.tds_tax_id);
+                          } else if (qh.tax_type === "TCS") {
+                            $('input[name="tax_type"][value="TCS"]').prop('checked', true).trigger('change');
+                            $('.tax-tcs-search-input').val(qh.tax_name);
+                            $('.selected-tcs-tax').val(qh.tax_rate).trigger('change');
+                            $('.tcs-tax-id').val(qh.tcs_tax_id);
                           }
-                          calculateFinalTotals();
+                          if (typeof checkRequiredFields === 'function') checkRequiredFields();
                         }
-                      }, 100); // Adjust delay if needed
+                      }, 150);
+
+                      // 300ms: recompute totals AFTER rows + discount/tax are all set
+                      setTimeout(() => {
+                        const qh = bill_header[0];
+                        const subTotalNow = (typeof calculateSubTotal === 'function') ? (calculateSubTotal() || 0) : 0;
+                        const esiVal   = parseFloat(qh.esi_value)   || 0;
+                        const esiType  = qh.esi_type   || 'fixed';
+                        const pfVal    = parseFloat(qh.pf_value)    || 0;
+                        const pfType   = qh.pf_type    || 'fixed';
+                        const otherVal = parseFloat(qh.other_value) || 0;
+                        const otherType = qh.other_type || 'fixed';
+                        const esiAmt   = (esiType === 'percent')   ? (subTotalNow * esiVal / 100)   : esiVal;
+                        const pfAmt    = (pfType  === 'percent')   ? (subTotalNow * pfVal  / 100)   : pfVal;
+                        const otherAmt = (otherType === 'percent') ? (subTotalNow * otherVal / 100) : otherVal;
+                        $('.esi-row').attr('data-esi', esiAmt);
+                        $('.pf-row').attr('data-pf', pfAmt);
+                        $('.other-row').attr('data-other', otherAmt);
+                        const fmtAmt = (n) => '₹' + (parseFloat(n)||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        if (esiAmt > 0) { $('.esi-row').show(); $('.esi-display-amount').text(fmtAmt(esiAmt)); }
+                        if (pfAmt  > 0) { $('.pf-row').show();  $('.pf-display-amount').text(fmtAmt(pfAmt)); }
+                        if (otherAmt > 0) { $('.other-row').show(); $('.other-display-amount').text(fmtAmt(otherAmt)); }
+                        if (typeof gstcalculate === 'function') gstcalculate($('.item-row:first'));
+                        if (typeof calculateFinalTotals === 'function') calculateFinalTotals();
+                      }, 300);
 
                       $('#notes').val(bill_header[0].note);
 
                         // From server
-                        window.existingFiles = JSON.parse(bill_header[0].documents); // array of strings
+                        try {
+                            window.existingFiles = JSON.parse(bill_header[0].documents || '[]') || [];
+                        } catch(e) { window.existingFiles = []; }
                         window.selectedFiles = []; // New files chosen
                         $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                         // Render existing files
@@ -3878,7 +3920,9 @@ function calculateFinalTotals() {
                       $('#notes').val(bill_header[0].note);
 
                         // From server
-                        window.existingFiles = JSON.parse(bill_header[0].documents); // array of strings
+                        try {
+                            window.existingFiles = JSON.parse(bill_header[0].documents || '[]') || [];
+                        } catch(e) { window.existingFiles = []; }
                         window.selectedFiles = []; // New files chosen
                         $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                         // Render existing files

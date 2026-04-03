@@ -21,14 +21,16 @@ class IncomeReconciliationMonthlyExport implements
     WithEvents,
     ShouldAutoSize
 {
-    protected $filter;
     protected $dateRange;
+    protected $zones;
+    protected $branches;
     protected $rows;
 
-    public function __construct($filter, $dateRange)
+    public function __construct($dateRange, array $zones = [], array $branches = [])
     {
-        $this->filter = $filter;
         $this->dateRange = $dateRange;
+        $this->zones     = $zones;
+        $this->branches  = $branches;
     }
 
     /* =====================================================
@@ -87,25 +89,13 @@ class IncomeReconciliationMonthlyExport implements
         /* ===============================
         * FILTERS
         * =============================== */
-          // ZONE FILTER
-          preg_match("/tblzones\.name='([^']+)'/", $this->filter, $zone);
-          $zones = !empty($zone[1])
-              ? array_map('trim', explode(',', $zone[1]))
-              : [];
+        if (!empty($this->zones)) {
+            $query->whereIn('zone_name', $this->zones);
+        }
 
-          if ($zones) {
-              $query->whereIn('zone_name', $zones);
-          }
-
-          // LOCATION FILTER
-          preg_match("/tbl_locations\.name='([^']+)'/", $this->filter, $loc);
-          $locations = !empty($loc[1])
-              ? array_map('trim', explode(',', $loc[1]))
-              : [];
-
-          if ($locations) {
-              $query->whereIn('location_name', $locations);
-          }
+        if (!empty($this->branches)) {
+            $query->whereIn('location_name', $this->branches);
+        }
 
 
         /* ===============================

@@ -101,6 +101,72 @@ use TCPDF;
 
 class VendorController extends Controller
 {
+    /**
+     * Normalize a bill / PO / quotation line from request data.
+     * Returns null for empty new rows (skip insert). Coerces quantity/rate for NOT NULL columns.
+     * Uses account_name or account for the stored account label.
+     *
+     * @return array{line_id: int|string|null, columns: array<string, mixed>}|null
+     */
+    private function prepareVendorLinePayload(array $linesData): ?array
+    {
+        $rawId = $linesData['id'] ?? null;
+        $hasId = $rawId !== null && $rawId !== '' && !(is_string($rawId) && trim($rawId) === '');
+
+        $itemDetails = isset($linesData['item_details']) ? trim((string) $linesData['item_details']) : '';
+
+        $q = $linesData['quantity'] ?? null;
+        if ($q === '') {
+            $q = null;
+        }
+
+        if (! $hasId) {
+            if ($itemDetails === '' && $q === null) {
+                return null;
+            }
+        }
+
+        $quantity = $q === null ? (($itemDetails !== '') ? 1.0 : 0.0) : (float) $q;
+
+        $r = $linesData['rate'] ?? null;
+        if ($r === '' || $r === null) {
+            $rate = 0.0;
+        } else {
+            $rate = (float) $r;
+        }
+
+        $account = $linesData['account_name'] ?? $linesData['account'] ?? null;
+        if (is_string($account)) {
+            $account = trim($account) === '' ? null : $account;
+        }
+
+        $accountId = $linesData['account_id'] ?? null;
+        if ($accountId === '') {
+            $accountId = null;
+        }
+
+        $columns = [
+            'item_details' => $itemDetails !== '' ? $itemDetails : null,
+            'account' => $account,
+            'account_id' => $accountId,
+            'quantity' => $quantity,
+            'rate' => $rate,
+            'customer' => $linesData['customer'] ?? null,
+            'gst_name' => $linesData['gst_name'] ?? null,
+            'gst_rate' => $linesData['gst_tax_selected'] ?? null,
+            'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
+            'gst_type' => $linesData['gst_tax_type'] ?? null,
+            'cgst_amount' => $linesData['cgst_amount'] ?? null,
+            'sgst_amount' => $linesData['sgst_amount'] ?? null,
+            'gst_amount' => $linesData['gst_amount'] ?? null,
+            'amount' => $linesData['amount'] ?? null,
+        ];
+
+        return [
+            'line_id' => $hasId ? $rawId : null,
+            'columns' => $columns,
+        ];
+    }
 
     public function getcustomer()
     {
@@ -1692,7 +1758,7 @@ public function statementprint(Request $request, $id)
         $billcategories = BillCategory::orderBy('name', 'asc')->get();
 
         if ($id !== "") {
-            $bill = Tblbill::with(['TblBilling', 'BillLines', 'Tblvendor'])->where('delete_status',0)->where('id',$id)->get();
+            $bill = Tblbill::with(['TblBilling', 'BillLines', 'Tblvendor', 'Quotation', 'Purchase'])->where('delete_status',0)->where('id',$id)->get();
             if($type == 'edit'){
                 return view('vendor.bill_create', compact(
                     'admin','locations','vendor','customer',
@@ -1980,12 +2046,12 @@ public function statementprint(Request $request, $id)
         if (!$isUpdate) {
             $data['updated_at'] = $now;
         }
-        if($request->quotation_id !==""){
+        if ($request->filled('quotation_id')) {
             TblQuotation::where('id', $request->quotation_id)->update([
                     'bill_status' => 1
                 ]);
         }
-        if($request->purchase_id !==""){
+        if ($request->filled('purchase_id')) {
             TblPurchaseorder::where('id', $request->purchase_id)->update([
                     'bill_status' => 1
                 ]);
@@ -2025,10 +2091,19 @@ public function statementprint(Request $request, $id)
             $data['bill_gen_number'] = $request->bill_gen_number;
             $bill = Tblbill::findOrFail($request->id);
             $grandTotal = (float) $this->cleanCurrency($request->grand_total_amount);
-            $partial    = (float) $bill->partially_payment;
+            $partial    = (float) ($bill->partially_payment ?? 0);
 
             $balanceamount = $grandTotal - $partial;
-            $data['balance_amount'] = $balanceamount;
+            $data['balance_amount'] = max(0, $balanceamount);
+
+            // Recalculate bill_status based on updated grand_total vs payments made
+            if ($balanceamount <= 0) {
+                $data['bill_status'] = 'Paid';
+            } elseif ($partial > 0) {
+                $data['bill_status'] = 'Partially Payed';
+            } else {
+                $data['bill_status'] = 'Due to Pay';
+            }
             // ── Append to edit_history JSON column ──
             $existingHistory = json_decode($bill->edit_history ?? '[]', true) ?: [];
             $roles = [1=>'Superadmin',2=>'Zonal Admin',3=>'Admin',4=>'Auditor',5=>'User'];
@@ -2054,9 +2129,17 @@ public function statementprint(Request $request, $id)
                 TblVendorHistory::create($history);
             }
             $bill_id = $bill->id;
-            $incomingLineIds = collect($request->linesdata)
-                ->pluck('id')
+            $incomingLineIds = collect($request->linesdata ?? [])
+                ->map(function ($row) {
+                    if (! is_array($row)) {
+                        return null;
+                    }
+                    $p = $this->prepareVendorLinePayload($row);
+
+                    return $p['line_id'] ?? null;
+                })
                 ->filter()
+                ->values()
                 ->toArray();
             // Delete removed rows
             TblBillLines::where('bill_id', $bill_id)
@@ -2066,31 +2149,24 @@ public function statementprint(Request $request, $id)
             // Update or insert contact persons
             if ($request->has('linesdata')) {
                 foreach ($request->linesdata as $linesData) {
-                    $linesDatas = [
+                    if (! is_array($linesData)) {
+                        continue;
+                    }
+                    $prepared = $this->prepareVendorLinePayload($linesData);
+                    if ($prepared === null) {
+                        continue;
+                    }
+                    $linesDatas = array_merge($prepared['columns'], [
                         'bill_id' => $bill_id,
-                        'item_details' => $linesData['item_details'] ?? null,
-                        'account' => $linesData['account_name'] ?? null,
-                        'account_id' => $linesData['account_id'] ?? null,
-                        'quantity' => $linesData['quantity'] ?? null,
-                        'rate' => $linesData['rate'] ?? null,
-                        'customer' => $linesData['customer'] ?? null,
-                        'gst_name' => $linesData['gst_name'] ?? null,
-                        'gst_rate' => $linesData['gst_tax_selected'] ?? null,
-                        'gst_type' => $linesData['gst_tax_type'] ?? null,
-                        'cgst_amount' => $linesData['cgst_amount'] ?? null,
-                        'sgst_amount' => $linesData['sgst_amount'] ?? null,
-                        'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
-                        'gst_amount' => $linesData['gst_amount'] ?? null,
-                        'amount' => $linesData['amount'] ?? null,
                         'updated_at' => $now,
-                    ];
+                    ]);
 
-                    if (!empty($linesData['id'])) {
-                        TblBillLines::where('id', $linesData['id'])
+                    if (! empty($prepared['line_id'])) {
+                        TblBillLines::where('id', $prepared['line_id'])
                             ->where('bill_id', $bill_id)
                             ->update($linesDatas);
                     } else {
-                        $contactValues['created_at'] = $now;
+                        $linesDatas['created_at'] = $now;
                         TblBillLines::create($linesDatas);
                     }
                 }
@@ -2123,24 +2199,18 @@ public function statementprint(Request $request, $id)
                 // dd($vendor_id);
             if ($request->has('linesdata')) {
                 foreach ($request->linesdata as $linesData) {
-                    TblBillLines::create([
+                    if (! is_array($linesData)) {
+                        continue;
+                    }
+                    $prepared = $this->prepareVendorLinePayload($linesData);
+                    if ($prepared === null) {
+                        continue;
+                    }
+                    $linesDatas = array_merge($prepared['columns'], [
                         'bill_id' => $bill_id,
-                        'item_details' => $linesData['item_details'] ?? null,
-                        'account' => $linesData['account_name'] ?? null,
-                        'account_id' => $linesData['account_id'] ?? null,
-                        'quantity' => $linesData['quantity'] ?? null,
-                        'rate' => $linesData['rate'] ?? null,
-                        'customer' => $linesData['customer'] ?? null,
-                        'gst_name' => $linesData['gst_name'] ?? null,
-                        'gst_rate' => $linesData['gst_tax_selected'] ?? null,
-                        'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
-                        'gst_type' => $linesData['gst_tax_type'] ?? null,
-                        'cgst_amount' => $linesData['cgst_amount'] ?? null,
-                        'sgst_amount' => $linesData['sgst_amount'] ?? null,
-                        'gst_amount' => $linesData['gst_amount'] ?? null,
-                        'amount' => $linesData['amount'] ?? null,
                         'created_at' => $now,
                     ]);
+                    TblBillLines::create($linesDatas);
                 }
             }
 
@@ -3126,9 +3196,8 @@ public function getpurchaseorder(Request $request)
     }
 
     function cleanCurrency($value) {
-        // Remove ₹, commas, and optional decimal part
-        $clean = str_replace(['₹', ',', '-'], '', $value);
-        return (int) floatval($clean);
+        $clean = str_replace(['₹', ','], '', $value);
+        return round(floatval($clean), 2);
     }
      public function savepurchaseorder(Request $request)
     {
@@ -3202,7 +3271,7 @@ public function getpurchaseorder(Request $request)
         if (!$isUpdate) {
             $data['updated_at'] = $now;
         }
-        if($request->quotation_id !==""){
+        if ($request->filled('quotation_id')) {
                 TblQuotation::where('id', $request->quotation_id)->update([
                         'po_status' => 1
                     ]);
@@ -3240,6 +3309,9 @@ public function getpurchaseorder(Request $request)
         if ($isUpdate) {
              $data['purchase_gen_order'] = $request->purchase_gen_order;
             $purchaseorder = TblPurchaseorder::findOrFail($request->id);
+            $grandTotal = (float) $this->cleanCurrency($request->grand_total_amount);
+            $partial    = (float) ($purchaseorder->partially_payment ?? 0);
+            $data['balance_amount'] = max(0, $grandTotal - $partial);
 
             // ── Append to edit_history JSON column ──
             $existingHistory = json_decode($purchaseorder->edit_history ?? '[]', true) ?: [];
@@ -3272,9 +3344,17 @@ public function getpurchaseorder(Request $request)
                 TblVendorHistory::create($history);
             }
             $purchaseorder_id = $purchaseorder->id;
-            $incomingLineIds = collect($request->linesdata)
-                ->pluck('id')
+            $incomingLineIds = collect($request->linesdata ?? [])
+                ->map(function ($row) {
+                    if (! is_array($row)) {
+                        return null;
+                    }
+                    $p = $this->prepareVendorLinePayload($row);
+
+                    return $p['line_id'] ?? null;
+                })
                 ->filter()
+                ->values()
                 ->toArray();
             // Delete removed rows
             TblPurchaseorderLines::where('purchase_order_id', $purchaseorder_id)
@@ -3284,31 +3364,24 @@ public function getpurchaseorder(Request $request)
             // Update or insert contact persons
             if ($request->has('linesdata')) {
                 foreach ($request->linesdata as $linesData) {
-                    $linesDatas = [
+                    if (! is_array($linesData)) {
+                        continue;
+                    }
+                    $prepared = $this->prepareVendorLinePayload($linesData);
+                    if ($prepared === null) {
+                        continue;
+                    }
+                    $linesDatas = array_merge($prepared['columns'], [
                         'purchase_order_id' => $purchaseorder_id,
-                        'item_details' => $linesData['item_details'] ?? null,
-                        'account' => $linesData['account_name'] ?? null,
-                        'account_id' => $linesData['account_id'] ?? null,
-                        'quantity' => $linesData['quantity'] ?? null,
-                        'rate' => $linesData['rate'] ?? null,
-                        'customer' => $linesData['customer'] ?? null,
-                        'gst_name' => $linesData['gst_name'] ?? null,
-                        'gst_rate' => $linesData['gst_tax_selected'] ?? null,
-                        'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
-                        'gst_type' => $linesData['gst_tax_type'] ?? null,
-                        'cgst_amount' => $linesData['cgst_amount'] ?? null,
-                        'sgst_amount' => $linesData['sgst_amount'] ?? null,
-                        'gst_amount' => $linesData['gst_amount'] ?? null,
-                        'amount' => $linesData['amount'] ?? null,
                         'updated_at' => $now,
-                    ];
+                    ]);
 
-                    if (!empty($linesData['id']) && $linesData['id']!==null) {
-                        TblPurchaseorderLines::where('id', $linesData['id'])
+                    if (! empty($prepared['line_id'])) {
+                        TblPurchaseorderLines::where('id', $prepared['line_id'])
                             ->where('purchase_order_id', $purchaseorder_id)
                             ->update($linesDatas);
                     } else {
-                        $contactValues['created_at'] = $now;
+                        $linesDatas['created_at'] = $now;
                         TblPurchaseorderLines::create($linesDatas);
                     }
                 }
@@ -3339,24 +3412,18 @@ public function getpurchaseorder(Request $request)
             $purchaseorder_id = $purchaseorder->id;
             if ($request->has('linesdata')) {
                 foreach ($request->linesdata as $linesData) {
-                    TblPurchaseorderLines::create([
+                    if (! is_array($linesData)) {
+                        continue;
+                    }
+                    $prepared = $this->prepareVendorLinePayload($linesData);
+                    if ($prepared === null) {
+                        continue;
+                    }
+                    $linesDatas = array_merge($prepared['columns'], [
                         'purchase_order_id' => $purchaseorder_id,
-                        'item_details' => $linesData['item_details'] ?? null,
-                        'account' => $linesData['account_name'] ?? null,
-                        'account_id' => $linesData['account_id'] ?? null,
-                        'quantity' => $linesData['quantity'] ?? null,
-                        'rate' => $linesData['rate'] ?? null,
-                        'customer' => $linesData['customer'] ?? null,
-                        'gst_name' => $linesData['gst_name'] ?? null,
-                        'gst_rate' => $linesData['gst_tax_selected'] ?? null,
-                        'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
-                        'gst_type' => $linesData['gst_tax_type'] ?? null,
-                        'cgst_amount' => $linesData['cgst_amount'] ?? null,
-                        'sgst_amount' => $linesData['sgst_amount'] ?? null,
-                        'gst_amount' => $linesData['gst_amount'] ?? null,
-                        'amount' => $linesData['amount'] ?? null,
                         'created_at' => $now,
                     ]);
+                    TblPurchaseorderLines::create($linesDatas);
                 }
             }
 
@@ -3400,10 +3467,26 @@ public function getpurchaseorder(Request $request)
                 return response()->json(['success' => false, 'message' => 'Purchase order not found']);
             }
 
-            $emails = TblPoEmail::pluck('email')->toArray();
-            if (!$emails) {
-                return response()->json(['success' => false, 'message' => 'No recipient emails found']);
+            // Only active PO email configs (menu_type stores JSON array of menu names)
+            $poEmailConfigs = TblPoEmail::where('status', 1)
+                ->where(function ($q) {
+                    $q->where('menu_type', 'like', '%Accounts Book%')
+                      ->orWhere('menu_type', 'Accounts Book');
+                })
+                ->get();
+
+            $toEmails = $poEmailConfigs->map(fn($r) => $r->to_email ?: $r->email)
+                ->filter()->unique()->values()->toArray();
+
+            if (!$toEmails) {
+                return response()->json(['success' => false, 'message' => 'No active recipient emails found for Purchase Order']);
             }
+
+            // Merge all CC emails from all active PO configs
+            $ccEmails = $poEmailConfigs->flatMap(function ($r) {
+                $cc = is_string($r->cc_emails) ? json_decode($r->cc_emails, true) : ($r->cc_emails ?? []);
+                return is_array($cc) ? $cc : [];
+            })->filter()->unique()->values()->toArray();
 
             if ($status === "Approve") {
                 TblPurchaseorder::where('id', $approver_id)->update([
@@ -3412,8 +3495,12 @@ public function getpurchaseorder(Request $request)
                 Mail::send('vendor.emails.purchase_order', [
                     'purchase' => $purchase,
                     'status'   => 'Approved'
-                ], function ($message) use ($emails, $approver_id,$purchase) {
-                    $message->to($emails)->subject("Purchase Order #{$purchase->purchase_gen_order} Approved");
+                ], function ($message) use ($toEmails, $ccEmails, $purchase) {
+                    $message->to($toEmails)
+                            ->subject("Purchase Order #{$purchase->purchase_gen_order} Approved");
+                    if ($ccEmails) {
+                        $message->cc($ccEmails);
+                    }
                 });
 
                 return response()->json(['success' => true, 'message' => 'Approval data updated & email sent successfully!']);
@@ -3424,8 +3511,12 @@ public function getpurchaseorder(Request $request)
                 Mail::send('vendor.emails.purchase_order', [
                     'purchase' => $purchase,
                     'status'   => 'Rejected'
-                ], function ($message) use ($emails, $approver_id) {
-                    $message->to($emails)->subject("Purchase Order #{$approver_id} Rejected");
+                ], function ($message) use ($toEmails, $ccEmails, $approver_id) {
+                    $message->to($toEmails)
+                            ->subject("Purchase Order #{$approver_id} Rejected");
+                    if ($ccEmails) {
+                        $message->cc($ccEmails);
+                    }
                 });
 
                 return response()->json(['success' => true, 'message' => 'Rejected data updated & email sent successfully!']);
@@ -4579,6 +4670,9 @@ public function getquotation(Request $request)
           if ($isUpdate) {
             $data['quotation_gen_no'] = $request->quotation_gen_no;
             $quotation = TblQuotation::findOrFail($request->id);
+            $grandTotal = (float) $this->cleanCurrency($request->grand_total_amount);
+            $partial    = (float) ($quotation->partially_payment ?? 0);
+            $data['balance_amount'] = max(0, $grandTotal - $partial);
 
             // ── Append to edit_history JSON column ──
             $existingHistory = json_decode($quotation->edit_history ?? '[]', true) ?: [];
@@ -4613,9 +4707,17 @@ public function getquotation(Request $request)
                 TblVendorHistory::create($history);
             }
             $quotation_id = $quotation->id;
-            $incomingLineIds = collect($request->linesdata)
-                ->pluck('id')
+            $incomingLineIds = collect($request->linesdata ?? [])
+                ->map(function ($row) {
+                    if (! is_array($row)) {
+                        return null;
+                    }
+                    $p = $this->prepareVendorLinePayload($row);
+
+                    return $p['line_id'] ?? null;
+                })
                 ->filter()
+                ->values()
                 ->toArray();
             // Delete removed rows
             TblQuotationLines::where('quotation_id', $quotation_id)
@@ -4625,31 +4727,24 @@ public function getquotation(Request $request)
             // Update or insert contact persons
             if ($request->has('linesdata')) {
                 foreach ($request->linesdata as $linesData) {
-                    $linesDatas = [
+                    if (! is_array($linesData)) {
+                        continue;
+                    }
+                    $prepared = $this->prepareVendorLinePayload($linesData);
+                    if ($prepared === null) {
+                        continue;
+                    }
+                    $linesDatas = array_merge($prepared['columns'], [
                         'quotation_id' => $quotation_id,
-                        'item_details' => $linesData['item_details'] ?? null,
-                        'account' => $linesData['account_name'] ?? null,
-                        'account_id' => $linesData['account_id'] ?? null,
-                        'quantity' => $linesData['quantity'] ?? null,
-                        'rate' => $linesData['rate'] ?? null,
-                        'customer' => $linesData['customer'] ?? null,
-                        'gst_name' => $linesData['gst_name'] ?? null,
-                        'gst_rate' => $linesData['gst_tax_selected'] ?? null,
-                        'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
-                        'gst_type' => $linesData['gst_tax_type'] ?? null,
-                        'cgst_amount' => $linesData['cgst_amount'] ?? null,
-                        'sgst_amount' => $linesData['sgst_amount'] ?? null,
-                        'gst_amount' => $linesData['gst_amount'] ?? null,
-                        'amount' => $linesData['amount'] ?? null,
                         'updated_at' => $now,
-                    ];
+                    ]);
 
-                    if (!empty($linesData['id'])) {
-                        TblQuotationLines::where('id', $linesData['id'])
+                    if (! empty($prepared['line_id'])) {
+                        TblQuotationLines::where('id', $prepared['line_id'])
                             ->where('quotation_id', $quotation_id)
                             ->update($linesDatas);
                     } else {
-                        $contactValues['created_at'] = $now;
+                        $linesDatas['created_at'] = $now;
                         TblQuotationLines::create($linesDatas);
                     }
                 }
@@ -4680,24 +4775,18 @@ public function getquotation(Request $request)
             $quotation_id = $quotation->id;
             if ($request->has('linesdata')) {
                 foreach ($request->linesdata as $linesData) {
-                    TblQuotationLines::create([
+                    if (! is_array($linesData)) {
+                        continue;
+                    }
+                    $prepared = $this->prepareVendorLinePayload($linesData);
+                    if ($prepared === null) {
+                        continue;
+                    }
+                    $linesDatas = array_merge($prepared['columns'], [
                         'quotation_id' => $quotation_id,
-                        'item_details' => $linesData['item_details'] ?? null,
-                        'account' => $linesData['account_name'] ?? null,
-                        'account_id' => $linesData['account_id'] ?? null,
-                        'quantity' => $linesData['quantity'] ?? null,
-                        'rate' => $linesData['rate'] ?? null,
-                        'customer' => $linesData['customer'] ?? null,
-                        'gst_name' => $linesData['gst_name'] ?? null,
-                        'gst_rate' => $linesData['gst_tax_selected'] ?? null,
-                        'gst_type' => $linesData['gst_tax_type'] ?? null,
-                        'gst_tax_id' => $linesData['gst_tax_id'] ?? null,
-                        'cgst_amount' => $linesData['cgst_amount'] ?? null,
-                        'sgst_amount' => $linesData['sgst_amount'] ?? null,
-                        'gst_amount' => $linesData['gst_amount'] ?? null,
-                        'amount' => $linesData['amount'] ?? null,
                         'created_at' => $now,
                     ]);
+                    TblQuotationLines::create($linesDatas);
                 }
             }
 
