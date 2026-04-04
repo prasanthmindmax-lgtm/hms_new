@@ -17,6 +17,7 @@ use App\Http\Controllers\LogController;
 use App\Http\Controllers\BillingStatsController;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\MenuMasterController;
+use App\Http\Controllers\PettyCashController;
 use App\Http\Controllers\RadiantCashPickupController;
 use App\Http\Controllers\RadiantMismatchAlertController;
 use App\Http\Controllers\LocationMasterController;
@@ -734,7 +735,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('/radiant-cash-pickup/stats',           [RadiantCashPickupController::class, 'stats'])->name('superadmin.radiantcash.stats');
     Route::get('/radiant-cash-pickup/{id}/compare',    [RadiantCashPickupController::class, 'compare'])->name('superadmin.radiantcash.compare');
     Route::post('/radiant-cash-pickup/mismatch-alert', [RadiantMismatchAlertController::class, 'sendAlert'])->name('superadmin.radiantcash.mismatchalert');
-     
+
 
     // Menu Master
     Route::get( 'superadmin/menu-master',           [MenuMasterController::class, 'index']  )->name('superadmin.menumaster.index');
@@ -760,8 +761,59 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('superadmin/email-master/store', [EmailMasterController::class, 'store'])->name('superadmin.emailmaster.store');
     Route::delete('superadmin/email-master/{id}', [EmailMasterController::class, 'destroy'])->name('superadmin.emailmaster.destroy');
     Route::patch('superadmin/email-master/{id}/toggle', [EmailMasterController::class, 'toggleStatus'])->name('superadmin.emailmaster.toggle');
-});
 
+    // Expense Type routes
+    Route::get('superadmin/expense_type', [VendorController::class, 'getExpenseType'])->name('superadmin.expensetype.index');
+    Route::post('superadmin/expense_type', [VendorController::class, 'storeExpenseType'])->name('superadmin.expensetype.store');
+
+    // Expense Category routes
+    Route::get('superadmin/expense_category', [VendorController::class, 'getExpenseCategory'])->name('superadmin.expensecategory.index');
+    Route::post('superadmin/expense_category', [VendorController::class, 'storeExpenseCategory'])->name('superadmin.expensecategory.store');
+
+    // Report Routes
+    Route::get('next-report-id', [VendorController::class, 'getNextReportId']);
+    Route::get('superadmin/expense-report', [VendorController::class, 'getExpenseReport'])->name('superadmin.expensereport.index');
+    Route::post('superadmin/expense-report', [VendorController::class, 'storeExpenseReport'])->name('superadmin.expensereport.store');
+
+    // Petty Cash Routes
+    Route::get('/superadmin/petty-cash', [PettyCashController::class, 'getPettyCash'])->name('superadmin.getpettycash');
+    Route::get('/superadmin/petty-cash-create', [PettyCashController::class, 'getPettyCashCreate'])->name('superadmin.getpettycashcreate');
+    Route::post('/superadmin/save-petty-cash', [PettyCashController::class, 'savePettyCash'])->name('superadmin.savepettycash');
+    Route::post('/superadmin/save-petty-cash-bulk', [PettyCashController::class, 'savePettyCashBulk'])->name('superadmin.savepettycashbulk');
+    Route::get('/superadmin/pettycash-approver', [PettyCashController::class, 'pettyCashApprover'])->name('superadmin.PettyCashApprover');
+    Route::get('/superadmin/petty-cash-ajax', [PettyCashController::class, 'getPettyCashAjax'])->name('superadmin.getpettycashajax');
+    Route::get('/superadmin/petty-cash-detail', [PettyCashController::class, 'getPettyCashDetail'])->name('superadmin.getpettycashdetail');
+
+    // Petty Cash Reports Routes
+    Route::get('/superadmin/petty-cash-reports', [PettyCashController::class, 'getPettyCashReports'])->name('superadmin.getpettycashreports');
+    Route::get('/superadmin/petty-cash-reports-ajax', [PettyCashController::class, 'getPettyCashReportsAjax'])->name('superadmin.getpettycashreportsajax');
+    Route::get('/superadmin/petty-cash-reports-export', [PettyCashController::class, 'exportPettyCashReports'])->name('superadmin.exportpettycashreports');
+
+    Route::get('/superadmin/pettycash-export', [PettyCashController::class, 'exportPettyCash'])->name('superadmin.pettycash.export');
+    Route::get('/download-pettycash-template', [PettyCashController::class, 'downloadPettyCashTemplate'])->name('superadmin.pettycash.template');
+    Route::post('/import-pettycash', [PettyCashController::class, 'importPettyCashExcel'])->name('superadmin.pettycash.import');
+
+    Route::get('/superadmin/expense-report-detail', [PettyCashController::class, 'getExpenseReportDetail'])->name('superadmin.getexpensereportdetail');
+    Route::post('/superadmin/expense-report-submit', [PettyCashController::class, 'submitExpenseReportForApproval'])->name('superadmin.expensereportsubmit');
+    Route::post('/superadmin/expense-report-approve', [PettyCashController::class, 'approveExpenseReport'])->name('superadmin.expensereportapprove');
+    Route::post('/superadmin/expense-report-reject', [PettyCashController::class, 'rejectExpenseReport'])->name('superadmin.expensereportreject');
+    Route::post('/superadmin/expense-report-reimburse', [PettyCashController::class, 'markExpenseReportReimbursed'])->name('superadmin.expensereportreimburse');
+    Route::get('/superadmin/expense-report-advances', [PettyCashController::class, 'getAdvancesForExpenseReport'])->name('superadmin.expensereportadvances');
+    Route::post('/superadmin/expense-report-apply-advances', [PettyCashController::class, 'applyAdvancesToExpenseReport'])->name('superadmin.expensereportapplyadvances');
+
+    // Advances Routes
+    Route::get('/superadmin/advances', [PettyCashController::class, 'getAdvances'])->name('superadmin.getadvances');
+    Route::get('/superadmin/advances-create', [PettyCashController::class, 'getAdvancesCreate'])->name('superadmin.getadvancescreate');
+    Route::post('/superadmin/save-advance', [PettyCashController::class, 'saveAdvance'])->name('superadmin.saveadvance');
+    Route::get('/superadmin/advances-ajax', [PettyCashController::class, 'getAdvancesAjax'])->name('superadmin.getadvancesajax');
+    Route::get('/superadmin/advance-approver', [PettyCashController::class, 'advanceApprover'])->name('superadmin.advanceApprover');
+    Route::get('/superadmin/advance-month-balance', [PettyCashController::class, 'getAdvanceMonthBalance'])->name('superadmin.getadvancemonthbalance');
+    Route::post('/superadmin/advance-apply', [PettyCashController::class, 'applyAdvanceToExpenses'])->name('superadmin.applyadvance');
+    Route::get('/superadmin/advance-detail', [PettyCashController::class, 'getAdvanceDetail'])->name('superadmin.advancedetail');
+    Route::get('/superadmin/advance-reports', [PettyCashController::class, 'getReportsForAdvance'])->name('superadmin.getreportsforadvance');
+    Route::post('/superadmin/advance-link-report', [PettyCashController::class, 'linkAdvanceReport'])->name('superadmin.linkreport');
+    Route::post('/superadmin/advance-recall', [PettyCashController::class, 'recallAdvance'])->name('superadmin.recalladvance');
+    });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
     Route::get('/referral/referral',[MarketController::class,'referral'])->name('referral.referral');

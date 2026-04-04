@@ -25,6 +25,10 @@ use App\Models\BillCategory;
 use App\Models\BillingListModel;
 use App\Models\CategoryModel;
 use App\Models\Customer;
+use App\Models\ExpenseCategory;
+use App\Models\ExpenseType;
+use App\Models\ExpenseReport;
+use App\Models\PettyCashHistory;
 use App\Models\HrmUsers;
 use App\Models\ImageModel;
 use App\Models\LocationModel;
@@ -6622,13 +6626,32 @@ public function getvendortypesave(Request $request)
     $totalTDS = 0;
     $totalGST = 0;
 
-    foreach ($details as $bill) {
-        $totalTDS           += $bill->tds_amount ?? 0;
-        $totalInvoiceAmount += $bill->sub_total_amount ?? 0;
-        $totalFinalAmount   += $bill->grand_total_amount ?? 0;
-        $totalGST           += $bill->tax_amount ?? 0; // GST from bill header (tax_amount)
-    }
+    // foreach ($details as $bill) {
+    //     $totalTDS           += $bill->tds_amount ?? 0;
+    //     $totalInvoiceAmount += $bill->sub_total_amount ?? 0;
+    //     $totalFinalAmount   += $bill->grand_total_amount ?? 0;
+    //     $totalGST           += $bill->tax_amount ?? 0; // GST from bill header (tax_amount)
+    // }
 
+    $processedBills = [];
+
+    foreach ($details as $bill) {
+
+        if (in_array($bill->id, $processedBills)) {
+            continue;
+        }
+
+        $processedBills[] = $bill->id;
+
+        $totalInvoiceAmount += (float) $bill->sub_total_amount;
+        $totalFinalAmount   += (float) $bill->grand_total_amount;
+        $totalTDS           += (float) $bill->tds_amount;
+
+        foreach ($bill->BillLines as $line) {
+            $totalGST += (float) $line->gst_amount;
+        }
+    }
+// dd($totalGST);
     // ---------- Handle Exports ----------
     if ($request->has('export')) {
         if ($request->export === 'excel') {
@@ -6780,44 +6803,101 @@ public function vendorSummary(Request $request)
         }
 
         // ---------------- Main Vendor Summary Grouping ----------------
+        // $bills = $billsQuery->get();
+
+        // // Flatten & group by account name
+        // $vendorSummary = $bills->flatMap(function ($bill) {
+        //     return $bill->BillLines->map(function ($line) use ($bill) {
+        //         return [
+        //             'account' => $line->account,
+        //             'vendor' => $bill->Tblvendor->display_name ?? $bill->vendor_name,
+        //             'vendor_id' => $bill->vendor_id,
+        //             'bill_total' => $bill->grand_total_amount ?? 0,
+        //             'paid' => $bill->partially_payment ?? 0,
+        //             'due' => $bill->balance_amount ?? 0,
+        //         ];
+        //     });
+        // })->groupBy('account');
+
+        // // Compute totals per vendor under each account
+        // $summaryData = $vendorSummary->map(function ($items, $account) {
+        //     // dd($items, $account);
+        //     $vendors = collect($items)->groupBy('vendor')->map(function ($rows, $vendorName) {
+        //         // dd($rows, $vendorName);
+        //         return [
+        //             'vendor_name' => $vendorName,
+        //             'vendor_id' => $rows[0]['vendor_id'],
+        //             'bills' => $rows->sum('bill_total'),
+        //             'paid' => $rows->sum('paid'),
+        //             'due' => $rows->sum('due'),
+        //         ];
+        //     });
+
+        //     return [
+        //         'account' => $account,
+        //         'vendors' => $vendors,
+        //         'total_bills' => $vendors->sum('bills'),
+        //         'total_paid' => $vendors->sum('paid'),
+        //         'total_due' => $vendors->sum('due'),
+        //     ];
+        // });
+
         $bills = $billsQuery->get();
+        $rows = collect();
+        foreach ($bills as $bill) {
+            $subTotal   = (float) ($bill->sub_total_amount ?? 0);
+            $grandTotal = (float) ($bill->grand_total_amount ?? 0);
 
-        // Flatten & group by account name
-        $vendorSummary = $bills->flatMap(function ($bill) {
-            return $bill->BillLines->map(function ($line) use ($bill) {
-                return [
-                    'account' => $line->account,
-                    'vendor' => $bill->Tblvendor->display_name ?? $bill->vendor_name,
+            if ($subTotal == 0) {
+                $subTotal = 1;
+            }
+
+            foreach ($bill->BillLines as $line) {
+                $lineAmount = (float) ($line->amount ?? 0);
+                // ratio based on subtotal
+                $ratio = $lineAmount / $subTotal;
+                // split bill total to each account
+                $finalAmount = $grandTotal * $ratio;
+
+                $rows->push([
+                    'account'   => $line->account,
+                    'vendor'    => $bill->Tblvendor->display_name ?? $bill->vendor_name,
                     'vendor_id' => $bill->vendor_id,
-                    'bill_total' => $bill->grand_total_amount ?? 0,
-                    'paid' => $bill->partially_payment ?? 0,
-                    'due' => $bill->balance_amount ?? 0,
-                ];
-            });
-        })->groupBy('account');
 
-        // Compute totals per vendor under each account
+                    'bill_total' => $finalAmount,
+                    'paid' => 0,
+
+                    'due'  => $finalAmount,
+                ]);
+            }
+        }
+
+        $vendorSummary = $rows->groupBy('account');
         $summaryData = $vendorSummary->map(function ($items, $account) {
-            // dd($items, $account);
-            $vendors = collect($items)->groupBy('vendor')->map(function ($rows, $vendorName) {
-                // dd($rows, $vendorName);
-                return [
-                    'vendor_name' => $vendorName,
-                    'vendor_id' => $rows[0]['vendor_id'],
-                    'bills' => $rows->sum('bill_total'),
-                    'paid' => $rows->sum('paid'),
-                    'due' => $rows->sum('due'),
-                ];
-            });
+
+            $vendors = collect($items)
+                ->groupBy('vendor')
+                ->map(function ($rows, $vendorName) {
+
+                    return [
+                        'vendor_name' => $vendorName,
+                        'vendor_id' => $rows->first()['vendor_id'],
+
+                        'bills' => $rows->sum('bill_total'),
+                        'paid'  => $rows->sum('paid'),
+                        'due'   => $rows->sum('due'),
+                    ];
+                });
 
             return [
                 'account' => $account,
                 'vendors' => $vendors,
                 'total_bills' => $vendors->sum('bills'),
-                'total_paid' => $vendors->sum('paid'),
-                'total_due' => $vendors->sum('due'),
+                'total_paid'  => $vendors->sum('paid'),
+                'total_due'   => $vendors->sum('due'),
             ];
         });
+
         if ($request->ajax()) {
             // dd(12);
             // Render ONLY the tbody rows from a partial view
@@ -8813,6 +8893,193 @@ public function checkBillNumber(Request $request)
         return response()->json([
             'success' => true,
             'message' => $message
+        ]);
+    }
+
+    public function getExpenseType(Request $request)
+    {
+        $admin   = auth()->user();
+        $perPage = $request->get('per_page', 10);
+
+        $types = ExpenseType::orderBy('id', 'asc')->paginate($perPage)
+            ->appends(['per_page' => $perPage]);
+
+        return view('vendor.expense_type', [
+            'admin' => $admin,
+            'types' => $types,
+            'perPage' => $perPage,
+        ]);
+    }
+
+    public function storeExpenseType(Request $request)
+    {
+        $request->validate([
+            'name'      => 'required|string|max:255',
+            'is_active' => ['required', Rule::in([0, 1])],
+        ]);
+
+        $id = $request->id;
+
+        $data = [
+            'name'       => $request->name,
+            'is_active'  => $request->is_active,
+            'description' => $request->description,
+            'created_by' => auth()->id(),
+        ];
+
+        if (!empty($id)) {
+            ExpenseType::where('id', $id)->update($data);
+            $message = 'Expense Type updated successfully!';
+        } else {
+            ExpenseType::create($data);
+            $message = 'Expense Type created successfully!';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
+    }
+
+    public function getExpenseCategory(Request $request)
+    {
+        $admin   = auth()->user();
+        $perPage = $request->get('per_page', 10);
+
+        $categories = ExpenseCategory::with('expenseType')->orderBy('id', 'asc')->paginate($perPage)
+            ->appends(['per_page' => $perPage]);
+
+        $types = ExpenseType::where('is_active', 1)->orderBy('name')->get();
+
+        return view('vendor.expense_category', [
+            'admin'      => $admin,
+            'categories' => $categories,
+            'types'      => $types,
+            'perPage'    => $perPage,
+        ]);
+    }
+
+    public function storeExpenseCategory(Request $request)
+    {
+        $request->validate([
+            'name'      => 'required|string|max:255',
+            'expense_type_id' => 'required|exists:expense_types,id',
+            'is_active' => ['required', Rule::in([0, 1])],
+        ]);
+
+        $id = $request->id;
+
+        $data = [
+            'name'       => $request->name,
+            'expense_type_id' => $request->expense_type_id,
+            'description' => $request->description,
+            'is_active'  => $request->is_active,
+            'created_by' => auth()->id(),
+        ];
+
+        if (!empty($id)) {
+            ExpenseCategory::where('id', $id)->update($data);
+            $category = ExpenseCategory::find($id);
+            $message = 'Expense Category updated successfully!';
+        } else {
+            $category = ExpenseCategory::create($data);
+            $message = 'Expense Category created successfully!';
+        }
+
+        return response()->json([
+            'success'  => true,
+            'message'  => $message,
+            'category' => $category,
+        ]);
+    }
+
+    public function getExpenseReport(Request $request)
+    {
+        $admin   = auth()->user();
+        $perPage = $request->get('per_page', 10);
+
+        $reports = ExpenseReport::orderBy('id', 'asc')->paginate($perPage)
+            ->appends(['per_page' => $perPage]);
+
+        // GENERATE NEXT REPORT ID
+        $last = ExpenseReport::orderBy('id', 'desc')->first();
+
+        if ($last && $last->report_id) {
+            $number = (int) str_replace('ER-', '', $last->report_id);
+            $nextNumber = $number + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        $nextReportId = 'ER-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+
+        return view('vendor.expense_report', [
+            'admin'        => $admin,
+            'reports'      => $reports,
+            'perPage'      => $perPage,
+            'nextReportId' => $nextReportId,
+        ]);
+    }
+
+    public function storeExpenseReport(Request $request)
+    {
+        $reportIdRules = ['required', 'string', 'max:255'];
+        if ($request->filled('id')) {
+            $reportIdRules[] = Rule::unique('expense_reports', 'report_id')->ignore((int) $request->id);
+        } else {
+            $reportIdRules[] = Rule::unique('expense_reports', 'report_id');
+        }
+
+        $request->validate([
+            'report_id' => $reportIdRules,
+            'name' => 'required|string|max:255',
+            'start_date'  => 'required|date',
+            'end_date'    => 'required|date',
+        ]);
+
+        $id = $request->id;
+
+        $data = [
+            'report_id'       => $request->report_id,
+            'report_name'     => $request->name,
+            'business_purpose'=> $request->business_purpose,
+            'start_date'      => $request->start_date,
+            'end_date'        => $request->end_date,
+            'trip_id'         => $request->trip_id,
+            'is_active'       => 1,
+            'created_by'      => auth()->id(),
+        ];
+
+        if (!empty($id)) {
+            ExpenseReport::where('id', $id)->update($data);
+            $message = 'Expense Report updated successfully!';
+        } else {
+            $report = ExpenseReport::create($data);
+            $message = 'Expense Report created successfully!';
+            PettyCashHistory::record((int) $report->id, 'report_created', 'Report created.');
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
+    }
+
+    public function getNextReportId()
+    {
+        $last = ExpenseReport::orderBy('id', 'desc')->first();
+
+        if ($last && $last->report_id) {
+            $number = (int) str_replace('ER-', '', $last->report_id);
+            $nextNumber = $number + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        $nextReportId = 'ER-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+
+        return response()->json([
+            'report_id' => $nextReportId
         ]);
     }
 }
