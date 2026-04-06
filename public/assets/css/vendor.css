@@ -1906,7 +1906,7 @@ input:focus {
 }
 
 /* Footer link */
-.manage-tds-link , .manage-tcs-link,.manage-gst-link,.manage-account-link,.manage-tds-section,.manage-delivery-link{
+.manage-tds-link , .manage-tcs-link,.manage-gst-link,.manage-account-link,.manage-tds-section,.manage-delivery-link,.manage-category-link{
   padding: 8px;
   text-align: center;
   font-size: 13px;
