@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 
 class RadiantMismatchService
 {
@@ -261,6 +262,41 @@ class RadiantMismatchService
         }, $emails));
     }
 
+    /**
+     * Restrict a bank_statements query to rows that count toward Radiant pickup
+     * reconciliation for the given location (standard BY CASH patterns, or
+     * radiant_match_against linked to the pickup location name).
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     */
+    public static function applyRadiantBankLocationMatch($query, string $locationName): void
+    {
+        $locationName = trim($locationName);
+        if ($locationName === '') {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where(function ($q) use ($locationName) {
+            $q->where(function ($q1) use ($locationName) {
+                $q1->where('description', 'like', '%BY CASH%'.$locationName.'%')
+                    ->orWhere('description', 'like', '%BYCASH%'.$locationName.'%');
+            });
+            if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+                $q->orWhere(function ($q2) use ($locationName) {
+                    $q2->whereNotNull('radiant_match_against')
+                        ->where('radiant_match_against', '!=', '')
+                        ->where(function ($q3) use ($locationName) {
+                            $q3->whereRaw('LOWER(TRIM(radiant_match_against)) = LOWER(?)', [$locationName])
+                                ->orWhereRaw('LOWER(?) LIKE CONCAT("%", LOWER(TRIM(radiant_match_against)), "%")', [$locationName])
+                                ->orWhereRaw('LOWER(TRIM(radiant_match_against)) LIKE CONCAT("%", LOWER(?), "%")', [$locationName]);
+                        });
+                });
+            }
+        });
+    }
+
     /* ══════════════════════════════════════════════════════
        Compare one pickup row vs BFR + Bank
     ══════════════════════════════════════════════════════ */
@@ -299,13 +335,10 @@ class RadiantMismatchService
             $bkFrom = $pd->copy()->subDay()->toDateString();
             $bkTo   = $pd->copy()->addDay()->toDateString();
 
-            $rows = DB::table('bank_statements')
-                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo])
-                ->where(function ($q) use ($locationName) {
-                    $q->where('description', 'like', '%BY CASH%' . $locationName . '%')
-                      ->orWhere('description', 'like', '%BYCASH%' . $locationName . '%');
-                })
-                ->get();
+            $bankQuery = DB::table('bank_statements')
+                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo]);
+            self::applyRadiantBankLocationMatch($bankQuery, $locationName);
+            $rows = $bankQuery->get();
 
             if ($rows->isNotEmpty()) {
                 $bankAmount  = (float) $rows->sum('deposit');

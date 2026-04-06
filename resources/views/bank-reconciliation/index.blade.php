@@ -369,6 +369,42 @@
                         </div>
                     </div>
 
+                    <!-- {{-- Radiant cash pickup reconciliation stats --}}
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2" style="font-size:12px;letter-spacing:1px;text-transform:uppercase;">
+                                <i class="bi bi-brightness-high me-1"></i> Radiant cash pickup
+                            </h6>
+                        </div>
+                        <div class="col-xl-3 col-md-6 mb-3">
+                            <div class="stat-card" style="background:linear-gradient(135deg,#ea580c,#c2410c);">
+                                <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
+                                <div class="stat-content">
+                                    <h3 id="radiantMatchedCount">0</h3>
+                                    <p>Radiant linked</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 mb-3">
+                            <div class="stat-card" style="background:linear-gradient(135deg,#78716c,#57534e);">
+                                <div class="stat-icon"><i class="bi bi-pencil-square"></i></div>
+                                <div class="stat-content">
+                                    <h3 id="radiantKeywordOnlyCount">0</h3>
+                                    <p>Keyword only</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 mb-3">
+                            <div class="stat-card" style="background:linear-gradient(135deg,#94a3b8,#64748b);">
+                                <div class="stat-icon"><i class="bi bi-circle"></i></div>
+                                <div class="stat-content">
+                                    <h3 id="radiantUnmatchedCount">0</h3>
+                                    <p>Radiant not linked</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div> -->
+
                     {{-- Bank Statements Table with Filter Button --}}
                     <div class="card shadow-sm">
                         <div class="card-header table-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -403,12 +439,13 @@
                                             <th>Matched Bill</th>
                                             <th>Matched By</th>
                                             <th>Income Tag</th>
+                                            <th>Radiant</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="statementsTableBody">
                                         <tr>
-                                            <td colspan="10" class="text-center py-5">
+                                            <td colspan="14" class="text-center py-5">
                                                 <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                                                 <p class="text-muted mt-3">No statements uploaded</p>
                                             </td>
@@ -464,6 +501,15 @@
                                 <option value="">All</option>
                                 <option value="income_matched">Income Matched</option>
                                 <option value="income_unmatched">Income Unmatched</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Radiant match</label>
+                            <select class="form-control" id="filterRadiantMatch">
+                                <option value="">All</option>
+                                <option value="radiant_matched">Radiant linked (pickup)</option>
+                                <option value="radiant_keyword_only">Keyword only</option>
+                                <option value="radiant_unmatched">Not linked</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -538,6 +584,11 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="categorize-tab" data-bs-toggle="tab" data-bs-target="#categorize-content" type="button">
                                 <i class="bi bi-tag me-1"></i>INCOME TAG
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="radiant-match-tab" data-bs-toggle="tab" data-bs-target="#radiant-match-content" type="button">
+                                <i class="bi bi-brightness-high me-1"></i>RADIANT MATCH
                             </button>
                         </li>
                     </ul>
@@ -715,6 +766,30 @@
 
                             </div>
                         </div>
+
+                        {{-- Radiant cash pickup: keyword to match this line vs pickup location in alerts --}}
+                        <div class="tab-pane fade" id="radiant-match-content">
+                            <div class="income-tag-panel">
+                                <p class="income-tag-filter-summary mb-3">
+                                    If this deposit is not found by the usual <strong>BY CASH</strong> + location search in Radiant mismatch alerts, enter the <strong>pickup location name</strong> (or alias) that should match this row.
+                                </p>
+                                <label class="income-tag-label" for="radiantMatchAgainstInput">
+                                    <span class="income-tag-label-dot" style="background:#f97316;"></span>MATCH AGAINST (LOCATION / KEYWORD)
+                                </label>
+                                <input type="text" class="form-control form-control-sm mb-3" id="radiantMatchAgainstInput" maxlength="255" placeholder="e.g. branch name as on Radiant pickup sheet" autocomplete="off">
+                                <label class="income-tag-label" for="radiantCashPickupIdInput">
+                                    <span class="income-tag-label-dot" style="background:#c2410c;"></span>RADIANT PICKUP ID (OPTIONAL)
+                                </label>
+                                <input type="number" class="form-control form-control-sm mb-2" id="radiantCashPickupIdInput" min="1" step="1" placeholder="radiant_cash_pickups.id — links row as &quot;Radiant matched&quot;">
+                                <p class="small text-muted mb-3">Leave pickup id empty and save to clear a link. Keyword and pickup id can be used together.</p>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="clearRadiantMatchBtn">Clear</button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="saveRadiantMatchBtn">
+                                        <i class="bi bi-save me-1"></i>Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer" style="display:none;">
@@ -750,7 +825,9 @@
             incomeUnmatch: "{{ route('bank-reconciliation.income-unmatch', ':id') }}",
             incomeTagZones: "{{ route('bank-reconciliation.income-tag.zones') }}",
             incomeTagBranches: "{{ route('bank-reconciliation.income-tag.branches') }}",
-            incomeTagResolve: "{{ route('bank-reconciliation.income-tag.resolve-description') }}"
+            incomeTagResolve: "{{ route('bank-reconciliation.income-tag.resolve-description') }}",
+            radiantMatchAgainst: "{{ route('bank-reconciliation.radiant-match-against') }}",
+            radiantUnmatch: "{{ route('bank-reconciliation.radiant-unmatch', ':id') }}"
         };
     </script>
     <script>

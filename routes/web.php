@@ -712,6 +712,8 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/income-tag/zones', [BankStatementController::class, 'incomeTagZones'])->name('income-tag.zones');
         Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');
         Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
+        Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
+        Route::post('/radiant-unmatch/{id}', [BankStatementController::class, 'unmatchRadiant'])->name('radiant-unmatch');
     });
 
     //income new stats

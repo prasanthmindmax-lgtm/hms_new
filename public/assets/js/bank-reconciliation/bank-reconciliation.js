@@ -84,6 +84,7 @@ $(document).ready(function() {
         currentFilters = {};
         $('#filterMatchStatus').val('');
         $('#filterIncomeMatch').val('');
+        $('#filterRadiantMatch').val('');
         $('#filterAmountMin').val('');
         $('#filterAmountMax').val('');
         $('#filterReference').val('');
@@ -112,6 +113,7 @@ $(document).ready(function() {
         currentFilters = {
             match_status:    $('#filterMatchStatus').val(),
             income_match:    $('#filterIncomeMatch').val(),
+            radiant_match:   $('#filterRadiantMatch').val(),
             amount_min:      $('#filterAmountMin').val(),
             amount_max:      $('#filterAmountMax').val(),
             reference_number:$('#filterReference').val(),
@@ -265,6 +267,15 @@ $(document).ready(function() {
         });
     }
     
+    function escapeAttr(str) {
+        if (str == null || str === '') return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/\r?\n/g, ' ');
+    }
+
     // ============================================
     // RENDER STATEMENTS TABLE
     // ============================================
@@ -275,7 +286,7 @@ $(document).ready(function() {
         if (!statements || statements.length === 0) {
             tbody.html(`
                 <tr>
-                    <td colspan="10" class="text-center py-5">
+                    <td colspan="14" class="text-center py-5">
                         <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                         <p class="text-muted mt-3">No statements found</p>
                     </td>
@@ -328,6 +339,32 @@ $(document).ready(function() {
                         ${taggedAt ? '<br><small class="text-muted">' + taggedAt + '</small>' : ''}
                     </div>`;
             }
+
+            const radiantLinked = stmt.radiant_match_status === 'radiant_matched';
+            let radiantTagCell = '<span class="text-muted small"><i class="bi bi-dash"></i> Not linked</span>';
+            if (radiantLinked) {
+                const rTaggedAt = stmt.radiant_matched_at
+                    ? formatDate(stmt.radiant_matched_at.substring(0, 10))
+                    : '';
+                radiantTagCell = `
+                    <div>
+                        <span class="badge bg-warning text-dark mb-1">
+                            <i class="bi bi-brightness-high me-1"></i>Radiant linked
+                        </span><br>
+                        <small class="text-dark fw-semibold">${stmt.radiant_matched_location || ''}</small><br>
+                        <small class="text-muted">${stmt.radiant_matched_pickup_date || ''}</small><br>
+                        ${stmt.radiant_cash_pickup_id ? '<small class="text-muted">Pickup #' + stmt.radiant_cash_pickup_id + '</small><br>' : ''}
+                        <small class="text-muted">By: <strong>${stmt.radiant_matched_by_name || ''}</strong></small>
+                        ${rTaggedAt ? '<br><small class="text-muted">' + rTaggedAt + '</small>' : ''}
+                        ${stmt.radiant_match_against ? '<br><small class="text-muted">Keyword: ' + escapeAttr(stmt.radiant_match_against) + '</small>' : ''}
+                    </div>`;
+            } else if (stmt.radiant_match_against) {
+                radiantTagCell = `
+                    <div>
+                        <span class="badge bg-secondary mb-1">Keyword only</span><br>
+                        <small class="text-muted">${escapeAttr(stmt.radiant_match_against)}</small>
+                    </div>`;
+            }
             
             const row = `
                 <tr class="statement-row-clickable ${stmt.match_status}" 
@@ -336,7 +373,10 @@ $(document).ready(function() {
                     data-type="${amountType}"
                     data-date="${stmt.transaction_date}"
                     data-reference="${stmt.reference_number || ''}"
-                    data-description="${stmt.description || ''}">
+                    data-description="${stmt.description || ''}"
+                    data-radiant-match="${escapeAttr(stmt.radiant_match_against)}"
+                    data-radiant-status="${escapeAttr(stmt.radiant_match_status)}"
+                    data-radiant-pickup-id="${stmt.radiant_cash_pickup_id || ''}">
                     <td>
                         <div class="date-cell">
                             ${formatDate(stmt.transaction_date)}
@@ -379,6 +419,9 @@ $(document).ready(function() {
                         ${incomeTagCell}
                     </td>
                     <td>
+                        ${radiantTagCell}
+                    </td>
+                    <td>
                         <div class="action-buttons">
                             ${!incomeTagged ? (stmt.match_status === 'unmatched' ? `
                                 <button class="btn btn-sm btn-success btn-match" data-id="${stmt.id}" title="Match Bill">
@@ -392,6 +435,11 @@ $(document).ready(function() {
                             ${incomeTagged ? `
                                 <button class="btn btn-sm btn-outline-danger btn-income-unmatch mt-1" data-id="${stmt.id}" title="Remove Income Tag">
                                     <i class="bi bi-tag-x"></i>Unmatch Income
+                                </button>
+                            ` : ''}
+                            ${radiantLinked ? `
+                                <button class="btn btn-sm btn-outline-warning btn-radiant-unmatch mt-1" data-id="${stmt.id}" title="Remove Radiant pickup link">
+                                    <i class="bi bi-brightness-high"></i> Unmatch Radiant
                                 </button>
                             ` : ''}
                             <button class="btn btn-sm btn-danger btn-delete" style="display:none;" data-id="${stmt.id}">
@@ -426,6 +474,8 @@ $(document).ready(function() {
         $('#txnDescription').text(currentTxnData.description);
         $('#txnAmount').text('₹' + formatNumber(currentTxnAmount));
         $('#pendingAmount').text(formatNumber(currentTxnAmount));
+        $('#radiantMatchAgainstInput').val($(this).attr('data-radiant-match') || '');
+        $('#radiantCashPickupIdInput').val($(this).attr('data-radiant-pickup-id') || '');
         
         // Reset
         selectedBills = [];
@@ -805,6 +855,45 @@ $(document).ready(function() {
     });
 
     // ============================================
+    // RADIANT UNMATCH (pickup link only; keyword kept)
+    // ============================================
+    $(document).on('click', '.btn-radiant-unmatch', function(e) {
+        e.stopPropagation();
+        const id = $(this).data('id');
+        Swal.fire({
+            title: 'Remove Radiant pickup link?',
+            text: 'The match keyword on this row will be kept. Only the pickup link and “Radiant linked” status are cleared.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d97706',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, remove link'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const url = routes.radiantUnmatch.replace(':id', id);
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: { _token: $('meta[name="csrf-token"]').attr('content') },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Radiant link removed');
+                            loadStatements(currentPage);
+                            updateStatistics();
+                        } else {
+                            toastr.error(response.message || 'Failed to remove Radiant link');
+                        }
+                    },
+                    error: function(xhr) {
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Error removing Radiant link';
+                        toastr.error(msg);
+                    }
+                });
+            }
+        });
+    });
+
+    // ============================================
     // DELETE BUTTON
     // ============================================
     $(document).on('click', '.btn-delete', function(e) {
@@ -874,6 +963,10 @@ $(document).ready(function() {
                     // Income reconciliation stats
                     $('#incomeMatchedCount').text(response.income_matched || 0);
                     $('#incomeUnmatchedCount').text(response.income_unmatched || 0);
+
+                    $('#radiantMatchedCount').text(response.radiant_matched || 0);
+                    $('#radiantKeywordOnlyCount').text(response.radiant_keyword_only || 0);
+                    $('#radiantUnmatchedCount').text(response.radiant_unmatched || 0);
                 }
             }
         });
@@ -1278,6 +1371,52 @@ $(document).ready(function() {
         }
 
         fireNext(0);
+    });
+
+    // ---- Radiant match keyword (bank_statements.radiant_match_against) ----
+    var radiantMatchInFlight = false;
+
+    $(document).on('click', '#clearRadiantMatchBtn', function () {
+        $('#radiantMatchAgainstInput').val('');
+    });
+
+    $(document).on('click', '#saveRadiantMatchBtn', function () {
+        if (radiantMatchInFlight) return;
+        if (!currentStatementId) {
+            toastr.warning('No bank statement selected');
+            return;
+        }
+        var val = ($('#radiantMatchAgainstInput').val() || '').trim();
+        var $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
+        radiantMatchInFlight = true;
+
+        var pickupVal = ($('#radiantCashPickupIdInput').val() || '').trim();
+
+        $.ajax({
+            url: routes.radiantMatchAgainst,
+            type: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                bank_statement_id: currentStatementId,
+                radiant_match_against: val,
+                radiant_cash_pickup_id: pickupVal
+            }
+        }).done(function (r) {
+            if (r.success) {
+                toastr.success(r.message || 'Saved');
+                loadStatements(currentPage);
+                updateStatistics();
+            } else {
+                toastr.error(r.message || 'Save failed');
+            }
+        }).fail(function (xhr) {
+            var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Error saving Radiant match keyword';
+            toastr.error(msg);
+        }).always(function () {
+            $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save');
+            radiantMatchInFlight = false;
+        });
     });
 
 });

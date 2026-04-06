@@ -489,14 +489,10 @@ class RadiantCashPickupController extends Controller
             $bkFrom  = $pd->copy()->subDays(1)->toDateString();
             $bkTo    = $pd->copy()->addDays(1)->toDateString();
 
-            $rows = DB::table('bank_statements')
-                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo])
-                ->where(function ($q) use ($locationName) {
-                    $q->where('description', 'like', '%BY CASH%' . $locationName . '%')
-                      ->orWhere('description', 'like', '%BYCASH%' . $locationName . '%');
-                })
-                ->orderBy('transaction_date')
-                ->get();
+            $bankQuery = DB::table('bank_statements')
+                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo]);
+            RadiantMismatchService::applyRadiantBankLocationMatch($bankQuery, $locationName);
+            $rows = $bankQuery->orderBy('transaction_date')->get();
 
             $bankEntries = $rows->map(function ($b) {
                 return [

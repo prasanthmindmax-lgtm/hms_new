@@ -227,20 +227,29 @@ class BankStatementController extends Controller
             return $this->getStatistics();
         }
         
+        $select = [
+            'bs.*',
+            'matched_user.user_fullname as matched_by_name',
+            'matched_user.username as matched_by_username',
+            'income_user.user_fullname as income_matched_by_name',
+            'income_user.username as income_matched_by_username',
+            'bill.bill_number',
+            'bill.vendor_name',
+            'bill.grand_total_amount as bill_amount',
+        ];
+        if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+            $select[] = 'radiant_user.user_fullname as radiant_matched_by_name';
+            $select[] = 'radiant_user.username as radiant_matched_by_username';
+        }
+
         $query = DB::table('bank_statements as bs')
-            ->select(
-                'bs.*',
-                'matched_user.user_fullname as matched_by_name',
-                'matched_user.username as matched_by_username',
-                'income_user.user_fullname as income_matched_by_name',
-                'income_user.username as income_matched_by_username',
-                'bill.bill_number',
-                'bill.vendor_name',
-                'bill.grand_total_amount as bill_amount'
-            )
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
-            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
-            ->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
+            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id');
+        if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+            $query->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id');
+        }
+        $query->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
+            ->select($select)
             ->orderBy('bs.transaction_date', 'desc')
             ->orderBy('bs.id', 'desc');
         
@@ -321,6 +330,26 @@ class BankStatementController extends Controller
                 });
             }
         }
+
+        // Radiant match filter (pickup linked / keyword-only / unmatched)
+        if ($request->filled('radiant_match') && Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+            $val = $request->radiant_match;
+            if ($val === 'radiant_matched') {
+                $query->where('bs.radiant_match_status', 'radiant_matched');
+            } elseif ($val === 'radiant_unmatched') {
+                $query->where(function ($q) {
+                    $q->where('bs.radiant_match_status', 'radiant_unmatched')
+                        ->orWhereNull('bs.radiant_match_status');
+                });
+            } elseif ($val === 'radiant_keyword_only' && Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+                $query->whereNotNull('bs.radiant_match_against')
+                    ->where('bs.radiant_match_against', '!=', '')
+                    ->where(function ($q) {
+                        $q->whereNull('bs.radiant_match_status')
+                            ->orWhere('bs.radiant_match_status', '!=', 'radiant_matched');
+                    });
+            }
+        }
         
         // Reference Number
         if ($request->filled('reference_number')) {
@@ -366,6 +395,27 @@ class BankStatementController extends Controller
             })->count();
         }
 
+        $radiantMatched   = 0;
+        $radiantUnmatched = 0;
+        $radiantKeywordOnly = 0;
+        if (Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+            $radiantMatched = DB::table('bank_statements')->where('radiant_match_status', 'radiant_matched')->count();
+            $radiantUnmatched = DB::table('bank_statements')->where(function ($q) {
+                $q->where('radiant_match_status', 'radiant_unmatched')
+                    ->orWhereNull('radiant_match_status');
+            })->count();
+            if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+                $radiantKeywordOnly = DB::table('bank_statements')
+                    ->whereNotNull('radiant_match_against')
+                    ->where('radiant_match_against', '!=', '')
+                    ->where(function ($q) {
+                        $q->whereNull('radiant_match_status')
+                            ->orWhere('radiant_match_status', '!=', 'radiant_matched');
+                    })
+                    ->count();
+            }
+        }
+
         return response()->json([
             'total'              => $total,
             'matched'            => $matched,
@@ -374,6 +424,9 @@ class BankStatementController extends Controller
             'total_amount'       => $totalWithdrawal + $totalDeposit,
             'income_matched'     => $incomeMatched,
             'income_unmatched'   => $incomeUnmatched,
+            'radiant_matched'    => $radiantMatched,
+            'radiant_unmatched'  => $radiantUnmatched,
+            'radiant_keyword_only' => $radiantKeywordOnly,
         ]);
     }
     
@@ -1944,6 +1997,184 @@ class BankStatementController extends Controller
                 'message' => 'Error removing income tag: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Save Radiant keyword and/or link to radiant_cash_pickups (marks radiant_matched like income tag).
+     */
+    public function saveRadiantMatchAgainst(Request $request)
+    {
+        if (! Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Column radiant_match_against is missing. Run: php artisan migrate',
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'bank_statement_id'      => 'required|integer',
+            'radiant_match_against'  => 'nullable|string|max:255',
+            'radiant_cash_pickup_id' => 'nullable',
+        ]);
+
+        $stmt = DB::table('bank_statements')->where('id', $validated['bank_statement_id'])->first();
+        if (! $stmt) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bank statement not found',
+            ], 404);
+        }
+
+        $raw = isset($validated['radiant_match_against']) ? trim($validated['radiant_match_against']) : '';
+        $keyword = $raw === '' ? null : $raw;
+
+        $pickupRaw = $request->input('radiant_cash_pickup_id');
+        $pickupId = ($pickupRaw === '' || $pickupRaw === null) ? null : (int) $pickupRaw;
+
+        $hadPickupLink = false;
+        if (Schema::hasColumn('bank_statements', 'radiant_match_status')
+            && (($stmt->radiant_match_status ?? '') === 'radiant_matched')) {
+            $hadPickupLink = true;
+        }
+        if (Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')
+            && ! empty($stmt->radiant_cash_pickup_id ?? null)) {
+            $hadPickupLink = true;
+        }
+
+        $update = [
+            'radiant_match_against' => $keyword,
+            'updated_at'            => now(),
+        ];
+
+        $hasTracking = Schema::hasColumn('bank_statements', 'radiant_match_status');
+
+        if ($hasTracking) {
+            if ($pickupId) {
+                $pickup = DB::table('radiant_cash_pickups')->where('id', $pickupId)->first();
+                if (! $pickup) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Radiant cash pickup id '.$pickupId.' was not found.',
+                    ], 422);
+                }
+
+                $pickupDateStr = $pickup->pickup_date;
+                if (! $pickupDateStr && ! empty($pickup->pickup_date_parsed)) {
+                    try {
+                        $pickupDateStr = Carbon::parse($pickup->pickup_date_parsed)->format('d/m/Y');
+                    } catch (\Exception $e) {
+                        $pickupDateStr = (string) $pickup->pickup_date_parsed;
+                    }
+                }
+
+                $user = Auth::user();
+                $update['radiant_match_status'] = 'radiant_matched';
+                $update['radiant_cash_pickup_id'] = $pickupId;
+                $update['radiant_matched_location'] = $pickup->location;
+                $update['radiant_matched_pickup_date'] = $pickupDateStr;
+                $update['radiant_matched_by'] = $user ? $user->id : null;
+                $update['radiant_matched_at'] = now();
+            } else {
+                $update['radiant_match_status'] = 'radiant_unmatched';
+                $update['radiant_cash_pickup_id'] = null;
+                $update['radiant_matched_location'] = null;
+                $update['radiant_matched_pickup_date'] = null;
+                $update['radiant_matched_by'] = null;
+                $update['radiant_matched_at'] = null;
+            }
+        }
+
+        $safeUpdate = [];
+        foreach ($update as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safeUpdate[$col] = $val;
+            }
+        }
+
+        DB::table('bank_statements')->where('id', $stmt->id)->update($safeUpdate);
+
+        $fresh = DB::table('bank_statements')->where('id', $stmt->id)->first();
+        $byName = null;
+        $byUsername = null;
+        if ($fresh && ! empty($fresh->radiant_matched_by) && Schema::hasTable('users')) {
+            $u = DB::table('users')->where('id', $fresh->radiant_matched_by)->first();
+            if ($u) {
+                $byName = $u->user_fullname ?? null;
+                $byUsername = $u->username ?? null;
+            }
+        }
+
+        $msgParts = [];
+        if ($keyword !== null) {
+            $msgParts[] = 'Keyword saved';
+        } else {
+            $msgParts[] = 'Keyword cleared';
+        }
+        if ($pickupId && $hasTracking) {
+            $msgParts[] = 'linked to Radiant pickup #'.$pickupId;
+        } elseif ($hasTracking && $hadPickupLink && ! $pickupId) {
+            $msgParts[] = 'pickup link cleared';
+        }
+
+        return response()->json([
+            'success'                      => true,
+            'message'                      => implode(' — ', $msgParts).'.',
+            'radiant_match_against'        => $fresh->radiant_match_against ?? null,
+            'radiant_match_status'         => $fresh->radiant_match_status ?? null,
+            'radiant_cash_pickup_id'       => $fresh->radiant_cash_pickup_id ?? null,
+            'radiant_matched_location'     => $fresh->radiant_matched_location ?? null,
+            'radiant_matched_pickup_date'  => $fresh->radiant_matched_pickup_date ?? null,
+            'radiant_matched_at'           => $fresh->radiant_matched_at ?? null,
+            'radiant_matched_by_name'      => $byName,
+            'radiant_matched_by_username'  => $byUsername,
+        ]);
+    }
+
+    /**
+     * Remove Radiant pickup link from a bank statement (keeps keyword if any).
+     */
+    public function unmatchRadiant($id)
+    {
+        if (! Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Radiant columns missing. Run migrations.',
+            ], 503);
+        }
+
+        $stmt = DB::table('bank_statements')->where('id', $id)->first();
+        if (! $stmt) {
+            return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+        }
+
+        if (($stmt->radiant_match_status ?? '') !== 'radiant_matched') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This statement has no Radiant pickup link to remove',
+            ], 400);
+        }
+
+        $reset = [
+            'radiant_match_status'         => 'radiant_unmatched',
+            'radiant_cash_pickup_id'       => null,
+            'radiant_matched_location'     => null,
+            'radiant_matched_pickup_date'  => null,
+            'radiant_matched_by'          => null,
+            'radiant_matched_at'           => null,
+            'updated_at'                   => now(),
+        ];
+        $safe = [];
+        foreach ($reset as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safe[$col] = $val;
+            }
+        }
+        DB::table('bank_statements')->where('id', $id)->update($safe);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Radiant pickup link removed (keyword kept if set)',
+        ]);
     }
 
     /**
