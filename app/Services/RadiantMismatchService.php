@@ -7,6 +7,7 @@ use App\Models\RadiantCashPickup;
 use App\Models\TblLocationModel;
 use App\Models\TblPoEmail;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -112,17 +113,19 @@ class RadiantMismatchService
             ];
         }
 
-        /* 4 — Resolve recipients */
+        /* 4 — Resolve recipients (email + SMS from same Radiant / Email Master rows) */
         [$toEmails, $ccEmails] = $this->resolveRecipients();
+        $smsRecipients       = $this->resolveSmsRecipients();
 
         $this->log('info', 'check_and_alert.recipients_resolved', [
-            'date'        => $parsedDate,
-            'to_count'    => count($toEmails),
-            'cc_count'    => count($ccEmails),
-            'to_domains'  => $this->maskEmailsForLog($toEmails),
+            'date'         => $parsedDate,
+            'to_count'     => count($toEmails),
+            'cc_count'     => count($ccEmails),
+            'sms_targets'  => count($smsRecipients),
+            'to_domains'   => $this->maskEmailsForLog($toEmails),
         ]);
 
-        if (empty($toEmails)) {
+        if (empty($toEmails) && empty($smsRecipients)) {
             $this->log('warning', 'check_and_alert.no_recipients', [
                 'date'           => $parsedDate,
                 'mismatch_count' => $mismatchCount,
@@ -135,85 +138,110 @@ class RadiantMismatchService
                 'matched'     => $matchedCount,
                 'mismatch'    => $mismatchCount,
                 'email_sent'  => false,
+                'sms_sent'    => 0,
                 'recipients'  => 0,
                 'all_matched' => false,
-                'message'     => "⚠ {$parsedDate}: {$mismatchCount} mismatch(es) found but no email recipients configured.",
+                'message'     => "⚠ {$parsedDate}: {$mismatchCount} mismatch(es) found but no email or SMS recipients configured (Radiant / Email Master).",
             ];
         }
 
-        /* 5 — Send email */
-        $emailSent = false;
-        try {
-            Mail::send(
-                'emails.radiant_mismatch_alert',
-                [
-                    'mismatches'    => $mismatches,
-                    'date'          => $parsedDate,
-                    'totalCount'    => $total,
-                    'matchedCount'  => $matchedCount,
-                    'mismatchCount' => $mismatchCount,
-                    'sentBy'        => $triggeredBy,
-                ],
-                function ($m) use ($toEmails, $ccEmails, $parsedDate, $mismatchCount) {
-                    $label = $mismatchCount > 1 ? 'mismatches' : 'mismatch';
-                    $m->to($toEmails)
-                      ->subject("⚠ Radiant Cash Mismatch Alert – {$parsedDate} ({$mismatchCount} {$label})");
-                    if (!empty($ccEmails)) {
-                        $m->cc($ccEmails);
+        /* 5 — Send email (optional) */
+        $emailSent  = false;
+        $emailError = null;
+        if (! empty($toEmails)) {
+            try {
+                Mail::send(
+                    'emails.radiant_mismatch_alert',
+                    [
+                        'mismatches'    => $mismatches,
+                        'date'          => $parsedDate,
+                        'totalCount'    => $total,
+                        'matchedCount'  => $matchedCount,
+                        'mismatchCount' => $mismatchCount,
+                        'sentBy'        => $triggeredBy,
+                    ],
+                    function ($m) use ($toEmails, $ccEmails, $parsedDate, $mismatchCount) {
+                        $label = $mismatchCount > 1 ? 'mismatches' : 'mismatch';
+                        $m->to($toEmails)
+                          ->subject("⚠ Radiant Cash Mismatch Alert – {$parsedDate} ({$mismatchCount} {$label})");
+                        if (! empty($ccEmails)) {
+                            $m->cc($ccEmails);
+                        }
                     }
-                }
-            );
-            $emailSent = true;
+                );
+                $emailSent = true;
 
-            $this->log('info', 'check_and_alert.email_sent', [
-                'date'           => $parsedDate,
-                'mismatch_count' => $mismatchCount,
-                'to_count'       => count($toEmails),
-                'cc_count'       => count($ccEmails),
-            ]);
-        } catch (\Exception $e) {
-            $this->log('error', 'check_and_alert.email_failed', [
-                'date'           => $parsedDate,
-                'mismatch_count' => $mismatchCount,
-                'exception'      => $e->getMessage(),
-                'file'           => $e->getFile(),
-                'line'           => $e->getLine(),
-            ]);
-
-            // Return failure info but don't throw — caller decides how to handle
-            return [
-                'date'        => $parsedDate,
-                'found'       => true,
-                'total'       => $total,
-                'matched'     => $matchedCount,
-                'mismatch'    => $mismatchCount,
-                'email_sent'  => false,
-                'email_error' => $e->getMessage(),
-                'recipients'  => count($toEmails),
-                'all_matched' => false,
-                'message'     => "⚠ {$parsedDate}: {$mismatchCount} mismatch(es) found but email failed: " . $e->getMessage(),
-            ];
+                $this->log('info', 'check_and_alert.email_sent', [
+                    'date'           => $parsedDate,
+                    'mismatch_count' => $mismatchCount,
+                    'to_count'       => count($toEmails),
+                    'cc_count'       => count($ccEmails),
+                ]);
+            } catch (\Exception $e) {
+                $emailError = $e->getMessage();
+                $this->log('error', 'check_and_alert.email_failed', [
+                    'date'           => $parsedDate,
+                    'mismatch_count' => $mismatchCount,
+                    'exception'      => $emailError,
+                    'file'           => $e->getFile(),
+                    'line'           => $e->getLine(),
+                ]);
+            }
         }
+
+        /* 6 — SMS: same DLT template as deadline (Dear {name + detail} You have received…) */
+        $smsSent = 0;
+        if (! empty($smsRecipients)) {
+            $smsSvc = app(HmsDltPortalSmsService::class);
+            $label  = $mismatchCount > 1 ? 'mismatches' : 'mismatch';
+            $detail = "Radiant {$parsedDate} {$mismatchCount} {$label} amount";
+            foreach ($smsRecipients as $rec) {
+                $res = $smsSvc->send($rec['mobile'], $rec['name'], $detail, 'radiant_mismatch');
+                if ($res['success']) {
+                    $smsSent++;
+                }
+            }
+            $this->log('info', 'check_and_alert.sms_batch_done', [
+                'date'      => $parsedDate,
+                'sms_sent'  => $smsSent,
+                'attempted' => count($smsRecipients),
+            ]);
+        }
+
+        $parts = [];
+        if ($emailSent) {
+            $parts[] = 'email to ' . count($toEmails) . ' address(es)';
+        } elseif (! empty($toEmails) && $emailError) {
+            $parts[] = 'email failed: ' . $emailError;
+        }
+        if ($smsSent > 0) {
+            $parts[] = "SMS {$smsSent}/" . count($smsRecipients);
+        } elseif (! empty($smsRecipients)) {
+            $parts[] = 'SMS not accepted for all numbers';
+        }
+        $summary = $parts !== [] ? implode('; ', $parts) : 'no channel succeeded';
 
         $out = [
-            'date'        => $parsedDate,
-            'found'       => true,
-            'total'       => $total,
-            'matched'     => $matchedCount,
-            'mismatch'    => $mismatchCount,
-            'email_sent'  => $emailSent,
-            'recipients'  => count($toEmails),
-            'all_matched' => false,
-            'message'     => "✓ {$parsedDate}: Alert sent to " . count($toEmails)
-                           . " recipient(s) — {$mismatchCount} mismatch(es) in {$total} records.",
+            'date'         => $parsedDate,
+            'found'        => true,
+            'total'        => $total,
+            'matched'      => $matchedCount,
+            'mismatch'     => $mismatchCount,
+            'email_sent'   => $emailSent,
+            'sms_sent'     => $smsSent,
+            'recipients'   => count($toEmails),
+            'all_matched'  => false,
+            'email_error'  => $emailError,
+            'message'      => "✓ {$parsedDate}: {$summary} — {$mismatchCount} mismatch(es) in {$total} records.",
         ];
 
         $this->log('info', 'check_and_alert.complete', [
-            'date'        => $parsedDate,
-            'email_sent'  => $emailSent,
-            'mismatch'    => $mismatchCount,
-            'matched'     => $matchedCount,
-            'total'       => $total,
+            'date'       => $parsedDate,
+            'email_sent' => $emailSent,
+            'sms_sent'   => $smsSent,
+            'mismatch'   => $mismatchCount,
+            'matched'    => $matchedCount,
+            'total'      => $total,
         ]);
 
         return $out;
@@ -350,8 +378,8 @@ class RadiantMismatchService
         return 'mismatch';
     }
 
-    /* ── Email recipients from Email Master ── */
-    private function resolveRecipients(): array
+    /** Active Email Master rows for Radiant (fallback: all active). */
+    private function radiantNotificationConfigs(): Collection
     {
         $configs = TblPoEmail::where('status', 1)
             ->where(function ($q) {
@@ -364,6 +392,14 @@ class RadiantMismatchService
             $configs = TblPoEmail::where('status', 1)->get();
         }
 
+        return $configs;
+    }
+
+    /* ── Email recipients from Email Master ── */
+    private function resolveRecipients(): array
+    {
+        $configs = $this->radiantNotificationConfigs();
+
         $toEmails = $configs
             ->map(fn ($r) => $r->to_email ?: $r->email)
             ->filter()->unique()->values()->toArray();
@@ -371,10 +407,34 @@ class RadiantMismatchService
         $ccEmails = $configs
             ->flatMap(function ($r) {
                 $cc = is_string($r->cc_emails) ? json_decode($r->cc_emails, true) : ($r->cc_emails ?? []);
+
                 return is_array($cc) ? $cc : [];
             })
             ->filter()->unique()->values()->toArray();
 
         return [$toEmails, $ccEmails];
+    }
+
+    /**
+     * @return list<array{mobile: string, name: string}>
+     */
+    private function resolveSmsRecipients(): array
+    {
+        $seen = [];
+        $out  = [];
+        foreach ($this->radiantNotificationConfigs() as $r) {
+            $raw = preg_replace('/\s+/u', '', (string) ($r->mobile_number ?? '')) ?? '';
+            if ($raw === '') {
+                continue;
+            }
+            if (isset($seen[$raw])) {
+                continue;
+            }
+            $seen[$raw] = true;
+            $name = trim((string) ($r->created_by ?? '')) ?: 'Team';
+            $out[] = ['mobile' => $raw, 'name' => $name];
+        }
+
+        return $out;
     }
 }

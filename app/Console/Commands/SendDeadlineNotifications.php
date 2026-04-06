@@ -1,21 +1,19 @@
 <?php
 namespace App\Console\Commands;
 
+use App\Models\TblPoEmail;
+use App\Services\HmsDltPortalSmsService;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Carbon\Carbon;
 
 class SendDeadlineNotifications extends Command
 {
     protected $signature   = 'notify:deadlines {--force : Clear today\'s sent records and re-send all notifications}';
-    protected $description = 'Send SMS, email and web notifications for due/overdue bills, POs and quotations';
-
-    private string $smsToken    = '55cefcfaa0bad65a743bcdba1d8b8a68';
-    private int    $smsCredit   = 3;
-    private string $smsSender   = 'DRAlVF';
-    private string $smsTemplate = '1707174037865605150';
+    protected $description = 'Send SMS, email and web alerts for due/overdue bills, POs, quotations, and timeline-end-today (Accounts Book recipients from po_email_tbl)';
 
     public function handle(): int
     {
@@ -33,19 +31,65 @@ class SendDeadlineNotifications extends Command
             ]);
         }
 
-        $recipients = DB::table('po_email_tbl')->get();
+        $recipients = $this->getDeadlineRecipients();
 
         if ($recipients->isEmpty()) {
-            $this->warn('No recipients found in po_email_tbl. Aborting.');
+            $this->warn('No recipients found (Accounts Book / active in po_email_tbl). Aborting.');
             return Command::SUCCESS;
         }
 
+        $this->info('Recipients (unique email/mobile from Email Master): ' . $recipients->count());
+
         $this->checkBills($today, $recipients);
+        $this->checkBillTimelines($today, $recipients);
         $this->checkPurchaseOrders($today, $recipients);
+        $this->checkPurchaseOrderTimelines($today, $recipients);
         $this->checkQuotations($today, $recipients);
+        $this->checkQuotationTimelines($today, $recipients);
 
         $this->info('Done.');
         return Command::SUCCESS;
+    }
+
+    /**
+     * Recipients from Email Master: active (status=1) and Accounts Book in menu_type (JSON or plain),
+     * same pattern as purchase approval / Radiant (filtered menu + fallback).
+     */
+    private function getDeadlineRecipients(): Collection
+    {
+        $configs = TblPoEmail::query()
+            ->where('status', 1)
+            ->where(function ($q) {
+                $q->where('menu_type', 'like', '%Accounts Book%')
+                    ->orWhere('menu_type', 'Accounts Book');
+            })
+            ->get();
+
+        if ($configs->isEmpty()) {
+            Log::warning('[DeadlineNotify] No po_email_tbl rows for Accounts Book; falling back to all active (status=1)');
+            $configs = TblPoEmail::query()->where('status', 1)->get();
+        }
+
+        $rows = [];
+        foreach ($configs as $r) {
+            $email  = trim((string) ($r->to_email ?: $r->email));
+            $mobile = trim((string) ($r->mobile_number ?? ''));
+            if ($email === '' && $mobile === '') {
+                continue;
+            }
+            $normMobile = preg_replace('/\D+/', '', $mobile);
+            $key        = strtolower($email) . '|' . $normMobile;
+            if (isset($rows[$key])) {
+                continue;
+            }
+            $rows[$key] = (object) [
+                'email'         => $email !== '' ? $email : null,
+                'mobile_number' => $mobile !== '' ? $mobile : null,
+                'created_by'    => $r->created_by ?? 'Team',
+            ];
+        }
+
+        return collect(array_values($rows));
     }
 
     private function checkBills(Carbon $today, $recipients): void
@@ -92,7 +136,7 @@ class SendDeadlineNotifications extends Command
             $vendor  = $bill->vendor_name ?? 'Vendor';
             $amount  = number_format((float)($bill->grand_total_amount ?? 0), 2);
 
-            $smsMsg = "ALERT: Bill {$number} for {$vendor} (Rs.{$amount}) is {$label}. Login: https://draravinds.com/hms";
+            $smsMsg = $this->compactSmsLine('bill', $number, $dueStatus);
 
             // FIX: compute label strings BEFORE putting them in double-quoted strings
             $emailSubLabel = ($dueStatus === 'due_today') ? 'Due Today' : 'OVERDUE';
@@ -109,6 +153,53 @@ class SendDeadlineNotifications extends Command
         }
 
         $this->info("Bills checked: {$bills->count()}");
+    }
+
+    /** bill_tbl.timeline_date is a SQL DATE column — notify when it is today. */
+    private function checkBillTimelines(Carbon $today, $recipients): void
+    {
+        $bills = DB::table('bill_tbl')
+            ->where('delete_status', 0)
+            ->whereNotIn('bill_status', ['paid', 'cancelled'])
+            ->whereNotNull('timeline_date')
+            ->whereDate('timeline_date', $today)
+            ->select(
+                'id',
+                'bill_gen_number',
+                'bill_number',
+                'vendor_name',
+                'timeline_date',
+                'grand_total_amount',
+                'bill_status'
+            )
+            ->get();
+
+        foreach ($bills as $bill) {
+            $tlDate = $this->parseNativeDateColumn($bill->timeline_date);
+            if (! $tlDate || ! $tlDate->isSameDay($today)) {
+                continue;
+            }
+
+            $dueStatus = 'timeline_today';
+            $label     = "Timeline ends TODAY ({$tlDate->format('d/m/Y')})";
+
+            $number = $bill->bill_gen_number ?? $bill->bill_number ?? "ID#{$bill->id}";
+            $vendor = $bill->vendor_name ?? 'Vendor';
+            $amount = number_format((float) ($bill->grand_total_amount ?? 0), 2);
+
+            $smsMsg = $this->compactSmsLine('bill', $number, 'timeline_today');
+
+            $emailSub = "Bill timeline ends today: {$number}";
+            $emailBody = $this->buildEmailBody('Bill', $number, $vendor, $amount, $label, 'bill_timeline');
+
+            $webTitle = "Bill timeline: {$number}";
+            $webMsg   = "Bill {$number} ({$vendor}) — {$label} — Rs.{$amount}";
+
+            $this->dispatchNotifications('bill_timeline', $bill->id, $number, $tlDate, $dueStatus,
+                $smsMsg, $emailSub, $emailBody, $webTitle, $webMsg, $recipients);
+        }
+
+        $this->info("Bill timelines (end today): {$bills->count()}");
     }
 
     private function checkPurchaseOrders(Carbon $today, $recipients): void
@@ -154,7 +245,7 @@ class SendDeadlineNotifications extends Command
             $vendor  = $po->vendor_name ?? 'Vendor';
             $amount  = number_format((float)($po->grand_total_amount ?? 0), 2);
 
-            $smsMsg = "ALERT: PO {$number} for {$vendor} (Rs.{$amount}) is {$label}. Login: https://app.draravindsivf.com/hrms/login";
+            $smsMsg = $this->compactSmsLine('po', $number, $dueStatus);
 
             // FIX: compute label strings BEFORE putting them in double-quoted strings
             $emailSubLabel = ($dueStatus === 'due_today') ? 'Due Today' : 'OVERDUE';
@@ -171,6 +262,56 @@ class SendDeadlineNotifications extends Command
         }
 
         $this->info("POs checked: {$pos->count()}");
+    }
+
+    /** purchase_order_tbl.timeline_date is stored like due_date (often d/m/Y). */
+    private function checkPurchaseOrderTimelines(Carbon $today, $recipients): void
+    {
+        $pos = DB::table('purchase_order_tbl')
+            ->where('delete_status', 0)
+            ->whereNotIn('status', ['received', 'cancelled', 'closed'])
+            ->whereNotNull('timeline_date')
+            ->where('timeline_date', '!=', '')
+            ->where(function ($query) use ($today) {
+                $query->whereRaw("STR_TO_DATE(timeline_date, '%d/%m/%Y') = ?", [$today])
+                    ->orWhereDate('timeline_date', $today);
+            })
+            ->select(
+                'id',
+                'purchase_gen_order',
+                'vendor_name',
+                'timeline_date',
+                'grand_total_amount',
+                'status'
+            )
+            ->get();
+
+        foreach ($pos as $po) {
+            $tlDate = $this->parseDate($po->timeline_date);
+            if (! $tlDate || ! $tlDate->isSameDay($today)) {
+                continue;
+            }
+
+            $dueStatus = 'timeline_today';
+            $label     = "Timeline ends TODAY ({$tlDate->format('d/m/Y')})";
+
+            $number = $po->purchase_gen_order ?? "PO-ID#{$po->id}";
+            $vendor = $po->vendor_name ?? 'Vendor';
+            $amount = number_format((float) ($po->grand_total_amount ?? 0), 2);
+
+            $smsMsg = $this->compactSmsLine('po', $number, 'timeline_today');
+
+            $emailSub = "PO timeline ends today: {$number}";
+            $emailBody = $this->buildEmailBody('Purchase Order', $number, $vendor, $amount, $label, 'po_timeline');
+
+            $webTitle = "PO timeline: {$number}";
+            $webMsg   = "PO {$number} ({$vendor}) — {$label} — Rs.{$amount}";
+
+            $this->dispatchNotifications('po_timeline', $po->id, $number, $tlDate, $dueStatus,
+                $smsMsg, $emailSub, $emailBody, $webTitle, $webMsg, $recipients);
+        }
+
+        $this->info("PO timelines (end today): {$pos->count()}");
     }
 
     private function checkQuotations(Carbon $today, $recipients): void
@@ -215,7 +356,7 @@ class SendDeadlineNotifications extends Command
             $vendor  = $q->vendor_name ?? 'Vendor';
             $amount  = number_format((float)($q->grand_total_amount ?? 0), 2);
 
-            $smsMsg = "ALERT: Quotation {$number} for {$vendor} (Rs.{$amount}) is {$label}. Login: https://app.draravindsivf.com/hrms/login";
+            $smsMsg = $this->compactSmsLine('quotation', $number, $dueStatus);
 
             // FIX: compute label strings BEFORE putting them in double-quoted strings
             $emailSubLabel = ($dueStatus === 'due_today') ? 'Due Today' : 'OVERDUE';
@@ -234,6 +375,55 @@ class SendDeadlineNotifications extends Command
         $this->info("Quotations checked: {$quotes->count()}");
     }
 
+    private function checkQuotationTimelines(Carbon $today, $recipients): void
+    {
+        $quotes = DB::table('quotation_order_tbl')
+            ->where('delete_status', 0)
+            ->whereNotIn('status', ['approved', 'rejected', 'cancelled'])
+            ->whereNotNull('timeline_date')
+            ->where('timeline_date', '!=', '')
+            ->where(function ($query) use ($today) {
+                $query->whereRaw("STR_TO_DATE(timeline_date, '%d/%m/%Y') = ?", [$today])
+                    ->orWhereDate('timeline_date', $today);
+            })
+            ->select(
+                'id',
+                'quotation_gen_no',
+                'vendor_name',
+                'timeline_date',
+                'grand_total_amount',
+                'status'
+            )
+            ->get();
+
+        foreach ($quotes as $q) {
+            $tlDate = $this->parseDate($q->timeline_date);
+            if (! $tlDate || ! $tlDate->isSameDay($today)) {
+                continue;
+            }
+
+            $dueStatus = 'timeline_today';
+            $label     = "Timeline ends TODAY ({$tlDate->format('d/m/Y')})";
+
+            $number = $q->quotation_gen_no ?? "QT-ID#{$q->id}";
+            $vendor = $q->vendor_name ?? 'Vendor';
+            $amount = number_format((float) ($q->grand_total_amount ?? 0), 2);
+
+            $smsMsg = $this->compactSmsLine('quotation', $number, 'timeline_today');
+
+            $emailSub = "Quotation timeline ends today: {$number}";
+            $emailBody = $this->buildEmailBody('Quotation', $number, $vendor, $amount, $label, 'quotation_timeline');
+
+            $webTitle = "Quotation timeline: {$number}";
+            $webMsg   = "Quotation {$number} ({$vendor}) — {$label} — Rs.{$amount}";
+
+            $this->dispatchNotifications('quotation_timeline', $q->id, $number, $tlDate, $dueStatus,
+                $smsMsg, $emailSub, $emailBody, $webTitle, $webMsg, $recipients);
+        }
+
+        $this->info("Quotation timelines (end today): {$quotes->count()}");
+    }
+
     private function dispatchNotifications(
         string $type,
         int    $recordId,
@@ -248,9 +438,9 @@ class SendDeadlineNotifications extends Command
                $recipients
     ): void {
         foreach ($recipients as $recipient) {
-            $email  = $recipient->email        ?? null;
+            $email  = $recipient->email ?? $recipient->to_email ?? null;
             $mobile = $recipient->mobile_number ?? null;
-            $name   = $recipient->created_by   ?? 'Team';
+            $name   = $recipient->created_by ?? 'Team';
 
             if ($mobile) {
                 if ($this->alreadySent($type, $recordId, 'sms', $dueStatus)) {
@@ -276,50 +466,47 @@ class SendDeadlineNotifications extends Command
         }
     }
 
+    /**
+     * Short text for the single DLT variable after "Dear " (bill/PO/QT id + status).
+     * Example: "DAP-BILL-040 overdue amount", "PO GEN-1 timeline end amount".
+     */
+    private function compactSmsLine(string $recordType, string $number, string $dueStatus): string
+    {
+        $n = trim($number);
+        $prefix = match ($recordType) {
+            'po' => 'PO ',
+            'quotation' => 'QT ',
+            default => '',
+        };
+
+        $state = match ($dueStatus) {
+            'timeline_today' => 'timeline end amount',
+            'due_today' => 'due today',
+            'overdue' => 'overdue amount',
+            default => 'alert',
+        };
+
+        return trim("{$prefix}{$n} {$state}");
+    }
+
     private function sendSms(
         string $mobile, string $name, string $detailMsg,
         string $type, int $recordId, string $number,
         Carbon $dueDate, string $dueStatus
     ): void {
-        // MUST use the DLT-registered template — any other text is silently blocked
-        // by the telecom operator even though the API returns "Sent".
-        // Must match the DLT-registered template EXACTLY (templateid 1707174037865605150).
-        // "HMS" vs "HRMS" or a different URL causes silent delivery failure at the
-        // telecom level even though the gateway API still returns "Sent".
-        $templateMsg = "Dear {$name}, You have received a notification in Dr. Aravind's IVF HRMS portal. Please log in and view it at https://app.draravindsivf.com/hrms/login";
+        $smsSvc = app(HmsDltPortalSmsService::class);
+        $result = $smsSvc->send($mobile, $name, $detailMsg, 'deadline_notify');
+        $gatewayOk = $result['success'];
+        $responseStr = $result['response'] ?? '';
+        $curlErr = $result['curl_error'] ?? '';
+        $failDetail = $curlErr !== '' ? $curlErr : (! $gatewayOk ? $responseStr : null);
 
-        $finalUrl = "http://pay4sms.in/sendsms/?"
-            . 'token='       . $this->smsToken
-            . '&credit='     . $this->smsCredit
-            . '&sender='     . $this->smsSender
-            . '&message='    . urlencode($templateMsg)
-            . '&number='     . $mobile
-            . '&templateid=' . $this->smsTemplate;
-
-        Log::info("[DeadlineNotify][SMS] Sending to {$mobile}", [
-            'type' => $type, 'number' => $number, 'template_msg' => $templateMsg,
+        Log::info("[DeadlineNotify][SMS] Dispatch to {$mobile}", [
+            'type' => $type,
+            'number' => $number,
+            'dlt_var' => $result['greeting_var'] ?? '',
+            'template_msg' => $result['template_msg'] ?? '',
         ]);
-        $this->info("finalUrl: ".$finalUrl);
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $finalUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        $response = curl_exec($ch);
-        $curlErr  = curl_error($ch);
-        curl_close($ch);
-
-        $success = ($response !== false) && empty($curlErr);
-
-        if ($success) {
-            Log::info("[DeadlineNotify][SMS] Sent OK", [
-                'mobile' => $mobile, 'response' => $response,
-            ]);
-        } else {
-            Log::error("[DeadlineNotify][SMS] FAILED", [
-                'mobile' => $mobile, 'curl_error' => $curlErr, 'response' => $response,
-            ]);
-        }
 
         try {
             DB::table('deadline_notifications')->insert([
@@ -329,9 +516,9 @@ class SendDeadlineNotifications extends Command
                 'recipient_mobile' => $mobile,
                 'recipient_name'   => $name,
                 'channel'          => 'sms',
-                'status'           => $success ? 'sent' : 'failed',
+                'status'           => $gatewayOk ? 'sent' : 'failed',
                 'message'          => $detailMsg,
-                'error'            => $curlErr ?: null,
+                'error'            => $failDetail,
                 'due_date'         => $dueDate->toDateString(),
                 'due_status'       => $dueStatus,
                 'created_at'       => now(),
@@ -343,8 +530,8 @@ class SendDeadlineNotifications extends Command
             ]);
         }
 
-        $this->line("  SMS to {$mobile} [{$type} {$number}] "
-            . ($success ? 'sent (response: ' . $response . ')' : 'FAILED: ' . $curlErr));
+        $this->line('  SMS to ' . $mobile . " [{$type} {$number}] "
+            . ($gatewayOk ? 'sent (response: ' . $responseStr . ')' : 'FAILED: ' . ($failDetail ?: 'unknown')));
     }
 
     private function sendEmail(
@@ -401,9 +588,12 @@ class SendDeadlineNotifications extends Command
         Carbon $dueDate, string $dueStatus
     ): void {
         $urlMap = [
-            'bill'      => "/superadmin/bill_dashboard?id={$recordId}",
-            'po'        => "/superadmin/purchase_dashboard?id={$recordId}",
-            'quotation' => "/superadmin/quotation_dashboard?id={$recordId}",
+            'bill'                => "/superadmin/bill_dashboard?id={$recordId}",
+            'bill_timeline'       => "/superadmin/bill_dashboard?id={$recordId}",
+            'po'                  => "/superadmin/purchase_dashboard?id={$recordId}",
+            'po_timeline'         => "/superadmin/purchase_dashboard?id={$recordId}",
+            'quotation'           => "/superadmin/quotation_dashboard?id={$recordId}",
+            'quotation_timeline'  => "/superadmin/quotation_dashboard?id={$recordId}",
         ];
 
         Log::info("[DeadlineNotify][Web] Creating notification", [
@@ -477,6 +667,19 @@ class SendDeadlineNotifications extends Command
         try { return Carbon::createFromFormat('d/m/Y', $value); } catch (\Exception $e) {}
         try { return Carbon::parse($value); }                    catch (\Exception $e) {}
         return null;
+    }
+
+    /** For MySQL DATE / datetime columns (e.g. bill_tbl.timeline_date). */
+    private function parseNativeDateColumn($value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        try {
+            return Carbon::parse($value)->startOfDay();
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     private function buildEmailBody(

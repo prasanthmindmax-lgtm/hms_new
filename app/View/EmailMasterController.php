@@ -50,9 +50,6 @@ class EmailMasterController extends Controller
     /* ── Store / Update ── */
     public function store(Request $request)
     {
-        // jQuery JSON POSTs sometimes do not populate $request->input(); merge body explicitly.
-        $this->mergeJsonBodyIntoRequest($request);
-
         $request->validate([
             'to_email'      => 'required|email',
             'label'         => 'nullable|string|max:120',
@@ -65,41 +62,30 @@ class EmailMasterController extends Controller
         ]);
 
         $admin = auth()->user();
-        $cc    = $this->normalizeStringListInput($request->input('cc_emails'));
-        $menus = $this->normalizeStringListInput($request->input('menu_types'));
+        $cc    = array_values(array_filter($request->input('cc_emails', [])));
+        $menus = array_values(array_filter($request->input('menu_types', [])));
 
-        $label = $request->filled('label') ? trim((string) $request->label) : null;
-        $to    = trim((string) $request->to_email);
-        $mobile = $request->filled('mobile_number') ? trim((string) $request->mobile_number) : null;
-        if ($mobile === '') {
-            $mobile = null;
-        }
+        $data = [
+            'label'         => $request->label,
+            'to_email'      => $request->to_email,
+            'email'         => $request->to_email,
+            'cc_emails'     => json_encode($cc),
+            'menu_type'     => json_encode($menus),
+            'mobile_number' => $request->mobile_number,
+            'status'        => (int) $request->status,
+            'user_id'       => $admin->id,
+            'created_by'    => $admin->user_fullname ?? $admin->name,
+        ];
 
-        $id = $request->input('id');
+        $id = $request->id;
 
         if ($id) {
-            $rec = TblPoEmail::findOrFail($id);
-            $rec->label         = $label;
-            $rec->to_email      = $to;
-            $rec->email         = $to;
-            $rec->cc_emails     = $cc;
-            $rec->menu_type     = json_encode($menus);
-            $rec->mobile_number = $mobile;
-            $rec->status        = (int) $request->status;
-            $rec->save();
+            unset($data['user_id'], $data['created_by']);
+            TblPoEmail::where('id', $id)->update($data);
             $msg = 'Email config updated successfully!';
         } else {
-            TblPoEmail::create([
-                'label'         => $label,
-                'to_email'      => $to,
-                'email'         => $to,
-                'cc_emails'     => $cc,
-                'menu_type'     => json_encode($menus),
-                'mobile_number' => $mobile,
-                'status'        => (int) $request->status,
-                'user_id'       => $admin->id,
-                'created_by'    => $admin->user_fullname ?? $admin->name,
-            ]);
+            $data['created_at'] = now();
+            TblPoEmail::create($data);
             $msg = 'Email config added successfully!';
         }
 
@@ -180,48 +166,5 @@ class EmailMasterController extends Controller
         if (!$val) return [];
         $decoded = json_decode($val, true);
         return is_array($decoded) ? $decoded : [];
-    }
-
-    /**
-     * Merge JSON request body into the request bag (fixes empty input() for AJAX JSON from jQuery).
-     */
-    private function mergeJsonBodyIntoRequest(Request $request): void
-    {
-        $ct = strtolower((string) $request->header('Content-Type', ''));
-        if (! str_contains($ct, 'json')) {
-            return;
-        }
-
-        $payload = $request->json()->all();
-        if ($payload === [] || $payload === null) {
-            $raw = $request->getContent();
-            if (is_string($raw) && $raw !== '') {
-                $decoded = json_decode($raw, true);
-                $payload = is_array($decoded) ? $decoded : [];
-            }
-        }
-
-        if (is_array($payload) && $payload !== []) {
-            $request->merge($payload);
-        }
-    }
-
-    /**
-     * @param  mixed  $value
-     * @return array<int, string>
-     */
-    private function normalizeStringListInput($value): array
-    {
-        if (is_array($value)) {
-            return array_values(array_filter(array_map('trim', $value), fn ($s) => $s !== ''));
-        }
-        if (is_string($value) && $value !== '') {
-            $decoded = json_decode($value, true);
-            if (is_array($decoded)) {
-                return array_values(array_filter(array_map('trim', $decoded), fn ($s) => $s !== ''));
-            }
-        }
-
-        return [];
     }
 }

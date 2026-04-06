@@ -132,6 +132,16 @@ return [
             'replace_placeholders' => true,
         ],
 
+
+        /* HMS Pay4SMS / DLT — full payload (token redacted), vars, gateway body, HTTP code */
+        'hms_dlt_sms' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/hms-dlt-sms.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

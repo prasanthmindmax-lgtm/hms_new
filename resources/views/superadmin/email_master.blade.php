@@ -744,16 +744,22 @@ function saveRecord() {
   if (ccPending) { addCC(ccPending); document.getElementById('ccInput').value = ''; }
 
   $.ajax({
-    url:         urlStore,
-    type:        'POST',
-    contentType: 'application/json',
+    url:          urlStore,
+    type:         'POST',
+    processData:  false,
+    contentType:  'application/json; charset=UTF-8',
+    headers:      {
+      'X-CSRF-TOKEN': CSRF,
+      'Accept':       'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
     data: JSON.stringify({
-      _token:       CSRF,
-      id:           id || null,
+      _token:        CSRF,
+      id:            id ? parseInt(id, 10) : null,
       label,
-      to_email:     toEmail,
-      cc_emails:    ccTags,
-      menu_types:   selectedMenus,
+      to_email:      toEmail,
+      cc_emails:     ccTags,
+      menu_types:    selectedMenus,
       mobile_number: mobile,
       status,
     }),
