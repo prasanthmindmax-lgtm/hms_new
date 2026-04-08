@@ -13,8 +13,11 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class TicketExport implements FromCollection, WithHeadings, WithEvents
 {
-    public function __construct(protected Collection $tickets)
+    protected Collection $tickets;
+
+    public function __construct(Collection $tickets)
     {
+        $this->tickets = $tickets;
     }
 
     public function collection(): Collection
