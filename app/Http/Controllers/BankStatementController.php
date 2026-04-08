@@ -17,8 +17,22 @@ class BankStatementController extends Controller
     public function index()
     {
         $admin = Auth::user();
-        
-        return view('bank-reconciliation.index', compact('admin'));
+        $bankAccountsEnabled = Schema::hasTable('bank_reconciliation_accounts')
+            && Schema::hasColumn('bank_statements', 'bank_account_id');
+
+        return view('bank-reconciliation.index', compact('admin', 'bankAccountsEnabled'));
+    }
+
+    /**
+     * Batch upload history page (AJAX table, no full reload).
+     */
+    public function batchUploadPage()
+    {
+        $admin = Auth::user();
+        $bankAccountsEnabled = Schema::hasTable('bank_reconciliation_accounts')
+            && Schema::hasColumn('bank_statements', 'bank_account_id');
+
+        return view('bank-reconciliation.batch_upload', compact('admin', 'bankAccountsEnabled'));
     }
     
     /**
@@ -104,13 +118,18 @@ class BankStatementController extends Controller
     // }
     public function upload(Request $request)
     {
-        $request->validate([
-            'excel_file' => 'required|mimes:xlsx,xls|max:10240'
-        ]);
+        $rules = [
+            'excel_file' => 'required|mimes:xlsx,xls|max:10240',
+        ];
+        if (Schema::hasTable('bank_reconciliation_accounts') && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+            $rules['bank_account_id'] = 'required|exists:bank_reconciliation_accounts,id';
+        }
+        $request->validate($rules);
 
         try {
             $file     = $request->file('excel_file');
-            $fileName = time() . '_' . $file->getClientOriginalName();
+            $originalName = $file->getClientOriginalName();
+            $fileName = time() . '_' . $originalName;
             $filePath = $file->move(public_path('bank_statements'), $fileName);
 
             // Load the spreadsheet
@@ -121,6 +140,10 @@ class BankStatementController extends Controller
             // Generate a unique batch ID for this upload
             $batchId  = uniqid('BATCH_');
             $userId   = Auth::id();
+            $bankAccountId = null;
+            if (Schema::hasColumn('bank_statements', 'bank_account_id') && $request->filled('bank_account_id')) {
+                $bankAccountId = (int) $request->bank_account_id;
+            }
 
             $insertedCount  = 0;
             $duplicateCount = 0;
@@ -172,7 +195,7 @@ class BankStatementController extends Controller
                 $referenceNumber = $this->extractReference($description, $chequeNumber);
 
                 // ── Insert into database ──────────────────────────────────
-                DB::table('bank_statements')->insert([
+                $insertRow = [
                     'user_id'                  => $userId,
                     'upload_batch_id'          => $batchId,
                     'file_name'                => $fileName,
@@ -190,9 +213,28 @@ class BankStatementController extends Controller
                     'match_status'             => 'unmatched',
                     'created_at'               => now(),
                     'updated_at'               => now(),
-                ]);
+                ];
+                if ($bankAccountId !== null) {
+                    $insertRow['bank_account_id'] = $bankAccountId;
+                }
+                DB::table('bank_statements')->insert($insertRow);
 
                 $insertedCount++;
+            }
+
+            if (Schema::hasTable('bank_statement_upload_batches') && $bankAccountId !== null) {
+                DB::table('bank_statement_upload_batches')->insert([
+                    'bank_account_id'    => $bankAccountId,
+                    'upload_batch_id'    => $batchId,
+                    'original_file_name' => $originalName,
+                    'stored_file_name'   => $fileName,
+                    'rows_imported'      => $insertedCount,
+                    'duplicates'         => $duplicateCount,
+                    'skipped'            => $skippedCount,
+                    'user_id'            => $userId,
+                    'created_at'         => now(),
+                    'updated_at'         => now(),
+                ]);
             }
 
             // Build a human-readable summary message
@@ -241,6 +283,10 @@ class BankStatementController extends Controller
             $select[] = 'radiant_user.user_fullname as radiant_matched_by_name';
             $select[] = 'radiant_user.username as radiant_matched_by_username';
         }
+        if (Schema::hasColumn('bank_statements', 'bank_account_id') && Schema::hasTable('bank_reconciliation_accounts')) {
+            $select[] = 'bra.account_number as bank_account_number';
+            $select[] = 'bra.bank_name as bank_account_bank_name';
+        }
 
         $query = DB::table('bank_statements as bs')
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
@@ -248,11 +294,18 @@ class BankStatementController extends Controller
         if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
             $query->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id');
         }
+        if (Schema::hasColumn('bank_statements', 'bank_account_id') && Schema::hasTable('bank_reconciliation_accounts')) {
+            $query->leftJoin('bank_reconciliation_accounts as bra', 'bs.bank_account_id', '=', 'bra.id');
+        }
         $query->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
             ->select($select)
             ->orderBy('bs.transaction_date', 'desc')
             ->orderBy('bs.id', 'desc');
-        
+
+        if ($request->filled('bank_account_id') && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+            $query->where('bs.bank_account_id', (int) $request->bank_account_id);
+        }
+
         // Apply filters - Date Range
         if ($request->filled('date_from')) {
             $query->whereRaw(
@@ -353,8 +406,11 @@ class BankStatementController extends Controller
         
         // Reference Number
         if ($request->filled('reference_number')) {
-            $query->where('bs.reference_number', 'LIKE', '%' . $request->reference_number . '%')
-            ->orWhere('bs.transaction_id', 'LIKE', '%' . $request->reference_number . '%');
+            $ref = $request->reference_number;
+            $query->where(function ($q) use ($ref) {
+                $q->where('bs.reference_number', 'LIKE', '%' . $ref . '%')
+                    ->orWhere('bs.transaction_id', 'LIKE', '%' . $ref . '%');
+            });
         }
         // General Search (Description, Reference, Cheque)
         if ($request->filled('search')) {
@@ -1226,7 +1282,11 @@ class BankStatementController extends Controller
             $deletedCount = DB::table('bank_statements')
                 ->where('upload_batch_id', $batchId)
                 ->delete();
-            
+
+            if (Schema::hasTable('bank_statement_upload_batches')) {
+                DB::table('bank_statement_upload_batches')->where('upload_batch_id', $batchId)->delete();
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => "Deleted {$deletedCount} statements successfully"
@@ -1239,7 +1299,276 @@ class BankStatementController extends Controller
             ], 500);
         }
     }
-    
+
+    /**
+     * JSON list of bank accounts (for dropdowns).
+     */
+    public function listBankAccounts()
+    {
+        if (! Schema::hasTable('bank_reconciliation_accounts')) {
+            return response()->json(['data' => []]);
+        }
+        $rows = DB::table('bank_reconciliation_accounts')
+            ->orderBy('bank_name')
+            ->orderBy('account_number')
+            ->get([
+                'id',
+                'account_number',
+                'bank_name',
+                'branch_name',
+                'ifsc_code',
+                'account_holder_name',
+                'notes',
+                'updated_at',
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /**
+     * Store a bank account master row.
+     */
+    public function storeBankAccount(Request $request)
+    {
+        if (! Schema::hasTable('bank_reconciliation_accounts')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Run database migrations to enable bank accounts.',
+            ], 503);
+        }
+
+        $request->validate([
+            'account_number'        => 'required|string|max:64|unique:bank_reconciliation_accounts,account_number',
+            'bank_name'             => 'nullable|string|max:191',
+            'branch_name'           => 'nullable|string|max:191',
+            'ifsc_code'             => 'nullable|string|max:32',
+            'account_holder_name'   => 'nullable|string|max:191',
+            'notes'                 => 'nullable|string|max:2000',
+        ]);
+
+        $id = DB::table('bank_reconciliation_accounts')->insertGetId([
+            'account_number'      => trim($request->account_number),
+            'bank_name'           => $request->bank_name ? trim($request->bank_name) : null,
+            'branch_name'         => $request->branch_name ? trim($request->branch_name) : null,
+            'ifsc_code'           => $request->ifsc_code ? trim($request->ifsc_code) : null,
+            'account_holder_name' => $request->account_holder_name ? trim($request->account_holder_name) : null,
+            'notes'               => $request->notes ? trim($request->notes) : null,
+            'created_at'          => now(),
+            'updated_at'          => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account saved.',
+            'account' => DB::table('bank_reconciliation_accounts')->where('id', $id)->first(),
+        ]);
+    }
+
+    /**
+     * Update an existing bank account master row.
+     */
+    public function updateBankAccount(Request $request, $id)
+    {
+        if (! Schema::hasTable('bank_reconciliation_accounts')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Run database migrations to enable bank accounts.',
+            ], 503);
+        }
+
+        $id = (int) $id;
+        $exists = DB::table('bank_reconciliation_accounts')->where('id', $id)->exists();
+        if (! $exists) {
+            return response()->json(['success' => false, 'message' => 'Account not found.'], 404);
+        }
+
+        $request->validate([
+            'account_number'        => 'required|string|max:64|unique:bank_reconciliation_accounts,account_number,' . $id,
+            'bank_name'             => 'nullable|string|max:191',
+            'branch_name'           => 'nullable|string|max:191',
+            'ifsc_code'             => 'nullable|string|max:32',
+            'account_holder_name'   => 'nullable|string|max:191',
+            'notes'                 => 'nullable|string|max:2000',
+        ]);
+
+        DB::table('bank_reconciliation_accounts')->where('id', $id)->update([
+            'account_number'      => trim($request->account_number),
+            'bank_name'           => $request->bank_name ? trim($request->bank_name) : null,
+            'branch_name'         => $request->branch_name ? trim($request->branch_name) : null,
+            'ifsc_code'           => $request->ifsc_code ? trim($request->ifsc_code) : null,
+            'account_holder_name' => $request->account_holder_name ? trim($request->account_holder_name) : null,
+            'notes'               => $request->notes ? trim($request->notes) : null,
+            'updated_at'          => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account updated.',
+            'account' => DB::table('bank_reconciliation_accounts')->where('id', $id)->first(),
+        ]);
+    }
+
+    /**
+     * Paginated upload batches (master) with filters.
+     */
+    public function listUploadBatches(Request $request)
+    {
+        if (! Schema::hasTable('bank_statement_upload_batches')) {
+            return response()->json([
+                'data'         => [],
+                'current_page' => 1,
+                'last_page'    => 1,
+                'per_page'     => (int) $request->get('per_page', 25),
+                'total'        => 0,
+                'from'         => null,
+                'to'           => null,
+            ]);
+        }
+
+        $q = DB::table('bank_statement_upload_batches as b')
+            ->join('bank_reconciliation_accounts as a', 'b.bank_account_id', '=', 'a.id')
+            ->leftJoin('users as u', 'b.user_id', '=', 'u.id')
+            ->select([
+                'b.id',
+                'b.upload_batch_id',
+                'b.original_file_name',
+                'b.stored_file_name',
+                'b.rows_imported',
+                'b.duplicates',
+                'b.skipped',
+                'b.created_at',
+                'a.account_number',
+                'a.bank_name',
+                'u.user_fullname as uploaded_by_name',
+                'u.username as uploaded_by_username',
+            ])
+            ->orderBy('b.id', 'desc');
+
+        if ($request->filled('account_number')) {
+            $term = '%' . $request->account_number . '%';
+            $q->where('a.account_number', 'LIKE', $term);
+        }
+
+        if ($request->filled('file_name')) {
+            $q->where('b.original_file_name', 'LIKE', '%' . $request->file_name . '%');
+        }
+
+        if ($request->filled('uploaded_by')) {
+            $search = '%' . $request->uploaded_by . '%';
+            $q->where(function ($w) use ($search) {
+                $w->where('u.user_fullname', 'LIKE', $search)
+                    ->orWhere('u.username', 'LIKE', $search);
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $q->whereDate('b.created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $q->whereDate('b.created_at', '<=', $request->date_to);
+        }
+
+        $perPage = max(5, min(100, (int) $request->get('per_page', 25)));
+
+        return response()->json($q->paginate($perPage));
+    }
+
+    /**
+     * Download the original uploaded file for a batch (by upload_batch_id).
+     */
+    public function downloadBatchFile(string $uploadBatchId)
+    {
+        if (! Schema::hasTable('bank_statement_upload_batches')) {
+            abort(404);
+        }
+        $batch = DB::table('bank_statement_upload_batches')->where('upload_batch_id', $uploadBatchId)->first();
+        if (! $batch) {
+            abort(404);
+        }
+        $path = public_path('bank_statements/' . $batch->stored_file_name);
+        if (! is_file($path)) {
+            abort(404, 'File no longer on disk.');
+        }
+
+        return response()->download($path, $batch->original_file_name);
+    }
+
+    /**
+     * Paginated rows from bank_statements for batch preview (full upload, AJAX pages).
+     */
+    public function previewBatch(Request $request, string $uploadBatchId)
+    {
+        if (! Schema::hasTable('bank_statement_upload_batches')) {
+            return response()->json([
+                'batch'      => null,
+                'rows'       => [],
+                'total'      => 0,
+                'per_page'   => 25,
+                'current_page' => 1,
+                'last_page'  => 1,
+                'from'       => null,
+                'to'         => null,
+            ]);
+        }
+        $batch = DB::table('bank_statement_upload_batches as b')
+            ->join('bank_reconciliation_accounts as a', 'b.bank_account_id', '=', 'a.id')
+            ->leftJoin('users as u', 'b.user_id', '=', 'u.id')
+            ->where('b.upload_batch_id', $uploadBatchId)
+            ->select([
+                'b.id',
+                'b.upload_batch_id',
+                'b.original_file_name',
+                'b.rows_imported',
+                'b.duplicates',
+                'b.skipped',
+                'b.created_at',
+                'a.account_number',
+                'a.bank_name',
+                'u.user_fullname as uploaded_by_name',
+                'u.username as uploaded_by_username',
+            ])
+            ->first();
+
+        if (! $batch) {
+            return response()->json(['batch' => null, 'rows' => []], 404);
+        }
+
+        $perPage = max(5, min(100, (int) $request->get('per_page', 25)));
+        $page    = max(1, (int) $request->get('page', 1));
+
+        $columns = [
+            'id',
+            'transaction_date',
+            'value_date',
+            'transaction_id',
+            'transaction_posted_date',
+            'reference_number',
+            'cheque_number',
+            'description',
+            'withdrawal',
+            'deposit',
+            'balance',
+            'category',
+            'match_status',
+        ];
+
+        $paginator = DB::table('bank_statements')
+            ->where('upload_batch_id', $uploadBatchId)
+            ->orderBy('id')
+            ->paginate($perPage, $columns, 'page', $page);
+
+        return response()->json([
+            'batch'         => $batch,
+            'rows'          => $paginator->items(),
+            'total'         => $paginator->total(),
+            'per_page'      => $paginator->perPage(),
+            'current_page'  => $paginator->currentPage(),
+            'last_page'     => $paginator->lastPage(),
+            'from'          => $paginator->firstItem(),
+            'to'            => $paginator->lastItem(),
+        ]);
+    }
+
     /**
      * Helper: Parse date from Excel
      */

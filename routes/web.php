@@ -716,6 +716,14 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
         Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
         Route::post('/radiant-unmatch/{id}', [BankStatementController::class, 'unmatchRadiant'])->name('radiant-unmatch');
+        // Bank account master & batch history
+        Route::get('/batch-uploads', [BankStatementController::class, 'batchUploadPage'])->name('batch-uploads');
+        Route::get('/accounts', [BankStatementController::class, 'listBankAccounts'])->name('accounts');
+        Route::post('/accounts', [BankStatementController::class, 'storeBankAccount'])->name('accounts.store');
+        Route::put('/accounts/{id}', [BankStatementController::class, 'updateBankAccount'])->name('accounts.update');
+        Route::get('/upload-batches', [BankStatementController::class, 'listUploadBatches'])->name('upload-batches');
+        Route::get('/batch-file/{uploadBatchId}', [BankStatementController::class, 'downloadBatchFile'])->name('batch-file');
+        Route::get('/batch-preview/{uploadBatchId}', [BankStatementController::class, 'previewBatch'])->name('batch-preview');
     });
 
     //income new stats

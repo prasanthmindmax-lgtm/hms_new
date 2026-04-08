@@ -101,6 +101,14 @@ body {
 
 
 
+/* Sticky toolbar above statements table (page scroll) */
+.bank-recon-statements-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
 /* Table wrapper - overflow so table doesn't stretch page */
 .bank-recon-table-wrap {
     overflow-x: auto;
@@ -108,6 +116,30 @@ body {
     max-height: 70vh;
     margin-bottom: 1rem;
 }
+
+/* Column headers stay visible while scrolling statement rows */
+.bank-recon-table-wrap #statementsTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    box-shadow: 0 1px 0 #dee2e6;
+}
+
+/* Batch master table (embedded or standalone): scroll + sticky header */
+.bank-recon-batch-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.bank-recon-batch-table-wrap #batchMasterTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background-color: #e9ecef !important;
+    box-shadow: 0 1px 0 #dee2e6;
+}
+
 #statementsTable {
     margin-bottom: 0;
     min-width: 900px;
@@ -685,4 +717,273 @@ body > .daterangepicker {
 #possibleMatchesList::-webkit-scrollbar-thumb {
     background: #667eea;
     border-radius: 3px;
+}
+
+/* ========== Batch preview modal (full data + pagination) ========== */
+.br-bpv-dialog.modal-xl {
+    max-width: min(1240px, 98vw);
+}
+
+.br-bpv-modal-content {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+}
+
+.br-bpv-modal-header {
+    background: linear-gradient(125deg, #0f172a 0%, #312e81 45%, #5b21b6 100%);
+    padding: 1rem 1.25rem;
+}
+
+.br-bpv-modal-header .btn-close,
+.br-bpv-modal-header .btn-close-white {
+    opacity: 0.85;
+    filter: brightness(0) invert(1);
+}
+
+.br-bpv-modal-body {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.br-bpv-root {
+    padding: 1rem 1.25rem 1.25rem;
+}
+
+.br-bpv-meta {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.br-bpv-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem 1.25rem;
+}
+
+.br-bpv-meta-item.br-bpv-meta-wide {
+    grid-column: 1 / -1;
+}
+
+.br-bpv-meta-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 2px;
+}
+
+.br-bpv-meta-value {
+    font-size: 13px;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.br-bpv-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+}
+
+.br-bpv-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.br-bpv-pill-ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.br-bpv-pill-warn {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.br-bpv-pill-muted {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.br-bpv-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.br-bpv-perpage {
+    border-radius: 8px;
+    border-color: #cbd5e1;
+}
+
+#brBpvTableHost {
+    position: relative;
+    transition: opacity 0.15s ease;
+}
+
+#brBpvTableHost.br-bpv-table-host-updating {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.br-bpv-table-scroll {
+    max-height: min(52vh, 520px);
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.br-bpv-table-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.br-bpv-table-scroll::-webkit-scrollbar-thumb {
+    background: #a5b4fc;
+    border-radius: 4px;
+}
+
+.br-bpv-table {
+    width: 100%;
+    font-size: 12px;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.br-bpv-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+    color: #e0e7ff;
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 10px 8px;
+    border-bottom: 2px solid #4338ca;
+    white-space: nowrap;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.br-bpv-table tbody td {
+    padding: 8px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.br-bpv-table tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.br-bpv-table tbody tr:hover {
+    background: #eef2ff;
+}
+
+.br-bpv-th-num,
+.br-bpv-td-num {
+    width: 44px;
+    text-align: center;
+}
+
+.br-bpv-desc {
+    max-width: 220px;
+}
+
+.br-bpv-desc-inner {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.35;
+}
+
+.br-bpv-neg {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.br-bpv-pos {
+    color: #047857;
+    font-weight: 600;
+}
+
+.br-bpv-balance {
+    color: #0f172a;
+}
+
+.br-bpv-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.br-bpv-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.br-bpv-st-matched {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.br-bpv-st-unmatched {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.br-bpv-st-partially_matched,
+.br-bpv-st-partiallymatched {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.br-bpv-st-none {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.br-bpv-nav .page-link {
+    border-radius: 8px;
+    margin: 0 2px;
+    color: #4338ca;
+    border-color: #e2e8f0;
+}
+
+.br-bpv-nav .page-item.active .page-link {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    border-color: transparent;
+    color: #fff;
+}
+
+.br-bpv-spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 3px;
+    color: #4f46e5 !important;
 }

@@ -202,6 +202,7 @@
             width: 100%;
         }
         .income-tag-date-input::placeholder { color: #94a3b8; }
+        .batch-toolbar .form-control, .batch-toolbar .form-select { min-width: 140px; }
     </style>
 </head>
 <body style="overflow-x: hidden;">
@@ -225,17 +226,25 @@
                         <div class="card header-card">
                             <div class="card-body p-4">
                                 <div class="row align-items-center">
-                                    <div class="col-md-8">
+                                    <div class="col-md-4">
                                         <h2 class="text-white mb-1">
                                             <i class="bi bi-bank me-2"></i>Bank Statement Reconciliation
                                         </h2>
                                         <p class="text-white-50 mb-0">Upload, match and reconcile bank statements with bills</p>
                                     </div>
-                                    <div class="col-md-4 text-end">
-                                        <button class="btn btn-light me-2" id="viewStatementsBtn">
+                                    <div class="col-md-8 text-end d-flex flex-wrap justify-content-md-end gap-1">
+                                        @if(!empty($bankAccountsEnabled))
+                                        <button type="button" class="btn btn-light" id="accountDetailsModalBtn" title="Bank account &amp; Excel upload">
+                                            <i class="bi bi-wallet2 me-1"></i>Account details
+                                        </button>
+                                        @endif
+                                        <button type="button" class="btn btn-outline-light" id="btnOpenBatchUploadView" title="Open batch list (no page reload)">
+                                            <i class="bi bi-collection me-1"></i>Batch uploads
+                                        </button>
+                                        <button type="button" class="btn btn-light" id="viewStatementsBtn">
                                             <i class="bi bi-table me-2"></i>View Statements
                                         </button>
-                                        <button class="btn btn-light" id="uploadBtn">
+                                        <button type="button" class="btn btn-light" id="uploadBtn">
                                             <i class="bi bi-upload me-2"></i>Upload New
                                         </button>
                                     </div>
@@ -253,6 +262,15 @@
                                 <div class="card-body p-4">
                                     <form id="uploadFormMain" enctype="multipart/form-data">
                                         @csrf
+                                        @if(!empty($bankAccountsEnabled))
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold"><i class="bi bi-bank me-1"></i>Bank account <span class="text-danger">*</span></label>
+                                            <select class="form-select bank-account-select" name="bank_account_id" id="mainUploadBankAccount" required>
+                                                <option value="">Select account number…</option>
+                                            </select>
+                                            <small class="text-muted">Each upload is stored against this account. Use <strong>Account details</strong> to add a new account.</small>
+                                        </div>
+                                        @endif
                                         <div class="upload-area-mini" id="uploadArea">
                                             <div class="row align-items-center">
                                                 <div class="col-md-8">
@@ -406,8 +424,8 @@
                     </div> -->
 
                     {{-- Bank Statements Table with Filter Button --}}
-                    <div class="card shadow-sm">
-                        <div class="card-header table-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="card shadow-sm bank-recon-statements-card">
+                        <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <h5 class="mb-0"><i class="bi bi-table me-2"></i>Bank Statements</h5>
                             <div class="d-flex align-items-center gap-2">
                                 <label class="mb-0 small text-white-50">Per page:</label>
@@ -428,6 +446,7 @@
                                     <thead>
                                         <tr>
                                             <th>Date</th>
+                                            <th>Account</th>
                                             <th>Description</th>
                                             <th>Reference</th>
                                             <th>Transaction ID</th>
@@ -445,7 +464,7 @@
                                     </thead>
                                     <tbody id="statementsTableBody">
                                         <tr>
-                                            <td colspan="14" class="text-center py-5">
+                                            <td colspan="15" class="text-center py-5">
                                                 <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                                                 <p class="text-muted mt-3">No statements uploaded</p>
                                             </td>
@@ -458,9 +477,31 @@
                     </div>
                 </div>
 
+                {{-- Batch uploads (same page, AJAX — no full reload) --}}
+                <div id="batchUploadSection" class="bank-recon-batch-embedded" style="display: none;">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 mt-2">
+                        <div>
+                            <h4 class="mb-0 text-body"><i class="bi bi-collection me-2"></i>Statement upload batches</h4>
+                            <p class="text-muted small mb-0">Data loads via AJAX only.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btnCloseBatchUploadView">
+                            <i class="bi bi-arrow-left me-1"></i>Back to reconciliation
+                        </button>
+                    </div>
+                    @if(empty($bankAccountsEnabled))
+                    <div class="alert alert-warning">
+                        Run migrations (<code>php artisan migrate</code>) to enable <code>bank_reconciliation_accounts</code> and batch history.
+                    </div>
+                    @else
+                    @include('bank-reconciliation.partials.batch_upload_panel_inner')
+                    @endif
+                </div>
+
             </div>
         </div>
     </div>
+
+    @include('bank-reconciliation.partials.batch_preview_modal')
 
     {{-- Processing Overlay --}}
     <div class="processing-overlay" id="processingOverlay">
@@ -472,6 +513,125 @@
         </div>
     </div>
 
+    @if(!empty($bankAccountsEnabled))
+    {{-- Account details + upload (modal): list, add/edit, upload --}}
+    <div class="modal fade" id="accountDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title"><i class="bi bi-wallet2 me-2"></i>Bank accounts &amp; uploads</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-3">
+                    <ul class="nav nav-tabs nav-fill mb-3" id="accountModalTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tabBtnAllAccounts" data-bs-toggle="tab" data-bs-target="#tabAllAccounts" type="button" role="tab">
+                                <i class="bi bi-list-ul me-1"></i>All accounts
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tabBtnNewAccount" data-bs-toggle="tab" data-bs-target="#tabNewAccount" type="button" role="tab">
+                                <i class="bi bi-plus-circle me-1"></i><span id="newAccountTabLabel">New account</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tabBtnUploadStmt" data-bs-toggle="tab" data-bs-target="#tabUploadStmt" type="button" role="tab">
+                                <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Excel
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="tabAllAccounts" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                <p class="text-muted small mb-0">Registered accounts used for statement uploads and filters.</p>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="btnRefreshModalAccountList">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div class="table-responsive border rounded" style="max-height: 320px; overflow-y: auto;">
+                                <table class="table table-sm table-hover align-middle mb-0" id="modalAccountsTable">
+                                    <thead class="table-light sticky-top" style="z-index: 1;">
+                                        <tr>
+                                            <th>Account #</th>
+                                            <th>Bank</th>
+                                            <th>Branch</th>
+                                            <th>IFSC</th>
+                                            <th>Holder</th>
+                                            <th class="text-end" style="width: 88px;">Edit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bankAccountsModalTableBody">
+                                        <tr><td colspan="6" class="text-center text-muted py-4">Open this window to load accounts…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="tabNewAccount" role="tabpanel">
+                            <p class="text-muted small mb-3" id="newAccountFormHint">Add a new bank account for statement uploads.</p>
+                            <form id="formNewBankAccount">
+                                @csrf
+                                <input type="hidden" id="editBankAccountId" value="">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Account number <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" name="account_number" id="newAccNumber" required maxlength="64" placeholder="e.g. 50100…">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Bank name</label>
+                                        <input type="text" class="form-control" name="bank_name" id="newAccBank" maxlength="191">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Branch</label>
+                                        <input type="text" class="form-control" name="branch_name" id="newAccBranch" maxlength="191">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">IFSC</label>
+                                        <input type="text" class="form-control" name="ifsc_code" id="newAccIfsc" maxlength="32">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Account holder</label>
+                                        <input type="text" class="form-control" name="account_holder_name" id="newAccHolder" maxlength="191">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Notes</label>
+                                        <textarea class="form-control" name="notes" id="newAccNotes" rows="2" maxlength="2000"></textarea>
+                                    </div>
+                                </div>
+                                <div class="mt-3 d-flex flex-wrap gap-2">
+                                    <button type="submit" class="btn btn-primary" id="btnSaveNewAccount">
+                                        <i class="bi bi-check2-circle me-1"></i><span id="btnSaveNewAccountLabel">Save account</span>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnCancelEditAccount" style="display: none;">
+                                        Cancel edit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade" id="tabUploadStmt" role="tabpanel">
+                            <form id="uploadFormModal" enctype="multipart/form-data">
+                                @csrf
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Bank account <span class="text-danger">*</span></label>
+                                    <select class="form-select bank-account-select" name="bank_account_id" id="modalUploadBankAccount" required>
+                                        <option value="">Select account…</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Excel file (.xlsx / .xls)</label>
+                                    <input type="file" class="form-control" name="excel_file" id="modalExcelFile" accept=".xlsx,.xls" required>
+                                </div>
+                                <button type="submit" class="btn btn-success" id="modalUploadSubmit">
+                                    <i class="bi bi-upload me-1"></i>Upload &amp; process
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Filter Modal --}}
     <div class="modal fade" id="filterModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -482,6 +642,14 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
+                        @if(!empty($bankAccountsEnabled))
+                        <div class="col-md-6">
+                            <label class="form-label">Bank account</label>
+                            <select class="form-control bank-account-select" id="filterBankAccount">
+                                <option value="">All accounts</option>
+                            </select>
+                        </div>
+                        @endif
                         <div class="col-md-6">
                             <label class="form-label">Date Range</label>
                             <input type="text" class="form-control" id="filterDateRange" placeholder="Select date range">
@@ -813,6 +981,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
+        window.bankAccountsEnabled = @json(!empty($bankAccountsEnabled));
         const routes = {
             upload: "{{ route('bank-reconciliation.upload') }}",
             statements: "{{ route('bank-reconciliation.statements') }}",
@@ -827,9 +996,16 @@
             incomeTagBranches: "{{ route('bank-reconciliation.income-tag.branches') }}",
             incomeTagResolve: "{{ route('bank-reconciliation.income-tag.resolve-description') }}",
             radiantMatchAgainst: "{{ route('bank-reconciliation.radiant-match-against') }}",
-            radiantUnmatch: "{{ route('bank-reconciliation.radiant-unmatch', ':id') }}"
+            radiantUnmatch: "{{ route('bank-reconciliation.radiant-unmatch', ':id') }}",
+            accounts: "{{ route('bank-reconciliation.accounts') }}",
+            accountsStore: "{{ route('bank-reconciliation.accounts.store') }}",
+            accountsUpdateBase: "{{ url('/bank-reconciliation/accounts') }}",
+            uploadBatches: "{{ route('bank-reconciliation.upload-batches') }}",
+            batchFile: "{{ url('/bank-reconciliation/batch-file') }}",
         };
     </script>
+    <script>window.BANK_RECON_BATCH_PREVIEW_BASE = "{{ url('/bank-reconciliation/batch-preview') }}";</script>
+    <script src="{{ asset('/assets/js/bank-reconciliation/batch-preview-modal.js') }}"></script>
     <script>
     // ============================================
     // FLATPICKR - Bank Reconciliation (replaced daterangepicker)
@@ -887,6 +1063,7 @@
         });
     });
     </script>
+    {{-- batch-preview-modal.js loaded above (before this file) --}}
     <script src="{{ asset('/assets/js/bank-reconciliation/bank-reconciliation.js') }}"></script>
 
     

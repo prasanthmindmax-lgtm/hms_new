@@ -1261,6 +1261,8 @@
 
                             <option value="5">User</option>
 
+                            <option value="6">IT Technician</option>
+
 
                         </select>
 

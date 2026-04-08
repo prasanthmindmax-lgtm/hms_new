@@ -14,6 +14,260 @@ $(document).ready(function() {
     let perPage = 25;
     let currentBestMatches = [];
     let currentPossibleMatches = [];
+
+    function bankAccountsOn() {
+        return typeof window.bankAccountsEnabled !== 'undefined' && window.bankAccountsEnabled;
+    }
+
+    var lastModalAccountsList = [];
+
+    function accModalEsc(s) {
+        if (s == null || s === '') return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function loadBankAccounts(selectedId) {
+        if (!bankAccountsOn() || !routes.accounts) return;
+        $.get(routes.accounts, function (res) {
+            var list = (res && res.data) ? res.data : [];
+            $('.bank-account-select').each(function () {
+                var id = $(this).attr('id');
+                var keep = (id === 'filterBankAccount')
+                    ? '<option value="">All accounts</option>'
+                    : '<option value="">Select account…</option>';
+                var inner = keep;
+                list.forEach(function (a) {
+                    var label = a.account_number + (a.bank_name ? ' — ' + a.bank_name : '');
+                    inner += '<option value="' + a.id + '">' + $('<div>').text(label).html() + '</option>';
+                });
+                $(this).html(inner);
+            });
+            if (selectedId) {
+                $('.bank-account-select').val(String(selectedId));
+            }
+        });
+    }
+
+    function resetAccountFormToCreate() {
+        $('#editBankAccountId').val('');
+        $('#formNewBankAccount')[0].reset();
+        $('#newAccountTabLabel').text('New account');
+        $('#btnSaveNewAccountLabel').text('Save account');
+        $('#newAccountFormHint').text('Add a new bank account for statement uploads.');
+        $('#btnCancelEditAccount').hide();
+    }
+
+    function fillAccountFormForEdit(acc) {
+        if (!acc) return;
+        $('#editBankAccountId').val(String(acc.id));
+        $('#newAccNumber').val(acc.account_number || '');
+        $('#newAccBank').val(acc.bank_name || '');
+        $('#newAccBranch').val(acc.branch_name || '');
+        $('#newAccIfsc').val(acc.ifsc_code || '');
+        $('#newAccHolder').val(acc.account_holder_name || '');
+        $('#newAccNotes').val(acc.notes || '');
+        $('#newAccountTabLabel').text('Edit account');
+        $('#btnSaveNewAccountLabel').text('Update account');
+        $('#newAccountFormHint').text('Update details and save. Account number must stay unique.');
+        $('#btnCancelEditAccount').show();
+    }
+
+    function showAccountModalTabAll() {
+        var el = document.getElementById('tabBtnAllAccounts');
+        if (el && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(el).show();
+        } else if (el) {
+            $(el).tab('show');
+        }
+    }
+
+    function showAccountModalTabNew() {
+        var el = document.getElementById('tabBtnNewAccount');
+        if (el && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(el).show();
+        } else if (el) {
+            $(el).tab('show');
+        }
+    }
+
+    function renderModalAccountList(list) {
+        lastModalAccountsList = list || [];
+        var tbody = $('#bankAccountsModalTableBody');
+        if (!tbody.length) return;
+        tbody.empty();
+        if (!lastModalAccountsList.length) {
+            tbody.html('<tr><td colspan="6" class="text-center text-muted py-4">No accounts yet. Use <strong>New account</strong> to add one.</td></tr>');
+            return;
+        }
+        lastModalAccountsList.forEach(function (a) {
+            var row = '<tr>' +
+                '<td class="fw-semibold">' + accModalEsc(a.account_number) + '</td>' +
+                '<td><small>' + accModalEsc(a.bank_name || '—') + '</small></td>' +
+                '<td><small>' + accModalEsc(a.branch_name || '—') + '</small></td>' +
+                '<td><code class="small">' + accModalEsc(a.ifsc_code || '—') + '</code></td>' +
+                '<td><small>' + accModalEsc(a.account_holder_name || '—') + '</small></td>' +
+                '<td class="text-end">' +
+                '<button type="button" class="btn btn-sm btn-outline-primary btn-edit-modal-account" data-account-id="' + accModalEsc(a.id) + '">' +
+                '<i class="bi bi-pencil"></i></button>' +
+                '</td></tr>';
+            tbody.append(row);
+        });
+    }
+
+    function refreshModalAccountList() {
+        if (!bankAccountsOn() || !routes.accounts) return;
+        var tbody = $('#bankAccountsModalTableBody');
+        if (!tbody.length) return;
+        tbody.html('<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>');
+        $.get(routes.accounts, function (res) {
+            var list = (res && res.data) ? res.data : [];
+            renderModalAccountList(list);
+        }).fail(function () {
+            tbody.html('<tr><td colspan="6" class="text-center text-danger py-3">Could not load accounts.</td></tr>');
+        });
+    }
+
+    if (bankAccountsOn()) {
+        loadBankAccounts();
+    }
+
+    $('#accountDetailsModalBtn').on('click', function () {
+        $('#accountDetailsModal').modal('show');
+    });
+
+    $('#accountDetailsModal').on('shown.bs.modal', function () {
+        if (!bankAccountsOn()) return;
+        resetAccountFormToCreate();
+        showAccountModalTabAll();
+        refreshModalAccountList();
+    });
+
+    $('#btnRefreshModalAccountList').on('click', function () {
+        refreshModalAccountList();
+    });
+
+    $(document).on('click', '.btn-edit-modal-account', function () {
+        var aid = $(this).data('account-id');
+        var acc = lastModalAccountsList.find(function (x) { return String(x.id) === String(aid); });
+        if (!acc) return;
+        fillAccountFormForEdit(acc);
+        showAccountModalTabNew();
+    });
+
+    $('#btnCancelEditAccount').on('click', function () {
+        resetAccountFormToCreate();
+        showAccountModalTabAll();
+    });
+
+    $(document).on('shown.bs.tab', '#tabBtnNewAccount', function () {
+        if (!$('#editBankAccountId').val()) {
+            $('#formNewBankAccount')[0].reset();
+            $('#newAccountTabLabel').text('New account');
+            $('#btnSaveNewAccountLabel').text('Save account');
+            $('#newAccountFormHint').text('Add a new bank account for statement uploads.');
+            $('#btnCancelEditAccount').hide();
+        }
+    });
+
+    $('#formNewBankAccount').on('submit', function (e) {
+        e.preventDefault();
+        if (!routes.accountsStore) return;
+        var $btn = $('#btnSaveNewAccount');
+        var editId = ($('#editBankAccountId').val() || '').trim();
+        var isEdit = !!editId;
+        var url = isEdit ? (routes.accountsUpdateBase + '/' + encodeURIComponent(editId)) : routes.accountsStore;
+        var payload = $(this).serialize();
+        if (isEdit) {
+            payload += (payload.length ? '&' : '') + '_method=PUT';
+        }
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: payload,
+            success: function (res) {
+                if (res.success) {
+                    toastr.success(res.message || (isEdit ? 'Account updated' : 'Account saved'));
+                    loadBankAccounts(res.account ? res.account.id : null);
+                    refreshModalAccountList();
+                    if (isEdit) {
+                        resetAccountFormToCreate();
+                        showAccountModalTabAll();
+                    } else {
+                        $('#formNewBankAccount')[0].reset();
+                        $('#accountDetailsModal').modal('hide');
+                    }
+                } else {
+                    toastr.error(res.message || 'Could not save');
+                }
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Save failed';
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    msg = Object.values(xhr.responseJSON.errors).flat().join(' ');
+                }
+                toastr.error(msg);
+            },
+            complete: function () {
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
+    $('#uploadFormModal').on('submit', function (e) {
+        e.preventDefault();
+        var fileEl = document.getElementById('modalExcelFile');
+        if (!fileEl || !fileEl.files || !fileEl.files[0]) {
+            toastr.error('Please select an Excel file');
+            return;
+        }
+        if (bankAccountsOn() && !$('#modalUploadBankAccount').val()) {
+            toastr.error('Select a bank account for this upload');
+            return;
+        }
+        var formData = new FormData(this);
+        $('#processingOverlay').addClass('active');
+        $('#processingStatus').text('Uploading file...');
+        $('#modalUploadSubmit').prop('disabled', true);
+        $.ajax({
+            url: routes.upload,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                if (response.success) {
+                    $('#processingStatus').text('Import completed!');
+                    setTimeout(function () {
+                        $('#processingOverlay').removeClass('active');
+                        toastr.success(response.message + ' - All marked as Uncategorized');
+                        $('#uploadFormModal')[0].reset();
+                        $('#accountDetailsModal').modal('hide');
+                        showStatementsSection();
+                        loadStatements();
+                        updateStatistics();
+                    }, 600);
+                } else {
+                    $('#processingOverlay').removeClass('active');
+                    toastr.error(response.message || 'Upload failed');
+                }
+            },
+            error: function (xhr) {
+                $('#processingOverlay').removeClass('active');
+                var message = 'Error uploading file';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                toastr.error(message);
+            },
+            complete: function () {
+                $('#modalUploadSubmit').prop('disabled', false);
+            }
+        });
+    });
     
     // Check if statements exist on load
     checkStatementsExist();
@@ -49,13 +303,24 @@ $(document).ready(function() {
     // TOGGLE SECTIONS
     // ============================================
     function showImportSection() {
+        $('#batchUploadSection').hide();
         $('#importSection').fadeIn();
         $('#statementsSection').hide();
     }
     
     function showStatementsSection() {
+        $('#batchUploadSection').hide();
         $('#importSection').hide();
         $('#statementsSection').fadeIn();
+    }
+
+    function showBatchUploadSection() {
+        $('#importSection').hide();
+        $('#statementsSection').hide();
+        $('#batchUploadSection').stop(true, true).fadeIn(150);
+        if (bankAccountsOn() && routes.uploadBatches && $('#batchTableBody').length) {
+            loadBatchesInline(1);
+        }
     }
     
     $('#viewStatementsBtn').on('click', function() {
@@ -66,6 +331,16 @@ $(document).ready(function() {
     
     $('#uploadBtn').on('click', function() {
         showImportSection();
+    });
+
+    $('#btnOpenBatchUploadView').on('click', function () {
+        showBatchUploadSection();
+    });
+
+    $('#btnCloseBatchUploadView').on('click', function () {
+        showStatementsSection();
+        loadStatements(currentPage || 1);
+        updateStatistics();
     });
     
     $('#perPageSelect').on('change', function() {
@@ -89,6 +364,9 @@ $(document).ready(function() {
         $('#filterAmountMax').val('');
         $('#filterReference').val('');
         $('#filterDescription').val('');
+        if ($('#filterBankAccount').length) {
+            $('#filterBankAccount').val('');
+        }
         var dateEl = document.getElementById('filterDateRange');
         if (dateEl) {
             if (dateEl._flatpickr) {
@@ -119,6 +397,9 @@ $(document).ready(function() {
             reference_number:$('#filterReference').val(),
             search:          $('#filterDescription').val()
         };
+        if ($('#filterBankAccount').length && $('#filterBankAccount').val()) {
+            currentFilters.bank_account_id = $('#filterBankAccount').val();
+        }
         if (window.bankReconDateFrom) currentFilters.date_from = window.bankReconDateFrom;
         if (window.bankReconDateTo) currentFilters.date_to = window.bankReconDateTo;
         Object.keys(currentFilters).forEach(key => {
@@ -188,6 +469,14 @@ $(document).ready(function() {
             toastr.error('Please select an Excel file');
             return;
         }
+
+        if (bankAccountsOn()) {
+            var accMain = $('#mainUploadBankAccount').val();
+            if (!accMain) {
+                toastr.error('Select the bank account this statement belongs to');
+                return;
+            }
+        }
         
         $('#processingOverlay').addClass('active');
         $('#processingStatus').text('Uploading file...');
@@ -214,6 +503,9 @@ $(document).ready(function() {
                         uploadForm[0].reset();
                         $('#fileNameDisplay').hide();
                         $('#uploadSubmitBtn').prop('disabled', true);
+                        if (bankAccountsOn()) {
+                            loadBankAccounts();
+                        }
                         
                         showStatementsSection();
                         loadStatements();
@@ -286,7 +578,7 @@ $(document).ready(function() {
         if (!statements || statements.length === 0) {
             tbody.html(`
                 <tr>
-                    <td colspan="14" class="text-center py-5">
+                    <td colspan="15" class="text-center py-5">
                         <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                         <p class="text-muted mt-3">No statements found</p>
                     </td>
@@ -382,6 +674,10 @@ $(document).ready(function() {
                             ${formatDate(stmt.transaction_date)}
                             ${stmt.value_date !== stmt.transaction_date ? '<br><small class="text-muted">Value: ' + formatDate(stmt.value_date) + '</small>' : ''}
                         </div>
+                    </td>
+                    <td>
+                        <small class="fw-semibold">${stmt.bank_account_number ? escapeAttr(stmt.bank_account_number) : '-'}</small>
+                        ${stmt.bank_account_bank_name ? '<br><span class="text-muted small">' + escapeAttr(stmt.bank_account_bank_name) + '</span>' : ''}
                     </td>
                     <td>
                         <div class="description-cell">
@@ -1417,6 +1713,151 @@ $(document).ready(function() {
             $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save');
             radiantMatchInFlight = false;
         });
+    });
+
+    // ============================================
+    // EMBEDDED BATCH UPLOAD PANEL (AJAX only — no full page load)
+    // ============================================
+    var batchInlinePage = 1;
+    var batchInlineFilters = {};
+    var batchInlinePerPage = 25;
+
+    function escBatchCell(s) {
+        if (s == null || s === '') return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function fmtBatchTs(iso) {
+        if (!iso) return '-';
+        try {
+            var d = new Date(String(iso).replace(' ', 'T'));
+            return isNaN(d.getTime()) ? iso : d.toLocaleString();
+        } catch (e) {
+            return iso;
+        }
+    }
+
+    function readBatchInlineFilters() {
+        batchInlineFilters = {};
+        var acc = ($('#fltAccount').val() || '').trim();
+        var fn = ($('#fltFile').val() || '').trim();
+        var u = ($('#fltUser').val() || '').trim();
+        var df = $('#fltDateFrom').val();
+        var dt = $('#fltDateTo').val();
+        if (acc) batchInlineFilters.account_number = acc;
+        if (fn) batchInlineFilters.file_name = fn;
+        if (u) batchInlineFilters.uploaded_by = u;
+        if (df) batchInlineFilters.date_from = df;
+        if (dt) batchInlineFilters.date_to = dt;
+        batchInlinePerPage = parseInt($('#fltPerPage').val(), 10) || 25;
+    }
+
+    function renderBatchInlineTable(res) {
+        var rows = res.data || [];
+        var tbody = $('#batchTableBody');
+        if (!tbody.length) return;
+        tbody.empty();
+        if (!rows.length) {
+            tbody.html('<tr><td colspan="9" class="text-center py-4 text-muted">No batches match your filters.</td></tr>');
+            $('#batchTotalHint').text('');
+            $('#batchPageInfo').text('');
+            return;
+        }
+        var from = res.from != null ? res.from : 0;
+        var to = res.to != null ? res.to : 0;
+        $('#batchTotalHint').text('Total: ' + (res.total || 0));
+        $('#batchPageInfo').text(from && to ? 'Showing ' + from + '–' + to + ' of ' + (res.total || 0) : '');
+
+        rows.forEach(function (b) {
+            var uid = escBatchCell(b.upload_batch_id);
+            var dl = routes.batchFile + '/' + encodeURIComponent(b.upload_batch_id);
+            var by = b.uploaded_by_name || b.uploaded_by_username || '-';
+            var tr = '<tr>' +
+                '<td><span class="badge bg-secondary">' + escBatchCell(b.id) + '</span></td>' +
+                '<td><small>' + escBatchCell(fmtBatchTs(b.created_at)) + '</small></td>' +
+                '<td><strong>' + escBatchCell(b.account_number) + '</strong>' +
+                (b.bank_name ? '<br><small class="text-muted">' + escBatchCell(b.bank_name) + '</small>' : '') + '</td>' +
+                '<td><small>' + escBatchCell(b.original_file_name) + '</small><br><code class="small">' + escBatchCell(b.upload_batch_id) + '</code></td>' +
+                '<td>' + escBatchCell(b.rows_imported) + '</td>' +
+                '<td>' + escBatchCell(b.duplicates) + '</td>' +
+                '<td>' + escBatchCell(b.skipped) + '</td>' +
+                '<td><small>' + escBatchCell(by) + '</small></td>' +
+                '<td class="text-end text-nowrap">' +
+                '<a class="btn btn-sm btn-outline-primary me-1" href="' + dl + '" title="Download"><i class="bi bi-download"></i></a>' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary btn-batch-preview" data-batch="' + uid + '">' +
+                '<i class="bi bi-eye"></i></button>' +
+                '</td></tr>';
+            tbody.append(tr);
+        });
+    }
+
+    function renderBatchInlinePagination(res) {
+        var ul = $('#batchPagination');
+        if (!ul.length) return;
+        ul.empty();
+        var last = res.last_page || 1;
+        var cur = res.current_page || 1;
+        if (last <= 1) return;
+
+        function addLi(label, p, disabled, active) {
+            var li = $('<li class="page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '') + '">');
+            var a = $('<a class="page-link" href="#">').text(label);
+            if (!disabled && !active) {
+                a.on('click', function (e) {
+                    e.preventDefault();
+                    loadBatchesInline(p);
+                });
+            }
+            li.append(a);
+            ul.append(li);
+        }
+
+        addLi('«', cur - 1, cur <= 1, false);
+        var start = Math.max(1, cur - 2);
+        var end = Math.min(last, cur + 2);
+        for (var p = start; p <= end; p++) {
+            addLi(String(p), p, false, p === cur);
+        }
+        addLi('»', cur + 1, cur >= last, false);
+    }
+
+    function loadBatchesInline(page) {
+        if (!$('#batchTableBody').length || !routes.uploadBatches) return;
+        batchInlinePage = page || 1;
+        readBatchInlineFilters();
+        var params = $.extend({ page: batchInlinePage, per_page: batchInlinePerPage }, batchInlineFilters);
+        $('#batchTableBody').html('<tr><td colspan="9" class="text-center py-4 text-muted">Loading…</td></tr>');
+        $.get(routes.uploadBatches, params, function (res) {
+            renderBatchInlineTable(res);
+            renderBatchInlinePagination(res);
+        }).fail(function () {
+            toastr.error('Could not load batches');
+            $('#batchTableBody').html('<tr><td colspan="9" class="text-center py-4 text-danger">Failed to load</td></tr>');
+        });
+    }
+
+    $(document).on('click', '#btnApplyBatchFilters', function () {
+        if ($('#batchUploadSection').is(':visible')) {
+            loadBatchesInline(1);
+        }
+    });
+
+    $(document).on('click', '#btnClearBatchFilters', function () {
+        if (!$('#batchUploadSection').is(':visible')) return;
+        $('#fltAccount,#fltFile,#fltUser').val('');
+        $('#fltDateFrom,#fltDateTo').val('');
+        $('#fltPerPage').val('25');
+        batchInlineFilters = {};
+        loadBatchesInline(1);
+    });
+
+    $(document).on('change', '#fltPerPage', function () {
+        if ($('#batchUploadSection').is(':visible')) {
+            loadBatchesInline(1);
+        }
     });
 
 });
