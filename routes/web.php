@@ -18,6 +18,7 @@ use App\Http\Controllers\BillingStatsController;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\MenuMasterController;
 use App\Http\Controllers\PettyCashController;
+use App\Http\Controllers\TicketController;
 use App\Http\Controllers\RadiantCashPickupController;
 use App\Http\Controllers\RadiantMismatchAlertController;
 use App\Http\Controllers\LocationMasterController;
@@ -815,6 +816,25 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('/superadmin/advance-reports', [PettyCashController::class, 'getReportsForAdvance'])->name('superadmin.getreportsforadvance');
     Route::post('/superadmin/advance-link-report', [PettyCashController::class, 'linkAdvanceReport'])->name('superadmin.linkreport');
     Route::post('/superadmin/advance-recall', [PettyCashController::class, 'recallAdvance'])->name('superadmin.recalladvance');
+
+    // Department Routes
+    Route::get('superadmin/departments', [TicketController::class, 'getDepartments'])->name('superadmin.departments.index');
+    Route::post('superadmin/departments', [TicketController::class, 'storeDepartments'])->name('superadmin.departments.store');
+
+    // Ticket Category Routes
+    Route::get('superadmin/ticket-categories', [TicketController::class, 'getTicketCategories'])->name('superadmin.ticket.categories.index');
+    Route::post('superadmin/ticket-categories', [TicketController::class, 'storeTicketCategories'])->name('superadmin.ticket.categories.store');
+
+    // Support tickets
+    Route::get('superadmin/tickets', [TicketController::class, 'index'])->name('superadmin.tickets.index');
+    Route::get('superadmin/tickets/data', [TicketController::class, 'data'])->name('superadmin.tickets.data');
+    Route::get('superadmin/tickets/export', [TicketController::class, 'export'])->name('superadmin.tickets.export');
+    Route::get('superadmin/tickets/categories-by-department', [TicketController::class, 'categoriesByDepartment'])->name('superadmin.tickets.categories');
+    Route::post('superadmin/tickets', [TicketController::class, 'store'])->name('superadmin.tickets.store');
+    Route::post('superadmin/tickets/update', [TicketController::class, 'update'])->name('superadmin.tickets.update');
+    Route::post('superadmin/tickets/status', [TicketController::class, 'updateStatus'])->name('superadmin.tickets.status');
+    Route::get('superadmin/tickets/{ticket}/timeline', [TicketController::class, 'timeline'])->name('superadmin.tickets.timeline');
+    Route::get('superadmin/tickets/attachment', [TicketController::class, 'viewAttachment'])->name('superadmin.tickets.attachment');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
