@@ -1260,7 +1260,7 @@ function rowClick(event) {
                       </div>
 
                         <p style="margin-top: -25px;" class="text-muted f-12 mb-0"><span class="text-truncate w-100"><span id="billsavecounts">0</span> Rows for <span
-                            id="mydateallviewssave">Last 30 days</span></span>
+                            id="mydateallviewssave">All</span></span>
                     <span class="my_search_saveview " style="color: #e40505;font-size: 12px;font-weight: 600;">Search
                         :</span>
                     <span style="cursor: pointer;" id="savezone_search"
@@ -1853,7 +1853,10 @@ function rowClick(event) {
         }
     }, mydata);
     mydata(start, end);
-
+    // Initial saved load: same as discount dashboard — API gets moredatefittervale=All (full list)
+    $('#mysavereportrange span').html('All');
+    $('#mydateallviewssave').text('All');
+    $('#mydateviewsallsave').text('All');
 
             $(document).on('click', '.editbtn_user', function(e) {
                 $('#exampleModaluser').modal('show');

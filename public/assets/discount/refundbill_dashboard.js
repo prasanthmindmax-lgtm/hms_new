@@ -28,6 +28,19 @@ $(document).ready(function () {
         },
     });
 
+    function hmsFormSaveBtnLoading($btn, loading) {
+        if (!$btn || !$btn.length) return;
+        if (loading) {
+            if (!$btn.data('hms-orig-html')) $btn.data('hms-orig-html', $btn.html());
+            $btn.prop('disabled', true).html(
+                '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...'
+            );
+        } else {
+            $btn.prop('disabled', false).html($btn.data('hms-orig-html') || $btn.html());
+            $btn.removeData('hms-orig-html');
+        }
+    }
+
     // Clear error span text on input
     $('input, select, textarea').on('input change', function () {
         $(this).siblings('span').text('');
@@ -141,6 +154,10 @@ $(document).ready(function () {
         event.preventDefault();
         if (!validateRefundAddForm()) return;
 
+        var $refundAddBtn = $('#submit_refundform');
+        if ($refundAddBtn.prop('disabled')) return;
+        hmsFormSaveBtnLoading($refundAddBtn, true);
+
         let formData = new FormData();
         let zoneId = $('#zone_id').attr('data-value');
         formData.append('ref_zone_id', zoneId);
@@ -168,10 +185,12 @@ $(document).ready(function () {
         ];
 
         let pendingBlobs = 0;
+        let refundAddSubmitSent = false;
 
         const finishSubmission = () => {
-            if (pendingBlobs === 0) {
-                $.ajax({
+            if (pendingBlobs !== 0 || refundAddSubmitSent) return;
+            refundAddSubmitSent = true;
+            $.ajax({
                     url: refundformadded,
                     type: "POST",
                     data: formData,
@@ -205,8 +224,11 @@ $(document).ready(function () {
                     error: function (error) {
                         showError(error.responseJSON?.message || 'An error occurred');
                     },
+                    complete: function () {
+                        hmsFormSaveBtnLoading($refundAddBtn, false);
+                        refundAddSubmitSent = false;
+                    },
                 });
-            }
         };
 
         function showError(message) {
@@ -403,7 +425,12 @@ $(document).ready(function () {
 
     $("#editrefundform").on("click", function (event) {
         event.preventDefault();
+        var $editRefundBtn = $('#editrefundform');
+        if ($editRefundBtn.prop('disabled')) return;
+        hmsFormSaveBtnLoading($editRefundBtn, true);
+
         const formData = new FormData();
+        formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
         formData.append('ref_id', $('#edit_refund_id').val());
         formData.append('ref_zone_id', $('#locationid').val());
         formData.append('ref_wife_name', $('#edit_ref_wife_name').val());
@@ -430,10 +457,12 @@ $(document).ready(function () {
         ];
 
         let pendingBlobs = 0;
+        let refundEditSubmitSent = false;
         const finishEditSubmission = () => {
-            if (pendingBlobs === 0) {
-                $.ajax({
-                    url: refundformadded,
+            if (pendingBlobs !== 0 || refundEditSubmitSent) return;
+            refundEditSubmitSent = true;
+            $.ajax({
+                    url: refundformeditsave,
                     type: "POST",
                     data: formData,
                     processData: false,
@@ -448,6 +477,15 @@ $(document).ready(function () {
                                     background: 'success',
                                 }
                             }));
+                            var rec = response.updatedRecord;
+                            var patched = !!(rec && rec.ref_id && patchRefundSavedTableRow(rec));
+                            if (typeof tableData !== 'undefined' && Array.isArray(tableData) && rec && rec.ref_id) {
+                                var ri = tableData.findIndex(function (r) { return String(r.ref_id) === String(rec.ref_id); });
+                                if (ri >= 0) $.extend(true, tableData[ri], rec);
+                            }
+                            if (!patched) {
+                                refundsaveformdata();
+                            }
                             if ($('#savedTab').length) $('#savedTab').click();
                         } else {
                             window.dispatchEvent(new CustomEvent('swal:toast', {
@@ -468,14 +506,25 @@ $(document).ready(function () {
                             });
                             $('.modal-backdrop').remove();
                         }, 300);
-                        refundformdata();
-                        refundsaveformdata();
                     },
                     error: function (error) {
                         console.error(error.responseJSON);
+                        if (typeof window.dispatchEvent === 'function') {
+                            window.dispatchEvent(new CustomEvent('swal:toast', {
+                                detail: {
+                                    title: 'Error!',
+                                    text: (error.responseJSON && error.responseJSON.message) || 'Request failed',
+                                    icon: 'error',
+                                    background: '#f8d7da',
+                                }
+                            }));
+                        }
+                    },
+                    complete: function () {
+                        hmsFormSaveBtnLoading($editRefundBtn, false);
+                        refundEditSubmitSent = false;
                     },
                 });
-            }
         };
 
         signers.forEach(signer => {
@@ -853,15 +902,30 @@ $(document).ready(function () {
 // =====================================================
 var dataSourcedocument = [];
 
-function getDateRangeForApi(selector) {
-    const dateText = $(selector).text().trim();
-    return dateText || moment().format('DD/MM/YYYY') + ' - ' + moment().format('DD/MM/YYYY');
+/**
+ * Pending (#mydateallviews): normalize labels to DD/MM/YYYY - DD/MM/YYYY.
+ * Saved (#mydateallviewssave): use { allowAll: true } so empty / "All" always sends All (full list on first load).
+ */
+function getDateRangeForApi(selector, opts) {
+    opts = opts || {};
+    var allowAll = !!opts.allowAll;
+    var dateText = ($(selector).text() || '').trim();
+    if (allowAll) {
+        if (!dateText || dateText.toLowerCase() === 'all') {
+            return 'All';
+        }
+        return dateText;
+    }
+    if (!dateText || dateText === 'Today' || dateText === 'Yesterday' || dateText.indexOf('-') === -1) {
+        return moment().format('DD/MM/YYYY') + ' - ' + moment().format('DD/MM/YYYY');
+    }
+    return dateText;
 }
 
 function refundformdata() {
     startLoader();
     $("#document_tbl").hide();
-    var moredatefittervale = getDateRangeForApi('#mydateallviews');
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     $(".value_views_mysearch").text("");
 
     $.ajax({
@@ -1024,7 +1088,7 @@ $(document).on('click', '.sec_options_marketers div', function () {
     $(".value_views_mysearch").text("");
     $('.clear_my_views').show();
     $(".my_search_view").show();
-    var moredatefittervale = getDateRangeForApi('#mydateallviews');
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     let resultsArray_marketer = [];
     $(".documentdatasearch").each(function () {
         const value = $(this).val();
@@ -1050,7 +1114,7 @@ $(document).on('click', '.sec_options_marketers div', function () {
 });
 
 $(document).on("click", ".value_views_mysearch", function () {
-    var moredatefittervale = getDateRangeForApi('#mydateallviews');
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     var morefillterremvedata = $(this).text().replace(/, /g, ",");
     var clear_filtr = $(this).attr('id');
     $(this).text("");
@@ -1086,7 +1150,7 @@ $('#ref_mrd_views').on('input', function () {
     $('.clear_my_views').show();
     $(".my_search_view").show();
 
-    const moredatefittervale = getDateRangeForApi('#mydateallviews');
+    const moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     let resultsArray_marketer = [];
 
     $(".documentdatasearch").each(function () {
@@ -1260,7 +1324,7 @@ let isApprover = false;
 function refundsaveformdata() {
     startLoader2();
     $("#sveddata_tbl").hide();
-    var moredatefittervale = getDateRangeForApi('#mydateallviewssave');
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     $(".value_save_mysearch").text("");
     $.ajax({
         url: refundformsave_data,
@@ -1550,6 +1614,86 @@ function renderTablesaved(data, pageSizedocuments, pageNum, isApprover) {
     $('#saved-select-all').prop('checked', false);
 }
 
+function patchRefundSavedTableRow(rec) {
+    if (!rec || rec.ref_id == null) return false;
+    var id = String(rec.ref_id);
+    var $tr = $('#sveddata_tbl tr').filter(function () {
+        return ($(this).find('.ref_id').text() || '').trim() === id;
+    });
+    if (!$tr.length) return false;
+
+    function renderStatus(status, approverName) {
+        status = parseInt(status, 10);
+        var icon = '';
+        if (status === 1) icon = '<span style="color:green;font-weight:bold;font-size:20px;">✔</span>';
+        else if (status === 2) icon = '<span style="color:red;font-weight:bold;font-size:20px;">✖</span>';
+        else icon = '<span style="color:#f0ad4e;font-weight:bold;font-size:14px;">⏳ Pending</span>';
+        var name = (approverName && String(approverName).trim()) ? String(approverName).trim() : '—';
+        return '<div>' + icon + '</div><div class="small text-muted" style="font-size:11px;margin-top:2px;">' + name + '</div>';
+    }
+
+    var wmrd = rec.ref_wife_mrd_no || 'N/A';
+    var wname = rec.ref_wife_name || 'N/A';
+    var hmrd = rec.ref_husband_mrd_no || 'N/A';
+    var hname = rec.ref_husband_name || 'N/A';
+
+    $tr.find('.locationname').text(rec.zone_name || 'N/A').attr('data-id', rec.ref_zone_id != null ? rec.ref_zone_id : '');
+    $tr.find('.branchname').text(rec.location_name || 'N/A');
+    $tr.find('.wifemrdno').html('<a href="#">' + wmrd + '<br>' + wname + '</a>').attr('data-ph_id', wmrd);
+    $tr.find('.husmrdno').html('<a href="#">' + hmrd + '<br>' + hname + '</a>').attr('data-ph_id', hmrd);
+    $tr.find('.treatmentcat').text(rec.ref_service_name || '-');
+    $tr.find('.totalbil').text(rec.ref_total_bill || '-');
+    var exp = rec.ref_expected_request || '-';
+    var fst = rec.ref_form_status || '-';
+    $tr.find('.totalbil').next('td').text(exp + ' (' + fst + ')');
+    $tr.find('.expamount').text(exp);
+    $tr.find('.requestfor').text(fst);
+    $tr.find('.consultby').text(rec.ref_counselled_by || '-');
+    $tr.find('.mobileno').text(rec.ref_patient_ph || '-');
+    $tr.find('.mobileno').next('td').text(rec.created_by_name || '-');
+    var rr = rec.reject_reason || '';
+    $tr.find('.reject-reason-cell').attr('title', rr.replace(/"/g, '&quot;')).text(rr ? (rr.length > 50 ? rr.substring(0, 50) + '...' : rr) : '-');
+
+    var al = admin_user.access_limits;
+    var $statusCells = $tr.find('.reject-reason-cell').nextAll('td.tdview');
+    if (al == 1 && $statusCells.length >= 4) {
+        $statusCells.eq(0).html(renderStatus(rec.admin_approver, rec.admin_approver_name));
+        $statusCells.eq(1).html(renderStatus(rec.zonal_approver, rec.zonal_approver_name));
+        $statusCells.eq(2).html(renderStatus(rec.audit_approver, rec.audit_approver_name));
+        $statusCells.eq(3).html(renderStatus(rec.final_approver, rec.final_approver_name));
+    } else if (al == 2 && $statusCells.length >= 4) {
+        $statusCells.eq(0).html(renderStatus(rec.admin_approver, rec.admin_approver_name));
+        $statusCells.eq(1).html(renderStatus(rec.audit_approver, rec.audit_approver_name));
+        $statusCells.eq(2).html(renderStatus(rec.final_approver, rec.final_approver_name));
+        $statusCells.eq(3).html(renderStatus(rec.zonal_approver, rec.zonal_approver_name));
+    } else if (al == 3 && $statusCells.length >= 4) {
+        $statusCells.eq(0).html(renderStatus(rec.zonal_approver, rec.zonal_approver_name));
+        $statusCells.eq(1).html(renderStatus(rec.audit_approver, rec.audit_approver_name));
+        $statusCells.eq(2).html(renderStatus(rec.final_approver, rec.final_approver_name));
+        $statusCells.eq(3).html(renderStatus(rec.admin_approver, rec.admin_approver_name));
+    } else if (al == 4 && $statusCells.length >= 4) {
+        $statusCells.eq(0).html(renderStatus(rec.admin_approver, rec.admin_approver_name));
+        $statusCells.eq(1).html(renderStatus(rec.zonal_approver, rec.zonal_approver_name));
+        $statusCells.eq(2).html(renderStatus(rec.final_approver, rec.final_approver_name));
+        $statusCells.eq(3).html(renderStatus(rec.audit_approver, rec.audit_approver_name));
+    } else if ($statusCells.length >= 4) {
+        $statusCells.eq(0).html(renderStatus(rec.admin_approver, rec.admin_approver_name));
+        $statusCells.eq(1).html(renderStatus(rec.zonal_approver, rec.zonal_approver_name));
+        $statusCells.eq(2).html(renderStatus(rec.audit_approver, rec.audit_approver_name));
+        $statusCells.eq(3).html(renderStatus(rec.final_approver, rec.final_approver_name));
+    }
+
+    $tr.find('.wifename').html('<a href="#">' + wname + '</a>');
+    $tr.find('.husname').html('<a href="#">' + hname + '</a>');
+    $tr.find('.authby').text(rec.ref_auth_by || '');
+    $tr.find('.finalapprove').text(rec.ref_approved_by || '');
+    $tr.find('.brno').text(rec.ref_branch_no || '');
+    $tr.find('.finalamount').text(rec.ref_final_auth || '');
+    $tr.find('.ref_id').text(id);
+
+    return true;
+}
+
 // =====================================================
 // APPROVAL ACTIONS
 // =====================================================
@@ -1809,7 +1953,7 @@ $(document).on('click', '.savedata_options div', function () {
     $(".value_save_mysearch").text("");
     $('.clear_my_saveviews').show();
     $(".my_search_saveview").show();
-    var moredatefittervale = getDateRangeForApi('#mydateallviewssave');
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     let resultsArray_marketer = [];
     $(".savedatasearch").each(function () {
         const value = $(this).val();
@@ -1834,7 +1978,7 @@ $(document).on('click', '.savedata_options div', function () {
 
 $(document).on("click", ".value_save_mysearch", function () {
 
-    var moredatefittervale = getDateRangeForApi('#mydateallviewssave');
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     var morefillterremvedata = $(this).text().replace(/, /g, ",");
     var clear_filtr = $(this).attr('id');
     $(this).text("");
@@ -1869,7 +2013,7 @@ $('#save_mrd_views').on('input', function () {
     $(".value_save_mysearch").text("");
     $('.clear_my_saveviews').show();
     $(".my_search_saveview").show();
-    const moredatefittervale = getDateRangeForApi('#mydateallviewssave');
+    const moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     let resultsArray_marketer = [];
     $(".savedatasearch").each(function () {
         const value = $(this).val();
@@ -1925,7 +2069,7 @@ function refundsavefilterview(uniqueResults, url, moredatefittervale, ph_id = ''
 }
 
 $('#save_status_filter').on('change', function () {
-    var moredatefittervale = getDateRangeForApi('#mydateallviewssave');
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     var phid = ($('#save_mrd_views').val() || '').trim();
     var statusVal = $(this).val();
     if (fitterremovedata && fitterremovedata.length) {

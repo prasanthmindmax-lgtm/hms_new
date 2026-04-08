@@ -33,6 +33,15 @@
     .stat-card:last-child .stat-value{
         font-size: 22px  !important;
     }
+    .stats-overview-toggle-bar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-bottom: 0.35rem;
+    }
+    #stats-container.is-hidden {
+        display: none !important;
+    }
     .form-border {
         border: 1px solid #000;
         padding: 20px;
@@ -550,6 +559,7 @@ function rowClick(event) {
                                             </div>
                                         </div>
                                         <input type="hidden" id="locationid">
+                                        <input type="hidden" id="edit_can_id" value="">
                                         <div class="form-row-line mb-2">
                                             <div class="form-label-col1">OP No</div>
                                             <div class="form-colon1">:</div>
@@ -810,6 +820,12 @@ function rowClick(event) {
                     $accessLimits = (int) ($admin->access_limits ?? 1);
                     $statKeys = $statCardsByRole[$accessLimits] ?? $statCardsByRole[1];
                 @endphp
+                <div class="stats-overview-toggle-bar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="stats-overview-toggle" aria-controls="stats-container" aria-expanded="true">
+                        <i class="bi bi-bar-chart-line me-1" id="stats-overview-toggle-icon"></i>
+                        <span id="stats-overview-toggle-label">Hide statistics</span>
+                    </button>
+                </div>
                 <div class="stats-container" id="stats-container">
                     @foreach ($statKeys as $key)
                         @php $cfg = $statConfig[$key] ?? ['label' => $key, 'icon' => 'circle', 'color' => 'blue']; @endphp
@@ -1406,6 +1422,34 @@ function rowClick(event) {
             e.preventDefault();
             switchTab($(this).data('tab'));
         });
+
+        (function () {
+            var STORAGE_KEY = 'hms_cancel_dashboard_stats_visible';
+            var $box = $('#stats-container');
+            var $btn = $('#stats-overview-toggle');
+            if (!$box.length || !$btn.length) return;
+            var $icon = $('#stats-overview-toggle-icon');
+            var $label = $('#stats-overview-toggle-label');
+            function applyVisible(visible) {
+                if (visible) {
+                    $box.removeClass('is-hidden');
+                    $btn.attr('aria-expanded', 'true');
+                    $icon.attr('class', 'bi bi-bar-chart-line me-1');
+                    $label.text('Hide statistics');
+                } else {
+                    $box.addClass('is-hidden');
+                    $btn.attr('aria-expanded', 'false');
+                    $icon.attr('class', 'bi bi-bar-chart me-1');
+                    $label.text('Show statistics');
+                }
+            }
+            applyVisible(localStorage.getItem(STORAGE_KEY) !== '0');
+            $btn.on('click', function () {
+                var willShow = $box.hasClass('is-hidden');
+                applyVisible(willShow);
+                localStorage.setItem(STORAGE_KEY, willShow ? '1' : '0');
+            });
+        })();
     </script>
     <script>
     window.admin_user = {

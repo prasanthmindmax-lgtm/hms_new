@@ -21,6 +21,15 @@
     .stat-card:last-child .stat-value{
         font-size: 22px  !important;
     }
+    .stats-overview-toggle-bar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-bottom: 0.35rem;
+    }
+    #stats-container.is-hidden {
+        display: none !important;
+    }
     /* Global Modal Overflow Fix - CSS Level */
     body:not(.modal-open) {
         overflow-x: hidden !important;
@@ -1058,6 +1067,12 @@ function rowClick(event) {
                     $accessLimits = (int) ($admin->access_limits ?? 1);
                     $statKeys = $statCardsByRole[$accessLimits] ?? $statCardsByRole[1];
                 @endphp
+                <div class="stats-overview-toggle-bar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="stats-overview-toggle" aria-controls="stats-container" aria-expanded="true">
+                        <i class="bi bi-bar-chart-line me-1" id="stats-overview-toggle-icon"></i>
+                        <span id="stats-overview-toggle-label">Hide statistics</span>
+                    </button>
+                </div>
                 <div class="stats-container" id="stats-container">
                     @foreach ($statKeys as $key)
                         @php $cfg = $statConfig[$key] ?? ['label' => $key, 'icon' => 'circle', 'color' => 'blue']; @endphp
@@ -1487,6 +1502,7 @@ function rowClick(event) {
             const refdocdetialsUrl = "{{route('superadmin.refundformdoc_detials')}}";
             const refundformsave_data = "{{route('superadmin.refundform_data')}}";
             const refundform_edit = "{{route('superadmin.refundform_edit')}}";
+            const refundformeditsave = "{{route('superadmin.refundformeditsave')}}";
             const refundform_approval = "{{route('superadmin.refundbill_approve_reject')}}";
         </script>
     <script src="{{ asset('/assets/discount/refundbill_dashboard.js') }}"></script>
@@ -1536,22 +1552,27 @@ function rowClick(event) {
             ranges: ranges
         }, function(start, end, label) {
             console.log("Pending date changed:", start.format('DD/MM/YYYY'), end.format('DD/MM/YYYY'), "Label:", label);
-            
+            var dateRangeText = start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY');
+            $('#mydateallviews').text(dateRangeText);
+            $('#mydateviewsall').text(dateRangeText);
+
             // Show label text if it's a preset, otherwise show date range
             if (label) {
                 $('#dateRangePickerPending span').html(label);
                 labelPending = label;
             } else {
-                $('#dateRangePickerPending span').html(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+                $('#dateRangePickerPending span').html(dateRangeText);
                 labelPending = '';
             }
-            
+
             if (typeof refundformdata === 'function') {
                 refundformdata();
             }
         });
 
         $('#dateRangePickerPending span').html(labelPending);
+        $('#mydateallviews').text(startPending.format('DD/MM/YYYY') + ' - ' + endPending.format('DD/MM/YYYY'));
+        $('#mydateviewsall').text($('#mydateallviews').text());
 
         // Initialize daterangepicker for SAVED tab - initially show "All" (no date filter); after user selects date, filter by that range
         var startSave = moment().startOf('day');
@@ -1667,6 +1688,34 @@ function rowClick(event) {
                 $(".dropdown").removeClass("active");
             }
         });
+
+        (function () {
+            var STORAGE_KEY = 'hms_refund_dashboard_stats_visible';
+            var $box = $('#stats-container');
+            var $btn = $('#stats-overview-toggle');
+            if (!$box.length || !$btn.length) return;
+            var $icon = $('#stats-overview-toggle-icon');
+            var $label = $('#stats-overview-toggle-label');
+            function applyVisible(visible) {
+                if (visible) {
+                    $box.removeClass('is-hidden');
+                    $btn.attr('aria-expanded', 'true');
+                    $icon.attr('class', 'bi bi-bar-chart-line me-1');
+                    $label.text('Hide statistics');
+                } else {
+                    $box.addClass('is-hidden');
+                    $btn.attr('aria-expanded', 'false');
+                    $icon.attr('class', 'bi bi-bar-chart me-1');
+                    $label.text('Show statistics');
+                }
+            }
+            applyVisible(localStorage.getItem(STORAGE_KEY) !== '0');
+            $btn.on('click', function () {
+                var willShow = $box.hasClass('is-hidden');
+                applyVisible(willShow);
+                localStorage.setItem(STORAGE_KEY, willShow ? '1' : '0');
+            });
+        })();
     </script>
     
 <script>

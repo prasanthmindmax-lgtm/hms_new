@@ -1539,6 +1539,7 @@ function rowClick(event) {
                                             </div>
                                         </div>
                                         <input type="hidden" id="locationid">
+                                        <input type="hidden" id="edit_can_id" value="">
                                         <div class="form-row-line mb-2">
                                             <div class="form-label-col1">OP No</div>
                                             <div class="form-colon1">:</div>

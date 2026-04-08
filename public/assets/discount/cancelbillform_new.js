@@ -26,6 +26,20 @@ $(document).ready(function () {
             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
         },
     });
+
+    function hmsFormSaveBtnLoading($btn, loading) {
+        if (!$btn || !$btn.length) return;
+        if (loading) {
+            if (!$btn.data('hms-orig-html')) $btn.data('hms-orig-html', $btn.html());
+            $btn.prop('disabled', true).html(
+                '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...'
+            );
+        } else {
+            $btn.prop('disabled', false).html($btn.data('hms-orig-html') || $btn.html());
+            $btn.removeData('hms-orig-html');
+        }
+    }
+
     // Clear error span text on input
     $('input, select, textarea').on('input change', function () {
         $(this).siblings('span').text('');
@@ -64,6 +78,10 @@ $(document).ready(function () {
 
   $('#submit_cancelform').click(function (event) {
     event.preventDefault();
+    var $cancelAddBtn = $('#submit_cancelform');
+    if ($cancelAddBtn.prop('disabled')) return;
+    hmsFormSaveBtnLoading($cancelAddBtn, true);
+
     var fullMobile = $('#pct_mobile').val();
     var maskedMobile = fullMobile.replace(/^(\d{2})\d{5}(\d{3})$/, '$1*****$2');
     let formData = new FormData();
@@ -115,10 +133,12 @@ $(document).ready(function () {
     ];
 
     let pendingBlobs = 0;
+    let cancelAddSubmitSent = false;
 
     const finishSubmission = () => {
-        if (pendingBlobs === 0) {
-            $.ajax({
+        if (pendingBlobs !== 0 || cancelAddSubmitSent) return;
+        cancelAddSubmitSent = true;
+        $.ajax({
                 url: cancelbillformadded,
                 type: "POST",
                 data: formData,
@@ -152,8 +172,11 @@ $(document).ready(function () {
                 error: function (error) {
                     showError(error.responseJSON?.message || 'An error occurred');
                 },
+                complete: function () {
+                    hmsFormSaveBtnLoading($cancelAddBtn, false);
+                    cancelAddSubmitSent = false;
+                },
             });
-        }
     };
 
     function showError(message) {
@@ -258,6 +281,9 @@ $(document).ready(function () {
 
     $("#editcancelform").on("click",function(event){
 
+        var $editCancelBtn = $('#editcancelform');
+        if ($editCancelBtn.prop('disabled')) return;
+
         // if($('#token_no_edit').val() ==="" || "-"){
         //     $('.token_no').text('Enter the Token No');
         //     isValid= false;
@@ -280,6 +306,8 @@ $(document).ready(function () {
         //       return;
         //   }
         event.preventDefault();
+        hmsFormSaveBtnLoading($editCancelBtn, true);
+
         const formData = new FormData();
     formData.append('can_zone_id', $('#locationid').val());
     formData.append('can_op_no', $('#opno_edit').val());
@@ -329,8 +357,10 @@ $(document).ready(function () {
     console.log("signers",signers);
 
     let pendingBlobs = 0;
+    let cancelEditSubmitSent = false;
      const finishEditSubmission = () => {
-    if (pendingBlobs === 0) {
+    if (pendingBlobs !== 0 || cancelEditSubmitSent) return;
+    cancelEditSubmitSent = true;
            $.ajax({
                url: cancelbillformadded,
                type: "POST",
@@ -347,6 +377,15 @@ $(document).ready(function () {
                           background: 'success',
                         }
                     }));
+                    var rec = response.updatedRecord;
+                    var patched = !!(rec && rec.can_id && patchCancelSavedTableRow(rec));
+                    if (typeof tableData !== 'undefined' && Array.isArray(tableData) && rec && rec.can_id) {
+                        var ci = tableData.findIndex(function (r) { return String(r.can_id) === String(rec.can_id); });
+                        if (ci >= 0) $.extend(true, tableData[ci], rec);
+                    }
+                    if (!patched) {
+                        cancelsaveformdata();
+                    }
                    if ($('#savedTab').length) $('#savedTab').click(); else if (document.getElementById('analytics-tab-2')) document.getElementById('analytics-tab-2').click();
                    }else{
                     window.dispatchEvent(new CustomEvent('swal:toast', {
@@ -367,14 +406,25 @@ $(document).ready(function () {
                        });
                        $('.modal-backdrop').remove();
                    }, 300);
-                   cancelformdata();
-                   cancelsaveformdata();
                },
                error: function (error) {
                    console.error(error.responseJSON);
+                   if (typeof window.dispatchEvent === 'function') {
+                       window.dispatchEvent(new CustomEvent('swal:toast', {
+                           detail: {
+                               title: 'Error!',
+                               text: (error.responseJSON && error.responseJSON.message) || 'Request failed',
+                               icon: 'error',
+                               background: '#f8d7da',
+                           }
+                       }));
+                   }
+               },
+               complete: function () {
+                   hmsFormSaveBtnLoading($editCancelBtn, false);
+                   cancelEditSubmitSent = false;
                },
            });
-        }
     };
     signers.forEach(signer => {
         const isUpload = $(`input[name="${signer.radio}"]:checked`).val() === 'upload';
@@ -584,6 +634,7 @@ $('#totalamt_edit').val(totalAmount.toFixed(2));
         $('#advancedamt_edit').val(advancedamt);
         $('#receivedamtword_edit').val(amount_word);
         $('#advancedamtword_edit').val(advance_word);
+        $('#edit_can_id').val(row.attr('data-id') || '');
       });
 
 function formatBillDate(rawDate) {
@@ -1844,6 +1895,84 @@ function renderTablesaved(data, pageSizedocuments, pageNum, isApprover) {
     $('#saved-select-all').prop('checked', false);
 }
 
+function patchCancelSavedTableRow(rec) {
+    if (!rec || rec.can_id == null) return false;
+    var cid = String(rec.can_id);
+    var $tr = $('#sveddata_tbl tr[data-id="' + cid + '"]');
+    if (!$tr.length && rec.can_bill_no) {
+        var bn = String(rec.can_bill_no).trim();
+        $tr = $('#sveddata_tbl tr').filter(function () {
+            return $(this).find('.bill_no').text().trim() === bn;
+        });
+    }
+    if (!$tr.length) return false;
+
+    function renderStatus(status, approverName) {
+        status = parseInt(status, 10);
+        var icon = '';
+        if (status === 1) icon = '<span style="color:green;font-weight:bold;font-size:20px;">✔</span>';
+        else if (status === 2) icon = '<span style="color:red;font-weight:bold;font-size:20px;">✖</span>';
+        else icon = '<span style="color:#f0ad4e;font-weight:bold;font-size:14px;">⏳ Pending</span>';
+        var name = (approverName && String(approverName).trim()) ? String(approverName).trim() : '—';
+        return '<div>' + icon + '</div><div class="small text-muted" style="font-size:11px;margin-top:2px;">' + name + '</div>';
+    }
+
+    var gender = rec.can_gender || '';
+    var wmrd = (gender === 'F' ? rec.can_mrdno : '') || 'N/A';
+    var wname = (gender === 'F' ? rec.can_name : '') || 'N/A';
+    var hmrd = (gender === 'M' ? rec.can_mrdno : '') || 'N/A';
+    var hname = (gender === 'M' ? rec.can_name : '') || 'N/A';
+
+    var $branch = $tr.find('td.branchname');
+    var $zoneTd = $branch.prev('td');
+    $zoneTd.text(rec.zone_name || 'N/A').attr('data-id', rec.can_zone_id != null ? rec.can_zone_id : '');
+    $branch.text(rec.location_name || 'N/A');
+    var $wifeTd = $branch.next('td');
+    var $husTd = $wifeTd.next('td');
+    $wifeTd.html('<a href="#">' + wmrd + '<br>' + wname + '</a>').attr('data-ph_id', wmrd);
+    $husTd.html('<a href="#">' + hmrd + '<br>' + hname + '</a>').attr('data-ph_id', hmrd);
+    var $c = $husTd.next('td');
+    $c.text(rec.can_op_no || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_form_status || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_age || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_gender || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_mobile || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_consultant || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_bill_no || '-');
+    $c = $c.next('td');
+    $c.text(rec.can_form_status || '-');
+    $c = $c.next('td');
+    $c.text(formatBillDate(rec.can_date));
+    $c = $c.next('td');
+    $c.text(rec.can_total || '-');
+
+    $tr.find('td.wifemrdno').html('<a href="#">' + wmrd + '</a>').attr('data-ph_id', wmrd);
+    $tr.find('td.husmrdno').html('<a href="#">' + hmrd + '</a>').attr('data-ph_id', hmrd);
+    $tr.find('td.wifename').html('<a href="#">' + wname + '</a>');
+    $tr.find('td.husname').html('<a href="#">' + hname + '</a>');
+
+    var uline = (rec.username || '') + '</br>' + (rec.userid || '');
+    $tr.find('.reject-reason-cell').prev('td').html(uline);
+
+    var rr = rec.reject_reason || '';
+    $tr.find('.reject-reason-cell').attr('title', rr.replace(/"/g, '&quot;')).text(rr ? (rr.length > 50 ? rr.substring(0, 50) + '...' : rr) : '-');
+
+    $tr.find('[data-column="admin-approver"]').html(renderStatus(rec.admin_approver, rec.admin_approver_name));
+    $tr.find('[data-column="zonal-approver"]').html(renderStatus(rec.zonal_approver, rec.zonal_approver_name));
+    $tr.find('[data-column="dit-approver"]').html(renderStatus(rec.audit_approver, rec.audit_approver_name));
+    $tr.find('[data-column="final-approver"]').html(renderStatus(rec.final_approver, rec.final_approver_name));
+
+    $tr.attr('data-id', rec.can_id);
+
+    return true;
+}
+
     var fitterremovedata = [];
     function ticketdatefillterrange(moredatefittervale,fitterremovedata) {
     var safeDate = getDateRangeForApi('#mydateallviews');
@@ -2326,6 +2455,7 @@ function stopLoader2(success = true, error = '') {
         BASIC HEADER DETAILS
         =============================== */
 
+        $('#edit_can_id').val(data.can_id != null ? data.can_id : '');
         $('#opno_edit').val(data.can_op_no || '');
         $('#token_no_edit').val(data.can_token_no || '');
         $('#billno_edit').val(data.can_bill_no || '');

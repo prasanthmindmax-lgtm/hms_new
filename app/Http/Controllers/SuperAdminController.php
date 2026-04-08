@@ -9895,15 +9895,35 @@ private function incomeFinalArray($input1){
 public function disformsave_data(Request $request){
     $admin = auth()->user();
     $fitterremovedataall = $request->input('morefilltersall');
-    $datefiltervalue = $request->input('moredatefittervale');
+    $datefiltervalue = trim((string) $request->input('moredatefittervale', ''));
     $phid = $request->input('mrodnofilter');
     $statusFilter = $request->input('status_filter'); // approved, pending, rejected
 
+    // Match refundform_data: empty / "All" = no date filter; valid d/m/Y range = filter (no extra gate on fitter/phid)
     $applyDateFilter = false;
-
-    if (!empty($datefiltervalue)) {
-        if (!empty($fitterremovedataall) || !empty($phid)) {
-            $applyDateFilter = true;
+    $startDate = null;
+    $endDate = null;
+    if ($datefiltervalue !== '' && strtolower($datefiltervalue) !== 'all') {
+        $dates = array_map('trim', explode(' - ', $datefiltervalue));
+        $startStr = $dates[0] ?? '';
+        $endStr = (isset($dates[1]) && $dates[1] !== '') ? $dates[1] : $startStr;
+        if ($startStr !== '') {
+            try {
+                $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', $startStr)->startOfDay();
+                $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', $endStr)->endOfDay();
+                if ($endDate->lt($startDate)) {
+                    $endDate = $startDate->copy()->endOfDay();
+                }
+                $applyDateFilter = true;
+            } catch (\Exception $e) {
+                \Log::warning('disformsave_data: invalid moredatefittervale, loading all (no date filter)', [
+                    'moredatefittervale' => $datefiltervalue,
+                    'error' => $e->getMessage(),
+                ]);
+                $applyDateFilter = false;
+                $startDate = null;
+                $endDate = null;
+            }
         }
     }
     if (!empty($fitterremovedataall) && empty($statusFilter)) {
@@ -9980,17 +10000,8 @@ public function disformsave_data(Request $request){
         $data->where('hms_discount_form.created_by', $admin->id);
     }
 
-    // Apply date filter
-    if ($applyDateFilter) {
-        $dates = explode(' - ', $datefiltervalue);
-        if (count($dates) === 2) {
-            $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[0]))
-                            ->startOfDay();
-            $endDate   = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[1]))
-                            ->endOfDay();
-
-            $data->whereBetween('hms_discount_form.created_at', [$startDate, $endDate]);
-        }
+    if ($applyDateFilter && $startDate && $endDate) {
+        $data->whereBetween('hms_discount_form.created_at', [$startDate, $endDate]);
     }
 
     // Apply additional filters
@@ -10742,7 +10753,11 @@ public function cancelbilladd(Request $request)
     // Save
     $model->save();
 
-    return response()->json(['success' => true, 'message' => 'Cancel Bill Form saved successfully!']);
+    return response()->json([
+        'success' => true,
+        'message' => 'Cancel Bill Form saved successfully!',
+        'updatedRecord' => $this->cancelBillRecordForGrid($model->can_id),
+    ]);
 }
 
 public function checkinapi($curr_date, $location_id, $max_retries, $end_date){
@@ -11855,10 +11870,13 @@ public function refundform_data(Request $request){
                 }
                 $applyDateFilter = true;
             } catch (\Exception $e) {
-                return response()->json(['data' => [], 'isApprover' => false, 'counts' => [
-                    'total_raised' => 0, 'admin_approved' => 0, 'zonal_approved' => 0, 'audit_approved' => 0,
-                    'final_approved' => 0, 'pending' => 0, 'total_refund_amount' => 0
-                ], 'statistics' => [], 'message' => 'Invalid date format. Use DD/MM/YYYY.']);
+                \Log::warning('refundform_data: invalid moredatefittervale, loading all (no date filter)', [
+                    'moredatefittervale' => $datefiltervalue,
+                    'error' => $e->getMessage(),
+                ]);
+                $applyDateFilter = false;
+                $startDate = null;
+                $endDate = null;
             }
         }
     }
@@ -12179,11 +12197,72 @@ public function refundformeditsave(Request $request)
     $model->save();
 
     return response()->json([
-        'success'=>true,
-        'message'=>'Refund form updated successfully!'
+        'success' => true,
+        'message' => 'Refund form updated successfully!',
+        'updatedRecord' => $this->refundFormRecordForGrid($model->ref_id),
     ]);
 }
 
+/**
+ * Single refund row for saved grid (same shape as refundform_data items).
+ */
+private function refundFormRecordForGrid($refId)
+{
+    if (empty($refId)) {
+        return null;
+    }
+
+    return RefundFormModel::select(
+        'tbl_locations.name as location_name',
+        'tblzones.name as zone_name',
+        'users.user_fullname as created_by_name',
+        'hms_refund_form.*',
+        'admin_approver_user.user_fullname as admin_approver_name',
+        'zonal_approver_user.user_fullname as zonal_approver_name',
+        'audit_approver_user.user_fullname as audit_approver_name',
+        'final_approver_user.user_fullname as final_approver_name'
+    )
+        ->leftJoin('tbl_locations', 'hms_refund_form.ref_zone_id', '=', 'tbl_locations.id')
+        ->leftJoin('tblzones', 'tbl_locations.zone_id', '=', 'tblzones.id')
+        ->leftJoin('users', 'hms_refund_form.created_by', '=', 'users.id')
+        ->leftJoin('users as admin_approver_user', 'hms_refund_form.admin_approved_by', '=', 'admin_approver_user.id')
+        ->leftJoin('users as zonal_approver_user', 'hms_refund_form.zonal_approved_by', '=', 'zonal_approver_user.id')
+        ->leftJoin('users as audit_approver_user', 'hms_refund_form.audit_approved_by', '=', 'audit_approver_user.id')
+        ->leftJoin('users as final_approver_user', 'hms_refund_form.final_approved_by', '=', 'final_approver_user.id')
+        ->where('hms_refund_form.ref_id', $refId)
+        ->first();
+}
+
+/**
+ * Single cancel bill row for saved grid (same shape as cancelformsave_data items).
+ */
+private function cancelBillRecordForGrid($canId)
+{
+    if (empty($canId)) {
+        return null;
+    }
+
+    return CancelbillFormModel::select(
+        'tbl_locations.name as location_name',
+        'tblzones.name as zone_name',
+        'users.user_fullname as username',
+        'users.username as userid',
+        'hms_cancelbill_form.*',
+        'admin_approver_user.user_fullname as admin_approver_name',
+        'zonal_approver_user.user_fullname as zonal_approver_name',
+        'audit_approver_user.user_fullname as audit_approver_name',
+        'final_approver_user.user_fullname as final_approver_name'
+    )
+        ->leftjoin('tbl_locations', 'hms_cancelbill_form.can_zone_id', '=', 'tbl_locations.id')
+        ->leftjoin('tblzones', 'tbl_locations.zone_id', '=', 'tblzones.id')
+        ->leftjoin('users', 'hms_cancelbill_form.created_by', '=', 'users.id')
+        ->leftJoin('users as admin_approver_user', 'hms_cancelbill_form.admin_head_id', '=', 'admin_approver_user.id')
+        ->leftJoin('users as zonal_approver_user', 'hms_cancelbill_form.zonal_head_id', '=', 'zonal_approver_user.id')
+        ->leftJoin('users as audit_approver_user', 'hms_cancelbill_form.audit_head_id', '=', 'audit_approver_user.id')
+        ->leftJoin('users as final_approver_user', 'hms_cancelbill_form.final_approver_id', '=', 'final_approver_user.id')
+        ->where('hms_cancelbill_form.can_id', $canId)
+        ->first();
+}
 
 public function refformsave_data(Request $request) {
     $fitterremovedataall = $request->input('morefilltersall');

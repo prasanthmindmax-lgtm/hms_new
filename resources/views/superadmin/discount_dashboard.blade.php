@@ -22,6 +22,15 @@
     .stat-card:last-child .stat-value{
         font-size: 22px  !important;
     }
+    .stats-overview-toggle-bar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-bottom: 0.35rem;
+    }
+    #stats-container.is-hidden {
+        display: none !important;
+    }
     /* When create-form modal is open: hide approver icons/buttons in saved table */
     body.create-form-modal-open .approve-btn,
     body.create-form-modal-open .reject-btn,
@@ -754,6 +763,12 @@ function rowClick(event) {
                     $accessLimits = (int) ($admin->access_limits ?? 1);
                     $statKeys = $statCardsByRole[$accessLimits] ?? $statCardsByRole[1];
                 @endphp
+                <div class="stats-overview-toggle-bar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="stats-overview-toggle" aria-controls="stats-container" aria-expanded="true">
+                        <i class="bi bi-bar-chart-line me-1" id="stats-overview-toggle-icon"></i>
+                        <span id="stats-overview-toggle-label">Hide statistics</span>
+                    </button>
+                </div>
                 <div class="stats-container" id="stats-container">
                     @foreach ($statKeys as $key)
                         @php $cfg = $statConfig[$key] ?? ['label' => $key, 'icon' => 'circle', 'color' => 'blue']; @endphp
@@ -924,7 +939,7 @@ function rowClick(event) {
                          <!-- Filter Summary -->
                          <div class="d-flex align-items-center" style="margin-top: 10px;">
                              <p class="text-muted mb-0" style="font-size: 12px;">
-                                 <span id="mycounts">0</span> Rows for <span id="mydateallviews">Today</span>
+                                 <span id="mycounts">0</span> Rows for <span id="mydateallviews">{{ \Carbon\Carbon::today()->format('d/m/Y') }} - {{ \Carbon\Carbon::today()->format('d/m/Y') }}</span>
                                  <span class="my_search_view" style="color: #e40505;font-size: 12px;font-weight: 600; display:none;">Search:</span>
                                  <span style="cursor: pointer;" id="diszone_search" class="badge  value_views_mysearch"></span>
                                  <span style="cursor: pointer;" id="disbranch_search" class="badge  value_views_mysearch"></span>
@@ -1072,7 +1087,7 @@ function rowClick(event) {
                          <!-- Filter Summary -->
                          <div class="d-flex align-items-center" style="margin-top: 10px;">
                              <p class="text-muted mb-0" style="font-size: 12px;">
-                                 <span id="billsavecounts">0</span> Rows for <span id="mydateallviewssave">Today</span>
+                                 <span id="billsavecounts">0</span> Rows for <span id="mydateallviewssave">All</span>
                                  <span class="my_search_saveview" style="color: #e40505;font-size: 12px;font-weight: 600; display:none;">Search:</span>
                                  <span style="cursor: pointer;" id="savezone_search" class="badge  value_save_mysearch"></span>
                                  <span style="cursor: pointer;" id="savebranch_search" class="badge  value_save_mysearch"></span>
@@ -1282,7 +1297,8 @@ function rowClick(event) {
         $('#dateRangePickerPending span').html('Today');
         myPending(startPending, endPending, 'Today', true);
 
-        // Saved table date picker (id: dateRangePickerSave) - default Today
+        // Saved table date picker — initial "All" (no date filter), same as refund/cancel saved behaviour
+        var labelSave = 'All';
         function mySave(start, end, label, skipReload) {
             let displayFrom = start.format('DD/MM/YYYY');
             let displayTo   = end.format('DD/MM/YYYY');
@@ -1304,8 +1320,9 @@ function rowClick(event) {
             autoUpdateInput: false,
             ranges: ranges
         }, mySave);
-        $('#dateRangePickerSave span').html('Today');
-        mySave(startSave, endSave, 'Today', true);
+        $('#dateRangePickerSave span').html(labelSave);
+        $('#mydateallviewssave').text('All');
+        $('#mydateviewsallsave').text('All');
 
         // Tab switch: show/hide sections and load saved data when switching to saved tab
         function switchTab(tab) {
@@ -1324,6 +1341,34 @@ function rowClick(event) {
             e.preventDefault();
             switchTab($(this).data('tab'));
         });
+
+        (function () {
+            var STORAGE_KEY = 'hms_discount_dashboard_stats_visible';
+            var $box = $('#stats-container');
+            var $btn = $('#stats-overview-toggle');
+            if (!$box.length || !$btn.length) return;
+            var $icon = $('#stats-overview-toggle-icon');
+            var $label = $('#stats-overview-toggle-label');
+            function applyVisible(visible) {
+                if (visible) {
+                    $box.removeClass('is-hidden');
+                    $btn.attr('aria-expanded', 'true');
+                    $icon.attr('class', 'bi bi-bar-chart-line me-1');
+                    $label.text('Hide statistics');
+                } else {
+                    $box.addClass('is-hidden');
+                    $btn.attr('aria-expanded', 'false');
+                    $icon.attr('class', 'bi bi-bar-chart me-1');
+                    $label.text('Show statistics');
+                }
+            }
+            applyVisible(localStorage.getItem(STORAGE_KEY) !== '0');
+            $btn.on('click', function () {
+                var willShow = $box.hasClass('is-hidden');
+                applyVisible(willShow);
+                localStorage.setItem(STORAGE_KEY, willShow ? '1' : '0');
+            });
+        })();
     </script>
     <script>
     window.admin_user = { access_limits: {{ $admin->access_limits ?? 0 }} };

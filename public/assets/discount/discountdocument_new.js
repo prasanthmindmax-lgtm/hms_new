@@ -26,6 +26,21 @@ $(document).ready(function () {
             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
         },
     });
+
+    /** Disable save buttons + show spinner; prevents double submit on discount add/edit */
+    function hmsFormSaveBtnLoading($btn, loading) {
+        if (!$btn || !$btn.length) return;
+        if (loading) {
+            if (!$btn.data('hms-orig-html')) $btn.data('hms-orig-html', $btn.html());
+            $btn.prop('disabled', true).html(
+                '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...'
+            );
+        } else {
+            $btn.prop('disabled', false).html($btn.data('hms-orig-html') || $btn.html());
+            $btn.removeData('hms-orig-html');
+        }
+    }
+
     // Clear error span text on input
     $('input, select, textarea').on('input change', function () {
         $(this).siblings('.errorss').text('');
@@ -200,10 +215,16 @@ $(document).ready(function () {
     });
     if (!allSignaturesValid) return;
 
+    var $discountAddBtn = $('#submit_discountform');
+    if ($discountAddBtn.prop('disabled')) return;
+    hmsFormSaveBtnLoading($discountAddBtn, true);
+
     let pendingBlobs = 0;
+    let discountAddSubmitSent = false;
     const finishSubmission = () => {
-        if (pendingBlobs === 0) {
-            $.ajax({
+        if (pendingBlobs !== 0 || discountAddSubmitSent) return;
+        discountAddSubmitSent = true;
+        $.ajax({
                 url: discountform_documentaddedUrl,
                 type: "POST",
                 data: formData,
@@ -245,8 +266,11 @@ $(document).ready(function () {
                 error: function (error) {
                     console.error(error.responseJSON);
                 },
+                complete: function () {
+                    hmsFormSaveBtnLoading($discountAddBtn, false);
+                    discountAddSubmitSent = false;
+                },
             });
-        }
     };
 
     signers.forEach(signer => {
@@ -416,6 +440,9 @@ function clearForm(){
     }
     return false;
   }
+  var $editDiscountBtn = $('#editdiscountform');
+  if ($editDiscountBtn.prop('disabled')) return false;
+  hmsFormSaveBtnLoading($editDiscountBtn, true);
   try {
   var exText = ($('#ex_discount_value_edit').text() || '').toString().replace(/₹/g, '').trim();
   var postText = ($('#post_discount_value_edit').text() || '').toString().replace(/₹/g, '').trim();
@@ -469,6 +496,7 @@ function clearForm(){
         processData: false,
         contentType: false,
         success: function (response) {
+          var rowPatched = false;
           if (response.success) {
             window.dispatchEvent(new CustomEvent('swal:toast', {
               detail: {
@@ -480,24 +508,54 @@ function clearForm(){
             }));
             var rec = response.updatedRecord;
             if (rec && rec.dis_id) {
-              var $tr = $("#sveddata_tbl tbody tr").filter(function() {
-                return $(this).find('td').eq(0).data('id') == rec.dis_id;
+              var $tr = $('#sveddata_tbl tr').filter(function () {
+                return String($(this).find('td[id="idfetch"]').data('id')) === String(rec.dis_id);
               });
               if ($tr.length) {
-                var counselText = rec.dis_counselled_by || '';
-                if (rec.dis_counselled_by_include || rec.dis_counselled_by_not_include) {
-                  counselText = [rec.dis_counselled_by_include, rec.dis_counselled_by_not_include].filter(Boolean).join(' / ');
+                function parseCounselledPatch(val) {
+                  if (!val) return '-';
+                  if (typeof val === 'string' && val.indexOf('[') === 0) {
+                    try { var a = JSON.parse(val); return (a && a[0]) ? a[0] : val; } catch (e) { return val; }
+                  }
+                  return val;
                 }
-                $tr.find('.consultby').text(counselText || '-');
+                var includeText = parseCounselledPatch(rec.dis_counselled_by_include);
+                var notIncludeText = parseCounselledPatch(rec.dis_counselled_by_not_include);
+                var exp = rec.dis_expected_request || '-';
+                var fst = rec.dis_form_status || '-';
+                $tr.find('.locationname').text(rec.zone_name || 'N/A').attr('data-id', rec.dis_zone_id != null ? rec.dis_zone_id : '');
+                $tr.find('.branchname').text(rec.location_name || 'N/A');
+                var $visPh = $tr.find('> td[data-ph_id]').not('.wifemrdno').not('.husmrdno');
+                if ($visPh.length >= 2) {
+                  $($visPh[0]).html('<a href="#">' + (rec.dis_wife_mrd_no || '') + '<br>' + (rec.dis_wife_name || '') + '</a>').attr('data-ph_id', rec.dis_wife_mrd_no || '');
+                  $($visPh[1]).html('<a href="#">' + (rec.dis_husband_mrd_no || '') + '<br>' + (rec.dis_husband_name || '') + '</a>').attr('data-ph_id', rec.dis_husband_mrd_no || '');
+                }
                 $tr.find('.treatmentcat').text(rec.dis_service_name || '-');
                 $tr.find('.totalbil').text(rec.dis_total_bill || '-');
+                $tr.find('.totalbil').next('td').text(exp + ' (' + fst + ')');
+                $tr.find('.expamount').text(exp);
+                $tr.find('.requestfor').text(fst);
                 $tr.find('.postdis').text(rec.dis_post_discount || '-');
-                $tr.find('.finalamount').text(rec.dis_final_auth || '-');
+                $tr.find('.include-col').text(includeText);
+                $tr.find('.notinclude-col').text(notIncludeText);
                 $tr.find('.authby').text(rec.dis_auth_by || '-');
                 $tr.find('.finalapprove').text(rec.dis_approved_by || '-');
                 $tr.find('.brno').text(rec.dis_branch_no || '-');
+                $tr.find('.finalamount').text(rec.dis_final_auth || '-');
+                $tr.find('.wifemrdno').html('<a href="#">' + (rec.dis_wife_mrd_no || '') + '</a>').attr('data-ph_id', rec.dis_wife_mrd_no || '');
+                $tr.find('.husmrdno').html('<a href="#">' + (rec.dis_husband_mrd_no || '') + '</a>').attr('data-ph_id', rec.dis_husband_mrd_no || '');
+                $tr.find('.wifename').html('<a href="#">' + (rec.dis_wife_name || '') + '</a>');
+                $tr.find('.husname').html('<a href="#">' + (rec.dis_husband_name || '') + '</a>');
+                var uploader = (rec.username || '') + '</br>' + (rec.userid || '');
+                $tr.find('.reject-reason-cell').prev('td').html(uploader);
+                rowPatched = true;
+                if (typeof dataSaved !== 'undefined' && Array.isArray(dataSaved)) {
+                  var di = dataSaved.findIndex(function (d) { return String(d.dis_id) === String(rec.dis_id); });
+                  if (di >= 0) $.extend(true, dataSaved[di], rec);
+                }
               }
-            } else {
+            }
+            if (!rowPatched) {
               discountsaveformdata();
             }
           } else {
@@ -510,7 +568,9 @@ function clearForm(){
               }
             }));
           }
-          discountformdata();
+          if (!rowPatched) {
+            discountformdata();
+          }
           $("#exampleModal2").modal('hide');
           setTimeout(function() {
               $('body').removeClass('modal-open').css({
@@ -528,6 +588,10 @@ function clearForm(){
             var msg = (xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || 'Request failed';
             window.dispatchEvent(new CustomEvent('swal:toast', { detail: { title: 'Error!', text: msg, icon: 'error', background: '#f8d7da' } }));
           }
+        },
+        complete: function () {
+          hmsFormSaveBtnLoading($editDiscountBtn, false);
+          editSubmitSent = false;
         },
       });
     }
@@ -565,6 +629,7 @@ function clearForm(){
   }
   } catch (err) {
     console.error('editdiscountform click handler error:', err);
+    hmsFormSaveBtnLoading($editDiscountBtn, false);
     if (typeof window.dispatchEvent === 'function') {
       window.dispatchEvent(new CustomEvent('swal:toast', { detail: { title: 'Error!', text: 'Could not submit: ' + (err.message || 'unknown error'), icon: 'error', background: '#f8d7da' } }));
     }
@@ -586,10 +651,28 @@ $('.dropdown-item-loc_edit').on('click', function () {
 });
 var dataSourcedocument = [];
 
+/** Pending: normalize Today/labels to d/m/Y range. Saved: pass through "All" when allowAll. */
+function getDateRangeForApi(selector, opts) {
+    opts = opts || {};
+    var allowAll = !!opts.allowAll;
+    var val = ($(selector).text() || '').trim();
+    if (allowAll && (!val || val.toLowerCase() === 'all')) {
+        return 'All';
+    }
+    if (!val || val === 'Today' || val === 'Yesterday' || val.indexOf('-') === -1) {
+        if (typeof moment !== 'undefined') {
+            var m = moment();
+            return m.format('DD/MM/YYYY') + ' - ' + m.format('DD/MM/YYYY');
+        }
+        return val;
+    }
+    return val;
+}
+
 function discountformdata() {
    startLoader();
     $("#pending_table_Body").closest('.table-container').hide();
-    var moredatefittervale = $('#mydateallviews').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     $(".value_views_mysearch").text("");
     $("#loader-container").show();
     $.ajax({
@@ -1273,7 +1356,7 @@ $(document).on('click', '.sec_options_marketers div', function () {
     $('.clear_my_views').show();
     $(".my_search_view").show();
 
-    var moredatefittervale = $('#mydateallviews').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     let resultsArray_marketer = [];
 
     $(".documentdatasearch").each(function () {
@@ -1302,7 +1385,7 @@ $(document).on('click', '.sec_options_marketers div', function () {
 });
 
 $(document).on("click", ".value_views_mysearch", function () {
-    var moredatefittervale = $('#mydateallviews').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     var morefillterremvedata = $(this).text().replace(/, /g, ",");
     var clear_filtr = $(this).attr('id');
     $(this).text("");
@@ -1342,7 +1425,7 @@ $(document).on("click", ".clear_my_views", function () {
 
 $(document).on("click", ".my_value_views", function () {
     $('.morefittersclr').val("");
-    var moredatefittervale = $('#mydateallviews').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
 
     var morefillterremvedata = $(this).text().replace(/\s*-\s*/, '-').trim();
 
@@ -1379,7 +1462,7 @@ $('#dis_mrd_views').on('input', function () {
     $('.clear_my_views').show();
     $(".my_search_view").show();
 
-    const moredatefittervale = $('#mydateallviews').text();
+    const moredatefittervale = getDateRangeForApi('#mydateallviews', { allowAll: false });
     let resultsArray_marketer = [];
 
     // Collect all filter input values
@@ -1555,7 +1638,7 @@ function savedFilterSyncBadgesAndApply(phid) {
     $(".my_savevalue_views").text("");
     $('.clear_my_saveviews').show();
     $(".my_search_saveview").show();
-    var moredatefittervale = $('#mydateallviewssave').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     var resultsArray_marketer = [];
     $(".savedatasearch").each(function () {
         var value = $(this).val();
@@ -1587,7 +1670,7 @@ $(document).on('click', '.savedata_options div', function (e) {
     savedFilterSyncBadgesAndApply();
 });
 $(document).on("click", ".value_save_mysearch", function () {
-    var moredatefittervale = $('#mydateallviewssave').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     var morefillterremvedata = $(this).text().replace(/, /g, ",");
     var clear_filtr = $(this).attr('id');
     $(this).text("");
@@ -1626,7 +1709,7 @@ $(document).on("click", ".clear_my_saveviews", function () {
 
 $(document).on("click", ".my_savevalue_views", function () {
     $('.morefittersclr').val("");
-    var moredatefittervale = $('#mydateallviewssave').text();
+    var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     var morefillterremvedata = $(this).text().replace(/\s*-\s*/, '-').trim();
 
     // Clear the text of the clicked element
@@ -1664,7 +1747,7 @@ $('#save_mrd_views').on('input', function () {
      $(".my_savevalue_views").text("");
     $('.clear_my_saveviews').show();
     $(".my_search_saveview").show();
-    const moredatefittervale = $('#mydateallviewssave').text();
+    const moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
     let resultsArray_marketer = [];
     $(".savedatasearch").each(function () {
         const value = $(this).val();
@@ -1778,7 +1861,7 @@ function renderStatisticsCards(statistics, responseData) {
 
 function discountsaveformdata() {
       startLoader2();
-		var moredatefittervale = $('#mydateallviewssave').text();
+		var moredatefittervale = getDateRangeForApi('#mydateallviewssave', { allowAll: true });
 		$(".value_save_mysearch").text("");
 		$.ajax({
 			url: disformsave_data,
