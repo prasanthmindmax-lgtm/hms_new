@@ -5,24 +5,25 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TblLocationModel;
+use App\Models\TblZonesModel;
 use App\Models\TicketCategory;
 use App\Models\usermanagementdetails;
 use App\Exports\TicketExport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\File;
 use Maatwebsite\Excel\Facades\Excel;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TicketController extends Controller
 {
+    private const OPEN = [1, 2, 3, 6];
+
+    private const OWN_ROWS = [4, 5];
+
     public function getDepartments(Request $request)
     {
         $admin   = auth()->user();
@@ -132,62 +133,28 @@ class TicketController extends Controller
         ]);
     }
 
-    protected function currentUserRoleId(): ?int
-    {
-        $id = auth()->id();
-        if (!$id) {
-            return null;
-        }
-
-        return (int) DB::table('users')->where('id', $id)->value('access_limits');
-    }
-
-    protected function ticketFullAccessLimits(): array
-    {
-        return [1, 2, 3, 6];
-    }
-
-    protected function currentUserHasFullTicketAccess(): bool
-    {
-        $limit = $this->currentUserRoleId();
-
-        return in_array($limit, $this->ticketFullAccessLimits(), true);
-    }
-
-    /** Non-elevated users only see tickets they raised. */
-    protected function applyTicketOwnershipScopeUnlessElevated(Builder $q): void
-    {
-        if ($this->currentUserHasFullTicketAccess()) {
-            return;
-        }
-        $uid = (int) auth()->id();
-        if ($uid > 0) {
-            $q->where('created_by', $uid);
-        }
-    }
-
-    protected function canUpdateTicketStatus(Ticket $ticket): bool
-    {
-        return $this->currentUserHasFullTicketAccess();
-    }
-
-    /**
-     * Creators may edit only while the ticket is still open
-     */
     protected function canEditTicket(Ticket $ticket): bool
     {
+        $access = $this->ticketAccessFromAuth();
+
+        if (!$access || isset($this->accessControl($ticket)['error'])) {
+            return false;
+        }
+
         if ($ticket->status !== 'open') {
             return false;
         }
+
         $userId = (int) auth()->id();
-        if ($userId <= 0) {
-            return false;
+
+        if ($this->ticketAccessIsOpen($access)) {
+            return true;
         }
 
         return (int) $ticket->created_by === $userId;
     }
 
-    protected function ticketUserNames(iterable $userIds): array
+    protected function namesForUsers(iterable $userIds): array
     {
         $ids = collect($userIds)->filter()->unique()->values();
         if ($ids->isEmpty()) {
@@ -200,163 +167,267 @@ class TicketController extends Controller
             ->all();
     }
 
-    protected function applyTicketScope(Builder $query, Request $request, int $userId): void
+    protected function accessControl(?Ticket $ticket = null, ?int $locationId = null)
     {
-        $scope = $request->get('scope', 'all');
-        if ($scope === 'mine') {
+        $a = $this->ticketAccessFromAuth();
+
+        if (!$a) {
+            return ['error' => response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401)];
+        }
+
+        if ($locationId && $err = $this->ticketAccessLocationError($a, $locationId)) {
+            return ['error' => $err];
+        }
+
+        if ($ticket && !$this->ticketAccessAllows($a, $ticket)) {
+            return ['error' => false];
+        }
+
+        return ['access' => $a];
+    }
+
+    protected function getIds(Request $request, string $key, $model = null, $extraWhere = [])
+    {
+        $raw = $request->input($key);
+        if (!$raw) return [];
+
+        $ids = collect(is_array($raw) ? $raw : explode(',', $raw))
+            ->map(fn($v) => trim($v))
+            ->filter(fn($v) => $v !== '')
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) return [];
+
+        if (!$model) return $ids->all();
+
+        $query = $model::query()->whereIn('id', $ids);
+
+        foreach ($extraWhere as $k => $v) {
+            $query->where($k, $v);
+        }
+
+        return $query->pluck('id')->map(fn($id) => (int) $id)->all();
+    }
+
+    protected function applyFilters(Builder $query, Request $request, int $userId)
+    {
+        // scope (mine / department)
+        if ($request->get('scope') === 'mine') {
             $query->where('created_by', $userId);
-        } elseif ($scope === 'department') {
-            $deptIds = DB::table('department_user')->where('user_id', $userId)->pluck('department_id');
+        } elseif ($request->get('scope') === 'department') {
+            $deptIds = DB::table('department_user')
+                ->where('user_id', $userId)
+                ->pluck('department_id');
+
             $query->whereIn('to_department_id', $deptIds);
         }
-    }
 
-    /**
-     * Active department IDs from filter (comma-separated or repeated params).
-     *
-     * @return int[]
-     */
-    protected function requestedDepartmentIds(Request $request): array
-    {
-        $raw = $request->input('to_department_id');
-        if ($raw === null || $raw === '') {
-            return [];
-        }
-        $parts = is_array($raw) ? $raw : explode(',', (string) $raw);
-        $ids = [];
-        foreach ($parts as $p) {
-            $p = trim((string) $p);
-            if ($p === '') {
-                continue;
-            }
-            $n = (int) $p;
-            if ($n > 0) {
-                $ids[] = $n;
-            }
-        }
-        $ids = array_values(array_unique($ids));
-        if ($ids === []) {
-            return [];
+        // access
+        if ($a = $this->ticketAccessFromAuth()) {
+            $this->ticketAccessApplyScope($a, $query);
+        } else {
+            $query->whereRaw('0=1');
         }
 
-        return Department::query()
-            ->where('is_active', 1)
-            ->whereIn('id', $ids)
-            ->pluck('id')
-            ->map(fn($id) => (int) $id)
-            ->all();
-    }
-
-    /**
-     * Status slugs from filter (comma-separated or array), validated against Ticket::STATUSES.
-     *
-     * @return string[]
-     */
-    protected function requestedStatuses(Request $request): array
-    {
-        $raw = $request->input('status');
-        if ($raw === null || $raw === '') {
-            return [];
+        // date filters
+        if ($d = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $d);
         }
-        $parts = is_array($raw) ? $raw : explode(',', (string) $raw);
-        $allowed = array_flip(Ticket::STATUSES);
-        $out = [];
-        foreach ($parts as $p) {
-            $p = trim((string) $p);
-            if ($p !== '' && isset($allowed[$p])) {
-                $out[] = $p;
-            }
+        if ($d = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $d);
         }
 
-        return array_values(array_unique($out));
-    }
+        // department
+        $dept = $this->getIds($request, 'to_department_id', Department::class, ['is_active' => 1]);
+        if ($dept) $query->whereIn('to_department_id', $dept);
 
-    protected function applyTicketDepartmentFilter(Builder $query, Request $request): void
-    {
-        $ids = $this->requestedDepartmentIds($request);
-        if ($ids !== []) {
-            $query->whereIn('to_department_id', $ids);
-        }
-    }
+        // status
+        $status = $this->getIds($request, 'status');
+        if ($status) $query->whereIn('status', $status);
 
-    protected function applyTicketStatusMultiFilter(Builder $query, Request $request): void
-    {
-        $statuses = $this->requestedStatuses($request);
-        if ($statuses !== []) {
-            $query->whereIn('status', $statuses);
+        // zone
+        $zones = $this->getIds($request, 'zone_id', TblZonesModel::class);
+        if ($zones) {
+            $query->whereHas('location', fn($q) => $q->whereIn('zone_id', $zones));
         }
-    }
 
-    protected function applyTicketListFilters(Builder $query, Request $request): void
-    {
-        $dateFrom = $request->input('date_from');
-        if (is_string($dateFrom) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
-            $query->whereDate('created_at', '>=', $dateFrom);
+        // branch
+        $branches = $this->getIds($request, 'branch_id', TblLocationModel::class);
+        if ($branches) {
+            $query->whereIn('location_id', $branches);
         }
-        $dateTo = $request->input('date_to');
-        if (is_string($dateTo) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
-            $query->whereDate('created_at', '<=', $dateTo);
-        }
-        $this->applyTicketDepartmentFilter($query, $request);
-        $qText = trim((string) $request->input('universal_search', ''));
-        if ($qText === '' && $request->filled('raised_by')) {
-            $qText = trim((string) $request->input('raised_by', ''));
-        }
-        if ($qText !== '') {
-            $needle = '%' . addcslashes($qText, '%_\\') . '%';
-            $query->where(function ($sub) use ($needle) {
-                $sub->where('ticket_no', 'like', $needle)
+
+        // search
+        $qText = trim($request->input('universal_search') ?: $request->input('raised_by', ''));
+        if ($qText) {
+            $needle = "%{$qText}%";
+            $query->where(function ($q) use ($needle) {
+                $q->where('ticket_no', 'like', $needle)
                     ->orWhere('subject', 'like', $needle)
                     ->orWhere('description', 'like', $needle)
-                    ->orWhereHas('creator', function ($cq) use ($needle) {
-                        $cq->where('user_fullname', 'like', $needle);
-                    })
-                    ->orWhereHas('location', function ($lq) use ($needle) {
-                        $lq->where('name', 'like', $needle);
-                    })
-                    ->orWhereHas('fromDepartment', function ($dq) use ($needle) {
-                        $dq->where('name', 'like', $needle);
-                    })
-                    ->orWhereHas('toDepartment', function ($dq) use ($needle) {
-                        $dq->where('name', 'like', $needle);
-                    })
-                    ->orWhereHas('category', function ($cq) use ($needle) {
-                        $cq->where('name', 'like', $needle);
-                    });
+                    ->orWhereHas('creator', fn($cq) => $cq->where('user_fullname', 'like', $needle))
+                    ->orWhereHas('location', fn($lq) => $lq->where('name', 'like', $needle))
+                    ->orWhereHas('fromDepartment', fn($dq) => $dq->where('name', 'like', $needle))
+                    ->orWhereHas('toDepartment', fn($dq) => $dq->where('name', 'like', $needle))
+                    ->orWhereHas('category', fn($cq) => $cq->where('name', 'like', $needle))
+                    ->orWhereHas('location.zone', fn($zq) => $zq->where('name', 'like', $needle));
             });
         }
+
+        return $query;
     }
 
-    protected function ticketListQueryForGrid(Request $request): Builder
+    protected function queryGrid(Request $request): Builder
     {
-        $q = Ticket::query()
-            ->with([
-                'location:id,name',
-                'fromDepartment:id,name',
-                'toDepartment:id,name',
-                'category:id,name,sla_time',
-                'creator:id,user_fullname',
-                'statusUpdater:id,user_fullname',
-            ]);
+        $q = Ticket::query()->with([
+            'location:id,name',
+            'fromDepartment:id,name',
+            'toDepartment:id,name',
+            'category:id,name,sla_time',
+            'creator:id,user_fullname',
+            'statusUpdater:id,user_fullname',
+        ]);
 
-        $this->applyTicketOwnershipScopeUnlessElevated($q);
+        return $this->applyFilters($q, $request, auth()->id());
+    }
 
-        $this->applyTicketListFilters($q, $request);
-        $this->applyTicketStatusMultiFilter($q, $request);
+    private function getZonesAndLocations($admin)
+    {
+        $locations = null;
+        $zones = null;
 
-        return $q;
+        if ($admin->access_limits == 1) {
+
+            $zones = TblZonesModel::select('name', 'id')->get();
+            $locations = TblLocationModel::select('name', 'id', 'zone_id')->get();
+        } else if ($admin->access_limits == 2) {
+
+            $zoneIds = [];
+
+            if (!empty($admin->multi_location)) {
+
+                $multiLocations = explode(',', $admin->multi_location);
+
+                $locationsFromMulti = TblLocationModel::whereIn('id', $multiLocations)
+                    ->pluck('zone_id')
+                    ->unique()
+                    ->toArray();
+
+                $zoneIds = array_unique(array_merge([$admin->zone_id], $locationsFromMulti));
+
+                $locations = TblLocationModel::select('name', 'id', 'zone_id')
+                    ->where('zone_id', $admin->zone_id)
+                    ->get();
+
+                $specificLocations = TblLocationModel::select('name', 'id', 'zone_id')
+                    ->whereIn('id', $multiLocations)
+                    ->get();
+
+                $locations = $locations->merge($specificLocations)->unique('id');
+            } else {
+                $locations = TblLocationModel::select('name', 'id', 'zone_id')
+                    ->where('zone_id', $admin->zone_id)
+                    ->get();
+
+                $zoneIds = [$admin->zone_id];
+            }
+
+            $zones = TblZonesModel::select('name', 'id')
+                ->whereIn('id', $zoneIds)
+                ->get();
+        } else {
+            $branchIds = [];
+            $branchIds[] = $admin->branch_id;
+
+            if (!empty($admin->multi_location)) {
+
+                $multiLocations = explode(',', $admin->multi_location);
+
+                $branchIds = array_merge($branchIds, $multiLocations);
+
+                $locations = TblLocationModel::select('name', 'id', 'zone_id')
+                    ->whereIn('id', $branchIds)
+                    ->get();
+            } else {
+                $locations = TblLocationModel::select('name', 'id', 'zone_id')
+                    ->where('id', $admin->branch_id)
+                    ->get();
+            }
+
+            $zoneIds = $locations->pluck('zone_id')->unique()->toArray();
+            $zones = TblZonesModel::select('name', 'id')
+                ->whereIn('id', $zoneIds)
+                ->get();
+        }
+
+        return compact('zones', 'locations');
+    }
+
+    private function applyAccessFilter($query, $admin)
+    {
+        if ($admin->access_limits == 1 || $admin->access_limits == 4) {
+            return $query;
+        } elseif ($admin->access_limits == 2) {
+            $branchIds = [];
+
+            if (!empty($admin->zone_id)) {
+                $zoneBranchIds = DB::table('tbl_locations')
+                    ->where('zone_id', $admin->zone_id)
+                    ->pluck('id')
+                    ->toArray();
+
+                $branchIds = array_merge($branchIds, $zoneBranchIds);
+            }
+
+            if (!empty($admin->multi_location)) {
+                $multiLocationIds = array_map(
+                    'intval',
+                    explode(',', $admin->multi_location)
+                );
+
+                $branchIds = array_merge($branchIds, $multiLocationIds);
+            }
+
+            $branchIds = array_unique($branchIds);
+
+            if (!empty($branchIds)) {
+                $query->whereIn('location_id', $branchIds);
+            }
+        } elseif ($admin->access_limits == 3 || $admin->access_limits == 5) {
+            $branchIds = [];
+
+            if (!empty($admin->multi_location)) {
+                $multiLocationIds = array_map(
+                    'intval',
+                    explode(',', $admin->multi_location)
+                );
+
+                $branchIds = array_merge($branchIds, $multiLocationIds);
+            }
+
+            $branchIds = array_unique($branchIds);
+
+            if (!empty($branchIds)) {
+                $query->whereIn('location_id', $branchIds);
+            }
+            $query->where('created_by', $admin->id);
+        }
+
+        return $query;
     }
 
     public function index(Request $request)
     {
         $admin = auth()->user();
-        $locations = TblLocationModel::orderBy('name')->get();
-        $departments = Department::where('is_active', 1)->orderBy('name')->get();
+
+        $data = $this->getZonesAndLocations($admin);
 
         return view('superadmin.tickets.index', [
             'admin' => $admin,
-            'locations' => $locations,
-            'departments' => $departments,
+            'zones' => $data['zones'],
+            'locations' => $data['locations'],
+            'departments' => Department::where('is_active', 1)->get(),
             'statuses' => Ticket::STATUSES,
             'priorities' => Ticket::PRIORITIES,
         ]);
@@ -379,13 +450,15 @@ class TicketController extends Controller
 
     public function data(Request $request)
     {
+        $admin = auth()->user();
         $userId = (int) auth()->id();
 
         $statsQuery = Ticket::query();
-        $this->applyTicketScope($statsQuery, $request, $userId);
-        $this->applyTicketOwnershipScopeUnlessElevated($statsQuery);
-        $this->applyTicketListFilters($statsQuery, $request);
-        $this->applyTicketStatusMultiFilter($statsQuery, $request);
+
+        $this->applyAccessFilter($statsQuery, $admin);
+
+        $this->applyFilters($statsQuery, $request, $userId);
+
         $countsByStatus = $statsQuery
             ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
@@ -395,16 +468,23 @@ class TicketController extends Controller
         foreach (Ticket::STATUSES as $st) {
             $byStatus[$st] = (int) ($countsByStatus[$st] ?? 0);
         }
+
         $statsTotal = array_sum($byStatus);
 
-        $q = $this->ticketListQueryForGrid($request);
+        $q = $this->queryGrid($request);
+
+        $this->applyAccessFilter($q, $admin);
 
         $page = max(1, (int) $request->input('page', 1));
         $perPage = (int) $request->input('per_page', 15);
         $perPage = min(100, max(5, $perPage));
 
         $listBase = clone $q;
-        $paginator = (clone $listBase)->orderByDesc('id')->paginate($perPage, ['*'], 'page', $page);
+
+        $paginator = (clone $listBase)
+            ->orderByDesc('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
         if ($paginator->total() > 0 && $paginator->isEmpty()) {
             $paginator = (clone $listBase)->orderByDesc('id')->paginate(
                 $perPage,
@@ -415,7 +495,8 @@ class TicketController extends Controller
         }
 
         $mapped = $paginator->getCollection()->map(function (Ticket $t) use ($userId) {
-            $canStatus = $this->canUpdateTicketStatus($t);
+
+            $access = $this->ticketAccessFromAuth();
             $slaSummary = $t->slaVersusActualSummary();
 
             return [
@@ -435,18 +516,19 @@ class TicketController extends Controller
                 'status' => $t->status,
                 'attachments' => $t->attachments ?? [],
                 'created_by_name' => $t->creator->user_fullname ?? '',
-                'created_at' => $this->formatTicketDateTimeForDisplay($t->created_at),
+                'created_at' => $this->fmtAt($t->created_at),
                 'status_updated_by_name' => $t->statusUpdater->user_fullname ?? '',
-                'status_updated_at' => $this->formatTicketDateTimeForDisplay($t->status_updated_at),
+                'status_updated_at' => $this->fmtAt($t->status_updated_at),
                 'time_to_close' => $t->timeToCloseDisplay(),
                 'sla_vs_actual' => $slaSummary['text'],
                 'sla_vs_actual_kind' => $slaSummary['kind'],
                 'closed_status_note' => $t->closedStatusNote(),
                 'is_creator' => (int) $t->created_by === $userId,
-                'can_update_status' => $canStatus,
+                'can_update_status' => $access && $this->ticketAccessIsOpen($access),
                 'can_edit' => $this->canEditTicket($t),
             ];
         });
+
         $paginator->setCollection($mapped);
 
         return response()->json([
@@ -465,190 +547,6 @@ class TicketController extends Controller
                 'to' => $paginator->lastItem(),
             ],
         ]);
-    }
-
-    public function export(Request $request)
-    {
-        $tickets = $this->ticketListQueryForGrid($request)->orderByDesc('id')->get();
-        $filename = 'tickets_' . now()->format('Y_m_d_His') . '.xlsx';
-
-        return Excel::download(new TicketExport($tickets), $filename);
-    }
-
-    /**
-     * Resolve stored filename to a real path under public/ticket_attachments, or null if invalid.
-     */
-    protected function resolveTicketAttachmentPath(string $name): ?string
-    {
-        $name = basename($name);
-        if ($name === '' || preg_match('/[\x00-\x1f\x7f\\\\\/]/', $name)) {
-            return null;
-        }
-
-        $baseDir = realpath(public_path('ticket_attachments'));
-        if ($baseDir === false) {
-            return null;
-        }
-
-        $fullPath = public_path('ticket_attachments') . DIRECTORY_SEPARATOR . $name;
-        $realPath = realpath($fullPath);
-        if ($realPath === false || ! is_file($realPath)) {
-            return null;
-        }
-
-        if (! str_starts_with($realPath, $baseDir . DIRECTORY_SEPARATOR)) {
-            return null;
-        }
-
-        return $realPath;
-    }
-
-    protected function guessAttachmentMimeType(string $realPath): string
-    {
-        $ext = strtolower(pathinfo($realPath, PATHINFO_EXTENSION));
-        $map = [
-            'pdf' => 'application/pdf',
-            'png' => 'image/png',
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'doc' => 'application/msword',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls' => 'application/vnd.ms-excel',
-            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ];
-        if (isset($map[$ext])) {
-            return $map[$ext];
-        }
-        $detected = @mime_content_type($realPath);
-
-        return is_string($detected) && $detected !== '' ? $detected : 'application/octet-stream';
-    }
-
-    /**
-     * Stream with Content-Disposition: inline + explicit Content-Type (new tab / in-browser where supported).
-     */
-    protected function streamTicketAttachment(string $name): BinaryFileResponse
-    {
-        $realPath = $this->resolveTicketAttachmentPath($name);
-        if ($realPath === null) {
-            abort(404);
-        }
-
-        $safeName = basename($realPath);
-        $response = response()->file($realPath);
-        $response->headers->set('Content-Type', $this->guessAttachmentMimeType($realPath));
-        $response->setContentDisposition('inline', $safeName);
-
-        return $response;
-    }
-
-    /**
-     * Streams an attachment, returns Office viewer JSON (?office=1), or serves a signed URL (no session) for Office Online.
-     */
-    public function viewAttachment(Request $request): BinaryFileResponse|JsonResponse|RedirectResponse
-    {
-        if ($request->hasValidSignature()) {
-            $request->validate([
-                'f' => 'required|string|max:512',
-            ]);
-
-            return $this->streamTicketAttachment((string) $request->query('f'));
-        }
-
-        $redirect = $this->requireSuperadminRoleForTicketAttachment($request);
-        if ($redirect !== null) {
-            return $redirect;
-        }
-
-        if ($request->query('office') === '1') {
-            return $this->officeAttachmentViewerPayload($request);
-        }
-
-        return $this->streamTicketAttachment((string) $request->query('f', ''));
-    }
-
-    protected function requireSuperadminRoleForTicketAttachment(Request $request): ?RedirectResponse
-    {
-        if (! auth()->check()) {
-            return redirect('login');
-        }
-
-        if ((int) auth()->user()->role_id !== 1) {
-            Auth::logout();
-            $request->session()->invalidate();
-
-            return redirect('login');
-        }
-
-        return null;
-    }
-
-    /**
-     * JSON for Word/Excel: Office Online viewer URL when app URL is public HTTPS; otherwise use_direct.
-     */
-    protected function officeAttachmentViewerPayload(Request $request): JsonResponse
-    {
-        $request->validate([
-            'f' => 'required|string|max:512',
-        ]);
-
-        $name = basename($request->query('f'));
-        if ($this->resolveTicketAttachmentPath($name) === null) {
-            abort(404);
-        }
-
-        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if (! in_array($ext, ['doc', 'docx', 'xls', 'xlsx'], true)) {
-            return response()->json([
-                'viewer_url' => null,
-                'use_direct' => true,
-            ]);
-        }
-
-        if (! $this->appBaseUrlEligibleForOfficeOnlineViewer()) {
-            return response()->json([
-                'viewer_url' => null,
-                'use_direct' => true,
-            ]);
-        }
-
-        $signedUrl = URL::temporarySignedRoute(
-            'superadmin.tickets.attachment',
-            now()->addMinutes(20),
-            ['f' => $name]
-        );
-
-        $viewerUrl = 'https://view.officeapps.live.com/op/view.aspx?src=' . rawurlencode($signedUrl);
-
-        return response()->json([
-            'viewer_url' => $viewerUrl,
-            'use_direct' => false,
-        ]);
-    }
-
-    /**
-     * Office Online must fetch the file from the public internet over HTTPS (not localhost / LAN-only hosts).
-     */
-    protected function appBaseUrlEligibleForOfficeOnlineViewer(): bool
-    {
-        $url = (string) config('app.url');
-        if (! str_starts_with($url, 'https://')) {
-            return false;
-        }
-        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
-        if ($host === '' || $host === 'localhost') {
-            return false;
-        }
-        if (str_ends_with($host, '.local') || str_ends_with($host, '.test')) {
-            return false;
-        }
-        if (str_starts_with($host, '127.') || str_starts_with($host, '192.168.') || str_starts_with($host, '10.')) {
-            return false;
-        }
-
-        return true;
     }
 
     public function store(Request $request)
@@ -683,23 +581,13 @@ class TicketController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid or inactive department.'], 422);
         }
 
-        $paths = [];
-        if ($request->hasFile('attachments')) {
-            $uploadPath = public_path('ticket_attachments');
-            if (!File::isDirectory($uploadPath)) {
-                File::makeDirectory($uploadPath, 0755, true);
-            }
-            foreach ($request->file('attachments') as $file) {
-                if (!$file) {
-                    continue;
-                }
-                $originalName = $file->getClientOriginalName();
-                $uniqueName = time() . '_' . preg_replace('/\s+/', '_', $originalName);
-                $file->move($uploadPath, $uniqueName);
-                $paths[] = 'ticket_attachments/' . $uniqueName;
-            }
+        $locDenied = $this->accessControl(null, (int) $validated['location_id'])['error'] ?? null;
+
+        if ($locDenied) {
+            return $locDenied;
         }
 
+        $paths = $this->uploadAttachments($request->file('attachments'));
         $ticket = Ticket::create([
             'ticket_no' => 'TKT-TMP-' . uniqid('', true),
             'location_id' => $validated['location_id'],
@@ -759,6 +647,12 @@ class TicketController extends Controller
             ], 403);
         }
 
+        $locDenied = $this->accessControl(null, (int) $validated['location_id'])['error'] ?? null;
+
+        if ($locDenied) {
+            return $locDenied;
+        }
+
         $category = TicketCategory::query()
             ->where('id', $validated['ticket_category_id'])
             ->where('department_id', $validated['to_department_id'])
@@ -782,22 +676,31 @@ class TicketController extends Controller
         if (!is_array($existing)) {
             $existing = [];
         }
+        $existing = array_values(array_filter($existing, static fn($p) => is_string($p) && $p !== ''));
 
-        $newPaths = [];
-        if ($request->hasFile('attachments')) {
-            $uploadPath = public_path('ticket_attachments');
-            if (!File::isDirectory($uploadPath)) {
-                File::makeDirectory($uploadPath, 0755, true);
+        $newPaths = $this->uploadAttachments($request->file('attachments'));
+
+        if ($request->has('keep_attachments_json')) {
+            $decoded = json_decode((string) $request->input('keep_attachments_json'), true);
+            if (!is_array($decoded)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid attachment keep list.',
+                ], 422);
             }
-            foreach ($request->file('attachments') as $file) {
-                if (!$file) {
+            $kept = [];
+            foreach ($decoded as $p) {
+                if (!is_string($p) || $p === '' || str_contains($p, '..')) {
                     continue;
                 }
-                $originalName = $file->getClientOriginalName();
-                $uniqueName = time() . '_' . preg_replace('/\s+/', '_', $originalName);
-                $file->move($uploadPath, $uniqueName);
-                $newPaths[] = 'ticket_attachments/' . $uniqueName;
+                if (in_array($p, $existing, true)) {
+                    $kept[] = $p;
+                }
             }
+            $kept = array_values(array_unique($kept));
+            $merged = array_merge($kept, $newPaths);
+        } else {
+            $merged = array_merge($existing, $newPaths);
         }
 
         $ticket->location_id = $validated['location_id'];
@@ -807,12 +710,12 @@ class TicketController extends Controller
         $ticket->priority = $validated['priority'];
         $ticket->subject = $validated['subject'];
         $ticket->description = $validated['description'];
-        $ticket->attachments = array_values(array_merge($existing, $newPaths));
+        $ticket->attachments = array_values($merged);
         $ticket->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Ticket updated.',
+            'message' => 'Ticket updated successfully.',
         ]);
     }
 
@@ -835,10 +738,12 @@ class TicketController extends Controller
 
         $ticket = Ticket::findOrFail($request->id);
 
-        if (!$this->canUpdateTicketStatus($ticket)) {
+        $access = $this->ticketAccessFromAuth();
+
+        if (!$access || !$this->ticketAccessIsOpen($access)) {
             return response()->json([
                 'success' => false,
-                'message' => 'You are not allowed to update tickets for this department.',
+                'message' => 'You are not allowed to update status for this ticket.'
             ], 403);
         }
 
@@ -882,11 +787,11 @@ class TicketController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Status updated.',
+            'message' => 'Status updated Successfully!',
             'ticket' => [
                 'status' => $ticket->status,
                 'status_updated_by_name' => $ticket->statusUpdater->user_fullname ?? '',
-                'status_updated_at' => $this->formatTicketDateTimeForDisplay($ticket->status_updated_at),
+                'status_updated_at' => $this->fmtAt($ticket->status_updated_at),
                 'time_to_close' => $ticket->timeToCloseDisplay(),
                 'sla_vs_actual' => $slaSummary['text'],
                 'sla_vs_actual_kind' => $slaSummary['kind'],
@@ -895,8 +800,43 @@ class TicketController extends Controller
         ]);
     }
 
+    public function export(Request $request)
+    {
+        $tickets = $this->queryGrid($request)->orderByDesc('id')->get();
+        $filename = 'tickets_' . now()->format('Y_m_d_His') . '.xlsx';
+
+        return Excel::download(new TicketExport($tickets), $filename);
+    }
+
+    protected function filePath($name)
+    {
+        $path = public_path('ticket_attachments/' . basename($name));
+        return file_exists($path) ? $path : null;
+    }
+
+    public function viewAttachment(Request $request)
+    {
+        $name = $request->query('f');
+        $path = $this->filePath($name);
+
+        if (!$path) abort(404);
+
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+        if (in_array($ext, ['doc', 'docx', 'xls', 'xlsx'])) {
+            return response()->download($path, basename($name));
+        }
+
+        return response()->file($path);
+    }
+
     public function timeline(Ticket $ticket)
     {
+        if (isset($this->accessControl($ticket)['error'])) {
+            abort(403, 'You cannot view this ticket timeline.');
+        }
+
+
         $solution = $ticket->solution ?? [];
         if (!is_array($solution)) {
             $solution = [];
@@ -905,7 +845,7 @@ class TicketController extends Controller
         $userIds = collect($solution)->pluck('user_id')
             ->filter()
             ->unique();
-        $names = $this->ticketUserNames($userIds);
+        $names = $this->namesForUsers($userIds);
 
         $items = [];
 
@@ -914,7 +854,7 @@ class TicketController extends Controller
             $items[] = [
                 'type' => 'status',
                 'synthetic' => true,
-                'created_at' => $this->formatTicketDateTimeForDisplay($ticket->created_at),
+                'created_at' => $this->fmtAt($ticket->created_at),
                 'created_at_iso' => $ticket->created_at?->toIso8601String(),
                 'user_name' => $ticket->creator->user_fullname ?? '—',
                 'from_status' => null,
@@ -934,7 +874,7 @@ class TicketController extends Controller
                 $items[] = [
                     'type' => 'status',
                     'id' => $idx,
-                    'created_at' => $at ? $this->formatTicketDateTimeForDisplay($at) : '',
+                    'created_at' => $at ? $this->fmtAt($at) : '',
                     'created_at_iso' => $iso,
                     'user_name' => $userName,
                     'from_status' => $e['from_status'] ?? null,
@@ -954,12 +894,166 @@ class TicketController extends Controller
         ]);
     }
 
-    private function formatTicketDateTimeForDisplay($value): string
+    protected function ticketAccessFromAuth(): ?object
+    {
+        $id = auth()->id();
+        if (!$id) {
+            return null;
+        }
+        $row = DB::table('users')->where('id', $id)->first();
+
+        return $row ? $row : null;
+    }
+
+    protected function ticketAccessLevel(object $user): int
+    {
+        return (int) ($user->access_limits ?? 0);
+    }
+
+    protected function ticketAccessIsOpen(object $user): bool
+    {
+        return in_array($this->ticketAccessLevel($user), self::OPEN, true);
+    }
+
+    protected function ticketAccessAllowedLocationIds(object $user): ?array
+    {
+        if ($this->ticketAccessIsOpen($user)) {
+            return null;
+        }
+
+        $lv = $this->ticketAccessLevel($user);
+        if ($lv === 2) {
+
+            $zoneIds = array_values(array_filter([(int) ($user->zone_id ?? 0)]));
+
+            $multi = [];
+            if (!empty($user->multi_location)) {
+                $multi = array_values(array_unique(array_map('intval', explode(',', $user->multi_location))));
+            }
+
+            if ($multi !== []) {
+                $extra = TblLocationModel::query()
+                    ->whereIn('id', $multi)
+                    ->pluck('zone_id')
+                    ->filter()
+                    ->map(fn($z) => (int) $z)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $zoneIds = array_values(array_unique(array_merge($zoneIds, $extra)));
+            }
+
+            $zoneIds = array_values(array_filter($zoneIds));
+
+            $byZone = $zoneIds === []
+                ? collect()
+                : TblLocationModel::query()->whereIn('zone_id', $zoneIds)->pluck('id');
+
+            $byMulti = $multi === []
+                ? collect()
+                : TblLocationModel::query()->whereIn('id', $multi)->pluck('id');
+
+            return $byZone
+                ->merge($byMulti)
+                ->unique()
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
+        if (in_array($lv, self::OWN_ROWS, true)) {
+
+            $ids = array_values(array_filter([(int) ($user->branch_id ?? 0)]));
+
+            if (!empty($user->multi_location)) {
+                $multi = array_map('intval', explode(',', $user->multi_location));
+                $ids = array_merge($ids, $multi);
+            }
+
+            return array_values(array_unique($ids));
+        }
+
+        return [];
+    }
+
+    protected function ticketAccessApplyScope(object $user, Builder $q): void
+    {
+        $ids = $this->ticketAccessAllowedLocationIds($user);
+        if ($ids === null) {
+            return;
+        }
+        if ($ids === []) {
+            $q->whereRaw('0 = 1');
+
+            return;
+        }
+        $q->whereIn('location_id', $ids);
+        if (in_array($this->ticketAccessLevel($user), self::OWN_ROWS, true)) {
+            $q->where('created_by', (int) $user->id);
+        }
+    }
+
+    protected function ticketAccessAllows(object $user, Ticket $ticket): bool
+    {
+        $ids = $this->ticketAccessAllowedLocationIds($user);
+        if ($ids === null) {
+            return true;
+        }
+        if ($ids === [] || ! in_array((int) $ticket->location_id, $ids, true)) {
+            return false;
+        }
+        if (in_array($this->ticketAccessLevel($user), self::OWN_ROWS, true)) {
+            return (int) $ticket->created_by === (int) $user->id;
+        }
+
+        return true;
+    }
+
+    protected function ticketAccessLocationError(object $user, int $locationId): ?JsonResponse
+    {
+        $ids = $this->ticketAccessAllowedLocationIds($user);
+        if ($ids === null) {
+            return null;
+        }
+        if ($ids === [] || ! in_array($locationId, $ids, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot use this branch/location for tickets.',
+            ], 422);
+        }
+
+        return null;
+    }
+
+    private function fmtAt($value): string
     {
         if ($value === null) {
             return '';
         }
 
         return \Illuminate\Support\Carbon::parse($value)->format('d M Y, g:i A');
+    }
+
+    protected function uploadAttachments($files): array
+    {
+        $paths = [];
+        if (!$files) return $paths;
+
+        $uploadPath = public_path('ticket_attachments');
+
+        if (!File::isDirectory($uploadPath)) {
+            File::makeDirectory($uploadPath, 0755, true);
+        }
+
+        foreach ($files as $file) {
+            if (!$file) continue;
+
+            $name = time() . '_' . preg_replace('/\s+/', '_', $file->getClientOriginalName());
+            $file->move($uploadPath, $name);
+            $paths[] = 'ticket_attachments/' . $name;
+        }
+
+        return $paths;
     }
 }

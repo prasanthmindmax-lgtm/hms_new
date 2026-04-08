@@ -1,7 +1,214 @@
-/**
- * Superadmin ticket management UI (dashboard, filters, table, modals).
- * Loaded by resources/views/superadmin/tickets/index.blade.php
- */
+/* ─── Main card ──────────────────────────────────── */
+.qd-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e2e6ef;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+  overflow: visible;
+}
+
+/* ═══════════════════════════════════════════════════
+   FILTERS  –  2-row 4-col grid
+   ═══════════════════════════════════════════════════ */
+.qd-filters {
+  padding: 12px 18px 12px;
+  background: #f9fafd;
+  border-bottom: 1px solid #eef0f7;
+}
+
+.qd-filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.qd-filter-row:last-child {
+  margin-bottom: 0;
+}
+
+.qd-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.qd-filter-group > label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9aa5b8;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qd-filter-group .form-control {
+  height: 36px !important;
+  border: 1px solid #d4d9e8 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  font-size: 12.5px !important;
+  color: #3d4a5c !important;
+  box-shadow: none !important;
+  padding: 0 10px !important;
+  transition: border-color 0.15s !important;
+}
+.qd-filter-group .form-control:focus {
+  border-color: #4f6ef7 !important;
+  box-shadow: 0 0 0 2px rgba(79, 110, 247, 0.12) !important;
+  outline: none !important;
+}
+.qd-filter-group .form-control::placeholder {
+  color: #b0b9cc;
+}
+
+.qd-date-wrap {
+  height: 36px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-size: 12.5px;
+  color: #3d4a5c;
+}
+.qd-date-wrap:hover {
+  border-color: #a8b3d0;
+}
+.qd-date-wrap #data_values {
+  flex: 1;
+  font-size: 12.5px;
+  color: #3d4a5c;
+}
+.qd-date-wrap .fa-calendar {
+  color: #9aa5b8;
+  font-size: 12px;
+}
+.qd-date-wrap .fa-caret-down {
+  color: #9aa5b8;
+  font-size: 11px;
+  margin-left: auto;
+}
+
+.qd-search-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 18px 10px;
+  background: #f9fafd;
+  border-bottom: 1px solid #eef0f7;
+}
+.qd-search-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9aa5b8;
+  margin-right: 10px;
+  white-space: nowrap;
+}
+.qd-search-wrap {
+  position: relative;
+  width: 280px;
+}
+.qd-search-wrap i {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9aa5b8;
+  font-size: 13px;
+  pointer-events: none;
+}
+.qd-search-wrap input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  padding: 0 10px 0 32px;
+  font-size: 12.5px;
+  color: #3d4a5c;
+  background: #fff;
+  box-shadow: none;
+  transition: border-color 0.15s;
+}
+.qd-search-wrap input:focus {
+  border-color: #4f6ef7;
+  outline: none;
+}
+.qd-search-wrap input::placeholder {
+  color: #b0b9cc;
+}
+
+.qd-applied-bar {
+  padding: 6px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border-bottom: 1px solid #eef0f7;
+  min-height: 34px;
+}
+.qd-applied-bar .applied-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9aa5b8;
+}
+
+/* ═══════════════════════════════════════════════════
+   TABLE (dark header — base; .tk-table-card overrides details)
+   ═══════════════════════════════════════════════════ */
+.qdt-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e2e6f0;
+}
+
+.qdt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 1200px;
+}
+
+.qdt-head tr {
+  background: #1a2232;
+}
+.qdt-head th {
+  padding: 12px 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #c8d0e7;
+  border: none;
+  white-space: nowrap;
+}
+
+.qdt-row {
+  border-bottom: 1px solid #eef1f8;
+  transition: background 0.12s;
+}
+.qdt-row:hover {
+  background: #f5f7ff;
+}
+.qdt-row:last-child {
+  border-bottom: none;
+}
+
+.qdt-row td {
+  padding: 11px 14px;
+  vertical-align: middle;
+  color: #2c3655;
+  border: none;
+}
+
 .sm-modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.48); z-index:9998; backdrop-filter:saturate(120%) blur(3px); }
 .sm-modal { display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; padding:16px; overflow-y:auto; }
 .sm-modal.show { display:flex; }
@@ -620,7 +827,7 @@ body > .dropdown-menu.tax-dropdown.tk-ticket-filter-dd .tk-ticket-status-list di
   border-radius: 0;
   border: none;
 }
-/* Table: clearer type and roomier cells (scoped so quotation.css defaults don’t win) */
+/* Table: clearer type and roomier cells (scoped; base .qdt-* rules at top of file) */
 .tk-table-card .qdt-table {
   font-size: 14px;
   min-width: 1360px;
@@ -1496,6 +1703,21 @@ body > .dropdown-menu.tax-dropdown.tk-ticket-filter-dd .tk-ticket-status-list di
   font-weight: 600;
   color: #64748b;
   margin-top: 2px;
+}
+.tk-file-meta-saved {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+#raiseModal .tk-file-item--saved {
+  background: linear-gradient(90deg, #f8fafc 0%, #fff 40%);
+  border-radius: 12px;
 }
 .tk-file-remove {
   flex-shrink: 0;

@@ -4,7 +4,6 @@
 @include('superadmin.superadminhead')
 
 <link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}" id="main-style-link" />
-<link rel="stylesheet" href="{{ asset('/assets/css/quotation.css') }}" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -90,7 +89,7 @@
               </div>
               <div class="qd-filter-group tax-dropdown-wrapper tk-ticket-filter-tax tk-ticket-dept-wrap">
                 <label>To department</label>
-                <input type="text" class="form-control tk-dept-search-input dropdown-search-input" placeholder="All departments" value="All departments" readonly autocomplete="off">
+                <input type="text" class="form-control tk-dept-search-input dropdown-search-input" placeholder="Search Department" value="All departments" readonly autocomplete="off">
                 <input type="hidden" id="departmentFilter" name="to_department_id" value="">
                 <div class="dropdown-menu tax-dropdown tk-ticket-filter-dd">
                   <div class="inner-search-container">
@@ -109,7 +108,7 @@
               </div>
               <div class="qd-filter-group tax-dropdown-wrapper tk-ticket-filter-tax tk-ticket-status-wrap">
                 <label>Status</label>
-                <input type="text" class="form-control tk-status-search-input dropdown-search-input" placeholder="All statuses" value="All statuses" readonly autocomplete="off">
+                <input type="text" class="form-control tk-status-search-input dropdown-search-input" placeholder="Search Status" value="All statuses" readonly autocomplete="off">
                 <input type="hidden" id="statusFilter" name="ticket_status" value="">
                 <div class="dropdown-menu tax-dropdown tk-ticket-filter-dd">
                   <div class="inner-search-container">
@@ -122,6 +121,46 @@
                   <div class="dropdown-list multiselect tk-ticket-status-list">
                     @foreach($statuses as $st)
                       <div data-value="{{ $st }}" data-id="{{ $st }}">{{ ucwords(str_replace('_',' ', $st)) }}</div>
+                    @endforeach
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="qd-filter-row">
+              <div class="qd-filter-group tax-dropdown-wrapper tk-ticket-filter-tax tk-ticket-zone-wrap">
+                <label>Zone</label>
+                <input type="text" class="form-control tk-zone-search-input dropdown-search-input" placeholder="Search Zone" value="All zones" readonly autocomplete="off">
+                <input type="hidden" id="zoneFilter" name="zone_id" value="">
+                <div class="dropdown-menu tax-dropdown tk-ticket-filter-dd">
+                  <div class="inner-search-container">
+                    <input type="text" class="inner-search" placeholder="Search zone…" autocomplete="off">
+                  </div>
+                  <div class="tk-ticket-dd-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                  </div>
+                  <div class="dropdown-list multiselect zone-list">
+                    @foreach($zones as $z)
+                      <div data-value="{{ $z->name }}" data-id="{{ $z->id }}">{{ $z->name }}</div>
+                    @endforeach
+                  </div>
+                </div>
+              </div>
+              <div class="qd-filter-group tax-dropdown-wrapper tk-ticket-filter-tax tk-ticket-branch-wrap">
+                <label>Branch</label>
+                <input type="text" class="form-control tk-branch-search-input dropdown-search-input" placeholder="Search Branch" value="All branches" readonly autocomplete="off">
+                <input type="hidden" id="branchFilter" name="branch_id" value="">
+                <div class="dropdown-menu tax-dropdown tk-ticket-filter-dd">
+                  <div class="inner-search-container">
+                    <input type="text" class="inner-search" placeholder="Search branch…" autocomplete="off">
+                  </div>
+                  <div class="tk-ticket-dd-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                  </div>
+                  <div class="dropdown-list multiselect branch-list">
+                    @foreach($locations as $loc)
+                      <div data-value="{{ $loc->name }}" data-id="{{ $loc->id }}" data-zone-id="{{ $loc->zone_id ?? '' }}">{{ $loc->name }}</div>
                     @endforeach
                   </div>
                 </div>
@@ -486,6 +525,8 @@
 
   var TK_DEPT_ALL_LBL = 'All departments';
   var TK_STATUS_ALL_LBL = 'All statuses';
+  var TK_ZONE_ALL_LBL = 'All zones';
+  var TK_BRANCH_ALL_LBL = 'All branches';
 
   var ticketPage = 1;
   var ticketPerPage = 15;
@@ -534,6 +575,28 @@
       html +=
         '<span class="filter-badge remove-icon" data-tk-chip="status">' +
         $('<div>').text(stShown).html() +
+        '</span>';
+    }
+    var zoneHidden = ($('#zoneFilter').val() || '').trim();
+    if (zoneHidden) {
+      var zoneShown = ($('.tk-ticket-zone-wrap .tk-zone-search-input').val() || '').trim();
+      if (!zoneShown || zoneShown === TK_ZONE_ALL_LBL) {
+        zoneShown = zoneHidden;
+      }
+      html +=
+        '<span class="filter-badge remove-icon" data-tk-chip="zone">' +
+        $('<div>').text(zoneShown).html() +
+        '</span>';
+    }
+    var brHidden = ($('#branchFilter').val() || '').trim();
+    if (brHidden) {
+      var brShown = ($('.tk-ticket-branch-wrap .tk-branch-search-input').val() || '').trim();
+      if (!brShown || brShown === TK_BRANCH_ALL_LBL) {
+        brShown = brHidden;
+      }
+      html +=
+        '<span class="filter-badge remove-icon" data-tk-chip="branch">' +
+        $('<div>').text(brShown).html() +
         '</span>';
     }
     var q = ($('#ticketUniversalSearch').val() || '').trim();
@@ -629,6 +692,8 @@
     return { mod: '', icon: 'bi-file-earmark' };
   }
 
+  var raiseExistingAttachments = [];
+
   function renderRaiseAttachments() {
     var el = document.getElementById('raise_attachments');
     if (!el) return;
@@ -640,7 +705,11 @@
     var $badge = $('#raise_file_count_badge');
 
     $list.empty();
-    if (!el.files || !el.files.length) {
+    var existing = Array.isArray(raiseExistingAttachments) ? raiseExistingAttachments : [];
+    var fileCount = el.files ? el.files.length : 0;
+    var total = existing.length + fileCount;
+
+    if (!total) {
       $card.removeClass('is-visible');
       $zone.removeClass('tk-has-files');
       $hint.text(raiseFileHintDefault);
@@ -649,20 +718,61 @@
       return;
     }
 
-    var n = el.files.length;
     $card.addClass('is-visible');
     $zone.addClass('tk-has-files');
-    $title.text('Add more files');
-    $hint.text(
-      'Selected ' +
-        n +
-        ' file' +
-        (n === 1 ? '' : 's') +
-        '. Add more below or remove items from the list.'
-    );
-    $badge.text(String(n));
+    $title.text(fileCount ? 'Add more files' : 'Add files');
+    if (existing.length && fileCount) {
+      $hint.text(
+        existing.length +
+          ' saved file' +
+          (existing.length === 1 ? '' : 's') +
+          ', plus ' +
+          fileCount +
+          ' new. Remove any you do not want; new uploads are added on save.'
+      );
+    } else if (fileCount) {
+      $hint.text(
+        'Selected ' +
+          fileCount +
+          ' new file' +
+          (fileCount === 1 ? '' : 's') +
+          '. Add more below or remove items from the list.'
+      );
+    } else {
+      $hint.text(
+        'These files are already on the ticket. Remove any you want replaced, then add new files below.'
+      );
+    }
+    $badge.text(String(total));
 
-    for (var i = 0; i < n; i++) {
+    existing.forEach(function (path) {
+      var base = String(path).split('/').pop() || path;
+      var spec = fileIconSpec(base);
+      var mod = spec.mod ? ' ' + spec.mod : '';
+      var nameEsc = $('<div>').text(base).html();
+      var pathEsc = $('<div>').text(path).html();
+      $list.append(
+        '<li class="tk-file-item tk-file-item--saved">' +
+          '<span class="tk-file-item-ic' +
+          mod +
+          '"><i class="bi ' +
+          spec.icon +
+          '" aria-hidden="true"></i></span>' +
+          '<span class="tk-file-item-main">' +
+          '<span class="tk-file-item-name">' +
+          nameEsc +
+          '</span>' +
+          '<span class="tk-file-item-meta"><span class="tk-file-meta-saved">Saved</span></span>' +
+          '</span>' +
+          '<button type="button" class="tk-file-remove tk-file-remove-existing" data-path="' +
+          pathEsc +
+          '" title="Remove from ticket (save to apply)" aria-label="Remove saved file">' +
+          '<i class="bi bi-x-lg" aria-hidden="true"></i></button>' +
+          '</li>'
+      );
+    });
+
+    for (var i = 0; i < fileCount; i++) {
       var f = el.files[i];
       var spec = fileIconSpec(f.name);
       var mod = spec.mod ? ' ' + spec.mod : '';
@@ -702,6 +812,7 @@
     $('#raiseModalTitle').text('Raise ticket');
     $('#raiseSubmitBtn').html('<i class="bi bi-send-fill me-1"></i>Submit ticket');
     $('#raise_edit_hint').hide();
+    raiseExistingAttachments = [];
   }
 
   function closeModal() {
@@ -1294,6 +1405,95 @@
     $wrap.find('.tk-status-search-input').val(labels.length ? labels.join(', ') : TK_STATUS_ALL_LBL);
   }
 
+  function getSelectedZoneIdsArr() {
+    var raw = String($('#zoneFilter').val() || '').trim();
+    if (!raw) return [];
+    return raw.split(',').map(function (s) { return String(s).trim(); }).filter(Boolean);
+  }
+
+  function pruneBranchFilterToSelectedZones() {
+    var zids = getSelectedZoneIdsArr();
+    if (!zids.length) return;
+    var raw = String($('#branchFilter').val() || '').trim();
+    if (!raw) return;
+    var ids = raw.split(',').map(function (s) { return String(s).trim(); }).filter(Boolean);
+    var allowed = {};
+    $('.tk-tickets-page .branch-list > div').each(function () {
+      var bid = String($(this).attr('data-id') || '');
+      var zid = String($(this).attr('data-zone-id') || '');
+      if (zids.indexOf(zid) !== -1) {
+        allowed[bid] = true;
+      }
+    });
+    var kept = ids.filter(function (id) { return allowed[id]; });
+    $('#branchFilter').val(kept.join(','));
+  }
+
+  function ticketApplyZoneVisibilityToBranchListInDropdown($dd) {
+    var zids = getSelectedZoneIdsArr();
+    $dd.find('.branch-list > div').each(function () {
+      var zid = String($(this).attr('data-zone-id') || '');
+      var ok = zids.length === 0 || zids.indexOf(zid) !== -1;
+      if (ok) {
+        $(this).show();
+      } else {
+        $(this).hide().removeClass('selected');
+      }
+    });
+  }
+
+  function syncTicketZoneFilterUi() {
+    var raw = String($('#zoneFilter').val() || '').trim();
+    var ids = raw
+      ? raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+      : [];
+    var $wrap = $('.tk-tickets-page .tk-ticket-zone-wrap');
+    if (!$wrap.length) return;
+    var $list = $wrap.find('.zone-list');
+    $list.children('div').removeClass('selected');
+    if (!ids.length) {
+      $wrap.find('.tk-zone-search-input').val(TK_ZONE_ALL_LBL);
+      return;
+    }
+    var labels = [];
+    ids.forEach(function (id) {
+      var $item = $list.children('div').filter(function () {
+        return String($(this).attr('data-id')) === String(id);
+      });
+      if ($item.length) {
+        $item.first().addClass('selected');
+        labels.push($item.first().text().trim());
+      }
+    });
+    $wrap.find('.tk-zone-search-input').val(labels.length ? labels.join(', ') : TK_ZONE_ALL_LBL);
+  }
+
+  function syncTicketBranchFilterUi() {
+    var raw = String($('#branchFilter').val() || '').trim();
+    var ids = raw
+      ? raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+      : [];
+    var $wrap = $('.tk-tickets-page .tk-ticket-branch-wrap');
+    if (!$wrap.length) return;
+    var $list = $wrap.find('.branch-list');
+    $list.children('div').removeClass('selected');
+    if (!ids.length) {
+      $wrap.find('.tk-branch-search-input').val(TK_BRANCH_ALL_LBL);
+      return;
+    }
+    var labels = [];
+    ids.forEach(function (id) {
+      var $item = $list.children('div').filter(function () {
+        return String($(this).attr('data-id')) === String(id);
+      });
+      if ($item.length) {
+        $item.first().addClass('selected');
+        labels.push($item.first().text().trim());
+      }
+    });
+    $wrap.find('.tk-branch-search-input').val(labels.length ? labels.join(', ') : TK_BRANCH_ALL_LBL);
+  }
+
   /** Read selection from body-cloned menu, sync hidden + visible, reload grid (do not rely on .trigger('change') alone). */
   function ticketFilterUpdateMultiSelection($dropdown) {
     var $wrapper = $dropdown.data('wrapper');
@@ -1303,7 +1503,9 @@
     var selectedItems = [];
     var selectedIds = [];
     $dropdown
-      .find('.tk-ticket-dept-list > div.selected, .tk-ticket-status-list > div.selected')
+      .find(
+        '.tk-ticket-dept-list > div.selected, .tk-ticket-status-list > div.selected, .zone-list > div.selected, .branch-list > div.selected'
+      )
       .each(function () {
         selectedItems.push($(this).text().trim());
         var rid = $(this).attr('data-id');
@@ -1324,6 +1526,20 @@
       $('#statusFilter').val(idsCsv);
       syncTicketStatusFilterUi();
       syncStatCards();
+      renderTicketFilterChips();
+      fetchTickets({ resetPage: true });
+    } else if ($wrapper.hasClass('tk-ticket-zone-wrap')) {
+      $visible.val(selectedItems.length ? selectedItems.join(', ') : TK_ZONE_ALL_LBL);
+      $('#zoneFilter').val(idsCsv);
+      pruneBranchFilterToSelectedZones();
+      syncTicketZoneFilterUi();
+      syncTicketBranchFilterUi();
+      renderTicketFilterChips();
+      fetchTickets({ resetPage: true });
+    } else if ($wrapper.hasClass('tk-ticket-branch-wrap')) {
+      $visible.val(selectedItems.length ? selectedItems.join(', ') : TK_BRANCH_ALL_LBL);
+      $('#branchFilter').val(idsCsv);
+      syncTicketBranchFilterUi();
       renderTicketFilterChips();
       fetchTickets({ resetPage: true });
     }
@@ -1373,6 +1589,33 @@
           }
         });
       });
+    } else if ($w.hasClass('tk-ticket-zone-wrap')) {
+      var rawZ = String($('#zoneFilter').val() || '').trim();
+      var zids = rawZ
+        ? rawZ.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+        : [];
+      $dropdown.find('.zone-list').children('div').removeClass('selected');
+      zids.forEach(function (id) {
+        $dropdown.find('.zone-list').children('div').each(function () {
+          if (String($(this).attr('data-id')) === String(id)) {
+            $(this).addClass('selected');
+          }
+        });
+      });
+    } else if ($w.hasClass('tk-ticket-branch-wrap')) {
+      var rawB = String($('#branchFilter').val() || '').trim();
+      var bids = rawB
+        ? rawB.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+        : [];
+      $dropdown.find('.branch-list').children('div').removeClass('selected').show();
+      bids.forEach(function (id) {
+        $dropdown.find('.branch-list').children('div').each(function () {
+          if (String($(this).attr('data-id')) === String(id)) {
+            $(this).addClass('selected');
+          }
+        });
+      });
+      ticketApplyZoneVisibilityToBranchListInDropdown($dropdown);
     }
   }
 
@@ -1397,11 +1640,15 @@
     $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper'));
 
     var offset = $input.offset();
+    var triggerW = $input.outerWidth();
+    /* Match Status/Department panel readability; at least ~trigger width, floor so search + actions don’t feel cramped */
+    var panelW = Math.max(triggerW, 260);
     $dropdown.css({
       position: 'absolute',
       top: offset.top + $input.outerHeight(),
       left: offset.left,
-      width: $input.outerWidth(),
+      width: panelW,
+      minWidth: panelW,
       zIndex: 10050
     });
     $dropdown.addClass('show').show();
@@ -1409,6 +1656,10 @@
     $dropdown.find('.inner-search').val('');
     $dropdown.find('.dropdown-list div').show();
     ticketFilterSyncCloneSelection($dropdown);
+    var $wOpen = $dropdown.data('wrapper');
+    if ($wOpen && $wOpen.hasClass('tk-ticket-branch-wrap')) {
+      ticketApplyZoneVisibilityToBranchListInDropdown($dropdown);
+    }
     $dropdown.find('.inner-search').trigger('focus');
   });
 
@@ -1430,6 +1681,25 @@
     ticketFilterUpdateMultiSelection($dd);
   });
 
+  $(document).on('click.tkTkFilter', '.dropdown-menu.tk-ticket-filter-dd .zone-list > div', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var $row = $(this);
+    var $dd = $row.closest('.dropdown-menu');
+    $row.toggleClass('selected');
+    ticketFilterUpdateMultiSelection($dd);
+  });
+
+  $(document).on('click.tkTkFilter', '.dropdown-menu.tk-ticket-filter-dd .branch-list > div', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var $row = $(this);
+    if (!$row.is(':visible')) return;
+    var $dd = $row.closest('.dropdown-menu');
+    $row.toggleClass('selected');
+    ticketFilterUpdateMultiSelection($dd);
+  });
+
   $(document).on('click.tkTkFilter', '.dropdown-menu.tk-ticket-filter-dd .select-all', function (e) {
     e.preventDefault();
     e.stopPropagation();
@@ -1440,6 +1710,10 @@
       $dd.find('.tk-ticket-dept-list').children('div').addClass('selected');
     } else if ($w.hasClass('tk-ticket-status-wrap')) {
       $dd.find('.tk-ticket-status-list').children('div').addClass('selected');
+    } else if ($w.hasClass('tk-ticket-zone-wrap')) {
+      $dd.find('.zone-list').children('div').addClass('selected');
+    } else if ($w.hasClass('tk-ticket-branch-wrap')) {
+      $dd.find('.branch-list > div:visible').addClass('selected');
     }
     ticketFilterUpdateMultiSelection($dd);
   });
@@ -1454,13 +1728,29 @@
       $dd.find('.tk-ticket-dept-list').children('div').removeClass('selected');
     } else if ($w.hasClass('tk-ticket-status-wrap')) {
       $dd.find('.tk-ticket-status-list').children('div').removeClass('selected');
+    } else if ($w.hasClass('tk-ticket-zone-wrap')) {
+      $dd.find('.zone-list').children('div').removeClass('selected');
+    } else if ($w.hasClass('tk-ticket-branch-wrap')) {
+      $dd.find('.branch-list').children('div').removeClass('selected');
     }
     ticketFilterUpdateMultiSelection($dd);
   });
 
   $(document).on('keyup.tkTkFilter', '.dropdown-menu.tk-ticket-filter-dd .inner-search', function () {
     var q = $(this).val().toLowerCase();
-    $(this).closest('.dropdown-menu').find('.dropdown-list div').each(function () {
+    var $dd = $(this).closest('.dropdown-menu');
+    var $w = $dd.data('wrapper');
+    if ($w && $w.hasClass('tk-ticket-branch-wrap')) {
+      var zids = getSelectedZoneIdsArr();
+      $dd.find('.branch-list > div').each(function () {
+        var textOk = $(this).text().toLowerCase().indexOf(q) > -1;
+        var zid = String($(this).attr('data-zone-id') || '');
+        var zoneOk = zids.length === 0 || zids.indexOf(zid) !== -1;
+        $(this).toggle(textOk && zoneOk);
+      });
+      return;
+    }
+    $dd.find('.dropdown-list div').each(function () {
       $(this).toggle($(this).text().toLowerCase().indexOf(q) > -1);
     });
   });
@@ -1502,6 +1792,8 @@
       scope: getTicketScope(),
       status: statusParam,
       to_department_id: $('#departmentFilter').val() || '',
+      zone_id: $('#zoneFilter').val() || '',
+      branch_id: $('#branchFilter').val() || '',
       date_from: dr.from,
       date_to: dr.to,
       universal_search: ($('#ticketUniversalSearch').val() || '').trim(),
@@ -1531,6 +1823,8 @@
       scope: getTicketScope(),
       status: $('#statusFilter').val() || '',
       to_department_id: $('#departmentFilter').val() || '',
+      zone_id: $('#zoneFilter').val() || '',
+      branch_id: $('#branchFilter').val() || '',
       date_from: dr.from,
       date_to: dr.to,
       universal_search: ($('#ticketUniversalSearch').val() || '').trim(),
@@ -1543,8 +1837,12 @@
     $('#ticketUniversalSearch').val('');
     $('#departmentFilter').val('');
     $('#statusFilter').val('');
+    $('#zoneFilter').val('');
+    $('#branchFilter').val('');
     syncTicketDeptFilterUi();
     syncTicketStatusFilterUi();
+    syncTicketZoneFilterUi();
+    syncTicketBranchFilterUi();
     var drp = $('#tkTicketReportRange').data('daterangepicker');
     if (drp) {
       drp.setStartDate(moment());
@@ -1584,6 +1882,13 @@
       $('#statusFilter').val('');
       syncTicketStatusFilterUi();
       syncStatCards();
+    } else if (t === 'zone') {
+      $('#zoneFilter').val('');
+      syncTicketZoneFilterUi();
+      syncTicketBranchFilterUi();
+    } else if (t === 'branch') {
+      $('#branchFilter').val('');
+      syncTicketBranchFilterUi();
     }
     renderTicketFilterChips();
     fetchTickets({ resetPage: true });
@@ -1594,8 +1899,12 @@
     $('#ticketUniversalSearch').val('');
     $('#departmentFilter').val('');
     $('#statusFilter').val('');
+    $('#zoneFilter').val('');
+    $('#branchFilter').val('');
     syncTicketDeptFilterUi();
     syncTicketStatusFilterUi();
+    syncTicketZoneFilterUi();
+    syncTicketBranchFilterUi();
     var drp = $('#tkTicketReportRange').data('daterangepicker');
     if (drp) {
       drp.setStartDate(moment());
@@ -1654,7 +1963,18 @@
     if (input) input.click();
   });
 
-  $(document).on('click', '.tk-file-remove', function (e) {
+  $(document).on('click', '.tk-file-remove-existing', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var path = $(this).attr('data-path');
+    if (path == null || path === '') return;
+    raiseExistingAttachments = raiseExistingAttachments.filter(function (p) {
+      return p !== path;
+    });
+    renderRaiseAttachments();
+  });
+
+  $(document).on('click', '.tk-file-remove:not(.tk-file-remove-existing)', function (e) {
     e.preventDefault();
     e.stopPropagation();
     var idx = parseInt($(this).data('index'), 10);
@@ -1695,6 +2015,11 @@
     $('#raise_priority').val(t.priority || 'medium');
     $('#raise_subject').val(t.subject || '');
     $('#raise_description').val(t.description || '');
+    raiseExistingAttachments = Array.isArray(t.attachments)
+      ? t.attachments.slice().filter(function (p) {
+          return typeof p === 'string' && p !== '';
+        })
+      : [];
     renderRaiseAttachments();
     var catId = String(t.ticket_category_id || '');
     loadCategories(t.to_department_id, function () {
@@ -1712,6 +2037,7 @@
     var url = editId ? routes.update : routes.store;
     if (editId) {
       fd.append('id', editId);
+      fd.append('keep_attachments_json', JSON.stringify(raiseExistingAttachments));
     }
     $.ajax({
       url: url,
@@ -1866,6 +2192,8 @@
   renderTicketFilterChips();
   syncTicketDeptFilterUi();
   syncTicketStatusFilterUi();
+  syncTicketZoneFilterUi();
+  syncTicketBranchFilterUi();
   fetchTickets();
 })();
 </script>
