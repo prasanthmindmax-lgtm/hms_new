@@ -35,7 +35,7 @@ class MarketController extends Controller
 {
     public function dashboard(){
         $admin = auth()->user();
-        return view('referral.dashboard', ['admin' => $admin]);
+        return view('dashboard', ['admin' => $admin]);
     }
 
     public function referral(){

@@ -87,15 +87,15 @@ class AuthenticatedSessionController extends Controller
 
         $url = '';
         if ($request->user()->role_id === 1) {
-            $url = 'superadmin/referral';
+            $url = 'superadmin/dashboard';
         } elseif ($request->user()->role_id === 2) {
-            $url = 'referral/referral';
+            $url = 'referral/dashboard';
         } elseif ($request->user()->role_id === 3) {
-            $url = 'staff/ticket';
+            $url = 'staff/dashboard';
         } elseif ($request->user()->role_id === 4) {
-            $url = 'admin/ticket';
+            $url = 'admin/dashboard';
         } elseif ($request->user()->role_id === 5) {
-            $url = 'management/ticket';
+            $url = 'management/dashboard';
         } else {
             $url = 'login';
         }

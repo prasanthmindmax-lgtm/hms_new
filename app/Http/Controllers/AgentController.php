@@ -36,7 +36,12 @@ use App\Models\usermanagementdetails;
 
 class AgentController extends Controller
 {
-   
+    public function dashboard()
+    {
+        $admin = auth()->user();
+        return view('dashboard', ['admin' => $admin]);
+    }
+
     public function subCategoryBasedId(Request $request)
     {
         $subcategories = SubCategoryModel::where('category_id', $request->category)->get();
@@ -61,7 +66,7 @@ class AgentController extends Controller
         if ($request->hasFile('file')) {
             foreach($request->file('file') as $key => $file)
             {
-                $fileName = time().rand(1,99).'.'.$file->extension();  
+                $fileName = time().rand(1,99).'.'.$file->extension();
                 $file->move(public_path('uploads'), $fileName);
                 $files[]['name'] = $fileName;
             }
@@ -83,7 +88,7 @@ class AgentController extends Controller
         if ($request->hasFile('file')) {
             foreach($request->file('file') as $key => $file)
             {
-                $fileName = time().rand(1,99).'.'.$file->extension();  
+                $fileName = time().rand(1,99).'.'.$file->extension();
                 $file->move(public_path('uploads'), $fileName);
                 $files[]['name'] = $fileName;
             }
@@ -98,8 +103,8 @@ class AgentController extends Controller
         return response()->json(['status'=>"success",'userid'=>$ticketId]);
     }
 
-   
-    public function getTicket() 
+
+    public function getTicket()
     {
         $staffId = auth()->user()->id;
         $admin = auth()->user();
@@ -115,8 +120,8 @@ class AgentController extends Controller
     public function ticketFetch(Request $request)
     {
 		//print_r(auth()->user()->id);exit;
-        $datefiltervalue = $request->input('moredatefittervale'); 
-        $statusid = $request->input('statusid'); 
+        $datefiltervalue = $request->input('moredatefittervale');
+        $statusid = $request->input('statusid');
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
         $endDate = $dates[1];    // "04/01/2025"
@@ -146,15 +151,15 @@ class AgentController extends Controller
                         ->join('users', 'tbl_ticket_details.created_by', '=', 'users.id')
                         ->join('tblzones', 'tbl_ticket_details.zone_id', '=', 'tblzones.id')
                         ->where('tbl_ticket_details.created_by', auth()->user()->id);
-        if($statusid == 2){                 
+        if($statusid == 2){
             $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
-        } 
+        }
         $ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($ticketdetails);
     }
 
     public function ticketFillter(Request $request)
-    {         
+    {
         $datefiltervalue = $request->input('dateVal');
 
         $dates = explode(' - ', $datefiltervalue);
@@ -164,7 +169,7 @@ class AgentController extends Controller
         $endDateFormatted = \Carbon\Carbon::createFromFormat('d/m/Y', $endDate)->format('Y-m-d');
 
         $startdates=$startDateFormatted." 00:00:00";
-        $enddates=$endDateFormatted." 23:59:59";         
+        $enddates=$endDateFormatted." 23:59:59";
         $query = TicketDetails::select(
                             'tbl_ticket_details.*',
                             'tbl_locations.name',
@@ -186,19 +191,19 @@ class AgentController extends Controller
                             ->where('tbl_ticket_details.created_by', auth()->user()->id)
                             ->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates])
                             ->groupBy('tbl_ticket_details.id');
-							
+
 		if ($request->statusValues) {
                 $query->whereIN('ticket_status', explode(',', $request->statusValues));
             }
-            
+
 		if ($request->priorityValues) {
 			$query->whereIN('priority', explode(',', $request->priorityValues));
 		}
-		
+
 		if ($request->location_id) {
                 $query->where('location_id', $request->location_id);
             }
-			
+
 		if ($request->dateType) {
                 $startDate = $request->startDate;
                 $endDate = $request->endDate;
@@ -215,8 +220,8 @@ class AgentController extends Controller
     }
 
     public function fetchticketfitterremove(Request $request)
-    {  
-        $fitterremovedataall = $request->input('fitterremovedataall');  
+    {
+        $fitterremovedataall = $request->input('fitterremovedataall');
         $datefiltervalue = $request->input('moredatefittervale');
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
@@ -225,7 +230,7 @@ class AgentController extends Controller
         $endDateFormatted = \Carbon\Carbon::createFromFormat('d/m/Y', $endDate)->format('Y-m-d');
 
         $startdates=$startDateFormatted." 00:00:00";
-        $enddates=$endDateFormatted." 23:59:59";             
+        $enddates=$endDateFormatted." 23:59:59";
         $query = TicketDetails::select(
                             'tbl_ticket_details.*',
                             'tbl_locations.name',
@@ -252,21 +257,21 @@ class AgentController extends Controller
                     if($column == 'tbl_locations.name'){
                         $value = preg_replace("/(\w)-(\w)/", "$1 - $2", $value);
                         $query->where(trim($column), trim($value, " '"));
-                    }else{ 
+                    }else{
                         $value = trim($value, "'");
                         $query->whereIn(trim($column), explode(',', $value));
                     }
-                }							
-		
+                }
+
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
        // echo "<pre>";print_r($ticketdetails);exit;
         return response()->json($ticketdetails);
     }
 
     public function fetchticketfitter(Request $request)
-    {  
+    {
         $fitterremovedataall = $request->input('morefilltersall');
-        $moredatefittervale = $request->input('moredatefittervale');     
+        $moredatefittervale = $request->input('moredatefittervale');
         $dates = explode(' - ', $moredatefittervale);
         $startDate = $dates[0];  // "29/12/2024"
         $endDate = $dates[1];    // "04/01/2025"
@@ -301,11 +306,11 @@ class AgentController extends Controller
         $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
                              // Split conditions by 'AND' and loop through them
             foreach (explode(' AND ', $fitterremovedataall) as $condition) {
-                [$column, $value] = explode('=', $condition);           
+                [$column, $value] = explode('=', $condition);
                     $value = trim($value, "'");
-                    $query->whereIn(trim($column), explode(',', $value));            
-            }							
-		
+                    $query->whereIn(trim($column), explode(',', $value));
+            }
+
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($ticketdetails);
     }
@@ -326,7 +331,7 @@ class AgentController extends Controller
         else
         {
             $activity = TicketActivityModel::create($request->only(['created_by', 'priotity_level', 'ticket_status', 'description', 'ticket_id', 'department_id','sub_department_id','staff_id']));
-           
+
             if (!$activity) {
                 return response()->json(['status'=>"error"]);
             }
@@ -335,7 +340,7 @@ class AgentController extends Controller
     }
 
     public function ticketAdded(Request $request)
-    {		
+    {
         $validatedData = $request->validate([
             'location' => 'required|string|max:255',
                     'department' => 'required|string|max:255',
@@ -353,14 +358,14 @@ class AgentController extends Controller
         } else {
             $ticketNo = 1000;
         }
-        
+
         $location_id =  TblLocationModel::select('id','zone_id')->where('name', $request->location)->first();
         $department_id =  CategoryModel::select('id')->where('depart_name', $request->department)->first();
         $from_department_id =  CategoryModel::select('id')->where('depart_name', $request->from_department)->first();
         $ticAdmin =  AdminUserDepartments::where('depart_id', $department_id->id)->get();
         //echo "<pre>";print_r($ticAdmin);exit;
         if(count($ticAdmin) == 0){
-            return response()->json(['status'=>"error",'errors'=>'No ticket handler for this Department!']); 
+            return response()->json(['status'=>"error",'errors'=>'No ticket handler for this Department!']);
          }
         $removeDept = TblUserDepartments::where('depart_id', $ticAdmin[0]->depart_id)->delete();
         foreach($ticAdmin as $user){
@@ -372,9 +377,9 @@ class AgentController extends Controller
         }
 
          $imagePaths = [];
-        
+
             // Handle image uploads
-      
+
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $image) {
                     $filename = time() . '_' . $image->getClientOriginalName(); // Unique file name
@@ -387,14 +392,14 @@ class AgentController extends Controller
             //echo "<pre>";print_r($data);exit;
             $ticketCreate = TicketDetails::updateOrCreate(['id'   => $data['id']],array_merge($validatedData, [
                 'image_paths' => json_encode($imagePaths),
-                'created_by' => auth()->user()->id,	
-                'ticket_no'     => $ticketNo,	
-                'ticket_status' => $status,	
-                'is_read' => '1',	
-                'department_id' => $department_id->id,	
+                'created_by' => auth()->user()->id,
+                'ticket_no'     => $ticketNo,
+                'ticket_status' => $status,
+                'is_read' => '1',
+                'department_id' => $department_id->id,
                 'from_department_id' => $from_department_id->id,
-                'location_id' => $location_id->id,	
-                'zone_id' => $location_id->zone_id,	
+                'location_id' => $location_id->id,
+                'zone_id' => $location_id->zone_id,
             ]));
 
             $ticketupdate = TicketActivityModel::updateOrCreate(
@@ -410,8 +415,8 @@ class AgentController extends Controller
                     'created_by' => auth()->user()->id
                 ]
             );
-        
-            return response()->json(['status'=>"success", 'user_id'=>$ticketupdate['id'], 'ticketId' => $ticketCreate['id']]);       
+
+            return response()->json(['status'=>"success", 'user_id'=>$ticketupdate['id'], 'ticketId' => $ticketCreate['id']]);
     }
 
     public function ticketActivity($id)
@@ -461,15 +466,15 @@ class AgentController extends Controller
         // Add whereBetween for created_at
          $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
 
-        if($fitterremovedataall){           
+        if($fitterremovedataall){
                             // Split conditions by 'AND' and loop through them
             foreach (explode(' AND ', $fitterremovedataall) as $condition) {
-                [$column, $value] = explode('=', $condition);           
+                [$column, $value] = explode('=', $condition);
                     $value = trim($value, "'");
-                    $query->whereIn(trim($column), explode(',', $value));            
-            }            
+                    $query->whereIn(trim($column), explode(',', $value));
+            }
         }
-        $data = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();       
+        $data = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($data);
     }
 }

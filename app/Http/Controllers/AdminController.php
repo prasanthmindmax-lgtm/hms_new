@@ -32,16 +32,21 @@ use Log;
 
 class AdminController extends Controller
 {
-   
+    public function dashboard()
+    {
+        $admin = auth()->user();
+        return view('dashboard', ['admin' => $admin]);
+    }
+
     public function storeAdminImage(Request $request)
     {
         $files = [];
         $ticketId = $request->userid ?? '';
-        
+
         if ($request->hasFile('file')) {
             foreach($request->file('file') as $key => $file)
             {
-                $fileName = time().rand(1,99).'.'.$file->extension();  
+                $fileName = time().rand(1,99).'.'.$file->extension();
                 $file->move(public_path('uploads'), $fileName);
                 $files[]['name'] = $fileName;
             }
@@ -73,7 +78,7 @@ class AdminController extends Controller
         }
     }
 
-    public function getTicket() 
+    public function getTicket()
     {
         $staffId = auth()->user()->id;
         $admin = auth()->user();
@@ -106,14 +111,14 @@ class AdminController extends Controller
         } else {
             $ticketNo = 1000;
         }
-        
+
         $location_id =  TblLocationModel::select('id','zone_id')->where('name', $request->location)->first();
         $department_id =  CategoryModel::select('id')->where('depart_name', $request->department)->first();
         $from_department_id =  CategoryModel::select('id')->where('depart_name', $request->from_department)->first();
         $ticAdmin =  AdminUserDepartments::where('depart_id', $department_id->id)->get();
         //echo "<pre>";print_r(count($ticAdmin));exit;
         if(count($ticAdmin) == 0){
-            return response()->json(['status'=>"error",'errors'=>'No ticket handler for this Department!']);  
+            return response()->json(['status'=>"error",'errors'=>'No ticket handler for this Department!']);
         }
         $removeDept = TblUserDepartments::where('depart_id', $ticAdmin[0]->depart_id)->delete();
         foreach($ticAdmin as $user){
@@ -127,14 +132,14 @@ class AdminController extends Controller
             $data = TicketDetails::create($request->only(['sub_department_id']));
             //echo "<pre>";print_r($data);exit;
             $ticketCreate = TicketDetails::updateOrCreate(['id'   => $data['id']],array_merge($validatedData, [
-                'created_by' => auth()->user()->id,	
-                'ticket_no'     => $ticketNo,	
-                'ticket_status' => $status,	
-                'is_read' => '1',	
-                'department_id' => $department_id->id,	
+                'created_by' => auth()->user()->id,
+                'ticket_no'     => $ticketNo,
+                'ticket_status' => $status,
+                'is_read' => '1',
+                'department_id' => $department_id->id,
                 'from_department_id' => $from_department_id->id,
-                'location_id' => $location_id->id,	
-                'zone_id' => $location_id->zone_id,	
+                'location_id' => $location_id->id,
+                'zone_id' => $location_id->zone_id,
             ]));
 
             $ticketupdate = TicketActivityModel::updateOrCreate(
@@ -150,14 +155,14 @@ class AdminController extends Controller
                     'created_by' => auth()->user()->id
                 ]
             );
-        
-            return response()->json(['status'=>"success", 'user_id'=>$ticketupdate['id'], 'ticketId' => $ticketCreate['id']]);       
+
+            return response()->json(['status'=>"success", 'user_id'=>$ticketupdate['id'], 'ticketId' => $ticketCreate['id']]);
     }
 
     public function fetchticketfitter(Request $request)
-    {  
-        $fitterremovedataall = $request->input('morefilltersall'); 
-        $datefiltervalue = $request->input('moredatefittervale');             
+    {
+        $fitterremovedataall = $request->input('morefilltersall');
+        $datefiltervalue = $request->input('moredatefittervale');
         $depart_id = TblUserDepartments::select('depart_id')->where('user_id', auth()->user()->id)->get();
         $dept = array();
         foreach($depart_id as $depart){
@@ -172,7 +177,7 @@ class AdminController extends Controller
 
         $startdates=$startDateFormatted." 00:00:00";
         $enddates=$endDateFormatted." 23:59:59";
-        
+
         $query = TicketDetails::select(
                             'tbl_ticket_details.*',
                             'tbl_locations.name',
@@ -197,24 +202,24 @@ class AdminController extends Controller
                 ->whereIn('admin_user_departments.depart_id',$dept);
             $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
 
-        if($fitterremovedataall){ 
+        if($fitterremovedataall){
             // Split conditions by 'AND' and loop through them
             foreach (explode(' AND ', $fitterremovedataall) as $condition) {
-                [$column, $value] = explode('=', $condition);           
+                [$column, $value] = explode('=', $condition);
                     $value = trim($value, "'");
                     //echo "<pre>";print_r($value);
-                    $query->whereIn(trim($column), explode(',', $value));            
-            }							
+                    $query->whereIn(trim($column), explode(',', $value));
+            }
         }
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($ticketdetails);
     }
 
     public function fetchmyticketfitter(Request $request)
-    {  
-        $fitterremovedataall = $request->input('morefilltersall'); 
-        $datefiltervalue = $request->input('moredatefittervale');             
-        
+    {
+        $fitterremovedataall = $request->input('morefilltersall');
+        $datefiltervalue = $request->input('moredatefittervale');
+
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
         $endDate = $dates[1];    // "04/01/2025"
@@ -223,7 +228,7 @@ class AdminController extends Controller
 
         $startdates=$startDateFormatted." 00:00:00";
         $enddates=$endDateFormatted." 23:59:59";
-        
+
         $query = TicketDetails::select(
                             'tbl_ticket_details.*',
                             'tbl_locations.name',
@@ -247,14 +252,14 @@ class AdminController extends Controller
                     ->where('tbl_ticket_details.created_by', auth()->user()->id);
             $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
 
-        if($fitterremovedataall){ 
+        if($fitterremovedataall){
             // Split conditions by 'AND' and loop through them
             foreach (explode(' AND ', $fitterremovedataall) as $condition) {
-                [$column, $value] = explode('=', $condition);           
+                [$column, $value] = explode('=', $condition);
                     $value = trim($value, "'");
                     //echo "<pre>";print_r($value);
-                    $query->whereIn(trim($column), explode(',', $value));            
-            }							
+                    $query->whereIn(trim($column), explode(',', $value));
+            }
         }
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($ticketdetails);
@@ -262,8 +267,8 @@ class AdminController extends Controller
 
     public function myTicketFetch(Request $request)
     {
-        $datefiltervalue = $request->input('moredatefittervale'); 
-        $statusid = $request->input('statusid'); 
+        $datefiltervalue = $request->input('moredatefittervale');
+        $statusid = $request->input('statusid');
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
         $endDate = $dates[1];    // "04/01/2025"
@@ -293,24 +298,24 @@ class AdminController extends Controller
                         ->join('users', 'tbl_ticket_details.created_by', '=', 'users.id')
                         ->join('tblzones', 'tbl_ticket_details.zone_id', '=', 'tblzones.id')
                         ->where('tbl_ticket_details.created_by', auth()->user()->id);
-                    if($statusid == 2){                 
+                    if($statusid == 2){
                         $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
-                    } 
+                    }
                     $ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
-                          
+
         return response()->json($ticketdetails);
     }
 
     public function ticketFetch(Request $request)
     {
-        $datefiltervalue = $request->input('moredatefittervale'); 
-        $statusid = $request->input('statusid'); 
+        $datefiltervalue = $request->input('moredatefittervale');
+        $statusid = $request->input('statusid');
         $depart_id = TblUserDepartments::select('depart_id')->where('user_id', auth()->user()->id)->get();
         $dept = array();
         foreach($depart_id as $depart){
             $dept[] = $depart->depart_id;
         }
-       
+
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
         $endDate = $dates[1];    // "04/01/2025"
@@ -319,7 +324,7 @@ class AdminController extends Controller
 
         $startdates=$startDateFormatted." 00:00:00";
         $enddates=$endDateFormatted." 23:59:59";
-        
+
         $query = TicketDetails::select(
                             'tbl_ticket_details.*',
                             'tbl_locations.name',
@@ -342,16 +347,16 @@ class AdminController extends Controller
                         ->join('tblzones', 'tbl_ticket_details.zone_id', '=', 'tblzones.id')
                         ->where('admin_user_departments.user_id', auth()->user()->id)
                         ->whereIn('admin_user_departments.depart_id',$dept);
-       if($statusid == 2){                 
+       if($statusid == 2){
              $query->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
-       } 
+       }
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
        // echo "<pre>";print_r($ticketdetails);exit;
         return response()->json($ticketdetails);
     }
 
     public function myticketFillter(Request $request)
-    {   
+    {
         $datefiltervalue = $request->input('dateVal');
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
@@ -385,19 +390,19 @@ class AdminController extends Controller
             ->where('tbl_ticket_details.created_by', auth()->user()->id)
             ->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates])
             ->groupBy('tbl_ticket_details.id');
-							
+
 		if ($request->statusValues) {
                 $query->whereIn('ticket_status', explode(',', $request->statusValues));
             }
-            
+
 		if ($request->priorityValues) {
 			$query->whereIn('priority', explode(',', $request->priorityValues));
 		}
-		
+
 		if ($request->location_id) {
                 $query->where('location_id', $request->location_id);
             }
-			
+
 		if ($request->dateType) {
                 $startDate = $request->startDate;
                 $endDate = $request->endDate;
@@ -414,7 +419,7 @@ class AdminController extends Controller
     }
 
     public function ticketFillter(Request $request)
-    {                
+    {
         $datefiltervalue = $request->input('dateVal');
 
         $dates = explode(' - ', $datefiltervalue);
@@ -454,19 +459,19 @@ class AdminController extends Controller
                 ->where('admin_user_departments.user_id', auth()->user()->id)
                 ->whereIn('admin_user_departments.depart_id',$dept)
                 ->groupBy('tbl_ticket_details.id');
-							
+
 		if ($request->statusValues) {
                 $query->whereIn('ticket_status', explode(',', $request->statusValues));
             }
-            
+
 		if ($request->priorityValues) {
 			$query->whereIn('priority', explode(',', $request->priorityValues));
 		}
-		
+
 		if ($request->location_id) {
                 $query->where('location_id', $request->location_id);
             }
-			
+
 		if ($request->dateType) {
                 $startDate = $request->startDate;
                 $endDate = $request->endDate;
@@ -483,8 +488,8 @@ class AdminController extends Controller
     }
 
     public function fetchticketfitterremove(Request $request)
-    {  
-        $fitterremovedataall = $request->input('fitterremovedataall');  
+    {
+        $fitterremovedataall = $request->input('fitterremovedataall');
         $datefiltervalue = $request->input('moredatefittervale');
         $dates = explode(' - ', $datefiltervalue);
         $startDate = $dates[0];  // "29/12/2024"
@@ -493,7 +498,7 @@ class AdminController extends Controller
         $endDateFormatted = \Carbon\Carbon::createFromFormat('d/m/Y', $endDate)->format('Y-m-d');
 
         $startdates=$startDateFormatted." 00:00:00";
-        $enddates=$endDateFormatted." 23:59:59";            
+        $enddates=$endDateFormatted." 23:59:59";
         $depart_id = TblUserDepartments::select('depart_id')->where('user_id', auth()->user()->id)->get();
         $dept = array();
         foreach($depart_id as $depart){
@@ -523,27 +528,27 @@ class AdminController extends Controller
                 ->where('admin_user_departments.user_id', auth()->user()->id)
                 ->whereIn('admin_user_departments.depart_id',$dept)
                 ->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
-                
+
                              // Split conditions by 'AND' and loop through them
         foreach (explode(' AND ', $fitterremovedataall) as $condition) {
             [$column, $value] = explode('=', $condition);
             if($column == 'tbl_locations.name'){
                 $value = preg_replace("/(\w)-(\w)/", "$1 - $2", $value);
                 $query->where(trim($column), trim($value, " '"));
-            }else{ 
+            }else{
                 $value = trim($value, "'");
                 $query->whereIn(trim($column), explode(',', $value));
             }
-        }							
-		
+        }
+
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($ticketdetails);
     }
 
     public function fetchmyticketfitterremove(Request $request)
-    {  
-        $fitterremovedataall = $request->input('fitterremovedataall');              
-       
+    {
+        $fitterremovedataall = $request->input('fitterremovedataall');
+
         $query = TicketDetails::select(
                             'tbl_ticket_details.*',
                             'tbl_locations.name',
@@ -572,12 +577,12 @@ class AdminController extends Controller
             if($column == 'tbl_locations.name'){
                 $value = preg_replace("/(\w)-(\w)/", "$1 - $2", $value);
                 $query->where(trim($column), trim($value, " '"));
-            }else{ 
+            }else{
                 $value = trim($value, "'");
                 $query->whereIn(trim($column), explode(',', $value));
             }
-        }							
-		
+        }
+
 		$ticketdetails = $query->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($ticketdetails);
     }
@@ -604,13 +609,13 @@ class AdminController extends Controller
             ]);
         } else {
             $activity = TicketActivityModel::create($request->only(['staff_id', 'priotity_level', 'ticket_status', 'description', 'ticket_id', 'department_id', 'sub_department_id', 'created_by']));
-            
+
             $ticStatusUpdate = TicketDetails::where('id', $request->ticket_id)
                 ->update([
                     'ticket_status' => $request->ticket_status,
                     'is_read' => 3,
                 ]);
-            
+
             //Log::info('Rows affected: ' . $ticStatusUpdate);
             if (!$activity) {
                 return response()->json(['status' => "error"]);
@@ -694,15 +699,15 @@ class AdminController extends Controller
                 ->where('admin_user_departments.user_id', auth()->user()->id)
                 ->whereIn('admin_user_departments.depart_id',$dept)
                 ->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
-                if($fitterremovedataall){           
+                if($fitterremovedataall){
                     // Split conditions by 'AND' and loop through them
                 foreach (explode(' AND ', $fitterremovedataall) as $condition) {
-                    [$column, $value] = explode('=', $condition);           
+                    [$column, $value] = explode('=', $condition);
                         $value = trim($value, "'");
-                        $data->whereIn(trim($column), explode(',', $value));            
-                }            
+                        $data->whereIn(trim($column), explode(',', $value));
+                }
             }
-            $data = $data->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();  
+            $data = $data->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
         return response()->json($data);
     }
 
@@ -742,16 +747,16 @@ class AdminController extends Controller
                         ->join('tblzones', 'tbl_ticket_details.zone_id', '=', 'tblzones.id')
                 ->where('tbl_ticket_details.created_by', auth()->user()->id)
                 ->whereBetween('tbl_ticket_details.created_at', [$startdates, $enddates]);
-                if($fitterremovedataall){           
+                if($fitterremovedataall){
                     // Split conditions by 'AND' and loop through them
                 foreach (explode(' AND ', $fitterremovedataall) as $condition) {
-                    [$column, $value] = explode('=', $condition);           
+                    [$column, $value] = explode('=', $condition);
                         $value = trim($value, "'");
-                        $data->whereIn(trim($column), explode(',', $value));            
-                }            
+                        $data->whereIn(trim($column), explode(',', $value));
+                }
             }
-            $data = $data->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();  
-        
+            $data = $data->groupBy('tbl_ticket_details.id')->orderBy('created_at', 'desc')->get();
+
         return response()->json($data);
     }
 

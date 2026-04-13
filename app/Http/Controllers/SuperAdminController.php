@@ -80,7 +80,7 @@ class SuperAdminController extends Controller
     public function dashboard()
     {
         $admin = auth()->user();
-        return view('superadmin.dashboard', ['admin' => $admin]);
+        return view('dashboard', ['admin' => $admin]);
     }
     // public function referral()
     // {
@@ -215,7 +215,7 @@ class SuperAdminController extends Controller
         ]));
         return response()->json(['success' => true, 'message' => 'Doctor saved successfully!']);
     }
-   
+
 public function fetch(Request $request)
 {
     $user = auth()->user();
@@ -515,31 +515,31 @@ public function fetchmorefitter(Request $request)
                 //     break;
                 case 2:
                     $branchIds = [];
-            
+
                     if (!empty($user->zone_id)) {
                         $zoneBranchIds = DB::table('tbl_locations')
                             ->where('zone_id', $user->zone_id)
                             ->pluck('id')
                             ->toArray();
-            
+
                         $branchIds = array_merge($branchIds, $zoneBranchIds);
                     }
-            
+
                     if (!empty($user->multi_location)) {
                         $multiLocationIds = array_map(
                             'intval',
                             explode(',', $user->multi_location)
                         );
-            
+
                         $branchIds = array_merge($branchIds, $multiLocationIds);
                     }
-            
+
                     $branchIds = array_unique($branchIds);
-            
+
                     if (!empty($branchIds)) {
                         $query->whereIn('ref_doctor_details.city', $branchIds);
                     }
-            
+
                     break;
 
                 case 3:
@@ -2072,13 +2072,13 @@ public function leadsfilter(Request $request){
     public function menuaccessurl()
     {
         $userId = auth()->user()->id;
-    
+
         $accessibleMenuIds = DB::table('user_menus')
             ->where('user_id', $userId)
             ->where('status','1')
             ->pluck('menu_id')
             ->toArray();
-    
+
         // Main Menus
         $mainMenus = DB::table('menus')
             ->where('main_menu', 1)
@@ -2086,41 +2086,41 @@ public function leadsfilter(Request $request){
             ->get();
         // dd($mainMenus);
         $mainMenus = $mainMenus->map(function ($menu) use ($accessibleMenuIds) {
-    
+
             // Level 2
             $children = DB::table('menus')
                 ->where('sub_menus', $menu->id)
                 ->whereIn('id', $accessibleMenuIds)
                 ->get();
-    
+
             $children = $children->map(function ($child) use ($accessibleMenuIds) {
-    
+
                 // Level 3
                 $subChildren = DB::table('menus')
                     ->where('sub_menus', $child->id)
                     ->whereIn('id', $accessibleMenuIds)
                     ->get();
-    
+
                 $child->children = $subChildren;
                 return $child;
             });
-    
+
             $menu->children = $children;
             return $menu;
         });
-    
+
         return response()->json($mainMenus);
     }
     // public function menuaccessurl()
     // {
     //     $userId = auth()->user()->id;
-    
+
     //     // Step 1: Get all menu IDs the user has access to
     //     $accessibleMenuIds = DB::table('user_menus')
     //         ->where('user_id', $userId)
     //         ->where('status','1')
     //         ->pluck('menu_id');
-    
+
     //     // Step 2: Get only top-level (main_menu = 1) menus the user has access to
     //     $userMenus = DB::table('menus')
     //         ->whereIn('id', $accessibleMenuIds)
@@ -2136,7 +2136,7 @@ public function leadsfilter(Request $request){
     //             'active_ids'
     //         )
     //         ->get();
-    
+
     //     // Step 3: For each top-level menu, get its children (that are ALSO in user_menus)
     //     $menusWithChildren = $userMenus->map(function ($menu) use ($accessibleMenuIds) {
     //         $children = DB::table('menus')
@@ -2144,14 +2144,14 @@ public function leadsfilter(Request $request){
     //             ->whereIn('id', $accessibleMenuIds) // Only include accessible submenus
     //             ->select('id', 'menu_name', 'route', 'icon', 'sub_menus', 'main_menu', 'dropdown', 'active_ids')
     //             ->get();
-    
+
     //         $menu->children = $children;
     //         return $menu;
     //     });
-    
+
     //     return response()->json($menusWithChildren);
     // }
-    
+
 
     public function incomefetchdetails()
     {
@@ -6694,7 +6694,7 @@ public function discountformeditsave(Request $request){
     public function licensedoc_detials(Request $request)
     {
         $admin = Auth::user();
-        
+
         $fitterremovedataall = $request->input('morefilltersall');
         $datefiltervalue = $request->input('moredatefittervale');
 
@@ -6707,14 +6707,14 @@ public function discountformeditsave(Request $request){
 
         $startdates = $startDateFormatted . " 00:00:00";
         $enddates = $endDateFormatted . " 23:59:59";
-        
+
         $data = documentdetails::select(
-                'tbl_locations.name', 
+                'tbl_locations.name',
                 'tbl_locations.id as location_id',
-                'tblzones.name as zone_name', 
+                'tblzones.name as zone_name',
                 'tblzones.id as zone_id',
                 'hms_document_typename.doc_type',
-                'hms_document_typename.doc_name', 
+                'hms_document_typename.doc_name',
                 'hms_document_manage.*'
             )
             ->join('tbl_locations', 'hms_document_manage.zone_id', '=', 'tbl_locations.id') // zone_id = location_id
@@ -6730,7 +6730,7 @@ public function discountformeditsave(Request $request){
         if ($admin->access_limits == 1 || $admin->access_limits == 4) {
             // SUPERADMIN (1) / AUDITOR (4) → ALL DATA
             // No additional filtering needed
-            
+
         } elseif ($admin->access_limits == 2) {
             // ZONAL ADMIN (2) → Zone branches + multi-location branches
             $branchIds = [];
@@ -6759,16 +6759,16 @@ public function discountformeditsave(Request $request){
                 // No access to any branches - return empty
                 $data->whereRaw('1 = 0');
             }
-            
+
         } elseif ($admin->access_limits == 3) {
             // ADMIN (3) → Own branch + multi-location branches only
             $branchIds = [$admin->branch_id];
-            
+
             if (!empty($admin->multi_location)) {
                 $multiLocationIds = array_map('intval', explode(',', $admin->multi_location));
                 $branchIds = array_unique(array_merge($branchIds, $multiLocationIds));
             }
-            
+
             if (!empty($branchIds)) {
                 // Filter by location IDs (stored in zone_id column)
                 $data->whereIn('hms_document_manage.zone_id', $branchIds);
@@ -6776,7 +6776,7 @@ public function discountformeditsave(Request $request){
                 // No access - return empty
                 $data->whereRaw('1 = 0');
             }
-            
+
         } elseif ($admin->access_limits == 5) {
             // USER (5) → Own records only
             $data->where('hms_document_manage.created_by', $admin->id);
@@ -6792,7 +6792,7 @@ public function discountformeditsave(Request $request){
                 $data->whereIn(trim($column), explode(',', $value));
             }
         }
-        
+
         $data = $data->orderBy('hms_document_manage.created_at', 'desc')->get();
 
         return response()->json($data);
@@ -11045,7 +11045,7 @@ private function getAccessibleLocations($admin)
 
 private function getCheckinData($locations, $hasZone, $hasLocation, $hasPhid, $values, $startDate, $endDate, $mrdno)
 {
-    
+
     $checkinData = [];
     $finalResults = [];
     $admin = auth()->user();
@@ -11436,7 +11436,7 @@ public function cancelformsave_data(Request $request)
         }
 
         $data->where('hms_cancelbill_form.created_by', $user->id);
-        
+
     } elseif ($user->access_limits == 3 && $user->access_limits == 5) {
         // NORMAL USER
         $branchIds = [];
@@ -12991,112 +12991,112 @@ public function purchasefetch()
     public function getAllZones()
     {
         $admin = Auth::user();
-        
+
         if ($admin->access_limits == 1 || $admin->access_limits == 4) {
             // Superadmin (1) or Auditor (4) → All zones
             $zones = TblZonesModel::select('name', 'id')
                 ->orderBy('name')
                 ->get();
-                
+
         } elseif ($admin->access_limits == 2) {
             // Zonal Admin (2) → Own zone + zones from multi-locations
             $zoneIds = [$admin->zone_id];
-            
+
             if (!empty($admin->multi_location)) {
                 $multiLocations = explode(',', $admin->multi_location);
-                
+
                 // Get zone IDs from multi-locations
                 $multiZoneIds = TblLocationModel::whereIn('id', $multiLocations)
                     ->pluck('zone_id')
                     ->unique()
                     ->toArray();
-                
+
                 $zoneIds = array_unique(array_merge($zoneIds, $multiZoneIds));
             }
-            
+
             $zones = TblZonesModel::select('name', 'id')
                 ->whereIn('id', $zoneIds)
                 ->orderBy('name')
                 ->get();
-                
+
         } elseif ($admin->access_limits == 3) {
             // Admin (3) → Zones derived from own branch + multi-locations
             $branchIds = [$admin->branch_id];
-            
+
             if (!empty($admin->multi_location)) {
                 $multiLocations = explode(',', $admin->multi_location);
                 $branchIds = array_unique(array_merge($branchIds, $multiLocations));
             }
-            
+
             $zoneIds = TblLocationModel::whereIn('id', $branchIds)
                 ->pluck('zone_id')
                 ->unique()
                 ->toArray();
-            
+
             $zones = TblZonesModel::select('name', 'id')
                 ->whereIn('id', $zoneIds)
                 ->orderBy('name')
                 ->get();
-                
+
         } else {
             // User (5+) → No zones
             $zones = collect();
         }
-        
+
         return response()->json($zones);
     }
-    
+
     public function getAllBranches()
     {
         $admin = Auth::user();
-        
+
         if ($admin->access_limits == 1 || $admin->access_limits == 4) {
             // Superadmin (1) or Auditor (4) → All branches
             $locations = TblLocationModel::select('name', 'id', 'zone_id')
                 ->orderBy('name')
                 ->get();
-                
+
         } elseif ($admin->access_limits == 2) {
             // Zonal Admin (2) → Zone branches + multi-location branches
             $branchIds = [];
-            
+
             // Get branches from user's zone
             $zoneBranches = TblLocationModel::where('zone_id', $admin->zone_id)
                 ->pluck('id')
                 ->toArray();
-            
+
             $branchIds = $zoneBranches;
-            
+
             // Add multi-locations
             if (!empty($admin->multi_location)) {
                 $multiLocations = array_map('intval', explode(',', $admin->multi_location));
                 $branchIds = array_unique(array_merge($branchIds, $multiLocations));
             }
-            
+
             $locations = TblLocationModel::select('name', 'id', 'zone_id')
                 ->whereIn('id', $branchIds)
                 ->orderBy('name')
                 ->get();
-                
+
         } elseif ($admin->access_limits == 3) {
             // Admin (3) → Own branch + multi-location branches
             $branchIds = [$admin->branch_id];
-            
+
             if (!empty($admin->multi_location)) {
                 $multiLocations = array_map('intval', explode(',', $admin->multi_location));
                 $branchIds = array_unique(array_merge($branchIds, $multiLocations));
             }
-            
+
             $locations = TblLocationModel::select('name', 'id', 'zone_id')
                 ->whereIn('id', $branchIds)
                 ->orderBy('name')
                 ->get();
-                
+
         } else {
             // User (5+) → No branches
             $locations = collect();
         }
-        
+
         return response()->json($locations);
     }
 
@@ -13384,7 +13384,7 @@ public function refundbill_dashboard()
 //         // Handle signature uploads/canvas
 //         $imagePaths = [];
 //         $signatureFields = ['ref_wife_sign', 'ref_husband_sign', 'ref_drsign', 'ref_admin_sign', 'ref_zonal_sign'];
-        
+
 //         foreach ($signatureFields as $field) {
 //             if ($request->hasFile($field)) {
 //                 $file = $request->file($field);
@@ -13468,7 +13468,7 @@ public function refundbill_dashboard()
 // public function refundbillform_data(Request $request)
 // {
 //     $admin = auth()->user();
-    
+
 //     // Date range parsing
 //     $dateRange = $request->moredatefittervale ?? '';
 //     if ($dateRange) {
@@ -13542,7 +13542,7 @@ public function refundbill_dashboard()
 // public function refundbill_savedata(Request $request)
 // {
 //     $admin = auth()->user();
-    
+
 //     // Date range parsing
 //     $dateRange = $request->moredatefittervale ?? '';
 //     if ($dateRange) {
@@ -13673,7 +13673,7 @@ public function refundbill_dashboard()
 //             $refund->admin_approver = $status;
 //             $refund->admin_approved_by = $admin->id;        // ← WHO approved
 //             $refund->admin_approved_at = $currentTimestamp; // ← WHEN approved
-            
+
 //             if ($status == 1) {
 //                 $refund->final_approver = 1;
 //                 $refund->final_approved_by = $admin->id;        // ← WHO gave final
@@ -13732,7 +13732,7 @@ public function refundbill_dashboard()
             $refund->final_approver = $request->status;
             $refund->final_approved_by = $admin->id;
             $refund->final_approved_at = $currentTimestamp;
-            
+
         } elseif ($admin->access_limits == 2) {
             $refund->zonal_approver = $request->status;
             $refund->zonal_approved_by = $admin->id;
