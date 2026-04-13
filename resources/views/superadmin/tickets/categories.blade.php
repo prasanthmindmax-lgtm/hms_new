@@ -96,7 +96,7 @@
                 </td>
               </tr>
             @empty
-              <tr><td colspan="4" class="text-center py-5 text-muted">
+              <tr><td colspan="5" class="text-center py-5 text-muted">
                 <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No Ticket Categories found
               </td></tr>
             @endforelse
