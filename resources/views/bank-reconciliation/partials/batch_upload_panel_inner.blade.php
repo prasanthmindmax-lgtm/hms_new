@@ -69,9 +69,11 @@
                 </tbody>
             </table>
         </div>
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border-top">
-            <div class="small text-muted" id="batchPageInfo"></div>
-            <nav><ul class="pagination pagination-sm mb-0" id="batchPagination"></ul></nav>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border-top bank-recon-batch-pager">
+            <div class="small text-muted flex-grow-1" id="batchPageInfo"></div>
+            <nav class="d-flex flex-wrap justify-content-end" aria-label="Batch list pages">
+                <ul class="pagination pagination-sm mb-0 flex-wrap" id="batchPagination"></ul>
+            </nav>
         </div>
     </div>
 </div>

@@ -109,6 +109,11 @@ body {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
+/* Export dropdown must sit above sticky statements toolbar */
+.bank-recon-export-dd .dropdown-menu {
+    z-index: 1040;
+}
+
 /* Table wrapper - overflow so table doesn't stretch page */
 .bank-recon-table-wrap {
     overflow-x: auto;

@@ -490,12 +490,13 @@ mark { background:#fde68a; padding:0 2px; border-radius:2px; }
                 <th style="width:115px;">Action</th>
                 <th style="width:160px;">Module</th>
                 <th style="width:200px;">Description</th>
+                <th style="width:128px;"><i class="bi bi-geo-alt text-secondary"></i> Location</th>
                 <th style="width:145px;">🖥️ Login IP</th>
                 <th style="width:44px;text-align:center;">+</th>
               </tr>
             </thead>
             <tbody id="logsTbody">
-              <tr><td colspan="9" class="text-center text-muted py-5" style="font-size:.9rem;">
+              <tr><td colspan="10" class="text-center text-muted py-5" style="font-size:.9rem;">
                 Click <strong>Search &amp; Filter</strong> and apply filters to load logs.
               </td></tr>
             </tbody>
@@ -654,6 +655,34 @@ $(document).ready(function () {
         return lvl ? '<span style="font-size:.74rem;color:#999;">Level ' + lvl + '</span>' : '<span style="color:#ccc;">—</span>';
     }
 
+    /** Coordinates from extra_data + map link (Google Maps). */
+    function locationCellFromExtra(ed) {
+        if (!ed || typeof ed !== 'object') {
+            return '<span style="color:#d1d5db;font-size:.85rem;">—</span>';
+        }
+        var lat = ed.latitude != null && ed.latitude !== '' ? Number(ed.latitude) : NaN;
+        var lng = ed.longitude != null && ed.longitude !== '' ? Number(ed.longitude) : NaN;
+        if (!isNaN(lat) && !isNaN(lng)) {
+            var q = lat + ',' + lng;
+            var gmaps = 'https://www.google.com/maps?q=' + encodeURIComponent(q);
+            var slat = lat.toFixed(5);
+            var slng = lng.toFixed(5);
+            return '<div style="font-size:.72rem;line-height:1.35;max-width:124px;">'
+                + '<span style="color:#374151;word-break:break-all;">' + esc(slat) + ', ' + esc(slng) + '</span><br/>'
+                + '<a href="' + esc(gmaps) + '" target="_blank" rel="noopener noreferrer" class="log-map-open" title="Open in Google Maps" '
+                + 'onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;'
+                + 'padding:2px 8px 2px 6px;border-radius:6px;background:#ecfdf5;color:#047857;font-size:.7rem;font-weight:600;text-decoration:none;border:1px solid #a7f3d0;">'
+                + '<i class="bi bi-geo-alt-fill" style="font-size:.85rem;"></i> Map</a></div>';
+        }
+        if (ed.geo_status === 'denied') {
+            return '<span style="font-size:.72rem;color:#9ca3af;" title="User declined location">Not shared</span>';
+        }
+        if (ed.geo_status === 'timeout' || ed.geo_status === 'unavailable' || ed.geo_status === 'unsupported') {
+            return '<span style="font-size:.72rem;color:#9ca3af;">—</span>';
+        }
+        return '<span style="color:#d1d5db;font-size:.85rem;">—</span>';
+    }
+
     /* ── Load logs ──────────────────────────────────── */
     function loadLogs() {
         $('#logsOverlay').css('display','flex');
@@ -672,7 +701,7 @@ $(document).ready(function () {
             },
             success  : function (res) { renderTable(res); },
             error    : function (xhr) {
-                $('#logsTbody').html('<tr><td colspan="9" class="text-center text-danger py-4">'
+                $('#logsTbody').html('<tr><td colspan="10" class="text-center text-danger py-4">'
                     + '<i class="bi bi-exclamation-triangle me-2"></i>Failed to load logs.'
                     + (xhr.responseJSON ? ' ' + xhr.responseJSON.message : '') + '</td></tr>');
             },
@@ -754,7 +783,7 @@ $(document).ready(function () {
         }
 
         if (!res.data || res.data.length === 0) {
-            $('#logsTbody').html('<tr><td colspan="9" class="text-center text-muted py-5" style="font-size:.9rem;">'
+            $('#logsTbody').html('<tr><td colspan="10" class="text-center text-muted py-5" style="font-size:.9rem;">'
                 + '<i class="bi bi-inbox me-2" style="font-size:1.3rem;"></i>No logs found for the selected filters.</td></tr>');
             renderPagination();
             return;
@@ -805,6 +834,18 @@ $(document).ready(function () {
                     + '&nbsp;Login Machine IP: <strong>' + esc(loginIpVal) + '</strong>'
                     + (sessionStart ? '&nbsp;&nbsp;|&nbsp;&nbsp;Session: ' + esc(sessionStart) : '')
                     + '</span></div>';
+            var edLoc = (r.extra_data && typeof r.extra_data === 'object') ? r.extra_data : null;
+            var dLat = edLoc && edLoc.latitude != null && edLoc.latitude !== '' ? Number(edLoc.latitude) : NaN;
+            var dLng = edLoc && edLoc.longitude != null && edLoc.longitude !== '' ? Number(edLoc.longitude) : NaN;
+            if (!isNaN(dLat) && !isNaN(dLng)) {
+                var mapHref = 'https://www.google.com/maps?q=' + encodeURIComponent(dLat + ',' + dLng);
+                detail += '<div class="col-12 mt-2">'
+                    + '<span class="login-ip-banner" style="background:linear-gradient(90deg,#ecfdf5,#f0fdf4);border-color:#86efac;color:#14532d;">'
+                    + '<i class="bi bi-geo-alt-fill"></i>&nbsp;Coordinates: <strong>' + esc(dLat.toFixed(7)) + ', ' + esc(dLng.toFixed(7)) + '</strong>'
+                    + (edLoc.location_accuracy_m != null ? '&nbsp;&nbsp;±' + esc(String(edLoc.location_accuracy_m)) + ' m' : '')
+                    + '&nbsp;&nbsp;|&nbsp;&nbsp;<a href="' + esc(mapHref) + '" target="_blank" rel="noopener noreferrer" style="font-weight:700;color:#047857;">Open in Google Maps</a>'
+                    + '</span></div>';
+            }
             if (r.url)
                 detail += '<div class="col-md-6 detail-section"><div class="detail-label">Full URL</div><div class="detail-val">' + esc(r.url) + '</div></div>';
             if (r.user_agent)
@@ -841,6 +882,9 @@ $(document).ready(function () {
                   + '<div style="font-size:.79rem;">' + hlText(descShort, currentSearch) + '</div>'
                   + (chips ? '<div style="margin-top:4px;line-height:2;">' + chips + '</div>' : '')
                   + '</td>';
+            html += '<td style="max-width:130px;vertical-align:middle;">'
+                  + locationCellFromExtra(r.extra_data && typeof r.extra_data === 'object' ? r.extra_data : null)
+                  + '</td>';
             html += '<td class="nw">'
                   + '<span class="ip-chip"><i class="bi bi-wifi"></i>' + hlText(displayIp, currentSearch) + '</span>'
                   + '</td>';
@@ -849,7 +893,7 @@ $(document).ready(function () {
                   + 'style="background:#f3f0ff;border:1px solid #c4b5fd;border-radius:6px;color:#5b21b6;width:28px;height:28px;cursor:pointer;font-size:.9rem;padding:0;">'
                   + '<i class="bi bi-chevron-down"></i></button></td>';
             html += '</tr>';
-            html += '<tr class="detail-row" id="' + rowId + '" style="display:none;"><td colspan="9"><div class="row g-2">' + detail + '</div></td></tr>';
+            html += '<tr class="detail-row" id="' + rowId + '" style="display:none;"><td colspan="10"><div class="row g-2">' + detail + '</div></td></tr>';
         });
 
         $('#logsTbody').html(html);
@@ -922,10 +966,10 @@ $(document).ready(function () {
 
     /* ── Export CSV ─────────────────────────────────── */
     $('#btnExportCsv').on('click', function () {
-        var rows = ['#,Date Time,Name,Email,Emp ID,Level,Action,Module,Description,Login IP'];
+        var rows = ['#,Date Time,Name,Email,Emp ID,Level,Action,Module,Description,Location,Login IP'];
         $('#logsTable tbody tr:not(.detail-row)').each(function (i) {
             var tds = $(this).find('td');
-            if (tds.length < 8) return;
+            if (tds.length < 10) return;
             var $userCell = tds.eq(2);
             rows.push([
                 i + 1,
@@ -937,7 +981,8 @@ $(document).ready(function () {
                 '"' + tds.eq(4).text().trim().replace(/"/g,'""') + '"',
                 '"' + tds.eq(5).text().trim().replace(/"/g,'""') + '"',
                 '"' + tds.eq(6).text().trim().replace(/"/g,'""') + '"',
-                '"' + tds.eq(7).text().trim().replace(/"/g,'""') + '"',
+                '"' + tds.eq(7).text().trim().replace(/\s+/g,' ').replace(/"/g,'""') + '"',
+                '"' + tds.eq(8).text().trim().replace(/"/g,'""') + '"',
             ].join(','));
         });
         var a  = document.createElement('a');

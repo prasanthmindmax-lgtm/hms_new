@@ -183,8 +183,7 @@ class LogController extends Controller
 
         // Always use the session login IP — ignore anything from the browser
         $loginIp = session('user_ip');
-        $loginIp = session('user_ip');
-        if(empty($loginIp)){
+        if (empty($loginIp)) {
             $loginIp   = session('user_login_ip', ActivityLog::resolveIp());
         }
         $loginAt   = session('user_login_at');

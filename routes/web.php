@@ -38,10 +38,6 @@ use Maatwebsite\Excel\Facades\Excel;
 Route::get('/', function () {
     return view('welcome');
 });
-Route::get('/login', function () {
-    //dd("dsdasdasdasadas");
-    return view('login');
-})->middleware(['auth', 'verified'])->name('login');
 
 Route::get('/superadmin/dashboard',[SuperAdminController::class,'dashboard'])->name('superadmin.dashboard');
 Route::get('/referral/dashboard',[MarketController::class,'dashboard'])->name('referral.dashboard');
@@ -692,6 +688,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/upload', [BankStatementController::class, 'upload'])->name('upload');
         // Get bank statements with filters
         Route::get('/statements', [BankStatementController::class, 'getStatements'])->name('statements');
+        Route::get('/statements-export', [BankStatementController::class, 'exportStatements'])->name('statements-export');
         // Search bills by amount
         Route::post('/search-bills', [BankStatementController::class, 'searchBills'])->name('search-bills');
         // Filter bills with advanced criteria

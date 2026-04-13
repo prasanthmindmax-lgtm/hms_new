@@ -85,6 +85,38 @@ class AuthenticatedSessionController extends Controller
         $request->session()->put('user_login_ip', $clientIp);
         $request->session()->put('user_login_at', now()->toDateTimeString());
 
+        $lat = $request->filled('login_latitude') ? round((float) $request->input('login_latitude'), 7) : null;
+        $lng = $request->filled('login_longitude') ? round((float) $request->input('login_longitude'), 7) : null;
+        $acc = $request->filled('login_location_accuracy') ? round((float) $request->input('login_location_accuracy'), 2) : null;
+        $geoStatus = $request->input('login_geo_status');
+        if (! is_string($geoStatus) || $geoStatus === '') {
+            $geoStatus = ($lat !== null && $lng !== null) ? 'granted' : null;
+        }
+
+        $loginExtra = [
+            'login_ip' => $clientIp,
+            'login_at' => now()->toDateTimeString(),
+        ];
+        if ($lat !== null && $lng !== null) {
+            $loginExtra['latitude'] = $lat;
+            $loginExtra['longitude'] = $lng;
+            if ($acc !== null) {
+                $loginExtra['location_accuracy_m'] = $acc;
+            }
+        }
+        if ($geoStatus) {
+            $loginExtra['geo_status'] = $geoStatus;
+        }
+
+        $desc = 'User logged in from IP: ' . $clientIp;
+        if ($lat !== null && $lng !== null) {
+            $desc .= ' | Coordinates: ' . $lat . ', ' . $lng;
+        } elseif ($geoStatus === 'denied') {
+            $desc .= ' | Location: not shared (permission denied)';
+        } elseif ($geoStatus === 'timeout' || $geoStatus === 'unavailable') {
+            $desc .= ' | Location: unavailable';
+        }
+
         $url = '';
         if ($request->user()->role_id === 1) {
             $url = 'superadmin/dashboard';
@@ -101,10 +133,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Log the login event (session IP is now set — resolveIp() will pick it up)
-        ActivityLog::log('Login', 'Auth',
-            'User logged in from IP: ' . $clientIp,
-            ['login_ip' => $clientIp, 'login_at' => now()->toDateTimeString()]
-        );
+        ActivityLog::log('Login', 'Auth', $desc, $loginExtra);
 
         return redirect()->intended($url);
 
@@ -138,7 +167,7 @@ class AuthenticatedSessionController extends Controller
 
 
 
-        return redirect('/login');
+        return redirect('/');
 
     }
 

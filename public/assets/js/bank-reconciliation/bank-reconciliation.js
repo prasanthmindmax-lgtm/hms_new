@@ -376,12 +376,43 @@ $(document).ready(function() {
         }
         window.bankReconDateFrom = null;
         window.bankReconDateTo = null;
+        var matchedEl = document.getElementById('filterMatchedDateRange');
+        if (matchedEl) {
+            if (matchedEl._flatpickr) {
+                matchedEl._flatpickr.clear();
+            }
+            $(matchedEl).val('');
+        }
+        window.bankReconMatchedDateFrom = null;
+        window.bankReconMatchedDateTo = null;
         $('#filterModal').modal('hide');
         loadStatements(1);
     }
 
     $('#clearAllFiltersBtn').on('click', function() {
         clearAllFilters();
+    });
+
+    function buildExportQueryString(format) {
+        var p = $.extend({ format: format }, currentFilters);
+        Object.keys(p).forEach(function (k) {
+            if (p[k] === '' || p[k] === undefined || p[k] === null) {
+                delete p[k];
+            }
+        });
+        return $.param(p);
+    }
+
+    $(document).on('click', '#btnExportStatementsCsv', function (e) {
+        e.preventDefault();
+        if (!routes.statementsExport) return;
+        window.location.href = routes.statementsExport + '?' + buildExportQueryString('csv');
+    });
+
+    $(document).on('click', '#btnExportStatementsXlsx', function (e) {
+        e.preventDefault();
+        if (!routes.statementsExport) return;
+        window.location.href = routes.statementsExport + '?' + buildExportQueryString('xlsx');
     });
 
     // ============================================
@@ -402,6 +433,8 @@ $(document).ready(function() {
         }
         if (window.bankReconDateFrom) currentFilters.date_from = window.bankReconDateFrom;
         if (window.bankReconDateTo) currentFilters.date_to = window.bankReconDateTo;
+        if (window.bankReconMatchedDateFrom) currentFilters.matched_date_from = window.bankReconMatchedDateFrom;
+        if (window.bankReconMatchedDateTo) currentFilters.matched_date_to = window.bankReconMatchedDateTo;
         Object.keys(currentFilters).forEach(key => {
             if (currentFilters[key] === '' || currentFilters[key] === undefined) delete currentFilters[key];
         });
@@ -578,7 +611,7 @@ $(document).ready(function() {
         if (!statements || statements.length === 0) {
             tbody.html(`
                 <tr>
-                    <td colspan="15" class="text-center py-5">
+                    <td colspan="16" class="text-center py-5">
                         <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                         <p class="text-muted mt-3">No statements found</p>
                     </td>
@@ -593,22 +626,26 @@ $(document).ready(function() {
             const amount = stmt.withdrawal > 0 ? stmt.withdrawal : stmt.deposit;
             const amountType = stmt.withdrawal > 0 ? 'withdrawal' : 'deposit';
             
+            const resolvedBillNo = (stmt.resolved_bill_number || stmt.resolved_bill_gen_number || stmt.bill_number || '').toString().trim();
+            const resolvedVendor = (stmt.resolved_vendor_name || stmt.vendor_name || '').toString().trim();
             let matchedBillInfo = '-';
-            if (stmt.match_status !== 'unmatched' && stmt.bill_number) {
+            if (stmt.match_status !== 'unmatched' && resolvedBillNo) {
                 matchedBillInfo = `
                     <div class="matched-bill-info">
-                        <strong>${stmt.bill_number}</strong><br>
-                        <small class="text-muted">${stmt.vendor_name || ''}</small><br>
+                        <strong>${escapeAttr(resolvedBillNo)}</strong><br>
+                        <small class="text-muted">${escapeAttr(resolvedVendor)}</small><br>
                         <small class="text-success">₹${formatNumber(stmt.bill_amount || 0)}</small>
                     </div>
                 `;
             }
             let matchedbyInfo = '-';
-            if (stmt.matched_by !== '' && stmt.matched_by_name !== null) {
+            const matchDispName = stmt.bbm_matched_by_name || stmt.matched_by_name;
+            const matchDispUser = stmt.bbm_matched_by_username || stmt.matched_by_username;
+            if (matchDispName != null && matchDispName !== '') {
                 matchedbyInfo = `
                     <div class="matched-bill-info">
-                        <strong>${stmt.matched_by_name}</strong><br>
-                        <small class="text-muted">${stmt.matched_by_username || ''}</small><br>
+                        <strong>${escapeAttr(matchDispName)}</strong><br>
+                        <small class="text-muted">${escapeAttr(matchDispUser || '')}</small><br>
                     </div>
                 `;
             }
@@ -710,6 +747,9 @@ $(document).ready(function() {
                     </td>
                     <td>
                         ${matchedbyInfo}
+                    </td>
+                    <td>
+                        <small class="text-muted">${(stmt.matched_date || stmt.bank_match_matched_at) ? formatDateTime(stmt.matched_date || stmt.bank_match_matched_at) : '—'}</small>
                     </td>
                     <td>
                         ${incomeTagCell}
@@ -1320,6 +1360,13 @@ $(document).ready(function() {
         if (!m.isValid()) return '-';
         return m.format('DD MMM YYYY');
     }
+
+    function formatDateTime(dateString) {
+        if (!dateString) return '—';
+        var m = moment(dateString);
+        if (!m.isValid()) return '—';
+        return m.format('DD MMM YYYY, HH:mm');
+    }
     
     function truncateText(text, length) {
         if (!text) return '-';
@@ -1762,14 +1809,22 @@ $(document).ready(function() {
         tbody.empty();
         if (!rows.length) {
             tbody.html('<tr><td colspan="9" class="text-center py-4 text-muted">No batches match your filters.</td></tr>');
-            $('#batchTotalHint').text('');
+            var ztot = parseInt(res.total, 10) || 0;
+            $('#batchTotalHint').text(ztot ? 'Total: ' + ztot : 'Total: 0');
             $('#batchPageInfo').text('');
             return;
         }
-        var from = res.from != null ? res.from : 0;
-        var to = res.to != null ? res.to : 0;
-        $('#batchTotalHint').text('Total: ' + (res.total || 0));
-        $('#batchPageInfo').text(from && to ? 'Showing ' + from + '–' + to + ' of ' + (res.total || 0) : '');
+        var total = parseInt(res.total, 10) || 0;
+        var from = res.from != null ? parseInt(res.from, 10) : null;
+        var to = res.to != null ? parseInt(res.to, 10) : null;
+        $('#batchTotalHint').text(total ? 'Total: ' + total : 'Total: 0');
+        if (!total) {
+            $('#batchPageInfo').text('');
+        } else if (from != null && to != null && !isNaN(from) && !isNaN(to)) {
+            $('#batchPageInfo').text('Showing ' + from + '–' + to + ' of ' + total + ' · page ' + (parseInt(res.current_page, 10) || 1) + ' / ' + (parseInt(res.last_page, 10) || 1));
+        } else {
+            $('#batchPageInfo').text('Page ' + (parseInt(res.current_page, 10) || 1) + ' of ' + (parseInt(res.last_page, 10) || 1) + ' · ' + total + ' total');
+        }
 
         rows.forEach(function (b) {
             var uid = escBatchCell(b.upload_batch_id);
@@ -1798,9 +1853,40 @@ $(document).ready(function() {
         var ul = $('#batchPagination');
         if (!ul.length) return;
         ul.empty();
-        var last = res.last_page || 1;
-        var cur = res.current_page || 1;
-        if (last <= 1) return;
+        var last = parseInt(res.last_page, 10) || 1;
+        var cur = parseInt(res.current_page, 10) || 1;
+        var total = parseInt(res.total, 10) || 0;
+        if (total === 0 || last <= 1) {
+            return;
+        }
+
+        // Prefer Laravel paginator "links" (Next/Previous + page window) when present.
+        if (res.links && Array.isArray(res.links) && res.links.length) {
+            res.links.forEach(function (lnk) {
+                var isActive = !!lnk.active;
+                var hasUrl = !!(lnk.url && String(lnk.url).trim());
+                var li = $('<li>').addClass('page-item').toggleClass('active', isActive).toggleClass('disabled', !hasUrl && !isActive);
+                var labelHtml = String(lnk.label == null ? '' : lnk.label);
+                var a = $('<a class="page-link" href="#">').attr('href', '#').html(labelHtml);
+                if (hasUrl && !isActive) {
+                    a.on('click', function (e) {
+                        e.preventDefault();
+                        try {
+                            var u = new URL(lnk.url, window.location.origin);
+                            var p = parseInt(u.searchParams.get('page'), 10) || 1;
+                            loadBatchesInline(p);
+                        } catch (err) {
+                            loadBatchesInline(cur);
+                        }
+                    });
+                } else {
+                    a.on('click', function (e) { e.preventDefault(); });
+                }
+                li.append(a);
+                ul.append(li);
+            });
+            return;
+        }
 
         function addLi(label, p, disabled, active) {
             var li = $('<li class="page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '') + '">');

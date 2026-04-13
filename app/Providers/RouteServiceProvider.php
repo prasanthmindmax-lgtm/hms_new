@@ -17,7 +17,8 @@ class RouteServiceProvider extends ServiceProvider
      *
      * @var string
      */
-    public const HOME = '/login';
+    /** Default post-auth path (e.g. registration); role-based redirects use middleware / controller. */
+    public const HOME = '/superadmin/dashboard';
 
     /**
      * Define your route model bindings, pattern filters, and other route configuration.

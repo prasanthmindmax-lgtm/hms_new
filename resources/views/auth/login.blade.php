@@ -65,8 +65,12 @@
               <hr />
               <x-input-error :messages="$errors->get('username')" class="mt-2" />
               <x-input-error :messages="$errors->get('password')" class="mt-2" />
-              <form method="POST" action="{{ route('login1') }}">
+              <form id="loginForm" method="POST" action="{{ route('login1') }}">
               @csrf
+              <input type="hidden" name="login_latitude" id="login_latitude" value="" />
+              <input type="hidden" name="login_longitude" id="login_longitude" value="" />
+              <input type="hidden" name="login_location_accuracy" id="login_location_accuracy" value="" />
+              <input type="hidden" name="login_geo_status" id="login_geo_status" value="" />
               <div class="mb-3">
                 <input type="text" name="username" class="form-control" id="floatingInput" placeholder="Username" />
 
@@ -391,11 +395,120 @@
   </div>
 </div>
 
+<script type="text/javascript">
+(function () {
+  var form = document.getElementById('loginForm');
+  if (!form) return;
+  /** Best-effort precise location: GPS when available; avoids stale/cached coarse fixes. */
+  var GEO_OPTS = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
+  var WATCH_MS = 14000;
+  var ACC_GOOD_M = 25;
+
+  form.addEventListener('submit', function (e) {
+    if (form.dataset.geoHandled === '1') return;
+    e.preventDefault();
+    var lat = document.getElementById('login_latitude');
+    var lng = document.getElementById('login_longitude');
+    var accEl = document.getElementById('login_location_accuracy');
+    var st = document.getElementById('login_geo_status');
+    var finished = false;
+    var watchId = null;
+    var timer = null;
+    var best = null;
+
+    function finishSubmit(status) {
+      if (st) st.value = status || '';
+      form.dataset.geoHandled = '1';
+      form.submit();
+    }
+    function clearTimers() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (watchId != null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    }
+    function submitGranted(b) {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      if (lat) lat.value = String(b.latitude);
+      if (lng) lng.value = String(b.longitude);
+      if (accEl && b.accuracy != null) accEl.value = String(b.accuracy);
+      finishSubmit('granted');
+    }
+    function submitError(err) {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      var code = err && err.code;
+      if (code === 1) finishSubmit('denied');
+      else if (code === 3) finishSubmit('timeout');
+      else finishSubmit('unavailable');
+    }
+    function consider(pos) {
+      if (finished) return;
+      var a = pos.coords.accuracy;
+      if (a == null || isNaN(a)) a = 999999;
+      if (!best || a < best.accuracy) {
+        best = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: a };
+      }
+      if (a <= ACC_GOOD_M) {
+        submitGranted({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        });
+      }
+    }
+    function endWatchPhase() {
+      if (finished) return;
+      clearTimers();
+      if (best) {
+        submitGranted(best);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          if (finished) return;
+          finished = true;
+          if (lat) lat.value = String(pos.coords.latitude);
+          if (lng) lng.value = String(pos.coords.longitude);
+          if (accEl && pos.coords.accuracy != null) accEl.value = String(pos.coords.accuracy);
+          finishSubmit('granted');
+        },
+        submitError,
+        GEO_OPTS
+      );
+    }
+
+    if (!navigator.geolocation) {
+      finishSubmit('unsupported');
+      return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+      function (pos) { consider(pos); },
+      function (err) {
+        if (finished) return;
+        if (err && err.code === 1) {
+          submitError(err);
+          return;
+        }
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(endWatchPhase, 0);
+      },
+      GEO_OPTS
+    );
+
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(endWatchPhase, WATCH_MS);
+  });
+})();
+</script>
   </body>
   <!-- [Body] end -->
 </html>
-<script type="text/javascript">
-  /*window.onblur = function () {
-    alert('You switched the tab');
-} */
-</script>

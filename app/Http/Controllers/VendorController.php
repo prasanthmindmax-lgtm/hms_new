@@ -916,8 +916,7 @@ public function exportvendor(Request $request)
         $headers =['vendorId','Salutation','First Name','Last Name','company Name','display Name','EmailID','Phone','MobilePhone','PAN Number','Payment Terms',
                 'Website','Opening Balance','Skype Identity','Department','Designation','Facebook','Twitter','Billing Attention','Billing Address','Billing City',
                 'Billing State','Billing Country','Billing Code','Billing Phone','Billing Fax','Shipping Attention','Shipping Address','Shipping City','Shipping State',
-                'Shipping Country','Shipping Code','Shipping Phone','Shipping Fax','Vendor Bank Holder Name','Vendor Bank Account Number','Vendor Bank Name','Vendor Bank IFSC Code'];
-
+                'Shipping Country','Shipping Code','Shipping Phone','Shipping Fax','Vendor Bank Holder Name','Vendor Bank Account Number','Vendor Bank Name','Vendor Bank IFSC Code','GSTIN Number'];
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col . '1', $header);
@@ -971,6 +970,7 @@ public function exportvendor(Request $request)
             $sheet->setCellValue('AK' . $row, $bank->accont_number ?? '-');
             $sheet->setCellValue('AL' . $row, $bank->bank_name ?? '-');
             $sheet->setCellValue('AM' . $row, $bank->ifsc_code ?? '-');
+            $sheet->setCellValue('AM' . $row, $vendor->gst_number ?? '-');
 
 
             $row++;

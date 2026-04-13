@@ -62,14 +62,22 @@
         tbody.empty();
         if (!rows.length) {
             tbody.html('<tr><td colspan="9" class="text-center py-4 text-muted">No batches match your filters.</td></tr>');
-            $('#batchTotalHint').text('');
+            var ztot = parseInt(res.total, 10) || 0;
+            $('#batchTotalHint').text(ztot ? 'Total: ' + ztot : 'Total: 0');
             $('#batchPageInfo').text('');
             return;
         }
-        var from = res.from != null ? res.from : 0;
-        var to = res.to != null ? res.to : 0;
-        $('#batchTotalHint').text('Total: ' + (res.total || 0));
-        $('#batchPageInfo').text(from && to ? 'Showing ' + from + '–' + to + ' of ' + (res.total || 0) : '');
+        var total = parseInt(res.total, 10) || 0;
+        var from = res.from != null ? parseInt(res.from, 10) : null;
+        var to = res.to != null ? parseInt(res.to, 10) : null;
+        $('#batchTotalHint').text(total ? 'Total: ' + total : 'Total: 0');
+        if (!total) {
+            $('#batchPageInfo').text('');
+        } else if (from != null && to != null && !isNaN(from) && !isNaN(to)) {
+            $('#batchPageInfo').text('Showing ' + from + '–' + to + ' of ' + total + ' · page ' + (parseInt(res.current_page, 10) || 1) + ' / ' + (parseInt(res.last_page, 10) || 1));
+        } else {
+            $('#batchPageInfo').text('Page ' + (parseInt(res.current_page, 10) || 1) + ' of ' + (parseInt(res.last_page, 10) || 1) + ' · ' + total + ' total');
+        }
 
         rows.forEach(function (b) {
             var uid = esc(b.upload_batch_id);
@@ -97,9 +105,38 @@
     function renderBatchPagination(res) {
         var ul = $('#batchPagination');
         ul.empty();
-        var last = res.last_page || 1;
-        var cur = res.current_page || 1;
-        if (last <= 1) return;
+        var last = parseInt(res.last_page, 10) || 1;
+        var cur = parseInt(res.current_page, 10) || 1;
+        var total = parseInt(res.total, 10) || 0;
+        if (total === 0 || last <= 1) {
+            return;
+        }
+
+        if (res.links && Array.isArray(res.links) && res.links.length) {
+            res.links.forEach(function (lnk) {
+                var isActive = !!lnk.active;
+                var hasUrl = !!(lnk.url && String(lnk.url).trim());
+                var li = $('<li>').addClass('page-item').toggleClass('active', isActive).toggleClass('disabled', !hasUrl && !isActive);
+                var a = $('<a class="page-link" href="#">').attr('href', '#').html(String(lnk.label == null ? '' : lnk.label));
+                if (hasUrl && !isActive) {
+                    a.on('click', function (e) {
+                        e.preventDefault();
+                        try {
+                            var u = new URL(lnk.url, window.location.origin);
+                            var p = parseInt(u.searchParams.get('page'), 10) || 1;
+                            loadBatches(p);
+                        } catch (err) {
+                            loadBatches(cur);
+                        }
+                    });
+                } else {
+                    a.on('click', function (e) { e.preventDefault(); });
+                }
+                li.append(a);
+                ul.append(li);
+            });
+            return;
+        }
 
         function addLi(label, p, disabled, active) {
             var li = $('<li class="page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '') + '">');

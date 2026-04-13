@@ -7,7 +7,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 
 class BankStatementController extends Controller
 {
@@ -264,114 +267,392 @@ class BankStatementController extends Controller
      */
     public function getStatements(Request $request)
     {
-        // If requesting stats only
         if ($request->has('stats_only')) {
             return $this->getStatistics();
         }
-        
+
+        $perPage = $request->get('per_page', 50);
+
+        $paginator = $this->bankStatementsFilteredQuery($request)->paginate($perPage);
+        $paginator->getCollection()->transform(function ($row) {
+            $this->hydrateStatementBillDisplayFields($row);
+
+            return $row;
+        });
+
+        return response()->json($paginator);
+    }
+
+    /**
+     * Export filtered statements as CSV or XLSX (same filters as list; max 25k rows).
+     */
+    public function exportStatements(Request $request)
+    {
+        $format = strtolower((string) $request->get('format', 'csv'));
+        if (! in_array($format, ['csv', 'xlsx'], true)) {
+            $format = 'csv';
+        }
+
+        $rows = $this->bankStatementsFilteredQuery($request)->limit(25000)->get();
+        // dd($rows);
+        $headers = [
+            'ID',
+            'Transaction date',
+            'Value date',
+            'Account number',
+            'Bank',
+            'Description',
+            'Reference',
+            'Transaction ID',
+            'Cheque',
+            'Withdrawal',
+            'Deposit',
+            'Balance',
+            'Category',
+            'Match status',
+            'Matched date',
+            'Bill number',
+            'Vendor',
+            'Matched by',
+        ];
+
+        $baseName = 'bank_statements_' . date('Y-m-d_His');
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($rows, $headers) {
+                $out = fopen('php://output', 'w');
+                fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+                fputcsv($out, $headers);
+                foreach ($rows as $r) {
+                    fputcsv($out, $this->bankStatementExportRow($r));
+                }
+                fclose($out);
+            }, $baseName . '.csv', [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->fromArray($headers, null, 'A1');
+        $rowNum = 2;
+        foreach ($rows as $r) {
+            $sheet->fromArray($this->bankStatementExportRow($r), null, 'A' . $rowNum);
+            $rowNum++;
+        }
+        foreach (range('A', 'Q') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $baseName . '.xlsx', [
+            'Content-Type'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+
+    /**
+     * @param  \stdClass  $r
+     */
+    private function bankStatementExportRow($r): array
+    {
+        // Bill comes from bill_tbl joined via bank_bill_matches.bill_id or bs.matched_bill_id (see applyBankStatementBillJoins).
+        $billNumber = trim((string) ($r->resolved_bill_gen_number ?? ''));
+        if ($billNumber === '' && ! empty($r->resolved_bill_gen_number ?? null)) {
+            $billNumber = trim((string) $r->resolved_bill_gen_number);
+        }
+        $vendorName = trim((string) ($r->resolved_vendor_name ?? ''));
+        $matchedByDisplay = trim((string) ($r->bbm_matched_by_name ?? ''));
+        if ($matchedByDisplay === '') {
+            $matchedByDisplay = trim((string) ($r->matched_by_name ?? ''));
+        }
+        if ($matchedByDisplay === '') {
+            $matchedByDisplay = (string) ($r->bbm_matched_by_username ?? $r->matched_by_username ?? '');
+        }
+
+        $matchedWhen = '';
+        if (! empty($r->matched_date)) {
+            $matchedWhen = (string) $r->matched_date;
+        } elseif (! empty($r->bank_match_matched_at)) {
+            $matchedWhen = (string) $r->bank_match_matched_at;
+        }
+
+        return [
+            $r->id ?? '',
+            $r->transaction_date ?? '',
+            $r->value_date ?? '',
+            $r->bank_account_number ?? '',
+            $r->bank_account_bank_name ?? '',
+            $r->description ?? '',
+            $r->reference_number ?? '',
+            $r->transaction_id ?? '',
+            $r->cheque_number ?? '',
+            $r->withdrawal ?? '',
+            $r->deposit ?? '',
+            $r->balance ?? '',
+            $r->category ?? '',
+            $r->match_status ?? '',
+            $matchedWhen,
+            $billNumber,
+            $vendorName,
+            $matchedByDisplay,
+        ];
+    }
+
+    /**
+     * Join bank_bill_matches (when present) and bill_tbl so bill id resolves as
+     * COALESCE(active_match.bill_id, bs.matched_bill_id), then bill rows supply number/vendor.
+     */
+    /**
+     * Fill bill_number / vendor_name from joined bill_tbl (resolved_* aliases) for API consumers.
+     */
+    private function hydrateStatementBillDisplayFields(object $row): void
+    {
+        $bn = trim((string) ($row->resolved_bill_number ?? ''));
+        if ($bn === '' && ! empty($row->resolved_bill_gen_number ?? null)) {
+            $bn = trim((string) $row->resolved_bill_gen_number);
+        }
+        $row->bill_number = $bn !== '' ? $bn : null;
+        $row->vendor_name = isset($row->resolved_vendor_name) && $row->resolved_vendor_name !== ''
+            ? $row->resolved_vendor_name
+            : null;
+    }
+
+    private function applyBankStatementBillJoins(Builder $query): void
+    {
+        if (Schema::hasTable('bank_bill_matches')) {
+            $query->leftJoin('bank_bill_matches as bbm', function ($join) {
+                $join->on('bbm.bank_statement_id', '=', 'bs.id');
+                if (Schema::hasColumn('bank_bill_matches', 'status')) {
+                    $join->where('bbm.status', '=', 'active');
+                }
+            })
+                ->leftJoin('users as bbm_matcher', 'bbm_matcher.id', '=', 'bbm.matched_by')
+                ->leftJoin('bill_tbl as bill', function ($join) {
+                    $join->whereRaw('bill.id = COALESCE(bbm.bill_id, bs.matched_bill_id)');
+                });
+        } else {
+            $query->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id');
+        }
+    }
+
+    /**
+     * Bank statements list query with joins and all UI filters applied.
+     */
+    // private function bankStatementsFilteredQuery(Request $request): Builder
+    // {
+    //     $select = [
+    //         'bs.*',
+    //         'matched_user.user_fullname as matched_by_name',
+    //         'matched_user.username as matched_by_username',
+    //         'income_user.user_fullname as income_matched_by_name',
+    //         'income_user.username as income_matched_by_username',
+    //         'bill.bill_number as resolved_bill_number',
+    //         'bill.vendor_name as resolved_vendor_name',
+    //         'bill.grand_total_amount as bill_amount',
+    //     ];
+    //     if (Schema::hasColumn('bill_tbl', 'bill_gen_number')) {
+    //         $select[] = 'bill.bill_gen_number as resolved_bill_gen_number';
+    //     }
+    //     if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+    //         $select[] = 'radiant_user.user_fullname as radiant_matched_by_name';
+    //         $select[] = 'radiant_user.username as radiant_matched_by_username';
+    //     }
+    //     if (Schema::hasColumn('bank_statements', 'bank_account_id') && Schema::hasTable('bank_reconciliation_accounts')) {
+    //         $select[] = 'bra.account_number as bank_account_number';
+    //         $select[] = 'bra.bank_name as bank_account_bank_name';
+    //     }
+    //     if (Schema::hasTable('bank_bill_matches')) {
+    //         $select[] = 'bbm_matcher.user_fullname as bbm_matched_by_name';
+    //         $select[] = 'bbm_matcher.username as bbm_matched_by_username';
+    //         $select[] = 'bbm.matched_at as bank_match_matched_at';
+    //     }
+
+    //     $query = DB::table('bank_statements as bs')
+    //         ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
+    //         ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id');
+    //     if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+    //         $query->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id');
+    //     }
+    //     if (Schema::hasColumn('bank_statements', 'bank_account_id') && Schema::hasTable('bank_reconciliation_accounts')) {
+    //         $query->leftJoin('bank_reconciliation_accounts as bra', 'bs.bank_account_id', '=', 'bra.id');
+    //     }
+
+    //     $this->applyBankStatementBillJoins($query);
+
+    //     $query->select($select);
+
+    //     if ($request->filled('bank_account_id') && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+    //         $query->where('bs.bank_account_id', (int) $request->bank_account_id);
+    //     }
+
+    //     if ($request->filled('date_from')) {
+    //         $query->whereRaw(
+    //             "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') >= ?",
+    //             [$request->date_from]
+    //         );
+    //     }
+
+    //     if ($request->filled('date_to')) {
+    //         $query->whereRaw(
+    //             "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') <= ?",
+    //             [$request->date_to]
+    //         );
+    //     }
+
+    //     if ($request->filled('amount_min') || $request->filled('amount_max')) {
+    //         $amountMin = $request->filled('amount_min')
+    //             ? (float) str_replace(',', '', $request->amount_min)
+    //             : null;
+    //         $amountMax = $request->filled('amount_max')
+    //             ? (float) str_replace(',', '', $request->amount_max)
+    //             : null;
+    //         $query->where(function ($q) use ($amountMin, $amountMax) {
+    //             if ($amountMin !== null) {
+    //                 $q->whereRaw('COALESCE(bs.withdrawal, bs.deposit) >= ?', [$amountMin]);
+    //             }
+    //             if ($amountMax !== null) {
+    //                 $q->whereRaw('COALESCE(bs.withdrawal, bs.deposit) <= ?', [$amountMax]);
+    //             }
+    //         });
+    //     }
+
+    //     if ($request->filled('match_status')) {
+    //         $query->where('bs.match_status', $request->match_status);
+    //     }
+
+    //     if ($request->filled('income_match')) {
+    //         $val = $request->income_match;
+    //         if ($val === 'income_matched') {
+    //             $query->where('bs.income_match_status', 'income_matched');
+    //         } elseif ($val === 'income_unmatched') {
+    //             $query->where(function ($q) {
+    //                 $q->where('bs.income_match_status', 'income_unmatched')
+    //                     ->orWhereNull('bs.income_match_status');
+    //             });
+    //         }
+    //     }
+
+    //     if ($request->filled('radiant_match') && Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+    //         $val = $request->radiant_match;
+    //         if ($val === 'radiant_matched') {
+    //             $query->where('bs.radiant_match_status', 'radiant_matched');
+    //         } elseif ($val === 'radiant_unmatched') {
+    //             $query->where(function ($q) {
+    //                 $q->where('bs.radiant_match_status', 'radiant_unmatched')
+    //                     ->orWhereNull('bs.radiant_match_status');
+    //             });
+    //         } elseif ($val === 'radiant_keyword_only' && Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+    //             $query->whereNotNull('bs.radiant_match_against')
+    //                 ->where('bs.radiant_match_against', '!=', '')
+    //                 ->where(function ($q) {
+    //                     $q->whereNull('bs.radiant_match_status')
+    //                         ->orWhere('bs.radiant_match_status', '!=', 'radiant_matched');
+    //                 });
+    //         }
+    //     }
+
+    //     if ($request->filled('reference_number')) {
+    //         $ref = $request->reference_number;
+    //         $query->where(function ($q) use ($ref) {
+    //             $q->where('bs.reference_number', 'LIKE', '%' . $ref . '%')
+    //                 ->orWhere('bs.transaction_id', 'LIKE', '%' . $ref . '%');
+    //         });
+    //     }
+
+    //     if ($request->filled('search')) {
+    //         $search = $request->search;
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('bs.description', 'LIKE', "%{$search}%")
+    //                 ->orWhere('bs.reference_number', 'LIKE', "%{$search}%")
+    //                 ->orWhere('bs.cheque_number', 'LIKE', "%{$search}%");
+    //         });
+    //     }
+
+    //     if (Schema::hasColumn('bank_statements', 'matched_date')) {
+    //         if ($request->filled('matched_date_from')) {
+    //             $query->whereDate('bs.matched_date', '>=', $request->matched_date_from);
+    //         }
+    //         if ($request->filled('matched_date_to')) {
+    //             $query->whereDate('bs.matched_date', '<=', $request->matched_date_to);
+    //         }
+    //     }
+
+    //     return $query->orderBy('bs.transaction_date', 'desc')->orderBy('bs.id', 'desc');
+    // }
+    private function bankStatementsFilteredQuery(Request $request): Builder
+    {
         $select = [
             'bs.*',
             'matched_user.user_fullname as matched_by_name',
             'matched_user.username as matched_by_username',
             'income_user.user_fullname as income_matched_by_name',
             'income_user.username as income_matched_by_username',
-            'bill.bill_number',
-            'bill.vendor_name',
+            'bill.bill_number as resolved_bill_number',
+            'bill.bill_gen_number as resolved_bill_gen_number',
+            'bill.vendor_name as resolved_vendor_name',
             'bill.grand_total_amount as bill_amount',
+            'bill.bill_gen_number as resolved_bill_gen_number',
+            'radiant_user.user_fullname as radiant_matched_by_name',
+            'radiant_user.username as radiant_matched_by_username',
+            'bra.account_number as bank_account_number',
+            'bra.bank_name as bank_account_bank_name',
+            'bbm_matcher.user_fullname as bbm_matched_by_name',
+            'bbm_matcher.username as bbm_matched_by_username',
+            'bbm.matched_at as bank_match_matched_at',
         ];
-        if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
-            $select[] = 'radiant_user.user_fullname as radiant_matched_by_name';
-            $select[] = 'radiant_user.username as radiant_matched_by_username';
-        }
-        if (Schema::hasColumn('bank_statements', 'bank_account_id') && Schema::hasTable('bank_reconciliation_accounts')) {
-            $select[] = 'bra.account_number as bank_account_number';
-            $select[] = 'bra.bank_name as bank_account_bank_name';
-        }
 
         $query = DB::table('bank_statements as bs')
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
-            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id');
-        if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
-            $query->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id');
-        }
-        if (Schema::hasColumn('bank_statements', 'bank_account_id') && Schema::hasTable('bank_reconciliation_accounts')) {
-            $query->leftJoin('bank_reconciliation_accounts as bra', 'bs.bank_account_id', '=', 'bra.id');
-        }
-        $query->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
-            ->select($select)
-            ->orderBy('bs.transaction_date', 'desc')
-            ->orderBy('bs.id', 'desc');
+            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
+            ->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id')
+            ->leftJoin('bank_reconciliation_accounts as bra', 'bs.bank_account_id', '=', 'bra.id');
 
-        if ($request->filled('bank_account_id') && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+        $this->applyBankStatementBillJoins($query);
+
+        $query->select($select);
+
+        if ($request->filled('bank_account_id')) {
             $query->where('bs.bank_account_id', (int) $request->bank_account_id);
         }
 
-        // Apply filters - Date Range
         if ($request->filled('date_from')) {
             $query->whereRaw(
                 "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') >= ?",
                 [$request->date_from]
             );
         }
-        
+
         if ($request->filled('date_to')) {
             $query->whereRaw(
                 "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') <= ?",
                 [$request->date_to]
             );
         }
-        // // Amount Range
-        // if ($request->filled('amount_min')) {
-        //     $amountMin = (float) str_replace(',', '', $request->amount_min);
-        //     $query->where(function($q) use ($amountMin) {
-        //         $q->where('bs.withdrawal', '>=', $amountMin)
-        //         ->orWhere('bs.deposit', '>=', $amountMin);
-        //     });
-        // }
-        
-        // if ($request->filled('amount_max')) {
-        //     $amountMax = (float) str_replace(',', '', $request->amount_max);
-        //     $query->where(function($q) use ($amountMax) {
-        //         $q->where('bs.withdrawal', '<=', $amountMax)
-        //           ->orWhere('bs.deposit', '<=', $amountMax);
-        //     });
-        // }
-        // Amount Range
+
         if ($request->filled('amount_min') || $request->filled('amount_max')) {
-
-            $amountMin = $request->filled('amount_min') 
-                ? (float) str_replace(',', '', $request->amount_min) 
+            $amountMin = $request->filled('amount_min')
+                ? (float) str_replace(',', '', $request->amount_min)
                 : null;
-
-            $amountMax = $request->filled('amount_max') 
-                ? (float) str_replace(',', '', $request->amount_max) 
+            $amountMax = $request->filled('amount_max')
+                ? (float) str_replace(',', '', $request->amount_max)
                 : null;
-            // dd($amountMin, $amountMax);
             $query->where(function ($q) use ($amountMin, $amountMax) {
-
                 if ($amountMin !== null) {
-                    $q->whereRaw(
-                        "COALESCE(bs.withdrawal, bs.deposit) >= ?",
-                        [$amountMin]
-                    );
+                    $q->whereRaw('COALESCE(bs.withdrawal, bs.deposit) >= ?', [$amountMin]);
                 }
-
                 if ($amountMax !== null) {
-                    $q->whereRaw(
-                        "COALESCE(bs.withdrawal, bs.deposit) <= ?",
-                        [$amountMax]
-                    );
+                    $q->whereRaw('COALESCE(bs.withdrawal, bs.deposit) <= ?', [$amountMax]);
                 }
-
             });
         }
 
-        // Match Status
         if ($request->filled('match_status')) {
             $query->where('bs.match_status', $request->match_status);
         }
 
-        // Income Match Status
         if ($request->filled('income_match')) {
             $val = $request->income_match;
             if ($val === 'income_matched') {
@@ -379,13 +660,12 @@ class BankStatementController extends Controller
             } elseif ($val === 'income_unmatched') {
                 $query->where(function ($q) {
                     $q->where('bs.income_match_status', 'income_unmatched')
-                      ->orWhereNull('bs.income_match_status');
+                        ->orWhereNull('bs.income_match_status');
                 });
             }
         }
 
-        // Radiant match filter (pickup linked / keyword-only / unmatched)
-        if ($request->filled('radiant_match') && Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+        if ($request->filled('radiant_match')) {
             $val = $request->radiant_match;
             if ($val === 'radiant_matched') {
                 $query->where('bs.radiant_match_status', 'radiant_matched');
@@ -394,7 +674,7 @@ class BankStatementController extends Controller
                     $q->where('bs.radiant_match_status', 'radiant_unmatched')
                         ->orWhereNull('bs.radiant_match_status');
                 });
-            } elseif ($val === 'radiant_keyword_only' && Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+            } elseif ($val === 'radiant_keyword_only') {
                 $query->whereNotNull('bs.radiant_match_against')
                     ->where('bs.radiant_match_against', '!=', '')
                     ->where(function ($q) {
@@ -403,8 +683,7 @@ class BankStatementController extends Controller
                     });
             }
         }
-        
-        // Reference Number
+
         if ($request->filled('reference_number')) {
             $ref = $request->reference_number;
             $query->where(function ($q) use ($ref) {
@@ -412,20 +691,24 @@ class BankStatementController extends Controller
                     ->orWhere('bs.transaction_id', 'LIKE', '%' . $ref . '%');
             });
         }
-        // General Search (Description, Reference, Cheque)
+
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('bs.description', 'LIKE', "%{$search}%")
-                  ->orWhere('bs.reference_number', 'LIKE', "%{$search}%")
-                  ->orWhere('bs.cheque_number', 'LIKE', "%{$search}%");
+                    ->orWhere('bs.reference_number', 'LIKE', "%{$search}%")
+                    ->orWhere('bs.cheque_number', 'LIKE', "%{$search}%");
             });
         }
-        
-        $perPage = $request->get('per_page', 50);
-        $statements = $query->paginate($perPage);
-        
-        return response()->json($statements);
+
+        if ($request->filled('matched_date_from')) {
+            $query->whereDate('bs.matched_date', '>=', $request->matched_date_from);
+        }
+        if ($request->filled('matched_date_to')) {
+            $query->whereDate('bs.matched_date', '<=', $request->matched_date_to);
+        }
+
+        return $query->orderBy('bs.transaction_date', 'desc')->orderBy('bs.id', 'desc');
     }
     
     /**
@@ -1199,26 +1482,36 @@ class BankStatementController extends Controller
      */
     public function getBankStatementById($id)
     {
-        $stmt = DB::table('bank_statements as bs')
-            ->select(
-                'bs.*',
-                'matched_user.user_fullname as matched_by_name',
-                'matched_user.username as matched_by_username',
-                'income_user.user_fullname as income_matched_by_name',
-                'income_user.username as income_matched_by_username',
-                'bill.bill_number',
-                'bill.vendor_name',
-                'bill.grand_total_amount as bill_amount'
-            )
+        $select = [
+            'bs.*',
+            'matched_user.user_fullname as matched_by_name',
+            'matched_user.username as matched_by_username',
+            'income_user.user_fullname as income_matched_by_name',
+            'income_user.username as income_matched_by_username',
+            'bill.bill_number as resolved_bill_number',
+            'bill.vendor_name as resolved_vendor_name',
+            'bill.grand_total_amount as bill_amount',
+        ];
+        if (Schema::hasColumn('bill_tbl', 'bill_gen_number')) {
+            $select[] = 'bill.bill_gen_number as resolved_bill_gen_number';
+        }
+        if (Schema::hasTable('bank_bill_matches')) {
+            $select[] = 'bbm_matcher.user_fullname as bbm_matched_by_name';
+            $select[] = 'bbm_matcher.username as bbm_matched_by_username';
+            $select[] = 'bbm.matched_at as bank_match_matched_at';
+        }
+
+        $query = DB::table('bank_statements as bs')
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
-            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
-            ->leftJoin('bill_tbl as bill', 'bs.matched_bill_id', '=', 'bill.id')
-            ->where('bs.id', $id)
-            ->first();
+            ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id');
+        $this->applyBankStatementBillJoins($query);
+        $stmt = $query->select($select)->where('bs.id', $id)->first();
 
         if (!$stmt) {
             return response()->json(['success' => false, 'message' => 'Statement not found'], 404);
         }
+
+        $this->hydrateStatementBillDisplayFields($stmt);
 
         return response()->json(['success' => true, 'data' => $stmt]);
     }

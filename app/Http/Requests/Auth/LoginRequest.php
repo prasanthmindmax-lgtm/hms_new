@@ -19,6 +19,19 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $merge = [];
+        foreach (['login_latitude', 'login_longitude', 'login_location_accuracy', 'login_geo_status'] as $key) {
+            if ($this->has($key) && $this->input($key) === '') {
+                $merge[$key] = null;
+            }
+        }
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -31,6 +44,10 @@ class LoginRequest extends FormRequest
         return [
             'username' => ['required'],
             'password' => ['required', 'string'],
+            'login_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'login_longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'login_location_accuracy' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'login_geo_status' => ['nullable', 'string', 'max:32'],
         ];
     }
 

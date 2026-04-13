@@ -427,7 +427,7 @@
                     <div class="card shadow-sm bank-recon-statements-card">
                         <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <h5 class="mb-0"><i class="bi bi-table me-2"></i>Bank Statements</h5>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end">
                                 <label class="mb-0 small text-white-50">Per page:</label>
                                 <select class="form-select form-select-sm" id="perPageSelect" style="width: auto;">
                                     <option value="10">10</option>
@@ -435,8 +435,25 @@
                                     <option value="50">50</option>
                                     <option value="100">100</option>
                                 </select>
+                                <div class="dropdown bank-recon-export-dd">
+                                    <button type="button" class="btn btn-outline-light btn-sm dropdown-toggle" id="exportStatementsDropdown" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" aria-haspopup="true" title="Export using current filters">
+                                        <i class="bi bi-download me-1"></i>Export
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="exportStatementsDropdown">
+                                        <li>
+                                            <button type="button" class="dropdown-item" id="btnExportStatementsCsv">
+                                                <i class="bi bi-file-earmark-text me-2 text-secondary"></i>Download CSV
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item" id="btnExportStatementsXlsx">
+                                                <i class="bi bi-file-earmark-excel me-2 text-success"></i>Download Excel (.xlsx)
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
                                 <button class="btn btn-light btn-sm" id="openFilterBtn">
-                                    <i class="bi bi-funnel me-1"></i>Search & Filter
+                                    <i class="bi bi-funnel me-1"></i>Search &amp; Filter
                                 </button>
                             </div>
                         </div>
@@ -457,6 +474,7 @@
                                             <th>Status</th>
                                             <th>Matched Bill</th>
                                             <th>Matched By</th>
+                                            <th>Matched date</th>
                                             <th>Income Tag</th>
                                             <th>Radiant</th>
                                             <th>Actions</th>
@@ -464,7 +482,7 @@
                                     </thead>
                                     <tbody id="statementsTableBody">
                                         <tr>
-                                            <td colspan="15" class="text-center py-5">
+                                            <td colspan="16" class="text-center py-5">
                                                 <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                                                 <p class="text-muted mt-3">No statements uploaded</p>
                                             </td>
@@ -651,8 +669,12 @@
                         </div>
                         @endif
                         <div class="col-md-6">
-                            <label class="form-label">Date Range</label>
+                            <label class="form-label">Transaction date</label>
                             <input type="text" class="form-control" id="filterDateRange" placeholder="Select date range">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Matched date <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" class="form-control" id="filterMatchedDateRange" placeholder="Bill match date range">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>
@@ -985,6 +1007,7 @@
         const routes = {
             upload: "{{ route('bank-reconciliation.upload') }}",
             statements: "{{ route('bank-reconciliation.statements') }}",
+            statementsExport: "{{ route('bank-reconciliation.statements-export') }}",
             searchBills: "{{ route('bank-reconciliation.search-bills') }}",
             filterBills: "{{ route('bank-reconciliation.filter-bills') }}",
             match: "{{ route('bank-reconciliation.match') }}",
@@ -1039,6 +1062,34 @@
                 }
             });
             filterDateEl.value = moment().format('DD/MM/YYYY') + ' to ' + moment().format('DD/MM/YYYY');
+        }
+
+        var filterMatchedDateEl = document.getElementById('filterMatchedDateRange');
+        if (filterMatchedDateEl) {
+            window.bankReconMatchedDateFrom = null;
+            window.bankReconMatchedDateTo = null;
+            flatpickr(filterMatchedDateEl, {
+                mode: 'range',
+                dateFormat: 'd/m/Y',
+                onChange: function(selectedDates) {
+                    if (selectedDates.length === 2) {
+                        window.bankReconMatchedDateFrom = moment(selectedDates[0]).format('YYYY-MM-DD');
+                        window.bankReconMatchedDateTo = moment(selectedDates[1]).format('YYYY-MM-DD');
+                    } else if (selectedDates.length === 1) {
+                        window.bankReconMatchedDateFrom = moment(selectedDates[0]).format('YYYY-MM-DD');
+                        window.bankReconMatchedDateTo = null;
+                    } else {
+                        window.bankReconMatchedDateFrom = null;
+                        window.bankReconMatchedDateTo = null;
+                    }
+                },
+                onClose: function(selectedDates) {
+                    if (selectedDates.length === 0) {
+                        window.bankReconMatchedDateFrom = null;
+                        window.bankReconMatchedDateTo = null;
+                    }
+                }
+            });
         }
 
         $('#matchTransactionModal').on('shown.bs.modal', function() {
