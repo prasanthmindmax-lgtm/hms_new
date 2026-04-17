@@ -27,6 +27,7 @@ class Tblgrn extends Authenticatable
         'branch_name',
         'company_name',
         'company_id',
+        'department_id',
         'grn_number',
         'company_name',
         'order_number',
@@ -39,25 +40,34 @@ class Tblgrn extends Authenticatable
         'documents',
         'status',
     ];
+
     public function BillLines()
     {
         return $this->hasMany(TblgrnLines::class, 'grn_id');
     }
+
     public function Tblvendor()
     {
         return $this->belongsTo(Tblvendor::class, 'vendor_id');
     }
+
     public function TblBilling()
     {
         return $this->belongsTo(TblBilling::class, 'vendor_id');
     }
+
     public function TblCompany()
     {
         return $this->belongsTo(Tblcompany::class, 'company_id');
     }
+
     public function QcCheckedBy()
     {
         return $this->belongsTo(usermanagementdetails::class, 'qc_checked_by');
     }
-
+    
+    public function Department()
+    {
+        return $this->belongsTo(Department::class, 'department_id');
+    }
 }

@@ -75,7 +75,7 @@
                     <!-- Vendor Name -->
                     <div class="col-md-6">
                         <div class="row mb-2 align-items-start">
-                            <label for="vendor-search" class="col-md-4  fw-semibold">Vendor Name*</label>
+                            <label for="vendor-search" class="col-md-4  fw-semibold">Vendor Name <span style="color:red;">*</span></label>
                             <input type="hidden" name="id" id="id">
                             <div class="col-md-8">
                                 <div class="search-dropdown">
@@ -217,14 +217,22 @@
                                     </option>
                                 @endforeach
                         </select>
+                        <span class="error_category" style="color:red;font-size:12px;"></span>
                     </div>
                 </div>
 
                 <!-- Row 6: Subject + Timeline -->
                 <div class="row mb-3">
-                    <label for="subject" class="col-md-2 ">Subject</label>
+                    <label for="department" class="col-md-2 ">Department<span style="color:red;">*</span></label>
                     <div class="col-md-4">
-                        <textarea class="form-control" id="subject" autocomplete="off" autocorrect="off" name="subject" placeholder="Enter a subject within 250 characters" rows="2" maxlength="250"></textarea>
+                      <div class="tax-dropdown-wrapper account-section" style="width:300px">
+                          <input type="text" class="form-control department-search-input" name="department" autocomplete="off" autocorrect="off" placeholder="Select a Department" readonly>
+                          <input type="hidden" name="department_id" class="department_id">
+                          <div class="dropdown-menu tax-dropdown">
+                            <div class="department-list"></div>
+                          </div>
+                          <span class="error_department" style="color:red;font-size:12px;"></span>
+                        </div>
                     </div>
                     <label for="timeline_date" class="col-md-2 ">Timeline<span style="color:red;">*</span></label>
                     <div class="col-md-4">
@@ -232,6 +240,14 @@
                         <span class="error_timeline" style="color:red;font-size:12px;"></span>
                     </div>
                 </div>
+
+                <div class="row mb-3">
+                    <label for="subject" class="col-md-2 ">Subject</label>
+                    <div class="col-md-4">
+                        <textarea class="form-control" id="subject" autocomplete="off" autocorrect="off" name="subject" placeholder="Enter a subject within 250 characters" rows="2" maxlength="250"></textarea>
+                    </div>
+                </div>
+
             <div class="card">
               <div class="card-header">
                 <h3>Item Table</h3>
@@ -1703,6 +1719,7 @@ function calculateFinalTotals() {
                 const gsttax = @json($gsttax);
                 const Tblaccount = @json($Tblaccount);
                 const TblZonesModel = @json($TblZonesModel);
+                const Tbldepartment = @json($Tbldepartment);
                 const Tbltdssection = @json($Tbltdssection);
                 const Tblcompany = @json($Tblcompany);
                 // Populate TDS dropdown with ALL records so every tax is selectable
@@ -1735,6 +1752,12 @@ function calculateFinalTotals() {
                           <div data-id="${locations.id}">${locations.name} </div>
                         `);
                         $('.zone-list').append(item);
+                    });
+                    (Array.isArray(Tbldepartment) ? Tbldepartment : (Tbldepartment.data || [])).forEach(dept => {
+                        const item = $(`
+                          <div data-id="${dept.id}">${dept.name} </div>
+                        `);
+                        $('.department-list').append(item);
                     });
                     Tbltdssection.data.forEach(Tbltdssection => {
                         const item = $(`
@@ -2301,6 +2324,53 @@ function calculateFinalTotals() {
                       $dropdown.hide();
                   });
 
+                  //department
+                  $(document).on('click', '.department-search-input', function (e) {
+                      e.stopPropagation();
+                      $(this).val('');
+                      $('.dropdown-menu.tax-dropdown').hide();
+
+                      const $input = $(this);
+                      let $dropdown = $input.data('dropdown');
+
+                      if (!$dropdown) {
+                          $dropdown = $input.siblings('.dropdown-menu').clone(true);
+                          $('body').append($dropdown);
+                          $input.data('dropdown', $dropdown);
+                      }
+
+                      $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper'));
+                      $dropdown.data('row', $input.closest('tr'));
+
+                      const offset = $input.offset();
+                      $dropdown.css({
+                          position: 'absolute',
+                          top: offset.top + $input.outerHeight(),
+                          left: offset.left,
+                          width: $input.outerWidth(),
+                          zIndex: 999
+                      }).show();
+                      $(this).removeAttr('readonly');
+                  });
+                  $(document).on('click', '.department-list div', function () {
+                      const selectedText = $(this).text().trim();
+                      const selectedid = $(this).data('id');
+
+                      const $dropdown = $(this).closest('.dropdown-menu.tax-dropdown');
+                      const wrapper = $dropdown.data('wrapper');
+                      const row = $dropdown.data('row');
+
+                      if (!wrapper || !row) {
+                          console.warn("Wrapper or row not found — GST selection failed.");
+                          $dropdown.hide();
+                          return;
+                      }
+                      wrapper.find('.department-search-input').val(selectedText);
+                      wrapper.find('.department_id').val(selectedid).trigger('change');
+
+                      $dropdown.hide();
+                  });
+
                   $('.zone_id').on('click', function () {
                     var id=$('.zone_id').val();
                     let formData = new FormData();
@@ -2367,6 +2437,18 @@ function calculateFinalTotals() {
 
                     if ($dropdown) {
                       const list = $dropdown.find('.zone-list div');
+                      list.each(function () {
+                        const itemText = $(this).text().toLowerCase();
+                        $(this).toggle(itemText.includes(searchText));
+                      });
+                    }
+                  });
+                  $('.department-search-input').on('keyup', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const $dropdown = $(this).data('dropdown');
+
+                    if ($dropdown) {
+                      const list = $dropdown.find('.department-list div');
                       list.each(function () {
                         const itemText = $(this).text().toLowerCase();
                         $(this).toggle(itemText.includes(searchText));
@@ -3100,6 +3182,8 @@ function calculateFinalTotals() {
                             $('.zone_id').val(header.zone_id).trigger('change');
                             $('.branch-search-input').val(header.branch_name);
                             $('.branch_id').val(header.branch_id).trigger('change');
+                            $('.department-search-input').val(header.department_name || '');
+                            $('.department_id').val(header.department_id || '').trigger('change');
                             $('.discount_type').val(header.discount_type);
                             $('.company_id').val(header.company_id).trigger('change');
                             $('.company-search-input').val(header.company_name);
@@ -3256,6 +3340,8 @@ function calculateFinalTotals() {
                             $('.zone_id').val(header.zone_id).trigger('change');
                             $('.branch-search-input').val(header.branch_name);
                             $('.branch_id').val(header.branch_id).trigger('change');
+                            $('.department-search-input').val(header.department_name || '');
+                            $('.department_id').val(header.department_id || '').trigger('change');
                             $('.discount_type').val(header.discount_type);
                             $('.company_id').val(header.company_id).trigger('change');
                             $('.company-search-input').val(header.company_name);
@@ -3380,11 +3466,12 @@ function calculateFinalTotals() {
                     const dueDateFilled  = ($('#due_date').val() || '').trim() !== '';
                     const zoneFilled     = ($('.zone_id').val() || '').trim() !== '';
                     const branchFilled   = ($('.branch_id').val() || '').trim() !== '';
+                    const departmentFilled = ($('.department_id').val() || '').trim() !== '';
                     const companyFilled  = ($('.company_id').val() || '').trim() !== '';
                     const timelineFilled = ($('#timeline_date').val() || '').trim() !== '';
 
                     const allFilled = vendorFilled && billDateFilled && dueDateFilled &&
-                                      zoneFilled && branchFilled && companyFilled && timelineFilled;
+                                      zoneFilled && branchFilled && departmentFilled && companyFilled && timelineFilled;
                     if (allFilled) {
                         $('#saveOpenBtn').prop('disabled', false).css({'opacity': '1', 'cursor': 'pointer'});
                     }
@@ -3413,6 +3500,11 @@ function calculateFinalTotals() {
                         isValid = false;
                     } else { $('.error_zone').text(''); }
 
+                    if (($('.department_id').val() || '').trim() === '') {
+                        $('.error_department').text('Department is required');
+                        isValid = false;
+                    } else { $('.error_department').text(''); }
+
                     if (($('.branch_id').val() || '').trim() === '') {
                         $('.error_branch').text('Branch is required');
                         isValid = false;
@@ -3422,6 +3514,13 @@ function calculateFinalTotals() {
                         $('.error_company').text('Group of Company is required');
                         isValid = false;
                     } else { $('.error_company').text(''); }
+
+                    if (($('#bill_category').val() || '').trim() === '') {
+                        $('.error_category').text('Bill Category is required');
+                        isValid = false;
+                    } else {
+                        $('.error_category').text('');
+                    }
 
                     if (($('#timeline_date').val() || '').trim() === '') {
                         $('.error_timeline').text('Timeline is required');
@@ -3524,7 +3623,7 @@ function calculateFinalTotals() {
                 $(document).on('change', '#selected-vendor-id', function () {
                     checkRequiredFields();
                 });
-                $(document).on('change', '.zone_id, .branch_id, .company_id', function () {
+                $(document).on('change', '.zone_id, .branch_id, .department_id, .company_id', function () {
                     checkRequiredFields();
                 });
             });
@@ -3592,8 +3691,23 @@ function calculateFinalTotals() {
 
                         const bill_header = @json($bill);
                         const bill_lines = @json($bill[0]->BillLines);
+                        const billDepartmentList = @json($Tbldepartment ?? []);
                         console.log("bill_header",bill_header);
                         console.log("bill_lines",bill_lines);
+
+                        function applyBillDepartmentFields(bh) {
+                            const arr = Array.isArray(billDepartmentList) ? billDepartmentList : (billDepartmentList.data || []);
+                            let deptName = (bh.department_name != null && bh.department_name !== undefined) ? String(bh.department_name) : '';
+                            const deptId = bh.department_id;
+                            if ((!deptName || !deptName.trim()) && deptId != null && deptId !== '') {
+                                const match = arr.find(function (d) { return String(d.id) === String(deptId); });
+                                if (match && match.name) {
+                                    deptName = match.name;
+                                }
+                            }
+                            $('.department-search-input').val(deptName);
+                            $('.department_id').val(deptId != null && deptId !== '' ? deptId : '');
+                        }
 
                         const vendor_id = bill_header[0].vendor_id;
                         setTimeout(function () {
@@ -3604,6 +3718,7 @@ function calculateFinalTotals() {
                             } else {
                                 console.warn('Vendor item not found for ID:', vendor_id);
                             }
+                            applyBillDepartmentFields(bill_header[0]);
                         }, 100);
                         $('#id').val(bill_header[0].id);
                         $('#bill_number').val(bill_header[0].bill_number);
@@ -3618,6 +3733,7 @@ function calculateFinalTotals() {
                         $('.zone_id').val(bill_header[0].zone_id);
                         $('.branch-search-input').val(bill_header[0].branch_name);
                         $('.branch_id').val(bill_header[0].branch_id);
+                        applyBillDepartmentFields(bill_header[0]);
                         $('.discount_type').val(bill_header[0].discount_type);
                         $('.company-search-input').val(bill_header[0].company_name);
                         $('.company_id').val(bill_header[0].company_id);
@@ -3814,6 +3930,20 @@ function calculateFinalTotals() {
         $(document).ready(function () {
                         const bill_header = @json($bill);
                         const bill_lines = @json($bill[0]->BillLines);
+                        const billDepartmentList = @json($Tbldepartment ?? []);
+                        function applyBillDepartmentFieldsClone(bh) {
+                            const arr = Array.isArray(billDepartmentList) ? billDepartmentList : (billDepartmentList.data || []);
+                            let deptName = (bh.department_name != null && bh.department_name !== undefined) ? String(bh.department_name) : '';
+                            const deptId = bh.department_id;
+                            if ((!deptName || !deptName.trim()) && deptId != null && deptId !== '') {
+                                const match = arr.find(function (d) { return String(d.id) === String(deptId); });
+                                if (match && match.name) {
+                                    deptName = match.name;
+                                }
+                            }
+                            $('.department-search-input').val(deptName);
+                            $('.department_id').val(deptId != null && deptId !== '' ? deptId : '');
+                        }
                         const vendor_id = bill_header[0].vendor_id;
                         setTimeout(function () {
                             const $vendorItem = $('.vendor-item[data-id="' + vendor_id + '"]');
@@ -3823,6 +3953,7 @@ function calculateFinalTotals() {
                             } else {
                                 console.warn('Vendor item not found for ID:', vendor_id);
                             }
+                            applyBillDepartmentFieldsClone(bill_header[0]);
                         }, 100);
 
                         $('#bill_date').val(bill_header[0].bill_date);
@@ -3833,6 +3964,7 @@ function calculateFinalTotals() {
                         $('.zone_id').val(bill_header[0].zone_id);
                         $('.branch-search-input').val(bill_header[0].branch_name);
                         $('.branch_id').val(bill_header[0].branch_id);
+                        applyBillDepartmentFieldsClone(bill_header[0]);
                         $('.discount_type').val(bill_header[0].discount_type);
                         $('.company-search-input').val(bill_header[0].company_name);
                         $('.company_id').val(bill_header[0].company_id);

@@ -23,6 +23,7 @@ class Tblbill extends Authenticatable
         'vendor_name',
         'zone_id',
         'zone_name',
+        'department_id',
         'branch_id',
         'branch_name',
         'company_name',
@@ -128,5 +129,10 @@ class Tblbill extends Authenticatable
     public function category()
     {
         return $this->belongsTo(BillCategory::class, 'bill_category');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 }
