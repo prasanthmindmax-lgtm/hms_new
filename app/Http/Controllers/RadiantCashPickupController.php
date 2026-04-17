@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -90,18 +91,12 @@ class RadiantCashPickupController extends Controller
     protected function computeFilteredStats($baseQuery): array
     {
         $totalAmount = (clone $baseQuery)->sum('pickup_amount');
-        $totalRecords = (clone $baseQuery)->count();
         $totalBatches = (clone $baseQuery)->whereNotNull('upload_batch_id')
             ->pluck('upload_batch_id')->unique()->filter()->count();
-        $locationsCount = (clone $baseQuery)->whereNotNull('location')
-            ->where('location', '!=', '')
-            ->pluck('location')->unique()->filter()->count();
 
         return [
             'total_amount' => (float) $totalAmount,
-            'total_records' => (int) $totalRecords,
             'total_batches' => (int) $totalBatches,
-            'locations_count' => (int) $locationsCount,
         ];
     }
 
@@ -201,15 +196,13 @@ class RadiantCashPickupController extends Controller
         }
 
         return view('Radiant.radiant_cash_pickup', [
-            'admin'            => $admin,
-            'records'          => $records,
-            'totalAmount'      => $stats['total_amount'],
-            'totalRecords'     => $stats['total_records'],
-            'totalBatches'     => $stats['total_batches'],
-            'locationsCount'   => $stats['locations_count'],
-            'states'           => $states,
-            'zones'            => $zones,
-            'branchesForFilter'=> $branchesForFilter,
+            'admin'             => $admin,
+            'records'           => $records,
+            'totalAmount'       => $stats['total_amount'],
+            'totalBatches'      => $stats['total_batches'],
+            'states'            => $states,
+            'zones'             => $zones,
+            'branchesForFilter' => $branchesForFilter,
         ]);
     }
 
@@ -542,24 +535,117 @@ class RadiantCashPickupController extends Controller
 
     public function deleteBatch(Request $request)
     {
-        $batch = $request->input('batch_id');
-        if (! $batch) {
-            return back()->with('error', 'No batch specified.');
-        }
-        $count = RadiantCashPickup::where('upload_batch_id', $batch)->count();
-        RadiantCashPickup::where('upload_batch_id', $batch)->delete();
+        $request->validate([
+            'batch_id' => 'required|string|max:191',
+        ]);
 
-        return back()->with('success', "Batch deleted: {$count} records removed.");
+        $batch = $request->input('batch_id');
+        $ids = RadiantCashPickup::where('upload_batch_id', $batch)->pluck('id');
+        if ($ids->isEmpty()) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'No records found for this upload.'], 404);
+            }
+
+            return back()->with('error', 'No records found for this upload.');
+        }
+
+        if (Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')) {
+            $upd = ['radiant_cash_pickup_id' => null];
+            if (Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+                $upd['radiant_match_status'] = 'radiant_unmatched';
+            }
+            foreach ([
+                'radiant_matched_location' => null,
+                'radiant_matched_pickup_date' => null,
+                'radiant_matched_by' => null,
+                'radiant_matched_at' => null,
+            ] as $col => $val) {
+                if (Schema::hasColumn('bank_statements', $col)) {
+                    $upd[$col] = $val;
+                }
+            }
+            DB::table('bank_statements')->whereIn('radiant_cash_pickup_id', $ids)->update($upd);
+        }
+
+        $count = RadiantCashPickup::where('upload_batch_id', $batch)->delete();
+        $msg = "Upload removed: {$count} pickup row(s) deleted for this file.";
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => $msg, 'deleted' => $count]);
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * AJAX: match / mismatch counts for current filters (heavy — run after table load).
+     */
+    public function reconcileCounts(Request $request)
+    {
+        $base = RadiantCashPickup::query();
+        $this->applyRequestFilters($base, $request);
+        $state = app(RadiantMismatchService::class)->reconcileDashboardState(clone $base, false);
+
+        return response()->json([
+            'success' => true,
+            'match_count' => $state['match_count'],
+            'mismatch_count' => $state['mismatch_count'],
+        ]);
+    }
+
+    /**
+     * AJAX: sample rows for matched / mismatched modals (capped).
+     */
+    public function reconcileLists(Request $request)
+    {
+        $cap = min(500, max(50, (int) $request->get('cap', 500)));
+        $base = RadiantCashPickup::query();
+        $this->applyRequestFilters($base, $request);
+        $state = app(RadiantMismatchService::class)->reconcileDashboardState(clone $base, true, $cap);
+
+        return response()->json([
+            'success' => true,
+            'match_count' => $state['match_count'],
+            'mismatch_count' => $state['mismatch_count'],
+            'matched' => $state['matched'],
+            'mismatched' => $state['mismatched'],
+            'list_cap' => $cap,
+        ]);
+    }
+
+    /**
+     * AJAX: upload batches visible under current filters (for batch management table).
+     */
+    public function batches(Request $request)
+    {
+        $base = RadiantCashPickup::query();
+        $this->applyRequestFilters($base, $request);
+
+        $rows = (clone $base)
+            ->whereNotNull('upload_batch_id')
+            ->where('upload_batch_id', '!=', '')
+            ->selectRaw('upload_batch_id as batch_id, MAX(uploaded_file_name) as file_name, MIN(created_at) as uploaded_at, COUNT(*) as row_count')
+            ->groupBy('upload_batch_id')
+            ->orderByDesc(DB::raw('MIN(created_at)'))
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'batches' => $rows,
+        ]);
     }
 
     public function stats(Request $request)
     {
         $base = RadiantCashPickup::query();
         $this->applyRequestFilters($base, $request);
+        $reconcile = app(RadiantMismatchService::class)->reconcileDashboardState(clone $base, false);
 
         return response()->json([
             'total_amount' => (clone $base)->sum('pickup_amount'),
             'total_records' => (clone $base)->count(),
+            'match_count' => $reconcile['match_count'],
+            'mismatch_count' => $reconcile['mismatch_count'],
             'by_state' => (clone $base)->selectRaw('state_name, SUM(pickup_amount) as total, COUNT(*) as cnt')->groupBy('state_name')->orderByDesc('total')->get(),
             'by_region' => (clone $base)->selectRaw('region, SUM(pickup_amount) as total, COUNT(*) as cnt')->groupBy('region')->orderByDesc('total')->get(),
         ]);

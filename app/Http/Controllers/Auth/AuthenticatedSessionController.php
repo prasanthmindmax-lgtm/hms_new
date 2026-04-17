@@ -113,8 +113,12 @@ class AuthenticatedSessionController extends Controller
             $desc .= ' | Coordinates: ' . $lat . ', ' . $lng;
         } elseif ($geoStatus === 'denied') {
             $desc .= ' | Location: not shared (permission denied)';
+        } elseif ($geoStatus === 'insecure_context') {
+            $desc .= ' | Location: not captured (browser requires HTTPS or localhost for GPS)';
+        } elseif ($geoStatus === 'unsupported') {
+            $desc .= ' | Location: not captured (browser has no geolocation API)';
         } elseif ($geoStatus === 'timeout' || $geoStatus === 'unavailable') {
-            $desc .= ' | Location: unavailable';
+            $desc .= ' | Location: unavailable (GPS/Wi‑Fi could not fix)';
         }
 
         $url = '';

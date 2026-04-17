@@ -7930,42 +7930,7 @@ public function getprofessionalsummary(Request $request)
 
     private function fetchTodayApiDataForDisplay($locationFilter = null)
     {
-        $locations = [
-            "location1" => "Kerala - Palakkad",
-            "location7" => "Erode",
-            "location14" => "Tiruppur",
-            "location6" => "Kerala - Kozhikode",
-            "location20" => "Coimbatore - Ganapathy",
-            "location21" => "Hosur",
-            "location22" => "Chennai - Sholinganallur",
-            "location23" => "Chennai - Urapakkam",
-            "location24" => "Chennai - Madipakkam",
-            "location26" => "Kanchipuram",
-            "location27" => "Coimbatore - Sundarapuram",
-            "location28" => "Trichy",
-            "location29" => "Thiruvallur",
-            "location30" => "Pollachi",
-            "location31" => "Bengaluru - Electronic City",
-            "location32" => "Bengaluru - Konanakunte",
-            "location33" => "Chennai - Tambaram",
-            "location34" => "Tanjore",
-            "location36" => "Harur",
-            "location39" => "Coimbatore - Thudiyalur",
-            "location40" => "Madurai",
-            "location41" => "Bengaluru - Hebbal",
-            "location42" => "Kallakurichi",
-            "location43" => "Vellore",
-            "location44" => "Tirupati",
-            "location45" => "Aathur",
-            "location46" => "Namakal",
-            "location47" => "Bengaluru - Dasarahalli",
-            "location48" => "Chengalpattu",
-            "location49" => "Chennai - Vadapalani",
-            "location50" => "Pennagaram",
-            "location51" => "Thirupathur",
-            "location52" => "Sivakasi",
-            "location13" => "Salem"
-        ];
+        $locations = array("location1" => "Kerala - Palakkad", "location7" => "Erode", "location14" => "Tiruppur","location6" => "Kerala - Kozhikode", "location20" => "Coimbatore - Ganapathy", "location21" => "Hosur", "location22" => "Chennai - Sholinganallur","location23" => "Chennai - Urapakkam", "location24" => "Chennai - Madipakkam", "location26" => "Kanchipuram", "location27" => "Coimbatore - Sundarapuram", "location28" => "Trichy","location29" => "Thiruvallur", "location30" => "Pollachi", "location31" => "Bengaluru - Electronic City","location32" => "Bengaluru - Konanakunte", "location33" => "Chennai - Tambaram", "location34" => "Tanjore", "location36" => "Harur", "location39" => "Coimbatore - Thudiyalur", "location40" => "Madurai","location41" => "Bengaluru - Hebbal", "location42" => "Kallakurichi", "location43" => "Vellore","location44" => "Tirupati","location45" => "Aathur", "location46" => "Namakal", "location47" => "Bengaluru - Dasarahalli","location48" => "Chengalpattu", "location49" => "Chennai - Vadapalani", "location50" => "Pennagaram","location51" => "Thirupathur", "location52" => "Sivakasi", "location13" => "Salem", "location54" => "Nagapattinam", "location56" => "Krishnagiri", "location57" => "Karur");
 
         if ($locationFilter && isset($locations[$locationFilter])) {
             $locations = [$locationFilter => $locations[$locationFilter]];

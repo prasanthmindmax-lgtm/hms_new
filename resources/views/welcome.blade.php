@@ -65,8 +65,15 @@
               <hr />
               <x-input-error :messages="$errors->get('username')" class="mt-2" />
               <x-input-error :messages="$errors->get('password')" class="mt-2" />
-              <form method="POST" action="{{ route('login1') }}">
+              <form id="loginForm" method="POST" action="{{ route('login1') }}">
               @csrf
+              <input type="hidden" name="login_latitude" id="login_latitude" value="" />
+              <input type="hidden" name="login_longitude" id="login_longitude" value="" />
+              <input type="hidden" name="login_location_accuracy" id="login_location_accuracy" value="" />
+              <input type="hidden" name="login_geo_status" id="login_geo_status" value="" />
+              <div id="loginGeoInsecureHint" class="alert alert-warning border-0 py-2 px-3 mb-3" style="display:none;font-size:.82rem;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d !important;color:#92400e;">
+                <strong>Map location on login:</strong> Browsers only allow GPS on a <strong>secure</strong> page. Use <strong>HTTPS</strong> or open this app as <code style="font-size:.78rem;">http://localhost/…</code> — plain <code style="font-size:.78rem;">http://192.168…</code> cannot send coordinates to the activity log.
+              </div>
               <div class="mb-3">
                 <input type="text" name="username" class="form-control" id="floatingInput" placeholder="Username" />
 
@@ -77,7 +84,7 @@
               </div>
               <div class="d-flex mt-1 justify-content-between align-items-center">
                 <div class="form-check">
-                  <input class="form-check-input input-primary" type="checkbox" id="customCheckc1" checked="" />
+                  <input class="form-check-input input-primary" type="checkbox" name="remember" value="1" id="customCheckc1" />
                   <label class="form-check-label text-muted" for="customCheckc1">Remember me?</label>
                 </div>
                 <!-- <h6 class="text-secondary f-w-400 mb-0">
@@ -378,6 +385,165 @@
   </div>
 </div>
 
+<script type="text/javascript">
+(function () {
+  var form = document.getElementById('loginForm');
+  if (!form) return;
+  var GEO_OPTS = { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 };
+  var WATCH_MS = 14000;
+  var ACC_GOOD_M = 25;
+
+  function resetGeoFormForFreshCapture() {
+    delete form.dataset.geoHandled;
+    delete form.dataset.geoInFlight;
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+    }
+    ['login_latitude', 'login_longitude', 'login_location_accuracy', 'login_geo_status'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', resetGeoFormForFreshCapture);
+  } else {
+    resetGeoFormForFreshCapture();
+  }
+  window.addEventListener('pageshow', resetGeoFormForFreshCapture);
+
+  var geoHintEl = document.getElementById('loginGeoInsecureHint');
+  if (geoHintEl && window.isSecureContext === false) {
+    geoHintEl.style.display = 'block';
+  }
+
+  form.addEventListener('submit', function (e) {
+    if (form.dataset.geoHandled === '1') return;
+    if (form.dataset.geoInFlight === '1') {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    form.dataset.geoInFlight = '1';
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.setAttribute('aria-busy', 'true');
+    }
+    var lat = document.getElementById('login_latitude');
+    var lng = document.getElementById('login_longitude');
+    var accEl = document.getElementById('login_location_accuracy');
+    var st = document.getElementById('login_geo_status');
+
+    function finishSubmit(status) {
+      if (st) st.value = status || '';
+      form.dataset.geoHandled = '1';
+      form.submit();
+    }
+
+    if (window.isSecureContext === false) {
+      finishSubmit('insecure_context');
+      return;
+    }
+
+    if (lat) lat.value = '';
+    if (lng) lng.value = '';
+    if (accEl) accEl.value = '';
+    if (st) st.value = '';
+    var finished = false;
+    var watchId = null;
+    var timer = null;
+    var best = null;
+    function clearTimers() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (watchId != null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    }
+    function submitGranted(b) {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      if (lat) lat.value = String(b.latitude);
+      if (lng) lng.value = String(b.longitude);
+      if (accEl && b.accuracy != null) accEl.value = String(b.accuracy);
+      finishSubmit('granted');
+    }
+    function submitError(err) {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      var code = err && err.code;
+      if (code === 1) finishSubmit('denied');
+      else if (code === 3) finishSubmit('timeout');
+      else finishSubmit('unavailable');
+    }
+    function consider(pos) {
+      if (finished) return;
+      var a = pos.coords.accuracy;
+      if (a == null || isNaN(a)) a = 999999;
+      if (!best || a < best.accuracy) {
+        best = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: a };
+      }
+      if (a <= ACC_GOOD_M) {
+        submitGranted({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        });
+      }
+    }
+    function endWatchPhase() {
+      if (finished) return;
+      clearTimers();
+      if (best) {
+        submitGranted(best);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          if (finished) return;
+          finished = true;
+          if (lat) lat.value = String(pos.coords.latitude);
+          if (lng) lng.value = String(pos.coords.longitude);
+          if (accEl && pos.coords.accuracy != null) accEl.value = String(pos.coords.accuracy);
+          finishSubmit('granted');
+        },
+        submitError,
+        GEO_OPTS
+      );
+    }
+
+    if (!navigator.geolocation) {
+      finishSubmit('unsupported');
+      return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+      function (pos) { consider(pos); },
+      function (err) {
+        if (finished) return;
+        if (err && err.code === 1) {
+          submitError(err);
+          return;
+        }
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(endWatchPhase, 0);
+      },
+      GEO_OPTS
+    );
+
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(endWatchPhase, WATCH_MS);
+  });
+})();
+</script>
   </body>
   <!-- [Body] end -->
 </html>

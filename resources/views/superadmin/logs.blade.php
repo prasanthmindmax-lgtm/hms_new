@@ -677,6 +677,9 @@ $(document).ready(function () {
         if (ed.geo_status === 'denied') {
             return '<span style="font-size:.72rem;color:#9ca3af;" title="User declined location">Not shared</span>';
         }
+        if (ed.geo_status === 'insecure_context') {
+            return '<span style="font-size:.7rem;color:#b45309;max-width:118px;display:inline-block;line-height:1.25;" title="Open site with HTTPS or http://localhost to enable map coordinates">HTTPS / localhost only</span>';
+        }
         if (ed.geo_status === 'timeout' || ed.geo_status === 'unavailable' || ed.geo_status === 'unsupported') {
             return '<span style="font-size:.72rem;color:#9ca3af;">—</span>';
         }

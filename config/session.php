@@ -25,9 +25,11 @@ return [
     | Session Lifetime
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the number of minutes that you wish the session
-    | to be allowed to remain idle before it expires. If you want them
-    | to immediately expire on the browser closing, set that option.
+    | Idle timeout in minutes: no authenticated request for this long ends
+    | the session (file driver uses the session file's last-modified time).
+    | Background browser tabs that poll the server (AJAX / .load) reset this
+    | timer — so a hidden tab can keep you "logged in" until you close it or
+    | polling is paused. Set SESSION_LIFETIME in .env (e.g. 120 = 2 hours).
     |
     */
 

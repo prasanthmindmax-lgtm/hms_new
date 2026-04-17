@@ -76,6 +76,8 @@ class Tblbill extends Authenticatable
         'other_amount',
         'other_reason',
         'status',
+        'br_nature_account_ids',
+        'br_nature_account_names',
     ];
     public function BillLines()
     {

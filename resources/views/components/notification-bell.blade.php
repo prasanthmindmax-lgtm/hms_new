@@ -298,8 +298,23 @@ $(document).ready(function() {
             .replace(/"/g, '&quot;');
     }
     
-    // ── Start polling ─────────────────────────────────────────────────────────
-    fetchNotifications();
-    setInterval(fetchNotifications, POLL_INTERVAL);
+    // ── Polling (pause when tab hidden so session idle timeout can run) ─────
+    var pollTimer = null;
+    function startNotifPoll() {
+        stopNotifPoll();
+        if (document.hidden) return;
+        fetchNotifications();
+        pollTimer = setInterval(function () {
+            if (!document.hidden) fetchNotifications();
+        }, POLL_INTERVAL);
+    }
+    function stopNotifPoll() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stopNotifPoll();
+        else startNotifPoll();
+    });
+    startNotifPoll();
 });
 </script>

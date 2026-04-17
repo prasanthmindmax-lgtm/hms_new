@@ -109,6 +109,16 @@ body{font-family:var(--font);background:#f1f5f9;}
 .sc-teal  .stat-icon{background:var(--teal-lt);color:var(--teal);}
 .sc-violet .stat-icon{background:var(--violet-lt);color:var(--violet);}
 .sc-rose  .stat-icon{background:var(--rose-lt);color:var(--rose);}
+.sc-emerald::after{background:linear-gradient(90deg,#059669,#34d399);}
+.sc-emerald .stat-icon{background:#d1fae5;color:#047857;}
+.rcp-stat-interactive{cursor:pointer;}
+.rcp-stat-interactive:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
+.rcp-stat-interactive:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+.rcp-stat-active.stat-card{transform:translateY(-1px);box-shadow:0 0 0 3px rgba(245,158,11,.35),var(--shadow-lg);}
+.stat-card.sc-violet.rcp-stat-active{box-shadow:0 0 0 3px rgba(139,92,246,.42),var(--shadow-lg);}
+.stat-card.sc-emerald.rcp-stat-active{box-shadow:0 0 0 3px rgba(5,150,105,.38),var(--shadow-lg);}
+.stat-card.sc-rose.rcp-stat-active{box-shadow:0 0 0 3px rgba(244,63,94,.38),var(--shadow-lg);}
+@keyframes rcpFadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .stat-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:3px;}
 .stat-value{font-size:1.35rem;font-weight:800;color:var(--text);font-family:var(--mono);letter-spacing:-.5px;}
 .stat-sub{font-size:.72rem;color:var(--text3);margin-top:2px;}
@@ -116,7 +126,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 /* ── UPLOAD MODAL OVERLAY ── */
 .upload-overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.65);
-    backdrop-filter:blur(6px);z-index:1000;
+    backdrop-filter:blur(6px);z-index:10050; /* above .pc-sidebar (1026) & .pc-header (1025) */
     display:none;align-items:center;justify-content:center;
     animation:fadeIn .2s ease;
 }
@@ -214,7 +224,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 /* ── FILTER MODAL ── */
 .filter-overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.55);
-    backdrop-filter:blur(4px);z-index:900;
+    backdrop-filter:blur(4px);z-index:10040;
     display:none;align-items:center;justify-content:center;
 }
 .filter-overlay.show{display:flex;}
@@ -420,7 +430,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 ════════════════════════════════════════════ */
 .cmp-overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.7);
-    backdrop-filter:blur(7px);z-index:2000;
+    backdrop-filter:blur(7px);z-index:10055;
     display:none;align-items:center;justify-content:center;
     animation:fadeIn .2s ease;
 }
@@ -565,7 +575,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 ════════════════════════════════════════════ */
 .alert-overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.7);
-    backdrop-filter:blur(7px);z-index:3000;
+    backdrop-filter:blur(7px);z-index:10060;
     display:none;align-items:center;justify-content:center;
     animation:fadeIn .2s ease;
 }
@@ -642,6 +652,148 @@ body{font-family:var(--font);background:#f1f5f9;}
 .alm-result.success{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;}
 .alm-result.warning{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
 .alm-result.error{background:#ffe4e6;color:#9f1239;border:1px solid #fda4af;}
+
+/* ── Batch uploads (shown when Upload Batches stat is clicked) ── */
+.rcp-batch-section{
+    display:none;
+    background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);
+    box-shadow:var(--shadow);margin-bottom:22px;overflow:hidden;
+}
+.rcp-batch-section.rcp-batch-section--open{
+    display:block;
+    animation:rcpFadeIn .28s ease;
+}
+.rcp-batch-head{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+    padding:18px 22px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#fff,#f8fafc);
+}
+.rcp-batch-head h2{font-size:.95rem;font-weight:800;margin:0;color:var(--navy);letter-spacing:-.25px;}
+.rcp-batch-head small{font-size:.74rem;color:var(--text2);display:block;margin-top:6px;line-height:1.45;max-width:52rem;}
+.rcp-batch-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.btn-batch-ghost{
+    padding:7px 14px;border-radius:9px;border:1px solid var(--border2);background:var(--surface);
+    color:var(--text2);font-size:.76rem;font-weight:700;cursor:pointer;font-family:var(--font);
+    display:inline-flex;align-items:center;gap:6px;transition:all .14s;
+}
+.btn-batch-ghost:hover{border-color:var(--navy3);color:var(--navy);}
+.rcp-batch-scroll{max-height:min(52vh,420px);overflow:auto;}
+.rcp-batch-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+.rcp-batch-table th{
+    text-align:left;padding:12px 18px;font-size:.64rem;font-weight:800;text-transform:uppercase;
+    letter-spacing:.55px;color:var(--text3);background:#f1f5f9;border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:1;
+}
+.rcp-batch-table td{padding:14px 18px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.rcp-batch-table tr:last-child td{border-bottom:none;}
+.rcp-batch-table tbody tr:hover{background:#fafafa;}
+.rcp-batch-file{font-weight:700;color:var(--text);max-width:min(320px,42vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rcp-batch-meta{color:var(--text2);font-size:.76rem;}
+.rcp-batch-id{font-family:var(--mono);font-size:.68rem;color:var(--text3);margin-top:4px;word-break:break-all;}
+.rcp-batch-rows{text-align:center;font-weight:700;font-variant-numeric:tabular-nums;}
+.btn-batch-del{
+    padding:7px 14px;border-radius:9px;border:1px solid #fecaca;background:linear-gradient(180deg,#fff,#fff1f2);
+    color:#be123c;font-size:.74rem;font-weight:800;cursor:pointer;font-family:var(--font);
+    transition:all .14s;white-space:nowrap;
+}
+.btn-batch-del:hover{background:#ffe4e6;border-color:#f87171;box-shadow:0 2px 8px rgba(244,63,94,.15);}
+
+/* ── Reconciliation modal (tabbed, soft dashboard) ── */
+.rcp-mm-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.52);
+    backdrop-filter:blur(8px);z-index:10050;display:none;align-items:center;justify-content:center;padding:16px;
+}
+.rcp-mm-overlay.show{display:flex;}
+.rcp-mm-modal{
+    background:#fff;border-radius:22px;width:100%;max-width:960px;max-height:92vh;
+    overflow:hidden;display:flex;flex-direction:column;box-shadow:0 32px 90px rgba(15,23,42,.2);
+    border:1px solid var(--border);
+    animation:slideUp .28s cubic-bezier(.22,1,.36,1);
+}
+.rcp-mm-header{
+    padding:20px 24px;background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#0f172a 100%);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-shrink:0;
+}
+.rcp-mm-title{color:#fff;font-size:1.05rem;font-weight:800;margin:0;letter-spacing:-.3px;}
+.rcp-mm-sub{color:rgba(255,255,255,.58);font-size:.78rem;margin:8px 0 0;line-height:1.5;max-width:46rem;}
+.rcp-mm-close{width:38px;height:38px;border-radius:11px;border:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.08);color:rgba(255,255,255,.9);cursor:pointer;display:flex;
+    align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+.rcp-mm-close:hover{background:rgba(255,255,255,.16);}
+.rcp-mm-body{padding:0 0 16px;overflow:hidden;display:flex;flex-direction:column;flex:1;min-height:0;}
+.rcp-mm-summary{
+    display:flex;flex-wrap:wrap;gap:10px;padding:14px 22px 0;
+}
+.rcp-mm-chip{
+    display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;
+    font-size:.72rem;font-weight:700;border:1px solid var(--border);background:var(--surface2);color:var(--text2);
+}
+.rcp-mm-chip strong{font-family:var(--mono);color:var(--text);font-size:.8rem;}
+.rcp-mm-chip.em{background:#ecfdf5;border-color:#a7f3d0;color:#065f46;}
+.rcp-mm-chip.em strong{color:#047857;}
+.rcp-mm-chip.un{background:#fff1f2;border-color:#fecdd3;color:#9f1239;}
+.rcp-mm-chip.un strong{color:#be123c;}
+.rcp-mm-tabs{
+    display:flex;gap:6px;padding:12px 22px 0;border-bottom:1px solid var(--border);
+}
+.rcp-mm-tab{
+    flex:1;max-width:240px;padding:11px 16px;border-radius:12px 12px 0 0;border:1px solid transparent;
+    border-bottom:none;background:transparent;font-family:var(--font);font-size:.78rem;font-weight:800;
+    color:var(--text3);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.rcp-mm-tab:hover{background:var(--surface2);color:var(--text);}
+.rcp-mm-tab.is-active{
+    background:var(--surface);color:var(--navy);border-color:var(--border);border-bottom-color:var(--surface);
+    margin-bottom:-1px;box-shadow:0 -2px 12px rgba(15,23,42,.06);
+}
+.rcp-mm-tab .rcp-mm-tab-badge{
+    font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:999px;background:var(--surface2);
+    color:var(--text2);font-weight:800;
+}
+.rcp-mm-tab.is-active .rcp-mm-tab-badge{background:#e2e8f0;color:var(--navy);}
+.rcp-mm-tab.tab-match.is-active{color:#047857;}
+.rcp-mm-tab.tab-match.is-active .rcp-mm-tab-badge{background:#d1fae5;color:#065f46;}
+.rcp-mm-tab.tab-mismatch.is-active{color:#be123c;}
+.rcp-mm-tab.tab-mismatch.is-active .rcp-mm-tab-badge{background:#ffe4e6;color:#9f1239;}
+.rcp-mm-tab-stack{flex:1;min-height:0;padding:0 22px;overflow:hidden;display:flex;flex-direction:column;}
+.rcp-mm-tab-panel{display:none;flex:1;flex-direction:column;min-height:0;padding-top:12px;}
+.rcp-mm-tab-panel.is-active{display:flex;}
+.rcp-mm-table-wrap{
+    flex:1;min-height:220px;max-height:min(50vh,400px);overflow:auto;border:1px solid var(--border);
+    border-radius:14px;background:#fafbfc;
+}
+.rcp-mm-table{width:100%;border-collapse:separate;border-spacing:0;font-size:.78rem;}
+.rcp-mm-table th{
+    position:sticky;top:0;background:#f1f5f9;padding:10px 12px;text-align:left;
+    font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.55px;color:var(--text3);
+    border-bottom:1px solid var(--border);z-index:1;
+}
+.rcp-mm-table td{padding:10px 12px;border-bottom:1px solid #eef2f7;vertical-align:middle;background:#fff;}
+.rcp-mm-table tbody tr:hover td{background:#f8fafc;}
+.rcp-mm-table tr:last-child td{border-bottom:none;}
+.rcp-mm-pill{font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:6px;display:inline-block;}
+.rcp-mm-pill.match{background:#d1fae5;color:#047857;}
+.rcp-mm-pill.mismatch{background:#ffe4e6;color:#be123c;}
+.rcp-mm-pill.close{background:#fef3c7;color:#b45309;}
+.rcp-mm-pill.nodata{background:#f1f5f9;color:#64748b;}
+.rcp-mm-amt{font-family:var(--mono);font-weight:700;color:var(--navy);}
+.rcp-mm-empty{
+    display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    padding:36px 24px;margin-top:10px;border-radius:14px;border:1px dashed var(--border2);background:var(--surface2);
+}
+.rcp-mm-empty.is-visible{display:flex;}
+.rcp-mm-empty-icon{
+    width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    font-size:1.4rem;margin-bottom:12px;
+}
+.rcp-mm-empty.match .rcp-mm-empty-icon{background:#d1fae5;color:#047857;}
+.rcp-mm-empty.mismatch .rcp-mm-empty-icon{background:#ffe4e6;color:#be123c;}
+.rcp-mm-empty strong{font-size:.88rem;color:var(--text);margin-bottom:6px;}
+.rcp-mm-empty p{font-size:.76rem;color:var(--text2);margin:0;max-width:28rem;line-height:1.5;}
+.rcp-mm-foot{
+    margin:12px 22px 0;padding:12px 16px;font-size:.72rem;color:var(--text2);
+    background:var(--surface2);border-radius:12px;border:1px solid var(--border);line-height:1.45;
+}
 </style>
 
 <body style="overflow-x:hidden;">
@@ -701,23 +853,56 @@ body{font-family:var(--font);background:#f1f5f9;}
     <div class="stat-value" id="rcpStatAmount">₹{{ number_format($totalAmount, 0) }}</div>
     <div class="stat-sub">Current filters</div>
   </div>
-  <div class="stat-card sc-teal">
-    <div class="stat-icon"><i class="bi bi-list-check"></i></div>
-    <div class="stat-label">Total Records</div>
-    <div class="stat-value" id="rcpStatRecords">{{ number_format($totalRecords) }}</div>
-    <div class="stat-sub">Current filters</div>
-  </div>
-  <div class="stat-card sc-violet">
+  <div class="stat-card sc-violet rcp-stat-interactive" id="rcpStatBatchesCard" role="button" tabindex="0" title="Show or hide uploaded files for this filter">
     <div class="stat-icon"><i class="bi bi-collection-fill"></i></div>
     <div class="stat-label">Upload Batches</div>
     <div class="stat-value" id="rcpStatBatches">{{ $totalBatches }}</div>
-    <div class="stat-sub">Current filters</div>
+    <div class="stat-sub">Distinct files · click to show list</div>
   </div>
-  <div class="stat-card sc-rose">
-    <div class="stat-icon"><i class="bi bi-geo-alt-fill"></i></div>
-    <div class="stat-label">Locations</div>
-    <div class="stat-value" id="rcpStatLocations">{{ $locationsCount }}</div>
-    <div class="stat-sub">Distinct locations</div>
+  <div class="stat-card sc-emerald rcp-stat-interactive" id="rcpStatMatchCard" role="button" tabindex="0" title="View matched rows (sample)">
+    <div class="stat-icon"><i class="bi bi-patch-check-fill"></i></div>
+    <div class="stat-label">Match count</div>
+    <div class="stat-value" id="rcpStatMatch">—</div>
+    <div class="stat-sub">BFR + bank vs pickup · click for detail</div>
+  </div>
+  <div class="stat-card sc-rose rcp-stat-interactive" id="rcpStatMismatchCard" role="button" tabindex="0" title="View mismatched rows (sample)">
+    <div class="stat-icon"><i class="bi bi-exclamation-octagon-fill"></i></div>
+    <div class="stat-label">Mismatch count</div>
+    <div class="stat-value" id="rcpStatMismatch">—</div>
+    <div class="stat-sub">Missing data or amount variance · click</div>
+  </div>
+</div>
+
+{{-- ── BATCH UPLOADS: toggled from “Upload Batches” stat card ─────────── --}}
+<div id="rcpBatchSection" class="rcp-batch-section">
+  <div class="rcp-batch-head">
+    <div>
+      <h2><i class="bi bi-folder2-open me-1"></i> Batch uploads</h2>
+      <small>Each row is one uploaded file. Delete removes only that file’s pickup rows and clears bank links to those rows.</small>
+    </div>
+    <div class="rcp-batch-actions">
+      <button type="button" class="btn-batch-ghost" id="rcpBatchesRefresh">
+        <i class="bi bi-arrow-clockwise"></i> Refresh list
+      </button>
+      <button type="button" class="btn-batch-ghost" id="rcpBatchHide">
+        <i class="bi bi-chevron-up"></i> Hide
+      </button>
+    </div>
+  </div>
+  <div class="rcp-batch-scroll">
+    <table class="rcp-batch-table">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th style="text-align:center;">Rows</th>
+          <th>Uploaded</th>
+          <th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody id="rcpBatchesBody">
+        <tr><td colspan="4" class="text-center py-4 text-muted" style="font-size:.8rem;">Click <strong>Upload Batches</strong> in the stats row above to load this list.</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -972,6 +1157,84 @@ body{font-family:var(--font);background:#f1f5f9;}
 </div>
 
 {{-- ══════════════════════════════════════════════════════════════════
+     RECONCILIATION MODAL (tabs + full-width table)
+══════════════════════════════════════════════════════════════════ --}}
+<div class="rcp-mm-overlay" id="rcpMmOverlay" aria-hidden="true">
+  <div class="rcp-mm-modal" id="rcpMmModalInner" role="dialog" aria-modal="true" aria-labelledby="rcpMmTitle">
+    <div class="rcp-mm-header">
+      <div>
+        <h2 class="rcp-mm-title" id="rcpMmTitle">Reconciliation overview</h2>
+        <div class="rcp-mm-sub">Pickup amounts compared to <strong>Branch Financial Report</strong> and <strong>Bank statement</strong> using the same rules as the row “Compare” action. Each side shows a status: <span style="opacity:.72">match · close · mismatch · no_data</span>.</div>
+      </div>
+      <button type="button" class="rcp-mm-close" id="rcpMmClose" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="rcp-mm-body">
+      <div class="rcp-mm-summary">
+        <span class="rcp-mm-chip em"><i class="bi bi-patch-check-fill"></i> Fully matched <strong id="rcpMmChipMatch">0</strong></span>
+        <span class="rcp-mm-chip un"><i class="bi bi-exclamation-octagon-fill"></i> Needs attention <strong id="rcpMmChipMismatch">0</strong></span>
+      </div>
+      <div class="rcp-mm-tabs" role="tablist">
+        <button type="button" class="rcp-mm-tab tab-match is-active" id="rcpMmTabMatched" data-rcp-mm-tab="matched" role="tab" aria-selected="true">
+          <i class="bi bi-patch-check-fill"></i> Matched <span class="rcp-mm-tab-badge" id="rcpMmTabBadgeMatch">0</span>
+        </button>
+        <button type="button" class="rcp-mm-tab tab-mismatch" id="rcpMmTabMismatch" data-rcp-mm-tab="mismatch" role="tab" aria-selected="false">
+          <i class="bi bi-exclamation-triangle-fill"></i> Unmatched <span class="rcp-mm-tab-badge" id="rcpMmTabBadgeMismatch">0</span>
+        </button>
+      </div>
+      <div class="rcp-mm-tab-stack">
+        <div class="rcp-mm-tab-panel is-active" id="rcpMmTabPanelMatched" role="tabpanel">
+          <div class="rcp-mm-table-wrap">
+            <table class="rcp-mm-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Location</th>
+                  <th>Slip</th>
+                  <th>Pickup ₹</th>
+                  <th>BFR</th>
+                  <th>Bank</th>
+                </tr>
+              </thead>
+              <tbody id="rcpMmBodyMatch"></tbody>
+            </table>
+          </div>
+          <div class="rcp-mm-empty match" id="rcpMmEmptyMatched">
+            <div class="rcp-mm-empty-icon"><i class="bi bi-inbox"></i></div>
+            <strong>No matched rows in this filter</strong>
+            <p>Either there is no pickup data, or branch report / bank lines are missing or outside tolerance for every row. Try other dates or zones, or use row Compare to inspect a location.</p>
+          </div>
+        </div>
+        <div class="rcp-mm-tab-panel" id="rcpMmTabPanelMismatch" role="tabpanel">
+          <div class="rcp-mm-table-wrap">
+            <table class="rcp-mm-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Location</th>
+                  <th>Slip</th>
+                  <th>Pickup ₹</th>
+                  <th>BFR</th>
+                  <th>Bank</th>
+                </tr>
+              </thead>
+              <tbody id="rcpMmBodyMismatch"></tbody>
+            </table>
+          </div>
+          <div class="rcp-mm-empty mismatch" id="rcpMmEmptyMismatch">
+            <div class="rcp-mm-empty-icon"><i class="bi bi-emoji-smile"></i></div>
+            <strong>Nothing to fix here</strong>
+            <p>Every pickup in the current filter lines up with branch report and bank within the rules above.</p>
+          </div>
+        </div>
+      </div>
+      <div class="rcp-mm-foot" id="rcpMmFootNote"></div>
+    </div>
+  </div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════════════
      COMPARISON MODAL
 ══════════════════════════════════════════════════════════════════ --}}
 <div class="cmp-overlay" id="cmpOverlay">
@@ -1092,7 +1355,11 @@ body{font-family:var(--font);background:#f1f5f9;}
         data: @json(route('superadmin.radiantcash.data')),
         upload: @json(route('superadmin.radiantcash.upload')),
         index: @json(route('superadmin.radiantcash.index')),
-        filterOptions: @json(route('superadmin.radiantcash.filteroptions'))
+        filterOptions: @json(route('superadmin.radiantcash.filteroptions')),
+        reconcileCounts: @json(route('superadmin.radiantcash.reconcilecounts')),
+        reconcileLists: @json(route('superadmin.radiantcash.reconcilists')),
+        batches: @json(route('superadmin.radiantcash.batches')),
+        deleteBatch: @json(route('superadmin.radiantcash.deletebatch'))
     };
     var rcpCsrf = $('meta[name="csrf-token"]').attr('content');
     var rcpState = { page: {{ (int) $records->currentPage() }} };
@@ -1132,6 +1399,164 @@ body{font-family:var(--font);background:#f1f5f9;}
             branch_id: $('#rcpBranchSelect').val() || '',
             search: $('#searchInput').val() || ''
         };
+    }
+
+    function getReconcileParams() {
+        syncPerPageHidden();
+        return {
+            date_from: $('#fDateFrom').val() || '',
+            date_to: $('#fDateTo').val() || '',
+            state: $('#rcpStateSelect').val() || '',
+            zone_id: $('#rcpZoneSelect').val() || '',
+            branch_id: $('#rcpBranchSelect').val() || '',
+            search: $('#searchInput').val() || ''
+        };
+    }
+
+    function esc(s) {
+        return $('<div/>').text(s == null ? '' : String(s)).html();
+    }
+
+    function statusPillClass(st) {
+        if (st === 'match') return 'match';
+        if (st === 'close') return 'close';
+        if (st === 'mismatch') return 'mismatch';
+        return 'nodata';
+    }
+
+    function loadReconcileCounts() {
+        $('#rcpStatMatch, #rcpStatMismatch').text('…');
+        $.ajax({
+            url: rcpRoutes.reconcileCounts,
+            method: 'GET',
+            data: getReconcileParams(),
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).done(function (res) {
+            if (!res || !res.success) return;
+            $('#rcpStatMatch').text(Number(res.match_count || 0).toLocaleString('en-IN'));
+            $('#rcpStatMismatch').text(Number(res.mismatch_count || 0).toLocaleString('en-IN'));
+        }).fail(function () {
+            $('#rcpStatMatch, #rcpStatMismatch').text('—');
+        });
+    }
+
+    function renderBatchesTable(rows) {
+        var $tb = $('#rcpBatchesBody');
+        if (!rows || !rows.length) {
+            $tb.html('<tr><td colspan="4" class="text-center py-4 text-muted" style="font-size:.8rem;">No uploads in the current filter.</td></tr>');
+            return;
+        }
+        var html = '';
+        rows.forEach(function (r) {
+            var fname = r.file_name || '(unknown file)';
+            var dt = r.uploaded_at || '';
+            html += '<tr>';
+            html += '<td><div class="rcp-batch-file" title="' + esc(fname) + '">' + esc(fname) + '</div>';
+            html += '<div class="rcp-batch-id">' + esc(r.batch_id || '') + '</div></td>';
+            html += '<td class="rcp-batch-rows"><strong>' + Number(r.row_count || 0).toLocaleString('en-IN') + '</strong></td>';
+            html += '<td><span class="rcp-batch-meta">' + esc(dt) + '</span></td>';
+            html += '<td style="text-align:right;"><button type="button" class="btn-batch-del rcp-batch-delete" data-batch="' + esc(r.batch_id || '') + '">Delete upload</button></td>';
+            html += '</tr>';
+        });
+        $tb.html(html);
+    }
+
+    function loadBatches() {
+        $('#rcpBatchesBody').html('<tr><td colspan="4" class="text-center py-3 text-muted" style="font-size:.8rem;">Loading…</td></tr>');
+        $.ajax({
+            url: rcpRoutes.batches,
+            method: 'GET',
+            data: getReconcileParams(),
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).done(function (res) {
+            if (!res || !res.success) {
+                $('#rcpBatchesBody').html('<tr><td colspan="4" class="text-center py-3 text-danger" style="font-size:.8rem;">Could not load batches.</td></tr>');
+                return;
+            }
+            renderBatchesTable(res.batches || []);
+        }).fail(function () {
+            $('#rcpBatchesBody').html('<tr><td colspan="4" class="text-center py-3 text-danger" style="font-size:.8rem;">Could not load batches.</td></tr>');
+        });
+    }
+
+    function renderReconcileRow(r) {
+        var bfr = '<span class="rcp-mm-pill ' + statusPillClass(r.bfr_status) + '">' + esc(r.bfr_status) + '</span> <span class="rcp-mm-amt">' + fmtINR(r.bfr_amount) + '</span>';
+        var bk = '<span class="rcp-mm-pill ' + statusPillClass(r.bank_status) + '">' + esc(r.bank_status) + '</span> <span class="rcp-mm-amt">' + fmtINR(r.bank_amount) + '</span>';
+        var d = r.pickup_date_parsed || r.pickup_date || '';
+        var slip = (r.hci_slip != null && String(r.hci_slip) !== '') ? esc(r.hci_slip) : '—';
+        var note = r.reason ? '<div style="font-size:.65rem;color:#94a3b8;margin-top:2px;">' + esc(r.reason) + '</div>' : '';
+        return '<tr><td>' + esc(r.pickup_id) + '</td><td>' + esc(d) + '</td><td>' + esc(r.location) + note + '</td><td>' + slip + '</td><td class="rcp-mm-amt">' + fmtINR(r.rcp_amount) + '</td><td>' + bfr + '</td><td>' + bk + '</td></tr>';
+    }
+
+    function setRcpMmTab(which) {
+        var w = which === 'mismatch' ? 'mismatch' : 'matched';
+        $('.rcp-mm-tab').removeClass('is-active').attr('aria-selected', 'false');
+        $('.rcp-mm-tab[data-rcp-mm-tab="' + w + '"]').addClass('is-active').attr('aria-selected', 'true');
+        $('.rcp-mm-tab-panel').removeClass('is-active');
+        if (w === 'matched') {
+            $('#rcpMmTabPanelMatched').addClass('is-active');
+        } else {
+            $('#rcpMmTabPanelMismatch').addClass('is-active');
+        }
+    }
+
+    var rcpMmLoading = false;
+    function openReconcileModal(defaultTab) {
+        if (rcpMmLoading) return;
+        rcpMmLoading = true;
+        var tab = defaultTab === 'mismatch' ? 'mismatch' : 'matched';
+        setRcpMmTab(tab);
+        $('#rcpMmEmptyMatched, #rcpMmEmptyMismatch').removeClass('is-visible');
+        $('#rcpMmBodyMatch, #rcpMmBodyMismatch').html('<tr><td colspan="7" class="text-center py-4 text-muted" style="font-size:.8rem;">Loading…</td></tr>');
+        $('#rcpMmOverlay').addClass('show').attr('aria-hidden', 'false');
+        $('body').css('overflow', 'hidden');
+        $.ajax({
+            url: rcpRoutes.reconcileLists,
+            method: 'GET',
+            data: getReconcileParams(),
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).done(function (res) {
+            if (!res || !res.success) {
+                toastr.error('Could not load reconciliation lists.');
+                closeReconcileModal();
+                return;
+            }
+            var mc = Number(res.match_count || 0);
+            var mmc = Number(res.mismatch_count || 0);
+            var cap = res.list_cap || 400;
+            $('#rcpMmChipMatch').text(mc.toLocaleString('en-IN'));
+            $('#rcpMmChipMismatch').text(mmc.toLocaleString('en-IN'));
+            $('#rcpMmTabBadgeMatch').text(mc.toLocaleString('en-IN'));
+            $('#rcpMmTabBadgeMismatch').text(mmc.toLocaleString('en-IN'));
+
+            var matched = res.matched || [];
+            var mismatched = res.mismatched || [];
+            var mRows = matched.map(renderReconcileRow).join('');
+            var uRows = mismatched.map(renderReconcileRow).join('');
+
+            $('#rcpMmBodyMatch').html(mRows);
+            $('#rcpMmBodyMismatch').html(uRows);
+
+            $('#rcpMmEmptyMatched').toggleClass('is-visible', matched.length === 0);
+            $('#rcpMmEmptyMismatch').toggleClass('is-visible', mismatched.length === 0);
+
+            var note = 'Totals include every pickup row under the current filters. Each tab lists up to ' + cap + ' sample rows (whichever appear first in the dataset order).';
+            if (matched.length >= cap || mismatched.length >= cap) {
+                note += ' One or both samples may stop at the cap even if more rows exist on that side.';
+            }
+            $('#rcpMmFootNote').text(note);
+            setRcpMmTab(tab);
+        }).fail(function () {
+            toastr.error('Could not load reconciliation lists.');
+            closeReconcileModal();
+        }).always(function () {
+            rcpMmLoading = false;
+        });
+    }
+
+    function closeReconcileModal() {
+        $('#rcpMmOverlay').removeClass('show').attr('aria-hidden', 'true');
+        $('body').css('overflow', '');
     }
 
     function loadFilterOptions(opts) {
@@ -1220,9 +1645,11 @@ body{font-family:var(--font);background:#f1f5f9;}
             $('#rcpTableBody').html(res.table_html);
             $('#rcpPaginationHost').html(res.pagination_html);
             $('#rcpStatAmount').text(fmtINR(res.stats.total_amount));
-            $('#rcpStatRecords').text(Number(res.stats.total_records || 0).toLocaleString('en-IN'));
             $('#rcpStatBatches').text(res.stats.total_batches);
-            $('#rcpStatLocations').text(res.stats.locations_count);
+            loadReconcileCounts();
+            if ($('#rcpBatchSection').hasClass('rcp-batch-section--open')) {
+                loadBatches();
+            }
             var from = res.result.from != null ? res.result.from : 0;
             var to = res.result.to != null ? res.result.to : 0;
             var total = res.result.total != null ? res.result.total : 0;
@@ -1479,6 +1906,7 @@ body{font-family:var(--font);background:#f1f5f9;}
             resetUploadFormState();
             closeFilterModal();
             closeCmpModal();
+            closeReconcileModal();
         }
     });
 
@@ -1501,6 +1929,81 @@ body{font-family:var(--font);background:#f1f5f9;}
     });
 
     renderChips();
+
+    loadReconcileCounts();
+
+    function toggleUploadBatchesPanel() {
+        var $sec = $('#rcpBatchSection');
+        var $card = $('#rcpStatBatchesCard');
+        if ($sec.hasClass('rcp-batch-section--open')) {
+            $sec.removeClass('rcp-batch-section--open');
+            $card.removeClass('rcp-stat-active');
+        } else {
+            $sec.addClass('rcp-batch-section--open');
+            $card.addClass('rcp-stat-active');
+            loadBatches();
+        }
+    }
+
+    $('#rcpStatBatchesCard').on('click.rcp', toggleUploadBatchesPanel);
+    $('#rcpStatBatchesCard').on('keydown.rcp', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleUploadBatchesPanel();
+        }
+    });
+    $('#rcpBatchHide').on('click.rcp', function () {
+        $('#rcpBatchSection').removeClass('rcp-batch-section--open');
+        $('#rcpStatBatchesCard').removeClass('rcp-stat-active');
+    });
+
+    $('#rcpMmModalInner').on('click.rcp', '[data-rcp-mm-tab]', function () {
+        setRcpMmTab($(this).data('rcp-mm-tab'));
+    });
+
+    $('#rcpStatMatchCard').on('click.rcp', function () { openReconcileModal('match'); });
+    $('#rcpStatMatchCard').on('keydown.rcp', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReconcileModal('match'); }
+    });
+    $('#rcpStatMismatchCard').on('click.rcp', function () { openReconcileModal('mismatch'); });
+    $('#rcpStatMismatchCard').on('keydown.rcp', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReconcileModal('mismatch'); }
+    });
+    $('#rcpMmClose').on('click.rcp', closeReconcileModal);
+    $('#rcpMmOverlay').on('click.rcp', function (e) {
+        if (e.target === this) closeReconcileModal();
+    });
+    $('#rcpMmModalInner').on('click.rcp', function (e) { e.stopPropagation(); });
+
+    $('#rcpBatchesRefresh').on('click.rcp', function () { loadBatches(); });
+
+    $(document).on('click.rcp', '.rcp-batch-delete', function () {
+        var batch = $(this).data('batch');
+        if (!batch) return;
+        if (!window.confirm('Delete this upload? All pickup rows from this file will be removed, and bank statement links pointing at those rows will be cleared.')) {
+            return;
+        }
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: rcpRoutes.deleteBatch,
+            method: 'POST',
+            data: { _token: rcpCsrf, batch_id: batch },
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).done(function (res) {
+            if (res && res.success) {
+                toastr.success(res.message || 'Upload deleted.');
+                rcpLoad(1);
+            } else {
+                toastr.error((res && res.message) ? res.message : 'Delete failed.');
+            }
+        }).fail(function (xhr) {
+            var j = xhr.responseJSON;
+            toastr.error((j && j.message) ? j.message : 'Delete failed.');
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
 
     /* ════════════════════════════════════════
        COMPARISON MODAL

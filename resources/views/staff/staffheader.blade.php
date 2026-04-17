@@ -169,7 +169,27 @@
 </header>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script type="text/javascript">
-    setInterval(function(){
-      $("#countUpdate").load(window.location.href + " #countUpdate" );
-}, 3000);
+(function () {
+  var POLL_MS = 30000;
+  var timer = null;
+  function tick() {
+    if (document.hidden) return;
+    $("#countUpdate").load(window.location.href + " #countUpdate");
+  }
+  function startPoll() {
+    stopPoll();
+    tick();
+    timer = setInterval(tick, POLL_MS);
+  }
+  function stopPoll() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) stopPoll();
+    else startPoll();
+  });
+  $(function () {
+    if (!document.hidden) startPoll();
+  });
+})();
 </script>

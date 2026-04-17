@@ -7,6 +7,7 @@ use App\Models\RadiantCashPickup;
 use App\Models\TblLocationModel;
 use App\Models\TblPoEmail;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -395,6 +396,100 @@ class RadiantMismatchService
         }
 
         return $loc;
+    }
+
+    /**
+     * Walk a filtered pickup query and count (and optionally sample) BFR + bank reconciliation rows.
+     *
+     * @param  Builder<\App\Models\RadiantCashPickup>  $query
+     * @return array{
+     *     match_count: int,
+     *     mismatch_count: int,
+     *     matched: list<array<string, mixed>>,
+     *     mismatched: list<array<string, mixed>>
+     * }
+     */
+    public function reconcileDashboardState(Builder $query, bool $includeLists = false, int $listCap = 400): array
+    {
+        $matchCount = 0;
+        $mismatchCount = 0;
+        $matched = [];
+        $mismatched = [];
+
+        foreach ((clone $query)->orderBy('id')->cursor() as $pickup) {
+            $row = $this->pickupReconcileRow($pickup);
+            if ($row['has_mismatch']) {
+                $mismatchCount++;
+                if ($includeLists && count($mismatched) < $listCap) {
+                    $mismatched[] = $row['summary'];
+                }
+            } else {
+                $matchCount++;
+                if ($includeLists && count($matched) < $listCap) {
+                    $matched[] = $row['summary'];
+                }
+            }
+        }
+
+        return [
+            'match_count' => $matchCount,
+            'mismatch_count' => $mismatchCount,
+            'matched' => $matched,
+            'mismatched' => $mismatched,
+        ];
+    }
+
+    /**
+     * @return array{has_mismatch: bool, summary: array<string, mixed>}
+     */
+    protected function pickupReconcileRow(RadiantCashPickup $pickup): array
+    {
+        $parsed = $pickup->pickup_date_parsed;
+        if ($parsed === null) {
+            return [
+                'has_mismatch' => true,
+                'summary' => [
+                    'pickup_id' => $pickup->id,
+                    'pickup_date' => $pickup->pickup_date,
+                    'pickup_date_parsed' => null,
+                    'location' => trim((string) ($pickup->location ?? '')),
+                    'state' => $pickup->state_name,
+                    'region' => $pickup->region,
+                    'rcp_amount' => (float) ($pickup->pickup_amount ?? 0),
+                    'bfr_status' => 'no_data',
+                    'bfr_amount' => 0.0,
+                    'bank_status' => 'no_data',
+                    'bank_amount' => 0.0,
+                    'hci_slip' => $pickup->hci_slip_no,
+                    'reason' => 'Missing parsed pickup date',
+                ],
+            ];
+        }
+
+        $dateStr = $parsed instanceof \DateTimeInterface
+            ? Carbon::instance($parsed)->toDateString()
+            : Carbon::parse($parsed)->toDateString();
+
+        $cmp = $this->compareOne($pickup, $dateStr);
+        $summary = [
+            'pickup_id' => $pickup->id,
+            'pickup_date' => $pickup->pickup_date,
+            'pickup_date_parsed' => $dateStr,
+            'location' => $cmp['location'],
+            'state' => $cmp['state'],
+            'region' => $cmp['region'],
+            'rcp_amount' => $cmp['rcp_amount'],
+            'bfr_status' => $cmp['bfr_status'],
+            'bfr_amount' => $cmp['bfr_amount'],
+            'bank_status' => $cmp['bank_status'],
+            'bank_amount' => $cmp['bank_amount'],
+            'hci_slip' => $cmp['hci_slip'],
+        ];
+
+        return [
+            'has_mismatch' => $cmp['has_mismatch'],
+            'summary' => $summary,
+        ];
     }
 
     /* ── Amount status ── */

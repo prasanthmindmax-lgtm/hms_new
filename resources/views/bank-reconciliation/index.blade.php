@@ -219,33 +219,50 @@
     <div class="pc-container">
         <div class="pc-content">
             <div class="container-fluid py-4">
+                @php
+                    $bankReconFyNow = \Carbon\Carbon::now();
+                    $bankReconFyStart = ($bankReconFyNow->month >= 4)
+                        ? \Carbon\Carbon::create($bankReconFyNow->year, 4, 1)->startOfDay()
+                        : \Carbon\Carbon::create($bankReconFyNow->year - 1, 4, 1)->startOfDay();
+                    $bankReconFyEnd = $bankReconFyStart->copy()->addYear()->subDay()->endOfDay();
+                    $bankReconFyYearOptions = [];
+                    // Current FY plus the four previous FYs (five choices total).
+                    $bankReconFyCurrentStartYear = (int) $bankReconFyStart->year;
+                    for ($bankReconFyIdx = 0; $bankReconFyIdx < 5; $bankReconFyIdx++) {
+                        $fyY = $bankReconFyCurrentStartYear - $bankReconFyIdx;
+                        $optStart = \Carbon\Carbon::create($fyY, 4, 1)->startOfDay();
+                        $optEnd = $optStart->copy()->addYear()->subDay()->endOfDay();
+                        $bankReconFyYearOptions[] = [
+                            'value' => $optStart->format('Y-m-d') . '|' . $optEnd->format('Y-m-d'),
+                            'label' => 'FY ' . $fyY . '-' . substr((string) ($fyY + 1), -2) . ' (Apr ' . $fyY . ' – Mar ' . ($fyY + 1) . ')',
+                            'default' => $bankReconFyIdx === 0,
+                        ];
+                    }
+                @endphp
                 
                 {{-- Page Header --}}
                 <div class="row">
                     <div class="col-12">
-                        <div class="card header-card">
-                            <div class="card-body p-4">
-                                <div class="row align-items-center">
-                                    <div class="col-md-4">
-                                        <h2 class="text-white mb-1">
+                        <div class="card header-card bank-recon-header-compact">
+                            <div class="card-body">
+                                <div class="row align-items-center g-2">
+                                    <div class="col-md-5 col-lg-6">
+                                        <h2 class="text-white mb-0 bank-recon-header-title">
                                             <i class="bi bi-bank me-2"></i>Bank Statement Reconciliation
                                         </h2>
-                                        <p class="text-white-50 mb-0">Upload, match and reconcile bank statements with bills</p>
+                                        <p class="text-white-50 mb-0 bank-recon-header-sub">Upload, match and reconcile bank statements with bills</p>
                                     </div>
-                                    <div class="col-md-8 text-end d-flex flex-wrap justify-content-md-end gap-1">
+                                    <div class="col-md-7 col-lg-6 text-end d-flex flex-wrap justify-content-md-end gap-1 align-items-center">
                                         @if(!empty($bankAccountsEnabled))
-                                        <button type="button" class="btn btn-light" id="accountDetailsModalBtn" title="Bank account &amp; Excel upload">
+                                        <button type="button" class="btn btn-light btn-sm" id="accountDetailsModalBtn" title="Bank accounts &amp; settings">
                                             <i class="bi bi-wallet2 me-1"></i>Account details
                                         </button>
                                         @endif
-                                        <button type="button" class="btn btn-outline-light" id="btnOpenBatchUploadView" title="Open batch list (no page reload)">
+                                        <button type="button" class="btn btn-light btn-sm" id="headerUploadBtn" title="Open bank statement Excel upload">
+                                            <i class="bi bi-upload me-1"></i>Upload
+                                        </button>
+                                        <button type="button" class="btn btn-outline-light btn-sm" id="btnOpenBatchUploadView" title="Open batch list (no page reload)">
                                             <i class="bi bi-collection me-1"></i>Batch uploads
-                                        </button>
-                                        <button type="button" class="btn btn-light" id="viewStatementsBtn">
-                                            <i class="bi bi-table me-2"></i>View Statements
-                                        </button>
-                                        <button type="button" class="btn btn-light" id="uploadBtn">
-                                            <i class="bi bi-upload me-2"></i>Upload New
                                         </button>
                                     </div>
                                 </div>
@@ -260,13 +277,25 @@
                         <div class="col-12">
                             <div class="card shadow-sm">
                                 <div class="card-body p-4">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                        <h5 class="mb-0 text-secondary"><i class="bi bi-cloud-upload me-2"></i>Import bank statement</h5>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="backToStatementBtn" title="Return to statements list">
+                                            <i class="bi bi-arrow-left me-1"></i>Back to statement
+                                        </button>
+                                    </div>
                                     <form id="uploadFormMain" enctype="multipart/form-data">
                                         @csrf
                                         @if(!empty($bankAccountsEnabled))
                                         <div class="mb-3">
+                                            <label class="form-label fw-semibold"><i class="bi bi-building me-1"></i>Company <span class="text-danger">*</span></label>
+                                            <select class="form-select" name="company_id" id="mainUploadCompany" required>
+                                                <option value="">Select company…</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
                                             <label class="form-label fw-semibold"><i class="bi bi-bank me-1"></i>Bank account <span class="text-danger">*</span></label>
-                                            <select class="form-select bank-account-select" name="bank_account_id" id="mainUploadBankAccount" required>
-                                                <option value="">Select account number…</option>
+                                            <select class="form-select bank-account-select" name="bank_account_id" id="mainUploadBankAccount" required disabled>
+                                                <option value="">Select company first…</option>
                                             </select>
                                             <small class="text-muted">Each upload is stored against this account. Use <strong>Account details</strong> to add a new account.</small>
                                         </div>
@@ -317,75 +346,442 @@
                 {{-- Statements Section (Initially Hidden) --}}
                 <div id="statementsSection" style="display: none;">
                     
-                    {{-- Statistics Cards --}}
-                    <div class="row">
-                        <div class="col-xl-3 col-md-6 mb-3">
-                            <div class="stat-card stat-card-1">
-                                <div class="stat-icon"><i class="bi bi-file-earmark-text"></i></div>
-                                <div class="stat-content">
-                                    <h3 id="totalStatements">0</h3>
-                                    <p>Total Statements</p>
+                    {{-- Statistics: single horizontal strip (scroll on small screens) --}}
+                    <div class="bank-recon-stats-strip mb-3">
+                        <div class="bank-recon-stats-scroll">
+                            <div class="bank-recon-stat-tile">
+                                <div class="stat-card stat-card-1 bank-recon-stat-clickable h-100" id="statCardFilterAll" role="button" tabindex="0" title="Show all statements (current date &amp; filters)">
+                                    <div class="stat-icon"><i class="bi bi-file-earmark-text"></i></div>
+                                    <div class="stat-content">
+                                        <h3 id="totalStatements">0</h3>
+                                        <p>Total Statements</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="col-xl-3 col-md-6 mb-3">
-                            <div class="stat-card stat-card-2">
-                                <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
-                                <div class="stat-content">
-                                    <h3 id="matchedStatements">0</h3>
-                                    <p>Matched</p>
+                            <div class="bank-recon-stat-tile">
+                                <div class="stat-card stat-card-2 bank-recon-stat-clickable h-100" id="statCardFilterMatched" role="button" tabindex="0" title="Show bill-matched statements">
+                                    <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+                                    <div class="stat-content">
+                                        <h3 id="matchedStatements">0</h3>
+                                        <p>Matched</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="col-xl-3 col-md-6 mb-3">
-                            <div class="stat-card stat-card-3">
-                                <div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div>
-                                <div class="stat-content">
-                                    <h3 id="unmatchedStatements">0</h3>
-                                    <p>Unmatched</p>
+                            <div class="bank-recon-stat-tile">
+                                <div class="stat-card stat-card-3 h-100">
+                                    <div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div>
+                                    <div class="stat-content">
+                                        <h3 id="unmatchedStatements">0</h3>
+                                        <p>Unmatched</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="col-xl-3 col-md-6 mb-3">
-                            <div class="stat-card stat-card-4">
-                                <div class="stat-icon"><i class="bi bi-currency-rupee"></i></div>
-                                <div class="stat-content">
-                                    <h3 id="totalAmount">₹0</h3>
-                                    <p>Total Amount</p>
+                            <div class="bank-recon-stat-tile bank-recon-stat-tile--amount">
+                                <div class="stat-card stat-card-4 h-100">
+                                    <div class="stat-icon"><i class="bi bi-currency-rupee"></i></div>
+                                    <div class="stat-content">
+                                        <h3 id="totalAmount">₹0</h3>
+                                        <p>Total Amount</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bank-recon-stat-tile">
+                                <div class="stat-card bank-recon-stat-clickable h-100" id="statCardFilterIncomeMatched" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);" role="button" tabindex="0" title="Show income-matched statements">
+                                    <div class="stat-icon"><i class="bi bi-check2-all"></i></div>
+                                    <div class="stat-content">
+                                        <h3 id="incomeMatchedCount">0</h3>
+                                        <p>Income Matched</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bank-recon-stat-tile">
+                                <div class="stat-card h-100" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+                                    <div class="stat-icon"><i class="bi bi-dash-circle"></i></div>
+                                    <div class="stat-content">
+                                        <h3 id="incomeUnmatchedCount">0</h3>
+                                        <p>Income Unmatched</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {{-- Income Reconciliation Stats --}}
-                    <div class="row mb-2">
-                        <div class="col-12">
-                            <h6 class="text-muted mb-2" style="font-size:12px;letter-spacing:1px;text-transform:uppercase;">
-                                <i class="bi bi-arrow-left-right me-1"></i> Income Reconciliation
-                            </h6>
-                        </div>
-                        <div class="col-xl-3 col-md-6 mb-3">
-                            <div class="stat-card" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">
-                                <div class="stat-icon"><i class="bi bi-check2-all"></i></div>
-                                <div class="stat-content">
-                                    <h3 id="incomeMatchedCount">0</h3>
-                                    <p>Income Matched</p>
-                                </div>
+                    {{-- Quick filter panel — dropdown multi-select style --}}
+                    <div class="bank-recon-qf-panel" id="bankReconQfPanel">
+
+                        {{-- Header row --}}
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <span class="bank-recon-qf-badge"><i class="bi bi-funnel-fill"></i> Quick Filters</span>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="qfResetBtn">
+                                    <i class="bi bi-x-circle me-1"></i>Reset
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="qfOpenFullFilterBtn">
+                                    <i class="bi bi-sliders me-1"></i>More Filters
+                                </button>
+                                <button type="button" class="btn btn-sm btn-primary" id="qfApplyBtn">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
                             </div>
                         </div>
-                        <div class="col-xl-3 col-md-6 mb-3">
-                            <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
-                                <div class="stat-icon"><i class="bi bi-dash-circle"></i></div>
-                                <div class="stat-content">
-                                    <h3 id="incomeUnmatchedCount">0</h3>
-                                    <p>Income Unmatched</p>
+
+                        {{-- Row 1 --}}
+                        <div class="row g-2 mb-2">
+
+                            @php
+                                /* helper macro: each field is (label-text, icon, btn-id, menu-id, select-id) */
+                            @endphp
+
+                            {{-- Financial Year --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-calendar3"></i> Financial Year</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-financialYear"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All years</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-financialYear">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfFinancialYear_all">
+                                            <label class="qf-menu-item-text" for="brqf_qfFinancialYear_all">All years</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                @foreach ($bankReconFyYearOptions as $opt)
+                                                    <div class="qf-menu-item">
+                                                        <input type="checkbox" id="brqf_qfFinancialYear_opt_{{ $loop->index }}" value="{{ $opt['value'] }}"{{ !empty($opt['default']) ? ' checked' : '' }}>
+                                                        <label class="qf-menu-item-text" for="brqf_qfFinancialYear_opt_{{ $loop->index }}">{{ $opt['label'] }}</label>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+                                <select id="qfFinancialYear" multiple class="d-none">
+                                    @foreach ($bankReconFyYearOptions as $opt)
+                                        <option value="{{ $opt['value'] }}"{{ !empty($opt['default']) ? ' selected' : '' }}>{{ $opt['label'] }}</option>
+                                    @endforeach
+                                </select>
                             </div>
-                        </div>
-                    </div>
+
+                            {{-- Company → Account Number (conditional) --}}
+                            @if(!empty($bankAccountsEnabled))
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-building"></i> Company</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-bankCompany"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All companies</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-bankCompany">
+                                        <div class="qf-menu-search-wrap">
+                                            <input type="text" class="qf-search-input" placeholder="Search companies…">
+                                        </div>
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfBankCompany_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfBankCompany_all">All companies</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfBankCompany" multiple class="d-none"></select>
+                            </div>
+                            @endif
+                            @if(!empty($bankAccountsEnabled))
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-credit-card-2-front"></i> Account Number</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-bankAccount"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All accounts</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-bankAccount">
+                                        <div class="qf-menu-search-wrap">
+                                            <input type="text" class="qf-search-input" placeholder="Search accounts…">
+                                        </div>
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfBankAccount_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfBankAccount_all">All accounts</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfBankAccount" multiple class="d-none"></select>
+                            </div>
+                            @endif
+
+                            {{-- Zone --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-map"></i> Zone</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-zone"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All zones</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-zone">
+                                        <div class="qf-menu-search-wrap">
+                                            <input type="text" class="qf-search-input" placeholder="Search zones…">
+                                        </div>
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfZone_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfZone_all">All zones</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfZone" multiple class="d-none"></select>
+                            </div>
+
+                            {{-- Branch --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-building"></i> Branch</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-branch"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All branches</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-branch">
+                                        <div class="qf-menu-search-wrap">
+                                            <input type="text" class="qf-search-input" placeholder="Search branches…">
+                                        </div>
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfBranch_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfBranch_all">All branches</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfBranch" multiple class="d-none"></select>
+                            </div>
+
+                            {{-- Category (categorized vs uncategorized) --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-tag"></i> Category</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-category"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-category">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfCategory_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfCategory_all">All</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfCategory" multiple class="d-none">
+                                    <option value="categorized">Categorized</option>
+                                    <option value="uncategorized">Uncategorized</option>
+                                </select>
+                            </div>
+
+                            {{-- PAY IN / PAY OUT --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-arrow-down-up"></i> PAY IN / PAY OUT</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-txnType"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All types</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-txnType">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfTxnType_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfTxnType_all">All types</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfTxnType_deposit" value="deposit">
+                                                    <label class="qf-menu-item-text" for="brqf_qfTxnType_deposit">PAY IN</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfTxnType_withdrawal" value="withdrawal">
+                                                    <label class="qf-menu-item-text" for="brqf_qfTxnType_withdrawal">PAY OUT</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="qfTxnType" multiple class="d-none">
+                                    <option value="deposit">PAY IN</option>
+                                    <option value="withdrawal">PAY OUT</option>
+                                </select>
+                            </div>
+
+                        </div>{{-- /row 1 --}}
+
+                        {{-- Row 2 --}}
+                        <div class="row g-2">
+
+                            {{-- Bill Match --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-check-circle"></i> Bill Match</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-expenseMatch"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All statuses</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-expenseMatch">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfExpenseMatch_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_all">All statuses</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfExpenseMatch_unmatched" value="unmatched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_unmatched">Unmatched</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfExpenseMatch_matched" value="matched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_matched">Matched</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfExpenseMatch_partially_matched" value="partially_matched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_partially_matched">Partially matched</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="qfExpenseMatch" multiple class="d-none">
+                                    <option value="unmatched">Unmatched</option>
+                                    <option value="matched">Matched</option>
+                                    <option value="partially_matched">Partially matched</option>
+                                </select>
+                            </div>
+
+                            {{-- Radiant --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-brightness-high"></i> Radiant</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-radiantMatch"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-radiantMatch">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfRadiantMatch_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_all">All</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfRadiantMatch_radiant_matched" value="radiant_matched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_radiant_matched">Radiant linked</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfRadiantMatch_radiant_keyword_only" value="radiant_keyword_only">
+                                                    <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_radiant_keyword_only">Keyword only</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfRadiantMatch_radiant_unmatched" value="radiant_unmatched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_radiant_unmatched">Not linked</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="qfRadiantMatch" multiple class="d-none">
+                                    <option value="radiant_matched">Radiant linked</option>
+                                    <option value="radiant_keyword_only">Keyword only</option>
+                                    <option value="radiant_unmatched">Not linked</option>
+                                </select>
+                            </div>
+
+                            {{-- Income Tag --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-bookmark"></i> Income Tag</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-incomeMatch"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-incomeMatch">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfIncomeMatch_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfIncomeMatch_all">All</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfIncomeMatch_income_matched" value="income_matched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfIncomeMatch_income_matched">Income matched</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfIncomeMatch_income_unmatched" value="income_unmatched">
+                                                    <label class="qf-menu-item-text" for="brqf_qfIncomeMatch_income_unmatched">Income unmatched</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="qfIncomeMatch" multiple class="d-none">
+                                    <option value="income_matched">Income matched</option>
+                                    <option value="income_unmatched">Income unmatched</option>
+                                </select>
+                            </div>
+
+                            {{-- Matched By --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-person"></i> Matched By</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-matchedBy"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">Anyone</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-matchedBy">
+                                        <div class="qf-menu-search-wrap">
+                                            <input type="text" class="qf-search-input" placeholder="Search users…">
+                                        </div>
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfMatchedBy_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfMatchedBy_all">Anyone</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfMatchedBy" multiple class="d-none"></select>
+                            </div>
+
+                            {{-- Vendor Name --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-person-badge"></i> Vendor Name</div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-vendor"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All vendors</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-vendor">
+                                        <div class="qf-menu-search-wrap">
+                                            <input type="text" class="qf-search-input" placeholder="Search vendors…">
+                                        </div>
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfVendor_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfVendor_all">All vendors</label>
+                                        </div>
+                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
+                                    </div>
+                                </div>
+                                <select id="qfVendor" multiple class="d-none"></select>
+                            </div>
+
+                        </div>{{-- /row 2 --}}
+
+                    </div>{{-- /bank-recon-qf-panel --}}
 
                     <!-- {{-- Radiant cash pickup reconciliation stats --}}
                     <div class="row mb-2">
@@ -426,8 +822,13 @@
                     {{-- Bank Statements Table with Filter Button --}}
                     <div class="card shadow-sm bank-recon-statements-card">
                         <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <h5 class="mb-0"><i class="bi bi-table me-2"></i>Bank Statements</h5>
-                            <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end">
+                            <div class="d-flex align-items-center flex-wrap gap-2 flex-grow-1 min-w-0 me-2">
+                                <h5 class="mb-0 text-nowrap"><i class="bi bi-table me-2"></i>Bank Statements</h5>
+                                @if(!empty($bankAccountsEnabled))
+                                <div id="bankReconToolbarAccountChips" class="bank-recon-toolbar-account-chips d-flex align-items-center flex-wrap gap-1" aria-label="Filter by bank account"></div>
+                                @endif
+                            </div>
+                            <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end flex-shrink-0">
                                 <label class="mb-0 small text-white-50">Per page:</label>
                                 <select class="form-select form-select-sm" id="perPageSelect" style="width: auto;">
                                     <option value="10">10</option>
@@ -435,7 +836,7 @@
                                     <option value="50">50</option>
                                     <option value="100">100</option>
                                 </select>
-                                <div class="dropdown bank-recon-export-dd">
+                                <!-- <div class="dropdown bank-recon-export-dd">
                                     <button type="button" class="btn btn-outline-light btn-sm dropdown-toggle" id="exportStatementsDropdown" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" aria-haspopup="true" title="Export using current filters">
                                         <i class="bi bi-download me-1"></i>Export
                                     </button>
@@ -454,7 +855,7 @@
                                 </div>
                                 <button class="btn btn-light btn-sm" id="openFilterBtn">
                                     <i class="bi bi-funnel me-1"></i>Search &amp; Filter
-                                </button>
+                                </button> -->
                             </div>
                         </div>
                         <div class="card-body">
@@ -462,7 +863,19 @@
                                 <table class="table table-hover" id="statementsTable">
                                     <thead>
                                         <tr>
-                                            <th>Date</th>
+                                            <th class="bank-recon-th-sort text-nowrap align-middle" scope="col">
+                                                <div class="bank-recon-th-sort-inner">
+                                                    <span class="bank-recon-th-sort-label">Date</span>
+                                                    <span class="bank-recon-sort-btns" role="group" aria-label="Sort by transaction date">
+                                                        <button type="button" class="bank-recon-sort-btn bank-recon-sort-asc" data-sort-dir="asc" title="Oldest first">
+                                                            <i class="bi bi-sort-up" aria-hidden="true"></i>
+                                                        </button>
+                                                        <button type="button" class="bank-recon-sort-btn bank-recon-sort-desc" data-sort-dir="desc" title="Newest first">
+                                                            <i class="bi bi-sort-down" aria-hidden="true"></i>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                            </th>
                                             <th>Account</th>
                                             <th>Description</th>
                                             <th>Reference</th>
@@ -475,6 +888,7 @@
                                             <th>Matched Bill</th>
                                             <th>Matched By</th>
                                             <th>Matched date</th>
+                                            <th>Nature / files</th>
                                             <th>Income Tag</th>
                                             <th>Radiant</th>
                                             <th>Actions</th>
@@ -482,7 +896,7 @@
                                     </thead>
                                     <tbody id="statementsTableBody">
                                         <tr>
-                                            <td colspan="16" class="text-center py-5">
+                                            <td colspan="17" class="text-center py-5">
                                                 <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
                                                 <p class="text-muted mt-3">No statements uploaded</p>
                                             </td>
@@ -535,113 +949,167 @@
     {{-- Account details + upload (modal): list, add/edit, upload --}}
     <div class="modal fade" id="accountDetailsModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-bottom">
-                    <h5 class="modal-title"><i class="bi bi-wallet2 me-2"></i>Bank accounts &amp; uploads</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content br-acc-modal-content">
+                {{-- Gradient header --}}
+                <div class="modal-header br-acc-modal-header border-0">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="br-acc-modal-icon">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title text-white mb-0 fw-bold">Bank Accounts &amp; Uploads</h5>
+                            <p class="text-white-50 mb-0 small">Manage registered accounts and import statements</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body pt-3">
-                    <ul class="nav nav-tabs nav-fill mb-3" id="accountModalTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="tabBtnAllAccounts" data-bs-toggle="tab" data-bs-target="#tabAllAccounts" type="button" role="tab">
-                                <i class="bi bi-list-ul me-1"></i>All accounts
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tabBtnNewAccount" data-bs-toggle="tab" data-bs-target="#tabNewAccount" type="button" role="tab">
-                                <i class="bi bi-plus-circle me-1"></i><span id="newAccountTabLabel">New account</span>
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tabBtnUploadStmt" data-bs-toggle="tab" data-bs-target="#tabUploadStmt" type="button" role="tab">
-                                <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Excel
-                            </button>
-                        </li>
-                    </ul>
-                    <div class="tab-content">
+
+                <div class="modal-body p-0">
+                    {{-- Pill tab nav --}}
+                    <div class="br-acc-tab-nav px-4 pt-3 pb-0">
+                        <ul class="nav nav-pills br-acc-nav-pills" id="accountModalTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="tabBtnAllAccounts" data-bs-toggle="tab" data-bs-target="#tabAllAccounts" type="button" role="tab">
+                                    <i class="bi bi-list-ul me-1"></i>All accounts
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="tabBtnNewAccount" data-bs-toggle="tab" data-bs-target="#tabNewAccount" type="button" role="tab">
+                                    <i class="bi bi-plus-circle me-1"></i><span id="newAccountTabLabel">New account</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="tabBtnUploadStmt" data-bs-toggle="tab" data-bs-target="#tabUploadStmt" type="button" role="tab">
+                                    <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Excel
+                                </button>
+                            </li>
+                        </ul>
+                        <div class="br-acc-tab-divider"></div>
+                    </div>
+
+                    <div class="tab-content px-4 pb-4 pt-3">
+                        {{-- TAB: All accounts --}}
                         <div class="tab-pane fade show active" id="tabAllAccounts" role="tabpanel">
-                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                <p class="text-muted small mb-0">Registered accounts used for statement uploads and filters.</p>
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="btnRefreshModalAccountList">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <div>
+                                    <span class="fw-semibold text-dark">Registered bank accounts</span>
+                                    <p class="text-muted small mb-0">Used for statement uploads and filters.</p>
+                                </div>
+                                <button type="button" class="btn btn-sm br-acc-refresh-btn" id="btnRefreshModalAccountList">
                                     <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                                 </button>
                             </div>
-                            <div class="table-responsive border rounded" style="max-height: 320px; overflow-y: auto;">
-                                <table class="table table-sm table-hover align-middle mb-0" id="modalAccountsTable">
-                                    <thead class="table-light sticky-top" style="z-index: 1;">
+                            <div class="br-acc-table-wrap">
+                                <table class="table table-hover align-middle mb-0 br-acc-table" id="modalAccountsTable">
+                                    <thead>
                                         <tr>
-                                            <th>Account #</th>
-                                            <th>Bank</th>
+                                            <th><i class="bi bi-building me-1 text-muted"></i>Company</th>
+                                            <th><i class="bi bi-credit-card me-1 text-muted"></i>Account #</th>
+                                            <th><i class="bi bi-bank me-1 text-muted"></i>Bank</th>
                                             <th>Branch</th>
                                             <th>IFSC</th>
                                             <th>Holder</th>
-                                            <th class="text-end" style="width: 88px;">Edit</th>
+                                            <th class="text-end" style="width: 80px;">Edit</th>
                                         </tr>
                                     </thead>
                                     <tbody id="bankAccountsModalTableBody">
-                                        <tr><td colspan="6" class="text-center text-muted py-4">Open this window to load accounts…</td></tr>
+                                        <tr><td colspan="7" class="text-center text-muted py-5">
+                                            <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary opacity-50"></i>
+                                            Open this window to load accounts…
+                                        </td></tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+
+                        {{-- TAB: New / Edit account --}}
                         <div class="tab-pane fade" id="tabNewAccount" role="tabpanel">
-                            <p class="text-muted small mb-3" id="newAccountFormHint">Add a new bank account for statement uploads.</p>
-                            <form id="formNewBankAccount">
-                                @csrf
-                                <input type="hidden" id="editBankAccountId" value="">
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Account number <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" name="account_number" id="newAccNumber" required maxlength="64" placeholder="e.g. 50100…">
+                            <div class="br-acc-form-card">
+                                <p class="text-muted small mb-3" id="newAccountFormHint">
+                                    <i class="bi bi-info-circle me-1"></i>Add a new bank account for statement uploads.
+                                </p>
+                                <form id="formNewBankAccount">
+                                    @csrf
+                                    <input type="hidden" id="editBankAccountId" value="">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-building me-1"></i>Company <span class="text-danger">*</span></label>
+                                            <select class="form-select br-form-select" name="company_id" id="newAccCompanyId" required>
+                                                <option value="">Select company…</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-credit-card me-1"></i>Account number <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control br-form-input" name="account_number" id="newAccNumber" required maxlength="64" placeholder="e.g. 50100…">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-bank me-1"></i>Bank name</label>
+                                            <input type="text" class="form-control br-form-input" name="bank_name" id="newAccBank" maxlength="191" placeholder="e.g. HDFC Bank">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-geo-alt me-1"></i>Branch</label>
+                                            <input type="text" class="form-control br-form-input" name="branch_name" id="newAccBranch" maxlength="191" placeholder="Branch name or city">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-hash me-1"></i>IFSC</label>
+                                            <input type="text" class="form-control br-form-input" name="ifsc_code" id="newAccIfsc" maxlength="32" placeholder="e.g. HDFC0001234" style="letter-spacing:.05em;">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-person me-1"></i>Account holder</label>
+                                            <input type="text" class="form-control br-form-input" name="account_holder_name" id="newAccHolder" maxlength="191" placeholder="Full name">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="br-form-label"><i class="bi bi-sticky me-1"></i>Notes</label>
+                                            <textarea class="form-control br-form-input" name="notes" id="newAccNotes" rows="2" maxlength="2000" placeholder="Optional remarks…"></textarea>
+                                        </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Bank name</label>
-                                        <input type="text" class="form-control" name="bank_name" id="newAccBank" maxlength="191">
+                                    <div class="mt-3 d-flex flex-wrap gap-2">
+                                        <button type="submit" class="btn br-btn-primary" id="btnSaveNewAccount">
+                                            <i class="bi bi-check2-circle me-1"></i><span id="btnSaveNewAccountLabel">Save account</span>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="btnCancelEditAccount" style="display: none;">
+                                            <i class="bi bi-x me-1"></i>Cancel edit
+                                        </button>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Branch</label>
-                                        <input type="text" class="form-control" name="branch_name" id="newAccBranch" maxlength="191">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">IFSC</label>
-                                        <input type="text" class="form-control" name="ifsc_code" id="newAccIfsc" maxlength="32">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Account holder</label>
-                                        <input type="text" class="form-control" name="account_holder_name" id="newAccHolder" maxlength="191">
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label">Notes</label>
-                                        <textarea class="form-control" name="notes" id="newAccNotes" rows="2" maxlength="2000"></textarea>
-                                    </div>
-                                </div>
-                                <div class="mt-3 d-flex flex-wrap gap-2">
-                                    <button type="submit" class="btn btn-primary" id="btnSaveNewAccount">
-                                        <i class="bi bi-check2-circle me-1"></i><span id="btnSaveNewAccountLabel">Save account</span>
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary" id="btnCancelEditAccount" style="display: none;">
-                                        Cancel edit
-                                    </button>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
                         </div>
+
+                        {{-- TAB: Upload Excel --}}
                         <div class="tab-pane fade" id="tabUploadStmt" role="tabpanel">
-                            <form id="uploadFormModal" enctype="multipart/form-data">
-                                @csrf
-                                <div class="mb-3">
-                                    <label class="form-label fw-semibold">Bank account <span class="text-danger">*</span></label>
-                                    <select class="form-select bank-account-select" name="bank_account_id" id="modalUploadBankAccount" required>
-                                        <option value="">Select account…</option>
-                                    </select>
+                            <div class="br-upload-card">
+                                <div class="br-upload-card-icon">
+                                    <i class="bi bi-file-earmark-spreadsheet"></i>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Excel file (.xlsx / .xls)</label>
-                                    <input type="file" class="form-control" name="excel_file" id="modalExcelFile" accept=".xlsx,.xls" required>
-                                </div>
-                                <button type="submit" class="btn btn-success" id="modalUploadSubmit">
-                                    <i class="bi bi-upload me-1"></i>Upload &amp; process
-                                </button>
-                            </form>
+                                <h6 class="fw-bold mb-1">Import bank statement</h6>
+                                <p class="text-muted small mb-3">Select company, account and upload your Excel file (.xlsx / .xls)</p>
+                                <form id="uploadFormModal" enctype="multipart/form-data">
+                                    @csrf
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-building me-1"></i>Company <span class="text-danger">*</span></label>
+                                            <select class="form-select br-form-select" name="company_id" id="modalUploadCompany" required>
+                                                <option value="">Select company…</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="br-form-label"><i class="bi bi-bank me-1"></i>Bank account <span class="text-danger">*</span></label>
+                                            <select class="form-select br-form-select bank-account-select" name="bank_account_id" id="modalUploadBankAccount" required disabled>
+                                                <option value="">Select company first…</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="br-form-label"><i class="bi bi-file-earmark-excel me-1"></i>Excel file</label>
+                                            <input type="file" class="form-control br-form-input" name="excel_file" id="modalExcelFile" accept=".xlsx,.xls" required>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button type="submit" class="btn br-btn-success" id="modalUploadSubmit">
+                                            <i class="bi bi-upload me-1"></i>Upload &amp; process
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -653,80 +1121,141 @@
     {{-- Filter Modal --}}
     <div class="modal fade" id="filterModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-funnel me-2"></i>Search & Filter</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content br-filter-modal-content">
+                {{-- Filter modal header --}}
+                <div class="br-filter-modal-header modal-header border-0">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="br-filter-modal-icon"><i class="bi bi-funnel-fill"></i></div>
+                        <div>
+                            <h5 class="modal-title text-white fw-bold mb-0">Search &amp; Filter</h5>
+                            <p class="text-white-50 small mb-0">Narrow down bank statements</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="row g-3">
-                        @if(!empty($bankAccountsEnabled))
-                        <div class="col-md-6">
-                            <label class="form-label">Bank account</label>
-                            <select class="form-control bank-account-select" id="filterBankAccount">
-                                <option value="">All accounts</option>
-                            </select>
+
+                <div class="modal-body pt-3 pb-2">
+                    @if(!empty($bankAccountsEnabled))
+                    {{-- Company / Account group --}}
+                    <div class="br-filter-group mb-3">
+                        <div class="br-filter-group-label">
+                            <i class="bi bi-building me-1"></i>Company &amp; Account
                         </div>
-                        @endif
-                        <div class="col-md-6">
-                            <label class="form-label">Transaction date</label>
-                            <input type="text" class="form-control" id="filterDateRange" placeholder="Select date range">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="br-filter-label"><i class="bi bi-building me-1 text-primary"></i>Company</label>
+                                <select class="form-select br-filter-select" id="filterBankCompany">
+                                    <option value="">All companies</option>
+                                </select>
+                                <div class="br-filter-hint">Choose a company to limit the account list</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="br-filter-label"><i class="bi bi-credit-card me-1 text-primary"></i>Bank account</label>
+                                <select class="form-select br-filter-select bank-account-select" id="filterBankAccount">
+                                    <option value="">All accounts</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Matched date <span class="text-muted fw-normal">(optional)</span></label>
-                            <input type="text" class="form-control" id="filterMatchedDateRange" placeholder="Bill match date range">
+                    </div>
+                    @endif
+
+                    {{-- Date group --}}
+                    <div class="br-filter-group mb-3">
+                        <div class="br-filter-group-label"><i class="bi bi-calendar3 me-1"></i>Date &amp; Period</div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="br-filter-label"><i class="bi bi-calendar-range me-1 text-primary"></i>Financial year</label>
+                                <select class="form-select br-filter-select" id="filterFinancialYear">
+                                    <option value="">Custom (use transaction dates below)</option>
+                                    @foreach ($bankReconFyYearOptions as $opt)
+                                        <option value="{{ $opt['value'] }}"{{ !empty($opt['default']) ? ' selected' : '' }}>{{ $opt['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="br-filter-hint">Optional preset. Transaction date overrides this.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="br-filter-label"><i class="bi bi-calendar-event me-1 text-primary"></i>Transaction date</label>
+                                <input type="text" class="form-control br-filter-input" id="filterDateRange" placeholder="Select date range" autocomplete="off">
+                                <div class="br-filter-hint">Leave empty to use Financial year filter.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="br-filter-label"><i class="bi bi-calendar-check me-1 text-primary"></i>Matched date <span class="text-muted fw-normal small">(optional)</span></label>
+                                <input type="text" class="form-control br-filter-input" id="filterMatchedDateRange" placeholder="Bill match date range">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="br-filter-label"><i class="bi bi-person-check me-1 text-primary"></i>Matched by</label>
+                                <select class="form-select br-filter-select" id="filterMatchedByUser">
+                                    <option value="">Anyone</option>
+                                </select>
+                                <div class="br-filter-hint">User who matched the expense/income</div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Status</label>
-                            <select class="form-control" id="filterMatchStatus">
-                                <option value="">All Status</option>
-                                <option value="unmatched">Unmatched</option>
-                                <option value="matched">Matched</option>
-                                <option value="partially_matched">Partially Matched</option>
-                            </select>
+                    </div>
+
+                    {{-- Match status group --}}
+                    <div class="br-filter-group mb-3">
+                        <div class="br-filter-group-label"><i class="bi bi-check2-all me-1"></i>Match Status</div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="br-filter-label"><i class="bi bi-receipt me-1 text-primary"></i>Expense Match</label>
+                                <select class="form-select br-filter-select" id="filterMatchStatus">
+                                    <option value="">All Status</option>
+                                    <option value="unmatched">Unmatched</option>
+                                    <option value="matched">Matched</option>
+                                    <option value="partially_matched">Partially Matched</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="br-filter-label"><i class="bi bi-currency-rupee me-1 text-primary"></i>Income Match</label>
+                                <select class="form-select br-filter-select" id="filterIncomeMatch">
+                                    <option value="">All</option>
+                                    <option value="income_matched">Income Matched</option>
+                                    <option value="income_unmatched">Income Unmatched</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="br-filter-label"><i class="bi bi-link-45deg me-1 text-primary"></i>Radiant match</label>
+                                <select class="form-select br-filter-select" id="filterRadiantMatch">
+                                    <option value="">All</option>
+                                    <option value="radiant_matched">Radiant linked (pickup)</option>
+                                    <option value="radiant_keyword_only">Keyword only</option>
+                                    <option value="radiant_unmatched">Not linked</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Income Match</label>
-                            <select class="form-control" id="filterIncomeMatch">
-                                <option value="">All</option>
-                                <option value="income_matched">Income Matched</option>
-                                <option value="income_unmatched">Income Unmatched</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Radiant match</label>
-                            <select class="form-control" id="filterRadiantMatch">
-                                <option value="">All</option>
-                                <option value="radiant_matched">Radiant linked (pickup)</option>
-                                <option value="radiant_keyword_only">Keyword only</option>
-                                <option value="radiant_unmatched">Not linked</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Total Range (Min)</label>
-                            <input type="number" class="form-control" id="filterAmountMin" placeholder="Min Amount">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Total Range (Max)</label>
-                            <input type="number" class="form-control" id="filterAmountMax" placeholder="Max Amount">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Reference/transcation ID</label>
-                            <input type="text" class="form-control" id="filterReference" placeholder="Reference Number">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Description</label>
-                            <input type="text" class="form-control" id="filterDescription" placeholder="Max 500 characters">
+                    </div>
+
+                    {{-- Amount & search group --}}
+                    <div class="br-filter-group">
+                        <div class="br-filter-group-label"><i class="bi bi-search me-1"></i>Amount &amp; Search</div>
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <label class="br-filter-label"><i class="bi bi-arrow-down-circle me-1 text-primary"></i>Min Amount</label>
+                                <input type="number" class="form-control br-filter-input" id="filterAmountMin" placeholder="0.00">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="br-filter-label"><i class="bi bi-arrow-up-circle me-1 text-primary"></i>Max Amount</label>
+                                <input type="number" class="form-control br-filter-input" id="filterAmountMax" placeholder="0.00">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="br-filter-label"><i class="bi bi-upc me-1 text-primary"></i>Reference / Transaction ID</label>
+                                <input type="text" class="form-control br-filter-input" id="filterReference" placeholder="Reference number">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="br-filter-label"><i class="bi bi-card-text me-1 text-primary"></i>Description</label>
+                                <input type="text" class="form-control br-filter-input" id="filterDescription" placeholder="Keywords…">
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer" >
-                    <button type="button" class="btn btn-outline-secondary" id="clearAllFiltersBtn">
+
+                <div class="modal-footer br-filter-footer border-0 pt-0">
+                    <button type="button" class="btn br-filter-clear-btn" id="clearAllFiltersBtn">
                         <i class="bi bi-x-circle me-1"></i>Clear All
                     </button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="applyFiltersBtn">
-                        <i class="bi bi-search me-1"></i>Search
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn br-filter-apply-btn" id="applyFiltersBtn">
+                        <i class="bi bi-search me-1"></i>Apply filters
                     </button>
                 </div>
             </div>
@@ -910,15 +1439,20 @@
                                     </div>
                                 </div>
 
-                                {{-- Date of Collection --}}
+                                {{-- Date of Collection (multi-select: one MOC row per date; bank line split optional) --}}
                                 <div class="mb-3">
                                     <label class="income-tag-label">
                                         <span class="income-tag-label-dot" style="background:#f59e0b;"></span>DATE OF COLLECTION
+                                        <span class="text-muted fw-normal ms-1" style="font-size:10px;text-transform:none;">(multi-date)</span>
                                     </label>
                                     <div class="income-tag-date-wrap">
                                         <i class="bi bi-calendar3 text-warning"></i>
-                                        <input type="text" id="incomeTagDate" class="income-tag-date-input" placeholder="Pick a date...">
+                                        <input type="text" id="incomeTagDate" name="bank_recon_income_tag_collection_dt"
+                                            class="income-tag-date-input" placeholder="Pick one or more dates..."
+                                            autocomplete="off" autocorrect="off" spellcheck="false"
+                                            data-lpignore="true" data-1p-ignore data-form-type="other">
                                     </div>
+                                    <div id="incomeTagDateSplitWrap" class="mt-2" style="display:none;"></div>
                                 </div>
 
                                 {{-- Mode of Collection --}}
@@ -991,6 +1525,70 @@
         </div>
     </div>
 
+    {{-- Before match: nature of payment (account_tbl, same as vendor bill lines) + attachments --}}
+    <div class="modal fade" id="bankMatchDetailsModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content bank-match-details-modal">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title mb-1"><i class="bi bi-journal-text me-2 text-primary"></i>Match details</h5>
+                        <p class="text-muted small mb-0">Nature of payment uses <strong>account_tbl</strong> (same chart accounts as vendor bills) and is <strong>required</strong>. Attachments are optional for audit.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-3">
+                    <div class="bank-match-details-card mb-3">
+                        {{-- Same pattern as vendor purchase board: readonly trigger + cloned dropdown (Search / All / Clear / list) --}}
+                        <label class="form-label br-bank-match-nature-label mb-2">Nature of payment <span class="text-danger">*</span></label>
+                        <div class="tax-dropdown-wrapper br-bank-match-nature w-100">
+                            <input type="text" class="form-control dropdown-search-input br-bank-match-nature-input" placeholder="Select Nature" readonly autocomplete="off">
+                            <input type="hidden" id="bankMatchNatureIds" value="">
+                            <div class="dropdown-menu tax-dropdown br-bank-match-dd-template">
+                                <div class="inner-search-container">
+                                    <input type="text" class="inner-search" placeholder="Search Nature..." autocomplete="off">
+                                </div>
+                                <div class="d-flex justify-content-between p-2 border-bottom br-bank-match-nature-actions" style="gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary br-bank-match-select-all">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary br-bank-match-clear">Clear</button>
+                                </div>
+                                <div class="dropdown-list multiselect br-bank-match-account-list" id="bankMatchNatureAccountList"></div>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">Search, then select at least one account.</div>
+                    </div>
+                    <div class="bank-match-details-card bank-match-details-card-files mb-0">
+                        <label class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-paperclip text-secondary"></i> Attachments
+                        </label>
+                        <input type="file" class="form-control" id="bankMatchAttachmentsInput" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.doc,.docx">
+                        <div class="form-text">Multiple files allowed (max ~15 MB each).</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmBankMatchDetails">
+                        <i class="bi bi-check2-circle me-1"></i>Confirm &amp; match
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- View match attachments (public URLs — image/PDF preview + open in new tab) --}}
+    <div class="modal fade" id="bankMatchAttachmentsViewerModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-paperclip me-2"></i>Match attachments</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="bankMatchAttachmentsViewerBody" class="bank-match-att-viewer-body"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Scripts --}}
     {{-- jQuery: loaded here because the theme footer does NOT include it --}}
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -1004,7 +1602,12 @@
 
     <script>
         window.bankAccountsEnabled = @json(!empty($bankAccountsEnabled));
-        const routes = {
+        {{-- Full account_tbl list for nature dropdown (same as purchase board / Tblaccount) --}}
+        window.BANK_RECON_CHART_ACCOUNTS = @json($chartAccountsForSelect ?? []);
+        {{-- var on window so external bank-reconciliation.js can read URLs (const is not shared across script files) --}}
+        window.bankReconDateFrom = @json($bankReconFyStart->format('Y-m-d'));
+        window.bankReconDateTo = @json($bankReconFyEnd->format('Y-m-d'));
+        window.bankReconRoutes = {
             upload: "{{ route('bank-reconciliation.upload') }}",
             statements: "{{ route('bank-reconciliation.statements') }}",
             statementsExport: "{{ route('bank-reconciliation.statements-export') }}",
@@ -1025,24 +1628,30 @@
             accountsUpdateBase: "{{ url('/bank-reconciliation/accounts') }}",
             uploadBatches: "{{ route('bank-reconciliation.upload-batches') }}",
             batchFile: "{{ url('/bank-reconciliation/batch-file') }}",
+            matchedByOptions: "{{ route('bank-reconciliation.matched-by-options') }}",
+            chartAccounts: "{{ route('bank-reconciliation.chart-accounts') }}",
+            quickFilterOptions: "{{ route('bank-reconciliation.quick-filter-options') }}",
         };
+        var routes = window.bankReconRoutes;
     </script>
     <script>window.BANK_RECON_BATCH_PREVIEW_BASE = "{{ url('/bank-reconciliation/batch-preview') }}";</script>
     <script src="{{ asset('/assets/js/bank-reconciliation/batch-preview-modal.js') }}"></script>
+    <script src="{{ asset('/assets/js/bank-reconciliation/bank-reconciliation.js') }}"></script>
     <script>
     // ============================================
     // FLATPICKR - Bank Reconciliation (replaced daterangepicker)
     // ============================================
     $(document).ready(function() {
-        var filterDateEl = document.getElementById('filterDateRange');
-        if (filterDateEl) {
-            window.bankReconDateFrom = moment().format('YYYY-MM-DD');
-            window.bankReconDateTo = moment().format('YYYY-MM-DD');
-            flatpickr(filterDateEl, {
+        window.bankReconDefaultFyValue = @json($bankReconFyStart->format('Y-m-d') . '|' . $bankReconFyEnd->format('Y-m-d'));
+        function bankReconWireTxnRangeFlatpickr(el) {
+            if (!el) return;
+            window.bankReconSkipFpChange = false;
+            flatpickr(el, {
                 mode: 'range',
                 dateFormat: 'd/m/Y',
-                defaultDate: [moment().toDate(), moment().toDate()],
-                onChange: function(selectedDates, dateStr) {
+                allowInput: true,
+                onChange: function(selectedDates) {
+                    if (window.bankReconSkipFpChange) return;
                     if (selectedDates.length === 2) {
                         window.bankReconDateFrom = moment(selectedDates[0]).format('YYYY-MM-DD');
                         window.bankReconDateTo = moment(selectedDates[1]).format('YYYY-MM-DD');
@@ -1053,15 +1662,48 @@
                         window.bankReconDateFrom = null;
                         window.bankReconDateTo = null;
                     }
+                    if (typeof window.syncBankReconFinancialYearSelect === 'function') {
+                        window.syncBankReconFinancialYearSelect();
+                    }
                 },
-                onClose: function(selectedDates, dateStr) {
-                    if (selectedDates.length === 0) {
-                        window.bankReconDateFrom = null;
-                        window.bankReconDateTo = null;
+                onClose: function(selectedDates) {
+                    if (window.bankReconSkipFpChange) return;
+                    if (!selectedDates || selectedDates.length === 0) {
+                        if (typeof window.restoreBankReconWindowDatesAfterClearingTxnDay === 'function') {
+                            window.restoreBankReconWindowDatesAfterClearingTxnDay();
+                        } else {
+                            window.bankReconDateFrom = null;
+                            window.bankReconDateTo = null;
+                        }
+                        if (typeof window.syncBankReconFinancialYearSelect === 'function') {
+                            window.syncBankReconFinancialYearSelect();
+                        }
+                        if (typeof window.syncBankReconTransactionDatePickers === 'function') {
+                            window.syncBankReconTransactionDatePickers();
+                        }
+                    } else if (selectedDates.length === 1) {
+                        var d = moment(selectedDates[0]).format('YYYY-MM-DD');
+                        window.bankReconDateFrom = d;
+                        window.bankReconDateTo = d;
+                        if (typeof window.syncBankReconFinancialYearSelect === 'function') {
+                            window.syncBankReconFinancialYearSelect();
+                        }
+                        if (typeof window.syncBankReconTransactionDatePickers === 'function') {
+                            window.syncBankReconTransactionDatePickers();
+                        }
                     }
                 }
             });
-            filterDateEl.value = moment().format('DD/MM/YYYY') + ' to ' + moment().format('DD/MM/YYYY');
+        }
+
+        var filterDateEl = document.getElementById('filterDateRange');
+        if (filterDateEl) {
+            window.bankReconDateFrom = @json($bankReconFyStart->format('Y-m-d'));
+            window.bankReconDateTo = @json($bankReconFyEnd->format('Y-m-d'));
+            bankReconWireTxnRangeFlatpickr(filterDateEl);
+            if (typeof window.syncBankReconTransactionDatePickers === 'function') {
+                window.syncBankReconTransactionDatePickers();
+            }
         }
 
         var filterMatchedDateEl = document.getElementById('filterMatchedDateRange');
@@ -1112,11 +1754,13 @@
                 });
             }
         });
+
+        if (typeof window.applyBankReconDomFiltersToCurrent === 'function') {
+            window.applyBankReconDomFiltersToCurrent();
+        }
     });
     </script>
-    {{-- batch-preview-modal.js loaded above (before this file) --}}
-    <script src="{{ asset('/assets/js/bank-reconciliation/bank-reconciliation.js') }}"></script>
-
+    {{-- bank-reconciliation.js is loaded before this flatpickr block so sync helpers exist on init --}}
     
     @include('superadmin.superadminfooter')
 </body>

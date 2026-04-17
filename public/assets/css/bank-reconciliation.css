@@ -23,6 +23,34 @@ body {
     font-size: 28px;
 }
 
+/* Compact bank recon hero header (shorter vertical space) */
+.header-card.bank-recon-header-compact {
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(102, 126, 234, 0.22);
+}
+
+.header-card.bank-recon-header-compact .card-body {
+    padding: 0.5rem 1rem;
+}
+
+.header-card.bank-recon-header-compact .bank-recon-header-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.header-card.bank-recon-header-compact .bank-recon-header-sub {
+    font-size: 0.78rem;
+    line-height: 1.25;
+    margin-top: 0.15rem;
+    opacity: 0.92;
+}
+
+.header-card.bank-recon-header-compact .btn-sm {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.8125rem;
+}
+
 /* Statistics Cards */
 .stat-card {
     border-radius: 15px;
@@ -38,6 +66,29 @@ body {
 .stat-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Stat cards that apply a table filter when clicked */
+.stat-card.bank-recon-stat-clickable {
+    cursor: pointer;
+}
+
+.stat-card.bank-recon-stat-clickable:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 3px;
+}
+
+/* Matched bill column: bill line accounts + zone/branch */
+.matched-bill-info .bank-recon-bill-nature,
+.matched-bill-info .bank-recon-bill-zonebranch {
+    font-size: 11px;
+    line-height: 1.35;
+    margin-top: 4px;
+}
+
+.bank-recon-nature-files {
+    max-width: 220px;
+    word-break: break-word;
 }
 
 .stat-card-1 {
@@ -77,6 +128,295 @@ body {
     opacity: 0.9;
 }
 
+/* Stats row: single horizontal strip */
+.bank-recon-stats-strip {
+    width: 100%;
+}
+
+.bank-recon-stats-scroll {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.65rem;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102,126,234,0.3) transparent;
+}
+
+.bank-recon-stats-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+.bank-recon-stats-scroll::-webkit-scrollbar-thumb {
+    background: rgba(102,126,234,0.35);
+    border-radius: 4px;
+}
+
+.bank-recon-stat-tile {
+    flex: 1 1 0;
+    min-width: 155px;
+    scroll-snap-align: start;
+}
+
+/* The amount tile needs more room for long numbers */
+.bank-recon-stat-tile--amount {
+    min-width: 200px;
+}
+
+.bank-recon-stat-tile .stat-card {
+    min-height: 100px;
+    padding: 14px 16px;
+    gap: 12px;
+    align-items: center;
+}
+
+.bank-recon-stat-tile .stat-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.bank-recon-stat-tile .stat-content {
+    min-width: 0;   /* allow text truncation / wrapping inside flex */
+    flex: 1 1 0;
+}
+
+.bank-recon-stat-tile .stat-content h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.25;
+}
+
+/* Amount tile: slightly smaller text so the full number always fits */
+.bank-recon-stat-tile--amount .stat-content h3 {
+    font-size: 13px;
+}
+
+.bank-recon-stat-tile .stat-content p {
+    font-size: 11px;
+    margin: 2px 0 0;
+    opacity: 0.92;
+    white-space: nowrap;
+}
+
+/* ====================================================
+   Quick filter panel — dropdown style
+   ==================================================== */
+.bank-recon-qf-panel {
+    background: linear-gradient(140deg, #f8f9ff 0%, #f1f2ff 100%);
+    border: 1.5px solid #dde0f5;
+    border-radius: 16px;
+    padding: 14px 18px 16px;
+    box-shadow: 0 2px 14px rgba(99,102,241,0.08);
+    margin-bottom: 1rem;
+}
+
+/* "⚡ QUICK FILTERS" pill badge */
+.bank-recon-qf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #c5caf0;
+    background: linear-gradient(90deg,#eef0ff,#f4f0ff);
+    color: #4f52cc;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+/* Label row above each dropdown */
+.bank-recon-qf-field-label {
+    font-size: 0.59rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #8a93b0;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dropdown trigger — looks like a form-select */
+.bank-recon-qf-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 6px 10px;
+    min-height: 33px;
+    background: #fff;
+    border: 1.5px solid #dde1ee;
+    border-radius: 8px;
+    font-size: 0.79rem;
+    color: #6b7280;
+    cursor: pointer;
+    gap: 5px;
+    text-align: left;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.bank-recon-qf-btn:hover,
+.bank-recon-qf-btn:focus { border-color: #a5b4fc; background: #fafaff; outline: none; }
+
+.bank-recon-qf-btn[aria-expanded="true"],
+.bank-recon-qf-btn.show {
+    border-color: #6366f1;
+    background: #fafaff;
+    box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+    color: #4338ca;
+}
+
+/* when a value is selected */
+.bank-recon-qf-btn.qf-has-value {
+    border-color: #818cf8;
+    color: #3730a3;
+    background: #eff0ff;
+    font-weight: 600;
+}
+
+.qf-btn-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.qf-btn-arrow {
+    flex-shrink: 0;
+    font-size: 0.6rem;
+    color: #9ca3af;
+    transition: transform .2s;
+}
+.bank-recon-qf-btn[aria-expanded="true"] .qf-btn-arrow { transform: rotate(180deg); color: #6366f1; }
+
+/* Dropdown menu popup */
+.bank-recon-qf-menu {
+    min-width: 200px !important;
+    max-width: 300px;
+    padding: 8px !important;
+    border: 1.5px solid #dde1ee !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 36px rgba(0,0,0,0.11) !important;
+    z-index: 1055;
+}
+
+.qf-menu-search-wrap { margin-bottom: 6px; }
+
+.qf-search-input {
+    width: 100%;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 7px;
+    padding: 5px 9px;
+    font-size: 0.74rem;
+    outline: none;
+    transition: border-color .15s;
+    box-sizing: border-box;
+}
+.qf-search-input:focus { border-color: #818cf8; }
+
+.qf-menu-list {
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99,102,241,.3) transparent;
+}
+.qf-menu-list::-webkit-scrollbar { width: 4px; }
+.qf-menu-list::-webkit-scrollbar-thumb { background: rgba(99,102,241,.3); border-radius: 4px; }
+
+/* Grid: fixed checkbox column + fluid text — avoids flex+overflow clipping labels when checked */
+.qf-menu-item {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.79rem;
+    color: #374151 !important;
+    user-select: none;
+    transition: background .1s;
+    margin-bottom: 1px;
+    overflow: visible;
+    max-width: 100%;
+}
+.qf-menu-item:hover {
+    background: #f0f2ff;
+    color: #3730a3 !important;
+}
+
+.qf-menu-item input[type="checkbox"] {
+    accent-color: #6366f1;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+    grid-column: 1;
+    justify-self: start;
+    align-self: center;
+    flex-shrink: 0;
+}
+
+/* "All X" row at top of each dropdown */
+.qf-menu-item-all {
+    border-bottom: 1px solid #ebebf5;
+    padding-bottom: 7px;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #6366f1;
+}
+.qf-menu-item-all:hover { background: #eef0ff; }
+
+/* Option label text — always visible (theme / flex quirks can hide plain spans when checked) */
+.bank-recon-qf-menu {
+    color: #374151;
+}
+
+.bank-recon-qf-menu .qf-menu-item-text {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    grid-column: 2;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+    font-size: 0.79rem !important;
+    color: #1e293b !important;
+    -webkit-text-fill-color: #1e293b !important;
+}
+/* Associate text via for= — not a wrapping label, so global form styles cannot hide it when :checked */
+.bank-recon-qf-menu label.qf-menu-item-text {
+    margin: 0;
+    cursor: pointer;
+    font-weight: inherit;
+}
+
+.bank-recon-qf-menu .qf-menu-item:has(input:checked) {
+    background: #eef0ff;
+}
+
+.bank-recon-qf-menu .qf-menu-item:has(input:checked) .qf-menu-item-text {
+    color: #312e81 !important;
+    -webkit-text-fill-color: #312e81 !important;
+    font-weight: 600;
+}
+
+.bank-recon-qf-menu .qf-menu-item-all .qf-menu-item-text {
+    color: #4f46e5 !important;
+    font-weight: 600;
+}
+
 /* Filter Card */
 .filter-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -109,9 +449,101 @@ body {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
+/* Account quick-filters beside "Bank Statements" (gradient toolbar) */
+.bank-recon-toolbar-account-chips {
+    min-width: 0;
+}
+
+.bank-recon-toolbar-account-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 200px;
+    padding: 4px 10px;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.bank-recon-toolbar-account-chip:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.85);
+}
+
+.bank-recon-toolbar-account-chip.is-active {
+    background: #fff;
+    color: #4f46e5;
+    border-color: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
 /* Export dropdown must sit above sticky statements toolbar */
 .bank-recon-export-dd .dropdown-menu {
     z-index: 1040;
+}
+
+/* Date column: compact label + asc/desc sort */
+#statementsTable thead .bank-recon-th-sort {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.02em;
+}
+
+#statementsTable thead .bank-recon-th-sort-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+#statementsTable thead .bank-recon-sort-btns {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+}
+
+#statementsTable thead .bank-recon-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #f8fafc;
+    color: #64748b;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+#statementsTable thead .bank-recon-sort-btn:hover {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    color: #4338ca;
+}
+
+#statementsTable thead .bank-recon-sort-btn.is-active {
+    background: #6366f1;
+    border-color: #4f46e5;
+    color: #fff;
+}
+
+#statementsTable thead .bank-recon-sort-btn i {
+    font-size: 12px;
 }
 
 /* Table wrapper - overflow so table doesn't stretch page */
@@ -583,6 +1015,10 @@ body {
     .header-card h2 {
         font-size: 20px;
     }
+
+    .header-card.bank-recon-header-compact .bank-recon-header-title {
+        font-size: 1.05rem;
+    }
     
     .action-buttons {
         flex-direction: column;
@@ -991,4 +1427,977 @@ body > .daterangepicker {
     height: 2.5rem;
     border-width: 3px;
     color: #4f46e5 !important;
+}
+
+/* Match details modal — nature of payment (same UX as purchase board: tax-dropdown clone) */
+.bank-match-details-modal .modal-content {
+    border-radius: 14px;
+    border: none;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+}
+
+.bank-match-details-card {
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.bank-match-details-card-files {
+    background: #fff;
+}
+
+.br-bank-match-nature-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature.tax-dropdown-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-search-input {
+    cursor: pointer;
+    border-radius: 10px;
+    min-height: 42px;
+}
+
+#bankMatchDetailsModal .dropdown-menu.tax-dropdown.br-bank-match-dd-template {
+    display: none;
+}
+
+/* Open clone lives inside .br-bank-match-nature (not body) so modal focus trap allows search input */
+#bankMatchDetailsModal .modal-body {
+    overflow: visible;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd {
+    display: none;
+    padding-bottom: 0;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.15);
+    max-height: min(360px, 70vh);
+    overflow: hidden;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .inner-search-container {
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .inner-search {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .br-bank-match-nature-actions {
+    border-color: #e5e7eb !important;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .br-bank-match-account-list {
+    max-height: 200px;
+    overflow-y: auto;
+    position: relative;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .br-bank-match-account-list div {
+    padding: 8px 10px;
+    cursor: pointer;
+    position: relative;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .br-bank-match-account-list div:hover {
+    background: #f1f5f9;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .br-bank-match-account-list div.selected {
+    background: #e7f7ef;
+    font-weight: 500;
+}
+
+#bankMatchDetailsModal .br-bank-match-nature .dropdown-menu.tax-dropdown.br-bank-match-dd .br-bank-match-account-list div.selected::after {
+    content: "✔";
+    color: #0aad0a;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+}
+
+/* =============================================
+   SINGLE-ROW STATS
+   ============================================= */
+.bank-recon-stats-row .stat-card {
+    min-height: 100px;
+    padding: 14px 16px;
+}
+
+.bank-recon-stats-row .stat-content h3 {
+    font-size: 1.3rem;
+    margin-bottom: 2px;
+}
+
+.bank-recon-stats-row .stat-content p {
+    font-size: 0.76rem;
+    margin-bottom: 0;
+}
+
+.bank-recon-stats-row .stat-icon {
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+    opacity: 0.85;
+}
+
+/* Total amount card last — long rupee values wrap inside the tile */
+.bank-recon-stats-row .stat-card.bank-recon-stat-total-amount {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 14px 10px;
+    min-height: 100px;
+}
+
+.bank-recon-stats-row .stat-card.bank-recon-stat-total-amount .stat-icon {
+    font-size: 1.55rem;
+    margin: 0;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+.bank-recon-stats-row .stat-card.bank-recon-stat-total-amount .stat-content {
+    min-width: 0;
+    width: 100%;
+}
+
+.bank-recon-stats-row .stat-card.bank-recon-stat-total-amount .stat-content h3 {
+    font-size: clamp(0.65rem, 1.05vw, 0.95rem);
+    line-height: 1.28;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
+/* =============================================
+   QUICK FILTER PANEL  (brqf-*)
+   ============================================= */
+.brqf-panel {
+    border-radius: 16px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+    padding: 2px;
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.18);
+    overflow: visible;
+    position: relative;
+    /* Must be above sticky statements toolbar (z-index 1020) and export dropdown (1040) */
+    z-index: 1050;
+}
+
+.brqf-panel-inner {
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 14px 16px 16px;
+    overflow: visible;
+}
+
+/* --- header --- */
+.brqf-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.brqf-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.brqf-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.brqf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #4f46e5;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1.5px solid rgba(99, 102, 241, 0.22);
+    border-radius: 999px;
+    padding: 5px 12px;
+}
+
+.brqf-active-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    border-radius: 999px;
+    padding: 3px 10px;
+}
+
+.brqf-btn-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #475569;
+    background: #fff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.18s;
+    line-height: 1;
+}
+
+.brqf-btn-all:hover {
+    border-color: #94a3b8;
+    color: #1e293b;
+    background: #f1f5f9;
+}
+
+.brqf-btn-apply {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 10px;
+    padding: 7px 18px;
+    cursor: pointer;
+    transition: opacity 0.18s, transform 0.12s;
+    line-height: 1;
+    box-shadow: 0 3px 10px rgba(99, 102, 241, 0.35);
+}
+
+.brqf-btn-apply:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* --- grid --- */
+.brqf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    gap: 10px;
+    align-items: start;
+    overflow: visible;
+}
+
+/* Transaction date + FY (quick filter, spans 2 grid columns) */
+.brqf-item-date-fy {
+    grid-column: span 2;
+    min-width: 0;
+}
+
+@media (max-width: 576px) {
+    .brqf-item-date-fy {
+        grid-column: span 1;
+    }
+    .brqf-date-fy-row {
+        flex-direction: column;
+    }
+}
+
+.brqf-date-fy-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.brqf-date-fy-cell-date {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 55%;
+}
+
+.brqf-date-fy-cell-fy {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 45%;
+}
+
+.brqf-fy-inline-label {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.brqf-fy-select {
+    width: 100%;
+    height: 34px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    color: #1e293b;
+    background-color: #fff;
+    box-sizing: border-box;
+}
+
+.brqf-fy-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    outline: none;
+}
+
+.brqf-date-fy-cell-date .brqf-date-input {
+    height: 34px;
+    font-size: 0.78rem;
+}
+
+/* Static quick-filter dropdowns: field title always visible above value */
+.brqf-dd-static .brqf-dd-trigger-stack {
+    height: auto;
+    min-height: 38px;
+    align-items: flex-start;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.brqf-dd-trigger-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+.brqf-dd-field {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+.brqf-dd-static .brqf-dd-trigger-stack .brqf-dd-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.brqf-dd-static .brqf-dd-trigger-stack.has-value .brqf-dd-label {
+    color: #4f46e5;
+}
+
+.brqf-dd-static .brqf-dd-trigger-stack.has-value .brqf-dd-field {
+    color: #64748b;
+}
+
+.brqf-dd-static .brqf-dd-chevron {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Each filter item — must not clip its dropdown menu */
+.brqf-item {
+    position: relative;
+    overflow: visible;
+    min-width: 0;
+}
+
+/* --- individual filter item --- */
+.brqf-item-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 5px;
+}
+
+.brqf-item-label svg {
+    flex-shrink: 0;
+    color: #94a3b8;
+}
+
+/* date input */
+.brqf-date-input {
+    width: 100%;
+    height: 38px;
+    padding: 0 10px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    color: #1e293b;
+    background: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+
+.brqf-date-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* --- custom dropdown --- */
+.brqf-dd {
+    position: relative;
+}
+
+.brqf-dd-trigger {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 38px;
+    padding: 0 10px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    color: #374151;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.brqf-dd-trigger:hover {
+    border-color: #a5b4fc;
+}
+
+.brqf-dd.is-open .brqf-dd-trigger {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.brqf-dd-trigger.has-value {
+    border-color: #6366f1;
+    color: #4f46e5;
+    background: rgba(99, 102, 241, 0.04);
+}
+
+.brqf-dd-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.brqf-dd-count {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border-radius: 999px;
+}
+
+.brqf-dd-chevron {
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    color: #94a3b8;
+}
+
+.brqf-dd.is-open .brqf-dd-chevron {
+    transform: rotate(180deg);
+    color: #6366f1;
+}
+
+/* --- dropdown panel --- */
+.brqf-dd-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    z-index: 3000;
+    background: #fff;
+    border: 1.5px solid #e0e7ff;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
+    overflow: hidden;
+    min-width: 200px;
+    animation: brqfSlideIn 0.15s ease;
+}
+
+@keyframes brqfSlideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.brqf-dd.is-open .brqf-dd-menu {
+    display: block;
+}
+
+.brqf-dd-search-wrap {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.brqf-dd-search {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+
+.brqf-dd-search:focus {
+    border-color: #6366f1;
+}
+
+.brqf-dd-opts {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.brqf-dd-opts::-webkit-scrollbar {
+    width: 4px;
+}
+
+.brqf-dd-opts::-webkit-scrollbar-thumb {
+    background: #c7d2fe;
+    border-radius: 4px;
+}
+
+.brqf-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: #374151;
+    margin: 0;
+    transition: background 0.12s;
+    user-select: none;
+}
+
+.brqf-opt:hover {
+    background: #f5f3ff;
+    color: #4f46e5;
+}
+
+.brqf-opt input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    accent-color: #6366f1;
+    cursor: pointer;
+}
+
+/* Keep option text always visible — use !important to beat theme checkbox rules */
+.brqf-dd-menu .brqf-opt span {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #1e293b;
+    line-height: 1.35;
+}
+
+.brqf-dd-menu .brqf-opt:has(input:checked) span {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #4f46e5;
+    font-weight: 600;
+}
+
+.brqf-opt-empty {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    text-align: center;
+}
+
+/* dropdown on right edge of screen - flip left */
+.brqf-dd.drop-left .brqf-dd-menu {
+    left: auto;
+    right: 0;
+}
+
+/* ============================================================
+   ACCOUNT DETAILS MODAL – redesigned
+   ============================================================ */
+.br-acc-modal-content {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+
+.br-acc-modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1.1rem 1.5rem;
+}
+
+.br-acc-modal-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+/* Tab nav pill styling */
+.br-acc-tab-nav {
+    background: #f8faff;
+}
+
+.br-acc-nav-pills {
+    gap: 4px;
+}
+
+.br-acc-nav-pills .nav-link {
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    padding: 0.42rem 1rem;
+    color: #64748b;
+    background: transparent;
+    transition: all .18s;
+}
+
+.br-acc-nav-pills .nav-link:hover {
+    background: #eef0f8;
+    color: #4f46e5;
+}
+
+.br-acc-nav-pills .nav-link.active {
+    background: #4f46e5;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.22);
+}
+
+.br-acc-tab-divider {
+    height: 1px;
+    background: #e8eaf2;
+    margin-top: 0.65rem;
+}
+
+/* Account table */
+.br-acc-table-wrap {
+    border: 1px solid #e8eaf2;
+    border-radius: 10px;
+    overflow: hidden;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.br-acc-table thead th {
+    background: #f1f3fb;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 1px solid #dde1f0;
+    padding: 0.55rem 0.75rem;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.br-acc-table tbody td {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #f0f2f8;
+    color: #374151;
+    vertical-align: middle;
+}
+
+.br-acc-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.br-acc-table tbody tr:hover td {
+    background: #f5f7ff;
+}
+
+.br-acc-refresh-btn {
+    border: 1px solid #c7c9e8;
+    background: #fff;
+    color: #4f46e5;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    transition: all .18s;
+}
+
+.br-acc-refresh-btn:hover {
+    background: #4f46e5;
+    color: #fff;
+    border-color: #4f46e5;
+}
+
+/* Form card (new/edit account) */
+.br-acc-form-card {
+    background: #f8faff;
+    border: 1px solid #e8eaf2;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+}
+
+.br-form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.3rem;
+    display: block;
+}
+
+.br-form-input,
+.br-form-select {
+    border: 1px solid #dde1f0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #1e293b;
+    background: #fff;
+    transition: border-color .18s, box-shadow .18s;
+}
+
+.br-form-input:focus,
+.br-form-select:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+    outline: none;
+}
+
+.br-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 1.1rem;
+    transition: opacity .18s, box-shadow .18s;
+}
+
+.br-btn-primary:hover {
+    opacity: 0.9;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.35);
+}
+
+/* Upload card inside tab */
+.br-upload-card {
+    border: 2px dashed #c7c9e8;
+    border-radius: 14px;
+    background: #f8faff;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.br-upload-card-icon {
+    font-size: 2.4rem;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.br-upload-card h6 {
+    color: #1e293b;
+}
+
+.br-upload-card form {
+    text-align: left;
+    margin-top: 1rem;
+}
+
+.br-btn-success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 1.1rem;
+    transition: opacity .18s, box-shadow .18s;
+}
+
+.br-btn-success:hover {
+    opacity: 0.9;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(17,153,142,0.3);
+}
+
+/* ============================================================
+   FILTER MODAL – redesigned
+   ============================================================ */
+.br-filter-modal-content {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+
+.br-filter-modal-header {
+    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+    padding: 1rem 1.5rem;
+}
+
+.br-filter-modal-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+/* Grouped filter sections */
+.br-filter-group {
+    border: 1px solid #e8eaf2;
+    border-radius: 12px;
+    padding: 0.9rem 1rem 0.7rem;
+    background: #fafbff;
+    position: relative;
+}
+
+.br-filter-group-label {
+    position: absolute;
+    top: -0.58rem;
+    left: 0.9rem;
+    background: #fafbff;
+    padding: 0 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #4f46e5;
+}
+
+.br-filter-label {
+    font-size: 0.79rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.28rem;
+    display: block;
+}
+
+.br-filter-select,
+.br-filter-input {
+    border: 1px solid #dde1f0;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    color: #1e293b;
+    background: #fff;
+    transition: border-color .18s, box-shadow .18s;
+}
+
+.br-filter-select:focus,
+.br-filter-input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.11);
+    outline: none;
+}
+
+.br-filter-hint {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 0.22rem;
+    line-height: 1.35;
+}
+
+/* Footer buttons */
+.br-filter-footer {
+    background: #f8faff;
+    padding: 0.75rem 1.5rem;
+    gap: 0.5rem;
+}
+
+.br-filter-clear-btn {
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    font-size: 0.84rem;
+    border-radius: 8px;
+    padding: 0.4rem 0.9rem;
+    transition: all .18s;
+}
+
+.br-filter-clear-btn:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+.br-filter-apply-btn {
+    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 0.42rem 1.1rem;
+    transition: opacity .18s, box-shadow .18s;
+}
+
+.br-filter-apply-btn:hover {
+    opacity: 0.9;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.3);
 }

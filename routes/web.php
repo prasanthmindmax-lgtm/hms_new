@@ -689,6 +689,9 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         // Get bank statements with filters
         Route::get('/statements', [BankStatementController::class, 'getStatements'])->name('statements');
         Route::get('/statements-export', [BankStatementController::class, 'exportStatements'])->name('statements-export');
+        Route::get('/matched-by-options', [BankStatementController::class, 'listMatchedByUsersForFilter'])->name('matched-by-options');
+        Route::get('/quick-filter-options', [BankStatementController::class, 'statementQuickFilterOptions'])->name('quick-filter-options');
+        Route::get('/chart-accounts', [BankStatementController::class, 'listChartAccounts'])->name('chart-accounts');
         // Search bills by amount
         Route::post('/search-bills', [BankStatementController::class, 'searchBills'])->name('search-bills');
         // Filter bills with advanced criteria
@@ -735,13 +738,16 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('/notifications/{id}/read',[WebNotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [WebNotificationController::class, 'markAllRead'])->name('notifications.readAll');
 
-    Route::get('/radiant-cash-pickup',                 [RadiantCashPickupController::class, 'index'])->name('superadmin.radiantcash.index');
-    Route::get('/radiant-cash-pickup/data',            [RadiantCashPickupController::class, 'data'])->name('superadmin.radiantcash.data');
-    Route::get('/radiant-cash-pickup/filter-options',  [RadiantCashPickupController::class, 'getFilterOptions'])->name('superadmin.radiantcash.filteroptions');
-    Route::post('/radiant-cash-pickup/upload',         [RadiantCashPickupController::class, 'upload'])->name('superadmin.radiantcash.upload');
-    Route::post('/radiant-cash-pickup/delete-batch',   [RadiantCashPickupController::class, 'deleteBatch'])->name('superadmin.radiantcash.deletebatch');
-    Route::get('/radiant-cash-pickup/stats',           [RadiantCashPickupController::class, 'stats'])->name('superadmin.radiantcash.stats');
-    Route::get('/radiant-cash-pickup/{id}/compare',    [RadiantCashPickupController::class, 'compare'])->name('superadmin.radiantcash.compare');
+    Route::get('/radiant-cash-pickup',                   [RadiantCashPickupController::class, 'index'])->name('superadmin.radiantcash.index');
+    Route::get('/radiant-cash-pickup/data',              [RadiantCashPickupController::class, 'data'])->name('superadmin.radiantcash.data');
+    Route::get('/radiant-cash-pickup/filter-options',    [RadiantCashPickupController::class, 'getFilterOptions'])->name('superadmin.radiantcash.filteroptions');
+    Route::get('/radiant-cash-pickup/reconcile-counts',  [RadiantCashPickupController::class, 'reconcileCounts'])->name('superadmin.radiantcash.reconcilecounts');
+    Route::get('/radiant-cash-pickup/reconcile-lists',   [RadiantCashPickupController::class, 'reconcileLists'])->name('superadmin.radiantcash.reconcilists');
+    Route::get('/radiant-cash-pickup/batches',          [RadiantCashPickupController::class, 'batches'])->name('superadmin.radiantcash.batches');
+    Route::post('/radiant-cash-pickup/upload',           [RadiantCashPickupController::class, 'upload'])->name('superadmin.radiantcash.upload');
+    Route::post('/radiant-cash-pickup/delete-batch',     [RadiantCashPickupController::class, 'deleteBatch'])->name('superadmin.radiantcash.deletebatch');
+    Route::get('/radiant-cash-pickup/stats',             [RadiantCashPickupController::class, 'stats'])->name('superadmin.radiantcash.stats');
+    Route::get('/radiant-cash-pickup/{id}/compare',      [RadiantCashPickupController::class, 'compare'])->name('superadmin.radiantcash.compare');
     Route::post('/radiant-cash-pickup/mismatch-alert', [RadiantMismatchAlertController::class, 'sendAlert'])->name('superadmin.radiantcash.mismatchalert');
 
 
