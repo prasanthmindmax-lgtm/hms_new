@@ -202,7 +202,60 @@
             width: 100%;
         }
         .income-tag-date-input::placeholder { color: #94a3b8; }
+
+        /* Bank match modal — attachment staging (preview + document type) */
+        .bank-match-att-staging-item {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-start;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fafafa;
+        }
+        .bank-match-att-staging-preview {
+            width: 88px;
+            height: 88px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #e2e8f0;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .bank-match-att-staging-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .bank-match-att-staging-meta {
+            flex: 1;
+            min-width: 180px;
+        }
+        .bank-match-att-viewer-body .bank-recon-att-doc-badge {
+            font-size: 11px;
+        }
+        /* Nature multiselect panel must not be clipped by scrollable modal body */
+        #bankMatchDetailsModal.modal .modal-dialog,
+        #bankMatchDetailsModal .modal-content,
+        #bankMatchDetailsModal .modal-body,
+        #bankMatchDetailsModal .tab-content,
+        #bankMatchDetailsModal .tab-pane,
+        #bankMatchDetailsModal .bank-match-details-card {
+            overflow: visible;
+        }
+        #bankMatchDetailsModal .tax-dropdown-wrapper.br-bank-match-nature {
+            position: relative;
+            z-index: 2;
+        }
+        #bankMatchDetailsModal .dropdown-menu.tax-dropdown.br-bank-match-dd {
+            z-index: 2005;
+        }
         .batch-toolbar .form-control, .batch-toolbar .form-select { min-width: 140px; }
+        /* SweetAlert2 above Match Transaction drawer (JS also lowers modal z-index while Swal is open) */
+        .swal2-container { z-index: 2147483647 !important; }
     </style>
 </head>
 <body style="overflow-x: hidden;">
@@ -983,6 +1036,11 @@
                                     <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Excel
                                 </button>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="tabBtnAttachmentTypes" data-bs-toggle="tab" data-bs-target="#tabAttachmentTypes" type="button" role="tab">
+                                    <i class="bi bi-tags me-1"></i>Attachment types
+                                </button>
+                            </li>
                         </ul>
                         <div class="br-acc-tab-divider"></div>
                     </div>
@@ -1109,6 +1167,64 @@
                                         </button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+
+                        {{-- TAB: Match attachment document types (drives "Document type" in Match details) --}}
+                        <div class="tab-pane fade" id="tabAttachmentTypes" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <div>
+                                    <span class="fw-semibold text-dark">Document types for match attachments</span>
+                                    <p class="text-muted small mb-0">These labels appear in <strong>Match details → Attachments</strong> for each file.</p>
+                                </div>
+                                <button type="button" class="btn btn-sm br-acc-refresh-btn" id="btnRefreshMatchAttachmentTypes">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div class="br-acc-form-card mb-3">
+                                <p class="text-muted small mb-2" id="matchAttTypeFormHint">
+                                    <i class="bi bi-plus-circle me-1"></i>Add a label; optionally attach a sample file (template or example).
+                                </p>
+                                <form id="formMatchAttachmentType" enctype="multipart/form-data">
+                                    @csrf
+                                    <input type="hidden" id="matchAttTypeEditId" value="">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-4">
+                                            <label class="br-form-label small mb-1">Name <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control form-control-sm" id="matchAttTypeName" maxlength="191" placeholder="e.g. Purchase order" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="br-form-label small mb-1">Sort</label>
+                                            <input type="number" class="form-control form-control-sm" id="matchAttTypeSort" min="0" max="65535" value="0" placeholder="0">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="br-form-label small mb-1">Sample file</label>
+                                            <input type="file" class="form-control form-control-sm" id="matchAttTypeSample" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx">
+                                        </div>
+                                        <div class="col-md-2 d-flex flex-column gap-1">
+                                            <button type="submit" class="btn btn-sm br-btn-primary" id="btnSaveMatchAttachmentType">
+                                                <i class="bi bi-check2 me-1"></i><span id="btnSaveMatchAttachmentTypeLabel">Add</span>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCancelMatchAttachmentTypeEdit" style="display: none;">Cancel</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="br-acc-table-wrap">
+                                <table class="table table-hover align-middle mb-0 br-acc-table table-sm" id="matchAttachmentTypesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th class="text-end" style="width: 90px;">Sort</th>
+                                            <th style="width: 100px;">Active</th>
+                                            <th>Sample</th>
+                                            <th class="text-end" style="width: 120px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="matchAttachmentTypesTableBody">
+                                        <tr><td colspan="5" class="text-center text-muted py-4">Open this tab to load types…</td></tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -1525,6 +1641,30 @@
         </div>
     </div>
 
+    {{-- Income tag: read-only view (opened when clicking an income-matched row) --}}
+    <div class="modal fade right br-income-ro-modal" id="incomeTagReadonlyModal" tabindex="-1" data-bs-backdrop="true">
+        <div class="modal-dialog modal-dialog-scrollable br-income-ro-dialog">
+            <div class="modal-content br-income-ro-content">
+                <div class="modal-header br-income-ro-header border-0">
+                    <h5 class="modal-title mb-0 d-flex align-items-center gap-2 text-white">
+                        <span class="br-income-ro-header-icon"><i class="bi bi-tag-fill"></i></span>
+                        Income tag details
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body br-income-ro-body">
+                    <p class="br-income-ro-hint small mb-3">This is a read-only summary. To change or remove the tag, use <strong>Unmatch Income</strong> on the statement row.</p>
+                    <div id="incomeTagReadonlyBody" class="income-tag-panel br-income-ro-panel"></div>
+                </div>
+                <div class="modal-footer br-income-ro-footer border-0">
+                    <button type="button" class="btn br-income-ro-close-btn" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Before match: nature of payment (account_tbl, same as vendor bill lines) + attachments --}}
     <div class="modal fade" id="bankMatchDetailsModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1532,36 +1672,54 @@
                 <div class="modal-header border-0 pb-0">
                     <div>
                         <h5 class="modal-title mb-1"><i class="bi bi-journal-text me-2 text-primary"></i>Match details</h5>
-                        <p class="text-muted small mb-0">Nature of payment uses <strong>account_tbl</strong> (same chart accounts as vendor bills) and is <strong>required</strong>. Attachments are optional for audit.</p>
+                        <p class="text-muted small mb-0">Use <strong>Nature</strong> for chart accounts (required). Use <strong>Attachments</strong> to upload <span class="text-danger fw-semibold">at least one file</span> (required), preview each, and tag as PO, Quotation, etc.</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body pt-3">
-                    <div class="bank-match-details-card mb-3">
-                        {{-- Same pattern as vendor purchase board: readonly trigger + cloned dropdown (Search / All / Clear / list) --}}
-                        <label class="form-label br-bank-match-nature-label mb-2">Nature of payment <span class="text-danger">*</span></label>
-                        <div class="tax-dropdown-wrapper br-bank-match-nature w-100">
-                            <input type="text" class="form-control dropdown-search-input br-bank-match-nature-input" placeholder="Select Nature" readonly autocomplete="off">
-                            <input type="hidden" id="bankMatchNatureIds" value="">
-                            <div class="dropdown-menu tax-dropdown br-bank-match-dd-template">
-                                <div class="inner-search-container">
-                                    <input type="text" class="inner-search" placeholder="Search Nature..." autocomplete="off">
+                    <ul class="nav nav-tabs nav-justified mb-3" id="bankMatchDetailsTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="br-match-tab-nature" data-bs-toggle="tab" data-bs-target="#brMatchPaneNature" type="button" role="tab">
+                                <i class="bi bi-journal-check me-1"></i>Nature of payment
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="br-match-tab-files" data-bs-toggle="tab" data-bs-target="#brMatchPaneFiles" type="button" role="tab">
+                                <i class="bi bi-paperclip me-1"></i>Attachments <span class="text-danger">*</span>
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="bankMatchDetailsTabContent">
+                        <div class="tab-pane fade show active" id="brMatchPaneNature" role="tabpanel">
+                            <div class="bank-match-details-card mb-0">
+                                <label class="form-label br-bank-match-nature-label mb-2">Nature of payment <span class="text-danger">*</span></label>
+                                <div class="tax-dropdown-wrapper br-bank-match-nature w-100">
+                                    <input type="text" class="form-control dropdown-search-input br-bank-match-nature-input" placeholder="Select Nature" readonly autocomplete="off">
+                                    <input type="hidden" id="bankMatchNatureIds" value="">
+                                    <div class="dropdown-menu tax-dropdown br-bank-match-dd-template">
+                                        <div class="inner-search-container">
+                                            <input type="text" class="inner-search" placeholder="Search Nature..." autocomplete="off">
+                                        </div>
+                                        <div class="d-flex justify-content-between p-2 border-bottom br-bank-match-nature-actions" style="gap:8px;">
+                                            <button type="button" class="btn btn-sm btn-outline-primary br-bank-match-select-all">All</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary br-bank-match-clear">Clear</button>
+                                        </div>
+                                        <div class="dropdown-list multiselect br-bank-match-account-list" id="bankMatchNatureAccountList"></div>
+                                    </div>
                                 </div>
-                                <div class="d-flex justify-content-between p-2 border-bottom br-bank-match-nature-actions" style="gap:8px;">
-                                    <button type="button" class="btn btn-sm btn-outline-primary br-bank-match-select-all">All</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary br-bank-match-clear">Clear</button>
-                                </div>
-                                <div class="dropdown-list multiselect br-bank-match-account-list" id="bankMatchNatureAccountList"></div>
+                                <div class="form-text mt-2">Search, then select at least one account.</div>
                             </div>
                         </div>
-                        <div class="form-text mt-2">Search, then select at least one account.</div>
-                    </div>
-                    <div class="bank-match-details-card bank-match-details-card-files mb-0">
-                        <label class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
-                            <i class="bi bi-paperclip text-secondary"></i> Attachments
-                        </label>
-                        <input type="file" class="form-control" id="bankMatchAttachmentsInput" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.doc,.docx">
-                        <div class="form-text">Multiple files allowed (max ~15 MB each).</div>
+                        <div class="tab-pane fade" id="brMatchPaneFiles" role="tabpanel">
+                            <div class="bank-match-details-card bank-match-details-card-files mb-0">
+                                <label class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                    <i class="bi bi-cloud-upload text-secondary"></i> Add files <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" class="form-control" id="bankMatchAttachmentsInput" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.doc,.docx">
+                                <div class="form-text mb-2">At least one file is required to confirm a match. Multiple files allowed (max ~15 MB each). After adding, set <strong>Document type</strong> for each file.</div>
+                                <div id="bankMatchAttachmentStaging" class="bank-match-attachment-staging"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1577,15 +1735,125 @@
     {{-- View match attachments (public URLs — image/PDF preview + open in new tab) --}}
     <div class="modal fade" id="bankMatchAttachmentsViewerModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-paperclip me-2"></i>Match attachments</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content br-att-modal-content">
+                <div class="modal-header br-att-modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="br-att-modal-icon"><i class="bi bi-paperclip"></i></div>
+                        <div>
+                            <h5 class="modal-title mb-0">Match Attachments</h5>
+                            <div class="br-att-modal-subtitle">Uploaded files for this transaction</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body br-att-modal-body">
                     <div id="bankMatchAttachmentsViewerBody" class="bank-match-att-viewer-body"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    {{-- Income tag: remark + matched-by (from bank_statements + income recon context) --}}
+    <div class="modal fade" id="bankReconIncomeTagDetailModal" tabindex="-1" aria-labelledby="bankReconIncomeTagDetailTitle">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content br-income-detail-modal">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title" id="bankReconIncomeTagDetailTitle">
+                        <i class="bi bi-tag-fill text-info me-2"></i>Income tag details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <dl class="row br-income-detail-dl mb-0">
+                        <dt class="col-sm-4">Branch</dt>
+                        <dd class="col-sm-8" id="brIncomeDetailBranch">—</dd>
+                        <dt class="col-sm-4">Collection date</dt>
+                        <dd class="col-sm-8" id="brIncomeDetailDate">—</dd>
+                        <dt class="col-sm-4">Tagged at</dt>
+                        <dd class="col-sm-8" id="brIncomeDetailAt">—</dd>
+                        <dt class="col-sm-4">Matched by</dt>
+                        <dd class="col-sm-8" id="brIncomeDetailBy">—</dd>
+                        <dt class="col-sm-4">MOC mismatch remark</dt>
+                        <dd class="col-sm-8">
+                            <div class="br-income-detail-remark border rounded p-2 bg-light" id="brIncomeDetailRemark">—</div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Drill-down: statements by nature (chart account) or by bill zone/branch — data via AJAX only --}}
+    <div class="offcanvas offcanvas-end br-drill-offcanvas" tabindex="-1" id="bankReconDrilldownOffcanvas" aria-labelledby="bankReconDrilldownTitle">
+        {{-- Header --}}
+        <div class="br-drill-header">
+            <div class="br-drill-header-inner">
+                <div class="br-drill-header-icon" id="bankReconDrilldownHeaderIcon">
+                    <i class="bi bi-receipt"></i>
+                </div>
+                <div class="br-drill-header-text">
+                    <div class="br-drill-header-title" id="bankReconDrilldownTitle">Statements</div>
+                    <div class="br-drill-header-sub" id="bankReconDrilldownSubtitle"></div>
+                </div>
+            </div>
+            <button type="button" class="br-drill-close" data-bs-dismiss="offcanvas" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        {{-- Zone / branch filter bar (shown only for zone mode) --}}
+        <div id="bankReconDrilldownZoneFilters" class="br-drill-filter-bar" style="display:none;">
+            <div class="br-drill-filter-row">
+                <div class="br-drill-filter-field">
+                    <label class="br-drill-filter-label"><i class="bi bi-diagram-3 me-1"></i>Zone</label>
+                    <select class="form-select form-select-sm br-drill-select" id="bankReconDrilldownZoneSelect"></select>
+                </div>
+                <div class="br-drill-filter-field">
+                    <label class="br-drill-filter-label"><i class="bi bi-geo-alt me-1"></i>Branch</label>
+                    <select class="form-select form-select-sm br-drill-select" id="bankReconDrilldownBranchSelect">
+                        <option value="">All branches</option>
+                    </select>
+                </div>
+                <div class="br-drill-filter-apply">
+                    <button type="button" class="btn br-drill-apply-btn" id="bankReconDrilldownApplyZone">
+                        <i class="bi bi-search me-1"></i>Apply
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Body --}}
+        <div class="offcanvas-body br-drill-body d-flex flex-column">
+            {{-- Loading --}}
+            <div id="bankReconDrilldownLoading" class="br-drill-loading" style="display:none;">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                <span>Loading statements…</span>
+            </div>
+            {{-- Empty --}}
+            <div id="bankReconDrilldownEmpty" class="br-drill-empty" style="display:none;">
+                <i class="bi bi-inbox br-drill-empty-icon"></i>
+                <div class="br-drill-empty-text">No matching statements found</div>
+            </div>
+            {{-- Table --}}
+            <div class="table-responsive flex-grow-1 br-drill-table-wrap" id="bankReconDrilldownTableWrap">
+                <table class="table mb-0 br-drill-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Reference</th>
+                            <th class="text-end">Withdrawal</th>
+                            <th class="text-end">Deposit</th>
+                            <th>Bill</th>
+                            <th>Vendor</th>
+                            <th>Bank account</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bankReconDrilldownBody"></tbody>
+                </table>
+            </div>
+            {{-- Pagination --}}
+            <nav class="br-drill-pagination-wrap" id="bankReconDrilldownPagination" aria-label="Drill-down pagination"></nav>
         </div>
     </div>
 
@@ -1607,6 +1875,20 @@
         {{-- var on window so external bank-reconciliation.js can read URLs (const is not shared across script files) --}}
         window.bankReconDateFrom = @json($bankReconFyStart->format('Y-m-d'));
         window.bankReconDateTo = @json($bankReconFyEnd->format('Y-m-d'));
+        {{-- Web path to Laravel public/ — same /public/ insert as BankStatementController when APP_URL omits public --}}
+        @php
+            $bankReconMatchFilesPath = parse_url((string) asset('bank_recon_match_files'), PHP_URL_PATH) ?: '';
+            if ($bankReconMatchFilesPath !== '' && strpos($bankReconMatchFilesPath, '/public/bank_recon_match_files') === false) {
+                $fixedBrPath = preg_replace('#^/([^/]+)/(bank_recon_match_files.*)$#', '/$1/public/$2', $bankReconMatchFilesPath, 1);
+                if ($fixedBrPath !== null && $fixedBrPath !== $bankReconMatchFilesPath) {
+                    $bankReconMatchFilesPath = $fixedBrPath;
+                }
+            }
+            $bankReconPublicPrefix = $bankReconMatchFilesPath !== ''
+                ? rtrim(str_replace('\\', '/', dirname($bankReconMatchFilesPath)), '/')
+                : rtrim((string) request()->getBasePath(), '/');
+        @endphp
+        window.BANK_RECON_PUBLIC_PREFIX = @json($bankReconPublicPrefix);
         window.bankReconRoutes = {
             upload: "{{ route('bank-reconciliation.upload') }}",
             statements: "{{ route('bank-reconciliation.statements') }}",
@@ -1631,6 +1913,15 @@
             matchedByOptions: "{{ route('bank-reconciliation.matched-by-options') }}",
             chartAccounts: "{{ route('bank-reconciliation.chart-accounts') }}",
             quickFilterOptions: "{{ route('bank-reconciliation.quick-filter-options') }}",
+            matchAttachmentTypes: "{{ route('bank-reconciliation.match-attachment-types.index') }}",
+            matchAttachmentTypesStore: "{{ route('bank-reconciliation.match-attachment-types.store') }}",
+            matchAttachmentTypesUpdateBase: "{{ url('/bank-reconciliation/match-attachment-types') }}",
+            matchAttachmentTypesDestroy: "{{ route('bank-reconciliation.match-attachment-types.destroy', ':id') }}",
+            drilldownByNature: "{{ route('bank-reconciliation.drilldown.by-nature') }}",
+            drilldownByZone: "{{ route('bank-reconciliation.drilldown.by-zone') }}",
+            billPrint: "{{ route('superadmin.getbillprint') }}",
+            billDashboard: "{{ route('superadmin.getbill') }}",
+            vendorDashboard: "{{ route('superadmin.getvendor') }}",
         };
         var routes = window.bankReconRoutes;
     </script>

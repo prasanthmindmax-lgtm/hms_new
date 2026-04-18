@@ -330,6 +330,125 @@ class BankStatementController extends Controller
     }
 
     /**
+     * SQL expression for merged chart-account ids (statement vs bill), for FIND_IN_SET filters.
+     */
+    private function bankReconMergedNatureAccountIdsExpr(): ?string
+    {
+        $hasBs   = Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'br_nature_account_ids');
+        $hasBill = Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'br_nature_account_ids');
+        if ($hasBs && $hasBill) {
+            return 'TRIM(COALESCE(NULLIF(TRIM(IFNULL(bs.br_nature_account_ids, \'\')), \'\'), bill.br_nature_account_ids))';
+        }
+        if ($hasBs) {
+            return 'TRIM(IFNULL(bs.br_nature_account_ids, \'\'))';
+        }
+        if ($hasBill) {
+            return 'TRIM(IFNULL(bill.br_nature_account_ids, \'\'))';
+        }
+
+        return null;
+    }
+
+    /**
+     * Same filters as the main statement list, but without match_status / match_statuses so drill-down can force "matched" only.
+     */
+    private function bankStatementsFilteredQueryForDrilldown(Request $request): Builder
+    {
+        $params = $request->all();
+        unset($params['match_status'], $params['match_statuses']);
+
+        return $this->bankStatementsFilteredQuery(Request::create('/', 'GET', $params));
+    }
+
+    /**
+     * Paginated matched statements sharing the same nature of payment (chart account ids), AJAX for drill-down panel.
+     */
+    public function drilldownStatementsByNature(Request $request)
+    {
+        $ids = $this->requestIntIdArray($request, 'nature_account_ids');
+        if (count($ids) === 0 && $request->filled('nature_account_ids')) {
+            $raw = $request->input('nature_account_ids');
+            if (is_string($raw) && $raw !== '') {
+                $ids = array_values(array_unique(array_filter(
+                    array_map(static fn ($x) => (int) $x, preg_split('/\s*,\s*/', $raw)),
+                    static fn (int $x): bool => $x > 0
+                )));
+            }
+        }
+        if (count($ids) === 0) {
+            return response()->json(['success' => false, 'message' => 'nature_account_ids is required.'], 422);
+        }
+
+        $expr = $this->bankReconMergedNatureAccountIdsExpr();
+        if ($expr === null) {
+            return response()->json([
+                'success'    => true,
+                'data'       => [],
+                'total'      => 0,
+                'message'    => 'Nature columns are not available.',
+                'pagination' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 25, 'total' => 0],
+            ]);
+        }
+
+        $perPage = (int) $request->get('per_page', 25);
+        $perPage = max(5, min(100, $perPage));
+
+        $query = $this->bankStatementsFilteredQueryForDrilldown($request);
+        $query->where('bs.match_status', '=', 'matched');
+        $query->where(function ($outer) use ($expr, $ids) {
+            foreach ($ids as $id) {
+                $outer->orWhereRaw(
+                    'FIND_IN_SET(?, REPLACE('.$expr.", ' ', ''))",
+                    [(int) $id]
+                );
+            }
+        });
+
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(function ($row) {
+            $this->hydrateStatementBillDisplayFields($row);
+
+            return $row;
+        });
+
+        return response()->json($paginator->toArray());
+    }
+
+    /**
+     * Paginated matched statements for a bill zone/branch (bill_tbl), AJAX for drill-down panel.
+     */
+    public function drilldownStatementsByZone(Request $request)
+    {
+        $zoneId   = (int) $request->input('zone_id', 0);
+        $branchId = (int) $request->input('branch_id', 0);
+        if ($zoneId <= 0 && $branchId <= 0) {
+            return response()->json(['success' => false, 'message' => 'zone_id or branch_id is required.'], 422);
+        }
+
+        $perPage = (int) $request->get('per_page', 25);
+        $perPage = max(5, min(100, $perPage));
+
+        $query = $this->bankStatementsFilteredQueryForDrilldown($request);
+        $query->where('bs.match_status', '=', 'matched');
+
+        if ($zoneId > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'zone_id')) {
+            $query->where('bill.zone_id', '=', $zoneId);
+        }
+        if ($branchId > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'branch_id')) {
+            $query->where('bill.branch_id', '=', $branchId);
+        }
+
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(function ($row) {
+            $this->hydrateStatementBillDisplayFields($row);
+
+            return $row;
+        });
+
+        return response()->json($paginator->toArray());
+    }
+
+    /**
      * Export filtered statements as CSV or XLSX (same filters as list; max 25k rows).
      */
     public function exportStatements(Request $request)
@@ -746,6 +865,10 @@ class BankStatementController extends Controller
             'bbm_matcher.user_fullname as bbm_matched_by_name',
             'bbm_matcher.username as bbm_matched_by_username',
             'bbm.matched_at as bank_match_matched_at',
+            'bill.id as resolved_bill_id',
+            'bill.vendor_id as resolved_vendor_id',
+            'bill.zone_id as resolved_bill_zone_id',
+            'bill.branch_id as resolved_bill_branch_id',
         ];
 
         if (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'br_nature_account_names')
@@ -757,6 +880,17 @@ class BankStatementController extends Controller
             $select[] = 'bill.br_nature_account_names as resolved_br_nature_account_names';
         } elseif (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'br_nature_account_names')) {
             $select[] = 'bs.br_nature_account_names as resolved_br_nature_account_names';
+        }
+
+        if (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'br_nature_account_ids')
+            && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'br_nature_account_ids')) {
+            $select[] = DB::raw(
+                "NULLIF(TRIM(COALESCE(NULLIF(TRIM(bs.br_nature_account_ids), ''), bill.br_nature_account_ids)), '') as resolved_br_nature_account_ids"
+            );
+        } elseif (Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'br_nature_account_ids')) {
+            $select[] = 'bill.br_nature_account_ids as resolved_br_nature_account_ids';
+        } elseif (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'br_nature_account_ids')) {
+            $select[] = 'bs.br_nature_account_ids as resolved_br_nature_account_ids';
         }
 
         if (Schema::hasTable('bill_lines_tbl')) {
@@ -1414,11 +1548,17 @@ class BankStatementController extends Controller
             'match_type' => 'required|in:full,partial',
             'nature_account_ids' => 'required|array|min:1',
             'nature_account_ids.*' => 'integer',
-            'attachments' => 'nullable|array',
+            'attachments' => 'required|array|min:1',
             'attachments.*' => 'file|max:15360',
+            'attachment_tags' => 'nullable|array',
+            'attachment_tags.*' => 'nullable|string|max:255',
+            'attachment_type_ids' => 'nullable|array',
+            'attachment_type_ids.*' => 'nullable|integer',
         ], [
             'nature_account_ids.required' => 'Nature of payment is required — select at least one chart account.',
             'nature_account_ids.min' => 'Nature of payment is required — select at least one chart account.',
+            'attachments.required' => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
+            'attachments.min' => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
         ]);
         DB::beginTransaction();
         try {
@@ -1764,11 +1904,20 @@ class BankStatementController extends Controller
         }
 
         $attachmentRows = [];
+        $tagInputs = $request->input('attachment_tags', []);
+        if (! is_array($tagInputs)) {
+            $tagInputs = [];
+        }
+        $typeIdInputs = $request->input('attachment_type_ids', []);
+        if (! is_array($typeIdInputs)) {
+            $typeIdInputs = [];
+        }
         if ($request->hasFile('attachments')) {
             $destDir = public_path('bank_recon_match_files/'.$statementId);
             if (! File::isDirectory($destDir)) {
                 File::makeDirectory($destDir, 0755, true);
             }
+            $idx = 0;
             foreach ($request->file('attachments') as $file) {
                 if (! $file || ! $file->isValid()) {
                     continue;
@@ -1779,11 +1928,22 @@ class BankStatementController extends Controller
                 $safe = $base.'-'.Str::random(6).'.'.$ext;
                 $file->move($destDir, $safe);
                 $relative = 'bank_recon_match_files/'.$statementId.'/'.$safe;
-                $attachmentRows[] = [
+                $tagLabel = isset($tagInputs[$idx]) ? trim((string) $tagInputs[$idx]) : '';
+                if ($tagLabel === '') {
+                    $tagLabel = 'Unspecified';
+                }
+                $tid = isset($typeIdInputs[$idx]) ? (int) $typeIdInputs[$idx] : 0;
+                $row = [
                     'name' => $origName,
-                    'url' => asset($relative),
+                    'url' => $this->bankReconMatchAttachmentPublicUrl($relative),
                     'path' => $relative,
+                    'tag'  => $tagLabel,
                 ];
+                if ($tid > 0) {
+                    $row['tag_type_id'] = $tid;
+                }
+                $attachmentRows[] = $row;
+                $idx++;
             }
         }
 
@@ -1810,6 +1970,34 @@ class BankStatementController extends Controller
                 }
             }
         }
+    }
+
+    /**
+     * Absolute URL for files under public/bank_recon_match_files/….
+     * When APP_URL points at the project folder (e.g. https://…/hms) instead of …/hms/public, {@see asset()}
+     * omits the /public/ segment and links 404; insert /public/ before bank_recon_match_files for that layout.
+     */
+    private function bankReconMatchAttachmentPublicUrl(string $relative): string
+    {
+        $relative = ltrim(str_replace('\\', '/', $relative), '/');
+        $url = asset($relative);
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host']) || empty($parts['path'])) {
+            return $url;
+        }
+        $path = $parts['path'];
+        if (str_contains($path, '/public/bank_recon_match_files')) {
+            return $url;
+        }
+        $fixedPath = preg_replace('#^/([^/]+)/(bank_recon_match_files.*)$#', '/$1/public/$2', $path, 1);
+        if ($fixedPath === null || $fixedPath === $path) {
+            return $url;
+        }
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+        return $parts['scheme'].'://'.$parts['host'].$port.$fixedPath
+            .(isset($parts['query']) ? '?'.$parts['query'] : '')
+            .(isset($parts['fragment']) ? '#'.$parts['fragment'] : '');
     }
 
     /**
@@ -2998,8 +3186,15 @@ class BankStatementController extends Controller
      *
      * @return array{id:int, action:string, date_formatted:string}
      */
-    private function applyIncomeTagCore(object $stmt, string $zone, string $branch, Carbon $dateObj, string $mode, float $bankAmount): array
-    {
+    private function applyIncomeTagCore(
+        object $stmt,
+        string $zone,
+        string $branch,
+        Carbon $dateObj,
+        string $mode,
+        float $bankAmount,
+        ?string $incomeTagMismatchRemark = null
+    ): array {
         $dateFormatted = $dateObj->format('d/m/Y');
 
         if ($mode === 'card' || $mode === 'upi') {
@@ -3107,6 +3302,10 @@ class BankStatementController extends Controller
                 $curBankUpi, $curBankNeft, $curBankOth
             );
             $updateData = array_merge($updateData, $diffs);
+            if ($incomeTagMismatchRemark !== null && $incomeTagMismatchRemark !== ''
+                && Schema::hasColumn('income_reconciliation_table', 'income_tag_mismatch_remark')) {
+                $updateData['income_tag_mismatch_remark'] = $incomeTagMismatchRemark;
+            }
             DB::table('income_reconciliation_table')
                 ->where('id', $existing->id)
                 ->update($updateData);
@@ -3182,9 +3381,73 @@ class BankStatementController extends Controller
             $bankUpiCard, $bankNeft, $bankOthers
         );
         $insertData = array_merge($insertData, $diffs);
+        if ($incomeTagMismatchRemark !== null && $incomeTagMismatchRemark !== ''
+            && Schema::hasColumn('income_reconciliation_table', 'income_tag_mismatch_remark')) {
+            $insertData['income_tag_mismatch_remark'] = $incomeTagMismatchRemark;
+        }
         $incomeReconId = DB::table('income_reconciliation_table')->insertGetId($insertData);
 
         return ['id' => (int) $incomeReconId, 'action' => 'created', 'date_formatted' => $dateFormatted];
+    }
+
+    /** Rupee tolerance when comparing MOC DOC bucket total vs bank tag amount */
+    private const INCOME_TAG_MOC_AMOUNT_EPS = 1.0;
+
+    /**
+     * MOC DOC total for the income-tag mode (same buckets as fetchMocDocForBranch).
+     */
+    private function incomeTagMocAmountForMode(array $mocData, string $mode): float
+    {
+        return match ($mode) {
+            'cash'  => (float) ($mocData['cash'] ?? 0),
+            'card'  => (float) ($mocData['card'] ?? 0),
+            'upi'   => (float) ($mocData['upi'] ?? 0),
+            'neft'  => (float) ($mocData['neft'] ?? 0),
+            'other' => (float) ($mocData['other'] ?? 0),
+            default => 0.0,
+        };
+    }
+
+    /**
+     * Compare bank tag amount (per collection date) to MOC DOC for each selected mode.
+     * Uses the same API spacing as applyIncomeTag to reduce HTTP 429 on multi-date checks.
+     *
+     * @param  array<int, string>  $sortedYmd
+     * @param  array<int, string>  $modes
+     * @param  array<string, float>  $amountByYmd
+     * @return array<int, array{date_ymd:string, date_display:string, mode:string, moc_amount:float, tag_amount:float, diff:float}>
+     */
+    private function collectIncomeTagMocVsBankMismatches(string $branch, array $sortedYmd, array $modes, array $amountByYmd): array
+    {
+        $out = [];
+        $eps = self::INCOME_TAG_MOC_AMOUNT_EPS;
+        foreach ($sortedYmd as $idx => $ymd) {
+            if ($idx > 0) {
+                usleep(800000);
+            }
+            try {
+                $dateObj = Carbon::createFromFormat('Y-m-d', $ymd);
+            } catch (\Exception $e) {
+                continue;
+            }
+            $mocData = $this->fetchMocDocForBranch($branch, $dateObj->format('Ymd'));
+            $portion = (float) ($amountByYmd[$ymd] ?? 0);
+            foreach ($modes as $mode) {
+                $mocAmt = $this->incomeTagMocAmountForMode($mocData, $mode);
+                if (abs($mocAmt - $portion) > $eps) {
+                    $out[] = [
+                        'date_ymd'      => $ymd,
+                        'date_display'  => $dateObj->format('d/m/Y'),
+                        'mode'          => $mode,
+                        'moc_amount'    => round($mocAmt, 2),
+                        'tag_amount'    => round($portion, 2),
+                        'diff'          => round($portion - $mocAmt, 2),
+                    ];
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -3209,6 +3472,8 @@ class BankStatementController extends Controller
             'modes'             => 'nullable|array',
             'modes.*'           => 'nullable|in:cash,card,upi,neft,other',
             'date_amounts'      => 'nullable|array',
+            'acknowledge_income_amount_mismatch' => 'nullable|boolean',
+            'income_amount_mismatch_remark'      => 'nullable|string|max:2000',
         ]);
 
         $modes = [];
@@ -3289,6 +3554,28 @@ class BankStatementController extends Controller
         $zone   = $request->zone;
         $branch = $request->branch;
 
+        $acknowledgeMismatch = $request->boolean('acknowledge_income_amount_mismatch');
+        if ($acknowledgeMismatch) {
+            $request->validate([
+                'income_amount_mismatch_remark' => 'required|string|min:1|max:2000',
+            ]);
+        }
+        $mismatchRemark = $acknowledgeMismatch
+            ? trim((string) $request->input('income_amount_mismatch_remark', ''))
+            : null;
+
+        if (! $acknowledgeMismatch) {
+            $mocMismatches = $this->collectIncomeTagMocVsBankMismatches($branch, $sortedYmd, $modes, $amountByYmd);
+            if ($mocMismatches !== []) {
+                return response()->json([
+                    'success'    => false,
+                    'code'       => 'income_tag_moc_amount_mismatch',
+                    'message'    => 'MOC DOC amount does not match the bank amount you are tagging for one or more collection date / mode combinations. Review the differences below. If you still want to apply the tag, confirm below.',
+                    'mismatches' => $mocMismatches,
+                ], 409);
+            }
+        }
+
         $created = 0;
         $updated = 0;
         $firstDateFormatted = null;
@@ -3311,7 +3598,15 @@ class BankStatementController extends Controller
                 $portion = (float) ($amountByYmd[$ymd] ?? $lineTotal);
                 $lastIdForDate = null;
                 foreach ($modes as $mode) {
-                    $res = $this->applyIncomeTagCore($stmt, $zone, $branch, $dateObj, $mode, $portion);
+                    $res = $this->applyIncomeTagCore(
+                        $stmt,
+                        $zone,
+                        $branch,
+                        $dateObj,
+                        $mode,
+                        $portion,
+                        $acknowledgeMismatch ? $mismatchRemark : null
+                    );
                     
                     if ($res['action'] === 'created') {
                         $created++;
@@ -3347,6 +3642,12 @@ class BankStatementController extends Controller
                 ]);
             } elseif (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
                 $incomeUpdate['income_match_split_json'] = null;
+            }
+
+            if (Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark')) {
+                $incomeUpdate['income_tag_mismatch_remark'] = ($acknowledgeMismatch && $mismatchRemark !== null && $mismatchRemark !== '')
+                    ? $mismatchRemark
+                    : null;
             }
 
             $safeUpdate = [];
@@ -3447,6 +3748,10 @@ class BankStatementController extends Controller
                     $clearData['bank_others'] = 0;
                 }
 
+                if (Schema::hasColumn('income_reconciliation_table', 'income_tag_mismatch_remark')) {
+                    $clearData['income_tag_mismatch_remark'] = null;
+                }
+
                 if (count($clearData) <= 1) {
                     continue;
                 }
@@ -3486,6 +3791,9 @@ class BankStatementController extends Controller
             ];
             if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
                 $resetUpdate['income_match_split_json'] = null;
+            }
+            if (Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark')) {
+                $resetUpdate['income_tag_mismatch_remark'] = null;
             }
             $safeReset = [];
             foreach ($resetUpdate as $col => $val) {
@@ -3930,5 +4238,171 @@ class BankStatementController extends Controller
             "location56" => "Krishnagiri",
             "location57" => "Karur",
         ];
+    }
+
+    /**
+     * Document types for bank–bill match attachments (master). Dropdown uses non-admin list (active only).
+     */
+    public function listMatchAttachmentTypes(Request $request)
+    {
+        if (! Schema::hasTable('bank_recon_match_attachment_types')) {
+            return response()->json([]);
+        }
+        $q = DB::table('bank_recon_match_attachment_types')->orderBy('sort_order')->orderBy('id');
+        if (! $request->boolean('admin')) {
+            $q->where('is_active', true);
+        }
+
+        $rows = $q->get();
+
+        return response()->json($rows->map(function ($r) {
+            $path = isset($r->sample_file_path) ? (string) $r->sample_file_path : '';
+
+            return [
+                'id'               => (int) $r->id,
+                'name'             => (string) ($r->name ?? ''),
+                'sort_order'       => (int) ($r->sort_order ?? 0),
+                'is_active'        => (bool) ($r->is_active ?? true),
+                'sample_file_path' => $path !== '' ? $path : null,
+                'sample_url'       => ($path !== '' && is_file(public_path($path))) ? asset($path) : null,
+            ];
+        })->values()->all());
+    }
+
+    public function storeMatchAttachmentType(Request $request)
+    {
+        if (! Schema::hasTable('bank_recon_match_attachment_types')) {
+            return response()->json(['success' => false, 'message' => 'Run migrations to enable attachment types.'], 503);
+        }
+        $request->validate([
+            'name'       => 'required|string|max:191',
+            'sort_order' => 'nullable|integer|min:0|max:65535',
+            'sample_file'=> 'nullable|file|max:5120',
+        ]);
+
+        $sort = (int) $request->input('sort_order', 0);
+        $path = null;
+        if ($request->hasFile('sample_file') && $request->file('sample_file')->isValid()) {
+            $file = $request->file('sample_file');
+            $destDir = public_path('bank_recon_attachment_type_samples');
+            if (! File::isDirectory($destDir)) {
+                File::makeDirectory($destDir, 0755, true);
+            }
+            $orig = $file->getClientOriginalName();
+            $ext = $file->getClientOriginalExtension() ?: 'bin';
+            $base = Str::slug(pathinfo($orig, PATHINFO_FILENAME)) ?: 'sample';
+            $safe = $base.'-'.Str::random(6).'.'.$ext;
+            $file->move($destDir, $safe);
+            $path = 'bank_recon_attachment_type_samples/'.$safe;
+        }
+
+        $id = DB::table('bank_recon_match_attachment_types')->insertGetId([
+            'name'             => trim((string) $request->name),
+            'sort_order'       => $sort,
+            'is_active'        => true,
+            'sample_file_path' => $path,
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+
+        $row = DB::table('bank_recon_match_attachment_types')->where('id', $id)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Attachment type saved',
+            'type'    => [
+                'id'               => (int) $row->id,
+                'name'             => (string) $row->name,
+                'sort_order'       => (int) $row->sort_order,
+                'sample_file_path' => $row->sample_file_path,
+                'sample_url'       => $row->sample_file_path ? asset($row->sample_file_path) : null,
+            ],
+        ]);
+    }
+
+    public function updateMatchAttachmentType(Request $request, int $id)
+    {
+        if (! Schema::hasTable('bank_recon_match_attachment_types')) {
+            return response()->json(['success' => false, 'message' => 'Table missing'], 503);
+        }
+        $existing = DB::table('bank_recon_match_attachment_types')->where('id', $id)->first();
+        if (! $existing) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+        $request->validate([
+            'name'       => 'sometimes|required|string|max:191',
+            'sort_order' => 'nullable|integer|min:0|max:65535',
+            'is_active'  => 'sometimes|boolean',
+            'sample_file'=> 'nullable|file|max:5120',
+        ]);
+
+        $update = ['updated_at' => now()];
+        if ($request->has('name')) {
+            $update['name'] = trim((string) $request->name);
+        }
+        if ($request->has('sort_order')) {
+            $update['sort_order'] = (int) $request->sort_order;
+        }
+        if ($request->has('is_active')) {
+            $update['is_active'] = $request->boolean('is_active');
+        }
+        if ($request->hasFile('sample_file') && $request->file('sample_file')->isValid()) {
+            $oldPath = isset($existing->sample_file_path) ? (string) $existing->sample_file_path : '';
+            if ($oldPath !== '' && Str::startsWith($oldPath, 'bank_recon_attachment_type_samples/')) {
+                $full = public_path($oldPath);
+                if (is_file($full)) {
+                    @unlink($full);
+                }
+            }
+            $file = $request->file('sample_file');
+            $destDir = public_path('bank_recon_attachment_type_samples');
+            if (! File::isDirectory($destDir)) {
+                File::makeDirectory($destDir, 0755, true);
+            }
+            $orig = $file->getClientOriginalName();
+            $ext = $file->getClientOriginalExtension() ?: 'bin';
+            $base = Str::slug(pathinfo($orig, PATHINFO_FILENAME)) ?: 'sample';
+            $safe = $base.'-'.Str::random(6).'.'.$ext;
+            $file->move($destDir, $safe);
+            $update['sample_file_path'] = 'bank_recon_attachment_type_samples/'.$safe;
+        }
+
+        DB::table('bank_recon_match_attachment_types')->where('id', $id)->update($update);
+
+        $row = DB::table('bank_recon_match_attachment_types')->where('id', $id)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Updated',
+            'type'    => [
+                'id'               => (int) $row->id,
+                'name'             => (string) $row->name,
+                'sort_order'       => (int) $row->sort_order,
+                'is_active'        => (bool) $row->is_active,
+                'sample_file_path' => $row->sample_file_path,
+                'sample_url'       => $row->sample_file_path ? asset($row->sample_file_path) : null,
+            ],
+        ]);
+    }
+
+    public function destroyMatchAttachmentType(int $id)
+    {
+        if (! Schema::hasTable('bank_recon_match_attachment_types')) {
+            return response()->json(['success' => false, 'message' => 'Table missing'], 503);
+        }
+        $row = DB::table('bank_recon_match_attachment_types')->where('id', $id)->first();
+        if (! $row) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+        $p = isset($row->sample_file_path) ? (string) $row->sample_file_path : '';
+        if ($p !== '' && Str::startsWith($p, 'bank_recon_attachment_type_samples/')) {
+            $full = public_path($p);
+            if (is_file($full)) {
+                @unlink($full);
+            }
+        }
+        DB::table('bank_recon_match_attachment_types')->where('id', $id)->delete();
+
+        return response()->json(['success' => true, 'message' => 'Deleted']);
     }
 }

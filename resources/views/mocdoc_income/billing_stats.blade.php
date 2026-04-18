@@ -707,6 +707,10 @@ $(function () {
 
     /* ── APPLY FILTERS ─────────────────────────────────────────── */
     $('#applyBtn').on('click', function(){
+        var df = fpFrom.selectedDates && fpFrom.selectedDates[0];
+        var dt = fpTo.selectedDates && fpTo.selectedDates[0];
+        S.date_from = df ? toISO(df) : '';
+        S.date_to = dt ? toISO(dt) : '';
         S.search = $('#f_search').val().trim();
         S.page   = 1;
         fetchAll();
@@ -781,7 +785,12 @@ $(function () {
     /* ── FETCH STATS ───────────────────────────────────────────── */
     function fetchStats(){
         var p = params(); p.ajax = 'stats';
-        $.ajax({ url:BASE_URL, method:'GET', data:p,
+        $.ajax({
+            url: BASE_URL,
+            method: 'GET',
+            data: p,
+            dataType: 'json',
+            cache: false,
             success: function(r){ renderStats(r); },
             error:   function(){ toastr.error('Failed to load stats'); }
         });
@@ -791,7 +800,12 @@ $(function () {
     function fetchTable(){
         overlay(true);
         var p = params(); p.ajax = 'table';
-        $.ajax({ url:BASE_URL, method:'GET', data:p,
+        $.ajax({
+            url: BASE_URL,
+            method: 'GET',
+            data: p,
+            dataType: 'json',
+            cache: false,
             success: function(res){
                 overlay(false);
                 renderRows(res);

@@ -3622,13 +3622,17 @@ function calculateFinalTotals() {
                         $('.company-search-input').val(bill_header[0].company_name);
                         $('.company_id').val(bill_header[0].company_id);
                         $('#bill_category').val(bill_header[0].bill_category);
-                        if (bill_header[0].quotation_id && bill_header[0].Quotation) {
-                            $('#quotation_against_display').val(bill_header[0].Quotation.quotation_gen_no || bill_header[0].Quotation.quotation_no || '');
+                        if (bill_header[0].quotation_id) {
                             $('#quotation_id').val(bill_header[0].quotation_id);
+                            if (bill_header[0].Quotation) {
+                                $('#quotation_against_display').val(bill_header[0].Quotation.quotation_gen_no || bill_header[0].Quotation.quotation_no || '');
+                            }
                         }
-                        if (bill_header[0].purchase_id && bill_header[0].Purchase) {
-                            $('#po_against_display').val(bill_header[0].Purchase.purchase_gen_order || bill_header[0].Purchase.purchase_order_number || '');
+                        if (bill_header[0].purchase_id) {
                             $('#purchase_id').val(bill_header[0].purchase_id);
+                            if (bill_header[0].Purchase) {
+                                $('#po_against_display').val(bill_header[0].Purchase.purchase_gen_order || bill_header[0].Purchase.purchase_order_number || '');
+                            }
                         }
 
                         let isFirst = true;

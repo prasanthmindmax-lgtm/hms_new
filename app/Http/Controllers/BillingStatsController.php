@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\BillingListModel;
 use App\Models\TblZonesModel;
 use App\Models\TblLocationModel;
+use App\Support\MocdocLocationKeys;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -19,13 +20,16 @@ class BillingStatsController extends Controller
     public function index(Request $request)
     {
         $admin = Auth::user();
+        // Query param `ajax` (GET) — use input() so filters + ajax work reliably (not property magic)
+        $ajaxKind = $request->query('ajax', $request->input('ajax'));
+
         // ── AJAX: stats only ──────────────────────────────────────
-        if ($request->ajax && $request->ajax === 'stats') {
+        if ($ajaxKind === 'stats') {
             return response()->json($this->buildStats($request));
         }
 
         // ── AJAX: table only ─────────────────────────────────────
-        if ($request->ajax && $request->ajax === 'table') {
+        if ($ajaxKind === 'table') {
             return response()->json($this->buildTable($request));
         }
 
@@ -123,6 +127,63 @@ class BillingStatsController extends Controller
         ];
     }
 
+    /**
+     * @return int[]
+     */
+    private function intArrayFromRequest(Request $request, string $key): array
+    {
+        $v = $request->input($key);
+        if ($v === null || $v === '' || $v === []) {
+            return [];
+        }
+        if (is_array($v)) {
+            return array_values(array_unique(array_filter(array_map('intval', $v), static fn (int $x): bool => $x > 0)));
+        }
+        if (is_numeric($v)) {
+            $n = (int) $v;
+
+            return $n > 0 ? [$n] : [];
+        }
+
+        return [];
+    }
+
+    /**
+     * @return string[]
+     */
+    private function stringArrayFromRequest(Request $request, string $key): array
+    {
+        $v = $request->input($key);
+        if ($v === null || $v === '' || $v === []) {
+            return [];
+        }
+        if (is_array($v)) {
+            return array_values(array_filter(array_map('strval', $v), static fn (string $x): bool => $x !== ''));
+        }
+
+        return [(string) $v];
+    }
+
+    /**
+     * @param  int[]  $tblLocationIds  tbl_locations.id
+     */
+    private function applyBillingLocationScope($query, array $tblLocationIds): void
+    {
+        if ($tblLocationIds === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+        $locations = TblLocationModel::whereIn('id', $tblLocationIds)->get();
+        $variants = MocdocLocationKeys::billingLocationIdVariantsForBranches($locations);
+        if ($variants === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+        $query->whereIn('location_id', $variants);
+    }
+
     // ─────────────────────────────────────────────────────────────
     // BASE QUERY — shared filter logic
     // ─────────────────────────────────────────────────────────────
@@ -130,40 +191,51 @@ class BillingStatsController extends Controller
     {
         $query = BillingListModel::query();
 
+        // billdate: leading YYYYMMDD segment (compact API format) — string compare on first 8 digits
         if ($request->filled('date_from')) {
             try {
                 $dateFrom = Carbon::parse($request->date_from)->format('Ymd');
-                $query->whereRaw("LEFT(billdate,8) >= ?", [$dateFrom]);
-            } catch (\Exception $e) {}
+                $query->whereRaw('LEFT(billdate, 8) >= ?', [$dateFrom]);
+            } catch (\Exception $e) {
+            }
         }
-        
+
         if ($request->filled('date_to')) {
             try {
                 $dateTo = Carbon::parse($request->date_to)->format('Ymd');
-                $query->whereRaw("LEFT(billdate,8) <= ?", [$dateTo]);
-            } catch (\Exception $e) {}
-        }
-        // Zone multi-select: zone_ids[] → find matching tbl_locations → filter by location_id
-        if ($request->filled('zone_ids') && is_array($request->zone_ids)) {
-            $locationIds = TblLocationModel::whereIn('zone_id', $request->zone_ids)
-                ->pluck('id')->toArray();
-            if (!empty($locationIds)) {
-                $query->whereIn('location_id', $locationIds);
-            } else {
-                $query->whereRaw('1 = 0'); // selected zones have no branches
+                $query->whereRaw('LEFT(billdate, 8) <= ?', [$dateTo]);
+            } catch (\Exception $e) {
             }
         }
-        // Branch multi-select: branch_ids[] → tbl_locations.id = billing_list.location_id
-        if ($request->filled('branch_ids') && is_array($request->branch_ids)) {
-            $query->whereIn('location_id', $request->branch_ids);
+
+        // Zone → tbl_locations by zone_id → billing_list.location_id (API-style "location{N}")
+        $zoneIds = $this->intArrayFromRequest($request, 'zone_ids');
+        if ($zoneIds !== []) {
+            $tblBranchIds = TblLocationModel::whereIn('zone_id', $zoneIds)
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->toArray();
+            if (! empty($tblBranchIds)) {
+                $this->applyBillingLocationScope($query, $tblBranchIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+        }
+
+        // Branch → tbl_locations.id → same API key mapping (intersects with zone when both set)
+        $branchIds = $this->intArrayFromRequest($request, 'branch_ids');
+        if ($branchIds !== []) {
+            $this->applyBillingLocationScope($query, $branchIds);
         }
         // Type multi-select
-        if ($request->filled('type_vals') && is_array($request->type_vals)) {
-            $query->whereIn('type', $request->type_vals);
+        $typeVals = $this->stringArrayFromRequest($request, 'type_vals');
+        if ($typeVals !== []) {
+            $query->whereIn('type', $typeVals);
         }
         // Payment type multi-select
-        if ($request->filled('payment_vals') && is_array($request->payment_vals)) {
-            $query->whereIn('paymenttype', $request->payment_vals);
+        $paymentVals = $this->stringArrayFromRequest($request, 'payment_vals');
+        if ($paymentVals !== []) {
+            $query->whereIn('paymenttype', $paymentVals);
         }
         if ($request->filled('search')) {
             $s = $request->search;

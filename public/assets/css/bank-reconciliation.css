@@ -4,6 +4,517 @@
    WITH IMPORT PAGE STYLING
    ============================================ */
 
+/* =============================================
+   Drill-down offcanvas (nature / zone statements)
+   ============================================= */
+.br-drill-offcanvas {
+    width: min(1020px, 96vw) !important;
+    display: flex;
+    flex-direction: column;
+    border-left: none !important;
+    box-shadow: -6px 0 32px rgba(0,0,0,0.14) !important;
+}
+
+/* ---- Header ---- */
+.br-drill-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    padding: 18px 22px;
+    flex-shrink: 0;
+}
+.br-drill-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+.br-drill-header-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.br-drill-header-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.br-drill-header-sub {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.72);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.br-drill-close {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.br-drill-close:hover {
+    background: rgba(255,255,255,0.28);
+}
+
+/* ---- Zone filter bar ---- */
+.br-drill-filter-bar {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 14px 22px;
+    flex-shrink: 0;
+}
+.br-drill-filter-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.br-drill-filter-field {
+    flex: 1;
+    min-width: 160px;
+}
+.br-drill-filter-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 5px;
+}
+.br-drill-select {
+    border-color: #cbd5e1;
+    border-radius: 7px;
+    font-size: 0.82rem;
+}
+.br-drill-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+}
+.br-drill-filter-apply {
+    flex-shrink: 0;
+}
+.br-drill-apply-btn {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 6px 18px;
+    height: 34px;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+}
+.br-drill-apply-btn:hover {
+    opacity: 0.88;
+    color: #fff;
+}
+
+/* ---- Body ---- */
+.br-drill-body {
+    background: #f8fafc;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+/* ---- Loading ---- */
+.br-drill-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    font-size: 0.85rem;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+/* ---- Empty ---- */
+.br-drill-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 52px 24px;
+    flex-shrink: 0;
+}
+.br-drill-empty-icon {
+    font-size: 2.6rem;
+    color: #cbd5e1;
+    margin-bottom: 10px;
+}
+.br-drill-empty-text {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* ---- Table wrapper ---- */
+.br-drill-table-wrap {
+    flex: 1 1 0;
+    overflow-y: auto;
+    padding: 0 22px;
+    margin-top: 16px;
+}
+
+/* ---- Table ---- */
+.br-drill-table {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8rem;
+}
+.br-drill-table thead tr {
+    background: #f1f5f9;
+}
+.br-drill-table thead th {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    white-space: nowrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    background: transparent;
+}
+.br-drill-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.1s;
+}
+.br-drill-table tbody tr:last-child {
+    border-bottom: none;
+}
+.br-drill-table tbody tr:hover {
+    background: #f8faff;
+}
+.br-drill-table tbody td {
+    padding: 10px 14px;
+    vertical-align: middle;
+    color: #1e293b;
+}
+.br-drill-table tbody td.text-end {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Pagination ---- */
+.br-drill-pagination-wrap {
+    padding: 14px 22px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+.br-drill-pagination-wrap .pagination {
+    margin-bottom: 0;
+}
+.br-drill-pagination-wrap .page-link {
+    border-radius: 6px;
+    font-size: 0.78rem;
+    padding: 4px 12px;
+    color: #4f46e5;
+    border-color: #e2e8f0;
+}
+.br-drill-pagination-wrap .page-item.active .page-link {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: #fff;
+}
+.br-drill-pagination-wrap .page-item.disabled .page-link {
+    color: #cbd5e1;
+    background: transparent;
+}
+
+/* ---- Drill-down table cell helpers ---- */
+.br-drill-date {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+.br-drill-desc {
+    font-size: 0.78rem;
+    color: #1e293b;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.br-drill-ref-code {
+    font-size: 0.72rem;
+    color: #6366f1;
+    background: #eef2ff;
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+}
+.br-drill-withdrawal {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #dc2626;
+}
+.br-drill-deposit {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #16a34a;
+}
+.br-drill-bill-no {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #0369a1;
+    white-space: nowrap;
+}
+.br-drill-vendor {
+    font-size: 0.78rem;
+    color: #1e293b;
+}
+.br-drill-acct-num {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    display: block;
+    white-space: nowrap;
+}
+.br-drill-acct-bank {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    display: block;
+}
+.br-drill-count-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+    border-radius: 999px;
+    padding: 1px 8px;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+}
+
+/* =============================================
+   Match Attachments Viewer Modal
+   ============================================= */
+.br-att-modal-content {
+    border: none;
+    border-radius: 14px;
+    overflow: hidden;
+}
+.br-att-modal-header {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    border-bottom: none;
+    padding: 18px 22px;
+    color: #fff;
+}
+.br-att-modal-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+.br-att-modal-header .modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+}
+.br-att-modal-subtitle {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.72);
+    margin-top: 1px;
+}
+.br-att-modal-body {
+    background: #f8fafc;
+    padding: 20px 22px;
+}
+
+/* Empty state */
+.br-att-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    gap: 10px;
+}
+.br-att-empty-icon {
+    font-size: 2.8rem;
+    color: #cbd5e1;
+}
+.br-att-empty-text {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+/* Each file item */
+.br-att-item {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.br-att-item-sep {
+    margin-top: 0;
+}
+
+/* Item header row */
+.br-att-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+}
+.br-att-file-meta {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+}
+.br-att-file-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    background: #f1f5f9;
+}
+.br-att-icon-img   { color: #0ea5e9; }
+.br-att-icon-pdf   { color: #ef4444; }
+.br-att-icon-word  { color: #2563eb; }
+.br-att-icon-excel { color: #16a34a; }
+.br-att-icon-generic { color: #64748b; }
+
+/* File icon background tints */
+.bi.br-att-icon-img   ~ .br-att-file-icon,
+.br-att-file-icon:has(.br-att-icon-img)   { background: #e0f2fe; }
+.br-att-file-icon:has(.br-att-icon-pdf)   { background: #fee2e2; }
+.br-att-file-icon:has(.br-att-icon-word)  { background: #dbeafe; }
+.br-att-file-icon:has(.br-att-icon-excel) { background: #dcfce7; }
+
+.br-att-file-info {
+    min-width: 0;
+}
+.br-att-file-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+}
+.br-att-file-tag {
+    margin-top: 3px;
+}
+.br-att-tag-chip {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #6d28d9;
+    background: #ede9fe;
+    border-radius: 4px;
+    padding: 1px 7px;
+}
+
+/* Open button */
+.br-att-open-btn {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #4f46e5;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 7px;
+    padding: 5px 13px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.br-att-open-btn:hover {
+    background: #4f46e5;
+    color: #fff;
+    border-color: #4f46e5;
+}
+
+/* Preview areas */
+.br-att-preview-box {
+    background: #f8fafc;
+    padding: 14px 16px;
+}
+.br-att-preview-img {
+    max-height: 420px;
+    max-width: 100%;
+    display: block;
+    margin: 0 auto;
+    border-radius: 6px;
+    object-fit: contain;
+}
+.br-att-preview-pdf {
+    padding: 0;
+}
+.br-att-preview-unavail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 6px;
+}
+.br-att-unavail-icon {
+    font-size: 2rem;
+    color: #94a3b8;
+}
+.br-att-unavail-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.br-att-unavail-sub {
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
 /* General Styles */
 body {
     background-color: #f8f9fa;
@@ -78,7 +589,190 @@ body {
     outline-offset: 3px;
 }
 
-/* Matched bill column: bill line accounts + zone/branch */
+/* =============================================
+   Matched Bill / Matched By / Matched Date cells
+   ============================================= */
+
+/* Empty placeholder */
+.br-cell-empty {
+    color: #cbd5e1;
+    font-size: 0.82rem;
+}
+
+/* ---------- Matched Bill card ---------- */
+.br-matched-bill-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: #f0fdf4;
+    border: none;
+    border-left: 3px solid #22c55e;
+    border-radius: 4px;
+    padding: 5px 10px;
+}
+
+/* Bill reference number(s) */
+.br-bill-ref {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #15803d;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+/* Matched bill — outbound links (bill print, vendor dashboard, drill-downs) */
+.br-bill-ref-link {
+    color: #15803d;
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.br-bill-ref-link:hover {
+    color: #0f766e;
+}
+.br-bill-vendor-link {
+    color: #1e293b;
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px dashed #94a3b8;
+}
+.br-bill-vendor-link:hover {
+    color: #0f172a;
+    border-bottom-color: #64748b;
+}
+.br-bill-nature-link,
+.br-bill-zone-link,
+.br-link-drill {
+    color: inherit;
+    font-weight: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.br-bill-nature-link:hover,
+.br-bill-zone-link:hover,
+.br-link-drill:hover {
+    color: #4f46e5;
+}
+.br-bill-ref .text-muted {
+    color: #94a3b8;
+    font-weight: 400;
+}
+
+/* Vendor name */
+.br-bill-vendor {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+.br-bill-vendor .bi { color: #64748b; font-size: 0.7rem; }
+
+/* Nature of payment */
+.br-bill-nature {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 0.68rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+.br-bill-nature .bi { color: #94a3b8; font-size: 0.64rem; margin-top: 1px; }
+
+/* Zone / branch */
+.br-bill-zone {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    color: #64748b;
+}
+.br-bill-zone .bi { color: #94a3b8; font-size: 0.64rem; }
+
+/* Amount */
+.br-bill-amount {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #16a34a;
+    margin-top: 2px;
+}
+
+/* ---------- Matched By stack ---------- */
+.br-matched-by-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.br-matched-by-chip {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+    border: none;
+    border-left: 3px solid transparent;
+    border-radius: 3px;
+    padding: 3px 8px;
+    min-width: 80px;
+}
+
+.br-matched-by-expense {
+    background: #f0f9ff;
+    border-left-color: #38bdf8;
+}
+.br-matched-by-income {
+    background: #fdf4ff;
+    border-left-color: #c084fc;
+}
+
+.br-matched-by-chip-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.br-matched-by-expense .br-matched-by-chip-label { color: #0ea5e9; }
+.br-matched-by-income  .br-matched-by-chip-label { color: #a855f7; }
+
+.br-matched-by-chip-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+.br-matched-by-chip-user {
+    font-size: 0.66rem;
+    color: #94a3b8;
+    line-height: 1;
+}
+
+/* ---------- Matched Date cell ---------- */
+.br-matched-date-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.br-matched-date-day {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.br-matched-date-day .bi { color: #6366f1; font-size: 0.74rem; }
+.br-matched-date-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+.br-matched-date-time .bi { font-size: 0.62rem; }
+
+/* legacy selectors kept for safety */
 .matched-bill-info .bank-recon-bill-nature,
 .matched-bill-info .bank-recon-bill-zonebranch {
     font-size: 11px;
@@ -602,8 +1296,8 @@ body {
 }
 
 #statementsTable tbody td {
-    padding: 15px 12px;
-    vertical-align: middle;
+    padding: 12px 12px;
+    vertical-align: top;
     font-size: 14px;
 }
 
@@ -672,6 +1366,7 @@ body {
     display: flex;
     gap: 5px;
     flex-wrap: wrap;
+    align-items: flex-start;
 }
 
 .btn-match, .btn-unmatch {
@@ -1348,6 +2043,7 @@ body > .daterangepicker {
 .br-bpv-desc-inner {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.35;
@@ -2400,4 +3096,695 @@ body > .daterangepicker {
     opacity: 0.9;
     color: #fff;
     box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+}
+
+/* SweetAlert2: must beat Bootstrap modals + theme (match drawer often gets inline z-index) */
+.swal2-container {
+    z-index: 2147483647 !important;
+}
+
+/* =============================================
+   MOC DOC mismatch dialog — custom SweetAlert2
+   ============================================= */
+
+/* Popup shell — remove default Swal padding/icon area
+   NOTE: overflow must NOT be hidden or inner textarea/checkbox cannot receive clicks (SweetAlert2 + focus trap). */
+.br-moc-swal-popup {
+    border-radius: 20px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: 0 24px 64px rgba(15,23,42,0.22) !important;
+}
+.br-moc-swal-popup .swal2-html-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    max-height: none !important;
+    pointer-events: auto !important;
+}
+.br-moc-swal-popup .swal2-actions {
+    pointer-events: auto !important;
+}
+/* Hide the default icon */
+.br-moc-swal-popup .swal2-icon { display: none !important; }
+
+/* Actions row */
+.br-moc-swal-actions {
+    padding: 0 24px 20px !important;
+    gap: 10px !important;
+}
+.br-moc-swal-confirm-btn,
+.br-moc-swal-cancel-btn {
+    border-radius: 10px !important;
+    font-size: 0.84rem !important;
+    font-weight: 600 !important;
+    padding: 9px 20px !important;
+}
+
+/* ---- inner wrapper ---- */
+.br-moc-swal-wrap {
+    font-family: inherit;
+}
+
+/* Top intro banner */
+.br-moc-swal-intro {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: linear-gradient(135deg, #fff7ed 0%, #fef2f2 100%);
+    border-bottom: 2px solid #fde68a;
+    padding: 22px 24px 18px;
+}
+.br-moc-swal-warn-icon {
+    font-size: 2.2rem;
+    color: #f59e0b;
+    flex-shrink: 0;
+    margin-top: 2px;
+    filter: drop-shadow(0 2px 4px rgba(245,158,11,0.30));
+}
+.br-moc-swal-intro-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+}
+.br-moc-swal-intro-sub {
+    font-size: 0.82rem;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.55;
+}
+
+/* Cards list */
+.br-moc-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 24px 4px;
+    max-height: 340px;
+    overflow-y: auto;
+}
+.br-moc-cards-list::-webkit-scrollbar { width: 5px; }
+.br-moc-cards-list::-webkit-scrollbar-track { background: #f1f5f9; }
+.br-moc-cards-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+/* Individual mismatch card */
+.br-moc-mismatch-card {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+}
+
+/* Card header bar */
+.br-moc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(90deg, var(--br-moc-color, #6366f1) 0%, rgba(255,255,255,0.12) 100%),
+                var(--br-moc-color, #6366f1);
+    padding: 7px 14px;
+    color: #fff;
+}
+.br-moc-card-mode-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+}
+.br-moc-card-mode-label {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex: 1;
+}
+.br-moc-card-date {
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.92;
+    background: rgba(255,255,255,0.18);
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+
+/* Card body */
+.br-moc-card-body {
+    padding: 12px 16px;
+}
+
+/* Two amount blocks side by side */
+.br-moc-amt-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.br-moc-amt-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+.br-moc-amt-moc {
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+}
+.br-moc-amt-bank {
+    background: #eff6ff;
+    border: 1.5px solid #93c5fd;
+}
+.br-moc-amt-label {
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 3px;
+}
+.br-moc-amt-value {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+/* VS divider */
+.br-moc-vs-divider {
+    font-size: 1.1rem;
+    color: #cbd5e1;
+    flex-shrink: 0;
+}
+
+/* Diff row */
+.br-moc-diff-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.br-moc-diff-chip {
+    font-size: 0.76rem;
+    font-weight: 700;
+    border: 1.5px solid transparent;
+    border-radius: 999px;
+    padding: 2px 10px;
+    flex-shrink: 0;
+}
+.br-moc-diff-note {
+    font-size: 0.75rem;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+/* Footer note */
+.br-moc-swal-footer-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    color: #94a3b8;
+    border-top: 1px solid #f1f5f9;
+    margin: 10px 24px 0;
+    padding-top: 12px;
+}
+
+/* Agreement + remark (MOC mismatch) */
+.br-moc-ack-section {
+    margin: 14px 24px 20px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+.br-moc-ack-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    margin: 0;
+}
+.br-moc-ack-cb {
+    margin-top: 3px !important;
+    flex-shrink: 0;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    accent-color: #7c3aed;
+}
+.br-moc-remark-wrap {
+    margin-top: 12px;
+}
+.br-moc-remark-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 6px;
+}
+.br-moc-remark-ta {
+    font-size: 0.82rem;
+    border-radius: 8px;
+    border-color: #cbd5e1;
+    resize: vertical;
+    min-height: 72px;
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 2;
+    background: #fff !important;
+    color: #0f172a !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    cursor: text !important;
+}
+.br-moc-remark-ta:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    outline: none;
+}
+.br-moc-remark-hint {
+    font-size: 0.68rem;
+    margin-top: 4px;
+}
+
+/* =============================================
+   Income Tag card — statement table cell
+   ============================================= */
+.br-income-not-tagged {
+    color: #94a3b8;
+    font-size: 0.78rem;
+}
+
+.br-income-tag-card-wrap {
+    position: relative;
+    padding-top: 2px;
+}
+.br-income-tag-detail-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(6, 182, 212, 0.12);
+    color: #0891b2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.br-income-tag-detail-btn:hover {
+    background: rgba(6, 182, 212, 0.22);
+    color: #0e7490;
+}
+.br-income-tag-detail-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f43f5e;
+    border: 1px solid #fff;
+}
+.br-income-detail-modal {
+    border-radius: 14px;
+    border: none;
+    box-shadow: 0 16px 48px rgba(15,23,42,0.18);
+}
+.br-income-detail-dl dt {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+}
+.br-income-detail-dl dd {
+    font-size: 0.88rem;
+    color: #1e293b;
+}
+.br-income-detail-remark {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.85rem;
+    min-height: 2.5rem;
+}
+
+.br-income-tag-card-wrap .br-income-tag-card {
+    padding-right: 30px;
+}
+
+.br-income-tag-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: #ecfeff;
+    border: none;
+    border-left: 3px solid #06b6d4;
+    border-radius: 4px;
+    padding: 6px 10px;
+    width: 100%;
+    min-width: 270px;
+    box-sizing: border-box;
+}
+
+/* "Income Tagged" flat label */
+.br-income-tag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #0891b2;
+    background: none;
+    border-radius: 0;
+    padding: 0;
+    width: fit-content;
+    margin-bottom: 2px;
+}
+
+/* Branch row — highlighted */
+.br-income-tag-branch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.83rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+    word-break: break-word;
+}
+.br-income-tag-branch-icon {
+    color: #06b6d4;
+    font-size: 0.82rem;
+}
+
+/* DOC rows container */
+.br-income-tag-doc-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* One DOC date+amount row */
+.br-income-doc-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    row-gap: 2px;
+}
+.br-income-doc-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    background: #e2e8f0;
+    border-radius: 4px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+.br-income-doc-date {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #0369a1;
+    white-space: nowrap;
+}
+.br-income-doc-sep {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+}
+.br-income-doc-amt {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #15803d;
+    white-space: nowrap;
+}
+.br-income-doc-tag-row {
+    margin-top: 1px;
+}
+.br-income-doc-tag-time {
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+
+/* "By: Name" row */
+.br-income-tag-by {
+    font-size: 0.76rem;
+    color: #475569;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* =============================================
+   Income tag details — read-only modal (design)
+   ============================================= */
+#incomeTagReadonlyModal.br-income-ro-modal .modal-dialog.br-income-ro-dialog {
+    max-width: min(440px, 96vw);
+    margin: 0.75rem auto;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-content {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-header {
+    background: linear-gradient(125deg, #4f46e5 0%, #7c3aed 52%, #6366f1 100%);
+    padding: 1rem 1.15rem;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.18);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-body {
+    background: #f1f5f9;
+    padding: 1rem 1.15rem 1.25rem;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-hint {
+    color: #64748b;
+    line-height: 1.45;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 0.85rem !important;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-panel {
+    padding: 0;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-footer {
+    background: #f8fafc;
+    padding: 0.65rem 1rem 1rem;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-close-btn {
+    background: #334155;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.45rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+#incomeTagReadonlyModal.br-income-ro-modal .br-income-ro-close-btn:hover {
+    background: #1e293b;
+    color: #fff;
+}
+
+/* Body stack */
+#incomeTagReadonlyModal .br-income-ro {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+/* Teal summary strip */
+#incomeTagReadonlyModal .br-income-ro-summary {
+    border-radius: 14px;
+    padding: 14px 14px 12px;
+    background: linear-gradient(145deg, #0d9488 0%, #14b8a6 42%, #2dd4bf 100%);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
+}
+#incomeTagReadonlyModal .br-income-ro-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    align-items: end;
+    margin-bottom: 10px;
+}
+#incomeTagReadonlyModal .br-income-ro-summary-lbl {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.82;
+    margin-bottom: 2px;
+}
+#incomeTagReadonlyModal .br-income-ro-summary-val {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+#incomeTagReadonlyModal .br-income-ro-summary-val--lg {
+    font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+}
+#incomeTagReadonlyModal .br-income-ro-summary-cell--amt {
+    text-align: right;
+}
+#incomeTagReadonlyModal .br-income-ro-summary-row {
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+#incomeTagReadonlyModal .br-income-ro-summary-txt {
+    display: block;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    opacity: 0.96;
+    margin-top: 2px;
+}
+
+/* White field cards */
+#incomeTagReadonlyModal .br-income-ro-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+#incomeTagReadonlyModal .br-income-ro-card--last {
+    margin-bottom: 0;
+}
+#incomeTagReadonlyModal .br-income-ro-sec-label {
+    margin-bottom: 8px !important;
+}
+#incomeTagReadonlyModal .br-income-ro-input {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+    border-radius: 8px !important;
+}
+
+/* Split table */
+#incomeTagReadonlyModal .br-income-ro-table-wrap {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+#incomeTagReadonlyModal .br-income-ro-table {
+    --bs-table-bg: transparent;
+    font-size: 0.8125rem;
+}
+#incomeTagReadonlyModal .br-income-ro-table thead th {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: #64748b;
+    background: #f8fafc !important;
+    border-bottom-color: #e2e8f0 !important;
+    padding: 8px 10px;
+}
+#incomeTagReadonlyModal .br-income-ro-table tbody td {
+    padding: 8px 10px;
+    vertical-align: middle;
+    border-color: #f1f5f9;
+}
+#incomeTagReadonlyModal .br-income-ro-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Mode badges */
+#incomeTagReadonlyModal .br-income-ro-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+#incomeTagReadonlyModal .br-income-ro-mode-badge {
+    background: linear-gradient(180deg, #475569 0%, #334155 100%);
+    color: #f8fafc;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    padding: 0.4em 0.65em;
+    border-radius: 8px;
+}
+
+/* Tag audit — left accent, icon rows */
+#incomeTagReadonlyModal .br-income-ro-meta-highlight {
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #6366f1;
+    background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    padding: 12px 12px 12px 10px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+#incomeTagReadonlyModal .br-income-ro-meta-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-item + .br-income-ro-meta-item {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #cbd5e1;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-ico {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: linear-gradient(145deg, #eef2ff 0%, #e0e7ff 100%);
+    color: #4f46e5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1rem;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-k {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #4f46e5;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-v {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0f172a;
+    word-break: break-word;
 }

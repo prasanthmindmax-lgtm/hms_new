@@ -25,6 +25,8 @@ use App\Models\BillCategory;
 use App\Models\BillingListModel;
 use App\Models\CategoryModel;
 use App\Models\Customer;
+use App\Models\CancelbillFormModel;
+use App\Models\DiscountFormModel;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseType;
 use App\Models\ExpenseReport;
@@ -32,6 +34,7 @@ use App\Models\PettyCashHistory;
 use App\Models\HrmUsers;
 use App\Models\ImageModel;
 use App\Models\LocationModel;
+use App\Models\RefundFormModel;
 use App\Models\PriorityModel;
 use App\Models\StatusModel;
 use App\Models\SubCategoryModel;
@@ -78,11 +81,13 @@ use App\Models\UserDesignations;
 use App\Models\usermanagementdetails;
 use App\Models\UserProfile;
 use App\Providers\RouteServiceProvider;
+use App\Support\MocdocLocationKeys;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -1998,7 +2003,6 @@ public function statementprint(Request $request, $id)
             'purchase_id' => $request->purchase_id,
             'vendor_name' => $request->vendor_name,
             'bill_number' => $request->bill_number,
-
             'order_number' => $request->order_number,
             'bill_date' => $request->bill_date,
             'due_date' => $request->due_date,
@@ -2094,6 +2098,13 @@ public function statementprint(Request $request, $id)
 
             $data['bill_gen_number'] = $request->bill_gen_number;
             $bill = Tblbill::findOrFail($request->id);
+            // Keep linkage when the edit form does not post hidden quotation/purchase IDs (e.g. relation missing on load).
+            if (! $request->filled('quotation_id')) {
+                $data['quotation_id'] = $bill->quotation_id;
+            }
+            if (! $request->filled('purchase_id')) {
+                $data['purchase_id'] = $bill->purchase_id;
+            }
             $grandTotal = (float) $this->cleanCurrency($request->grand_total_amount);
             $partial    = (float) ($bill->partially_payment ?? 0);
 
@@ -3200,7 +3211,7 @@ public function getpurchaseorder(Request $request)
     }
 
     function cleanCurrency($value) {
-        $clean = str_replace(['₹', ','], '', $value);
+        $clean = str_replace(['₹', ',','-'], '', $value);
         return round(floatval($clean), 2);
     }
      public function savepurchaseorder(Request $request)
@@ -7839,92 +7850,1083 @@ public function getprofessionalsummary(Request $request)
         return Excel::download(new ProfessionalSummaryExport($request), $fileName);
     }
 
+    /**
+     * billing_list rows treated as final / approved (exclude cancel & refund lines from income splits).
+     */
+    private function incomeSummarySqlApproved(): string
+    {
+        return '( (billing_list.billtype IS NULL OR TRIM(billing_list.billtype) = \'\' OR LOWER(TRIM(billing_list.billtype)) NOT IN (\'cancelled\',\'cancel\',\'refund\',\'refunded\')) '
+            . 'AND (billing_list.type IS NULL OR (LOWER(billing_list.type) NOT LIKE \'%cancel%\' AND LOWER(billing_list.type) NOT LIKE \'%refund%\')) )';
+    }
+
+    private function incomeSummarySqlCancel(): string
+    {
+        return '( LOWER(TRIM(COALESCE(billing_list.billtype,\'\'))) IN (\'cancelled\',\'cancel\') OR LOWER(COALESCE(billing_list.type,\'\')) LIKE \'%cancel%\' )';
+    }
+
+    private function incomeSummarySqlRefund(): string
+    {
+        return '( LOWER(TRIM(COALESCE(billing_list.billtype,\'\'))) IN (\'refund\',\'refunded\') OR LOWER(COALESCE(billing_list.type,\'\')) LIKE \'%refund%\' )';
+    }
+
+    /**
+     * One row per branch: merge SQL groups that only differ by whitespace/casing or duplicate location_id keys.
+     *
+     * @param  Collection<int, object>  $rows
+     * @return Collection<int, object>
+     */
+    private function incomeSummaryMergeRowsByLocationName(Collection $rows): Collection
+    {
+        return $rows
+            ->groupBy(function ($row) {
+                $name = trim((string) ($row->location_name ?? ''));
+
+                return $name === ''
+                    ? '__empty__' . (string) ($row->location_id ?? '')
+                    : mb_strtolower($name);
+            })
+            ->map(function (Collection $grp) {
+                $labelRow = $grp->sortByDesc(function ($r) {
+                    return strlen(trim((string) ($r->location_name ?? '')));
+                })->first();
+
+                $sum = static fn (string $col): float => $grp->sum(fn ($r) => (float) ($r->{$col} ?? 0));
+
+                $ids = $grp->pluck('location_id')->filter(fn ($v) => $v !== null && $v !== '')->unique()->sort()->values();
+
+                // Overall total = payment columns only (never discount / cancel / refund).
+                $totalPayments = $sum('cash') + $sum('card') + $sum('cheque') + $sum('dd')
+                    + $sum('neft') + $sum('credit') + $sum('upi');
+
+                return (object) [
+                    'location_id' => $ids->first(),
+                    'location_name' => (string) ($labelRow->location_name ?? ''),
+                    'cash' => $sum('cash'),
+                    'card' => $sum('card'),
+                    'cheque' => $sum('cheque'),
+                    'dd' => $sum('dd'),
+                    'neft' => $sum('neft'),
+                    'credit' => $sum('credit'),
+                    'upi' => $sum('upi'),
+                    'discount' => $sum('discount'),
+                    'cancel_amt' => $sum('cancel_amt'),
+                    'refund_amt' => $sum('refund_amt'),
+                    'total' => $totalPayments,
+                ];
+            })
+            ->values()
+            ->sortBy(fn ($r) => mb_strtolower(trim((string) ($r->location_name ?? ''))))
+            ->values();
+    }
+
+    /**
+     * Bucket billing lines into OP / IP / Pharmacy / Other for service-line matrix.
+     */
+    private function incomeSummaryServiceBucketSql(): string
+    {
+        // Normalize I/P, I / P, i/p → "ip" for IP bucket; include Advance (type or billtype) under IP.
+        $bt = 'LOWER(TRIM(COALESCE(billing_list.billtype,\'\')))';
+        $ty = 'LOWER(TRIM(COALESCE(billing_list.type,\'\')))';
+        $btNorm = 'REPLACE(REPLACE(' . $bt . ',\' \',\'\'),\'/\',\'\')';
+        $tyNorm = 'REPLACE(REPLACE(' . $ty . ',\' \',\'\'),\'/\',\'\')';
+
+        return 'CASE '
+            . 'WHEN ' . $bt . ' IN (\'pharmacy\',\'store\') '
+            . 'OR ' . $ty . ' LIKE \'%pharmacy%\' '
+            . 'OR ' . $ty . ' LIKE \'%store%\' THEN \'Pharmacy\' '
+            . 'WHEN ' . $btNorm . ' = \'ip\' OR ' . $tyNorm . ' = \'ip\' '
+            . 'OR ' . $ty . ' = \'advance\' OR ' . $bt . ' = \'advance\' THEN \'IP\' '
+            . 'WHEN ' . $bt . ' IN (\'op\',\'o/p\') OR ' . $ty . ' IN (\'op\',\'o/p\') '
+            . 'OR REPLACE(REPLACE(' . $bt . ',\' \',\'\'),\'/\',\'\') = \'op\' '
+            . 'OR REPLACE(REPLACE(' . $ty . ',\' \',\'\'),\'/\',\'\') = \'op\' THEN \'OP\' '
+            . 'ELSE \'Other\' END';
+    }
+
+    /**
+     * OP / IP / Pharmacy × payment columns (final approved amounts only) for branch drill-down.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildIncomeBranchMatrixPayload(Request $request): array
+    {
+        $locationId = $request->input('location_id');
+        $locationName = trim((string) $request->input('location_name', ''));
+        $dateFilter = $request->input('date_filter', 'yesterday');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $ap = $this->incomeSummarySqlApproved();
+        $bucket = $this->incomeSummaryServiceBucketSql();
+
+        $base = BillingListModel::query();
+        $this->incomeSummaryApplyDateToQuery($base, (string) $dateFilter, $startDate, $endDate);
+
+        if ($locationName !== '') {
+            $base->whereRaw('TRIM(billing_list.location_name) = ?', [$locationName]);
+        } elseif ($locationId) {
+            $base->where(function ($q) use ($locationId) {
+                $q->where('billing_list.location_id', $locationId)
+                    ->orWhere('billing_list.location_name', $locationId);
+            });
+        } else {
+            return [
+                'view' => 'matrix',
+                'matrix_rows' => [],
+                'matrix_grand_total' => 0.0,
+                'rows' => [],
+                'total' => 0,
+                'page' => 1,
+                'last_page' => 1,
+                'per_page' => 0,
+                'grand_total' => 0.0,
+                'type_groups' => [],
+            ];
+        }
+
+        $base->whereRaw($ap);
+
+        $agg = (clone $base)->selectRaw($bucket . ' as svc_cat')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "Cash" THEN billing_list.amt ELSE 0 END) as cash')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "Card" THEN billing_list.amt ELSE 0 END) as card')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "Cheque" THEN billing_list.amt ELSE 0 END) as cheque')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "DD" THEN billing_list.amt ELSE 0 END) as dd')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "Neft" THEN billing_list.amt ELSE 0 END) as neft')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "Credit" THEN billing_list.amt ELSE 0 END) as credit')
+            ->selectRaw('SUM(CASE WHEN billing_list.paymenttype = "UPI" THEN billing_list.amt ELSE 0 END) as upi')
+            ->groupBy(DB::raw($bucket))
+            ->get()
+            ->keyBy('svc_cat');
+
+        $pick = static function ($row, string $k): float {
+            return round((float) ($row ? ($row->{$k} ?? 0) : 0), 2);
+        };
+
+        $matrixRows = [];
+        foreach (['OP', 'IP', 'Pharmacy'] as $cat) {
+            $row = $agg->get($cat);
+            $cash = $pick($row, 'cash');
+            $card = $pick($row, 'card');
+            $cheque = $pick($row, 'cheque');
+            $dd = $pick($row, 'dd');
+            $neft = $pick($row, 'neft');
+            $credit = $pick($row, 'credit');
+            $upi = $pick($row, 'upi');
+            $line = round($cash + $card + $cheque + $dd + $neft + $credit + $upi, 2);
+            $matrixRows[] = [
+                'category' => $cat,
+                'cash' => $cash,
+                'card' => $card,
+                'cheque' => $cheque,
+                'dd' => $dd,
+                'neft' => $neft,
+                'credit' => $credit,
+                'upi' => $upi,
+                'line_total' => $line,
+            ];
+        }
+
+        $other = $agg->get('Other');
+        if ($other) {
+            $cash = $pick($other, 'cash');
+            $card = $pick($other, 'card');
+            $cheque = $pick($other, 'cheque');
+            $dd = $pick($other, 'dd');
+            $neft = $pick($other, 'neft');
+            $credit = $pick($other, 'credit');
+            $upi = $pick($other, 'upi');
+            $line = round($cash + $card + $cheque + $dd + $neft + $credit + $upi, 2);
+            if ($line > 0.0001) {
+                $matrixRows[] = [
+                    'category' => 'Others',
+                    'cash' => $cash,
+                    'card' => $card,
+                    'cheque' => $cheque,
+                    'dd' => $dd,
+                    'neft' => $neft,
+                    'credit' => $credit,
+                    'upi' => $upi,
+                    'line_total' => $line,
+                ];
+            }
+        }
+
+        $grand = round(array_sum(array_column($matrixRows, 'line_total')), 2);
+
+        return [
+            'view' => 'matrix',
+            'matrix_rows' => $matrixRows,
+            'matrix_grand_total' => $grand,
+            'rows' => [],
+            'total' => 0,
+            'page' => 1,
+            'last_page' => 1,
+            'per_page' => 0,
+            'grand_total' => $grand,
+            'type_groups' => [],
+        ];
+    }
+
+    /**
+     * Resolve tbl_locations.id for income drill-down (branch display name or Mocdoc location key).
+     *
+     * @return int[]
+     */
+    private function incomeDrilldownResolveBranchIds(?string $locationName, $locationId): array
+    {
+        $ids = [];
+        $name = trim((string) $locationName);
+        if ($name !== '') {
+            $loc = TblLocationModel::query()->whereRaw('TRIM(name) = ?', [$name])->first();
+            if ($loc) {
+                $ids[] = (int) $loc->id;
+            }
+        }
+        if ($ids === [] && $locationId !== null && $locationId !== '') {
+            $lid = (string) $locationId;
+            if (ctype_digit($lid)) {
+                $ids[] = (int) $lid;
+            }
+            $map = MocdocLocationKeys::locationKeyToNameMap();
+            if (isset($map[$lid])) {
+                $loc = TblLocationModel::query()->whereRaw('TRIM(name) = ?', [trim($map[$lid])])->first();
+                if ($loc) {
+                    $ids[] = (int) $loc->id;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    private static function incomeFormParseMoney($value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return (float) preg_replace('/[^0-9.\-]/', '', (string) $value);
+    }
+
+    /**
+     * tbl_locations.id values for income rows (branch name ↔ form *_zone_id).
+     *
+     * @param  iterable<string|\Stringable|null>  $locationNames
+     * @return int[]
+     */
+    private function incomeSummaryZoneIdsForLocationNames(iterable $locationNames): array
+    {
+        $ids = [];
+        foreach ($locationNames as $nm) {
+            $nm = trim((string) $nm);
+            if ($nm === '') {
+                continue;
+            }
+            $loc = TblLocationModel::query()->whereRaw('TRIM(name) = ?', [$nm])->first();
+            if ($loc) {
+                $ids[] = (int) $loc->id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * HMS discount / cancel / refund forms: final_approver 0 = pending, 1 = approved, 2 = rejected.
+     * Request param dcr_status: approved | pending | rejected (aliases: unapproved, reject).
+     */
+    private function incomeSummaryDcrApproverValue(Request $request): int
+    {
+        $s = strtolower(trim((string) $request->input('dcr_status', 'approved')));
+
+        return match ($s) {
+            'pending', 'unapproved' => 0,
+            'rejected', 'reject' => 2,
+            default => 1,
+        };
+    }
+
+    /**
+     * Discount / cancel / refund totals per branch from HMS forms (same rules as drill-down).
+     *
+     * @param  int[]  $zoneIds  tbl_locations.id
+     * @return array<int, array{discount: float, cancel: float, refund: float}>
+     */
+    private function incomeSummaryFormDcrAggregatesByZoneIds(array $zoneIds, string $dateFilter, $startDate, $endDate, int $dcrApprover = 1): array
+    {
+        $out = [];
+        foreach ($zoneIds as $id) {
+            $out[(int) $id] = ['discount' => 0.0, 'cancel' => 0.0, 'refund' => 0.0];
+        }
+        if ($zoneIds === []) {
+            return [];
+        }
+
+        $dq = DiscountFormModel::query()
+            ->whereIn('dis_zone_id', $zoneIds)
+            ->where('final_approver', $dcrApprover);
+        $this->incomeSummaryApplyDateToFormColumn($dq, 'hms_discount_form.created_at', $dateFilter, $startDate, $endDate);
+        foreach ($dq->cursor() as $r) {
+            $z = (int) ($r->dis_zone_id ?? 0);
+            if (! isset($out[$z])) {
+                continue;
+            }
+            $out[$z]['discount'] += self::incomeFormParseMoney($r->dis_post_discount ?? 0);
+        }
+
+        $rq = RefundFormModel::query()
+            ->whereIn('ref_zone_id', $zoneIds)
+            ->where('final_approver', $dcrApprover);
+        $this->incomeSummaryApplyDateToFormColumn($rq, 'hms_refund_form.created_at', $dateFilter, $startDate, $endDate);
+        foreach ($rq->cursor() as $r) {
+            $z = (int) ($r->ref_zone_id ?? 0);
+            if (! isset($out[$z])) {
+                continue;
+            }
+            $out[$z]['refund'] += (float) ($r->ref_final_auth ?? 0);
+        }
+
+        $cq = CancelbillFormModel::query()
+            ->whereIn('can_zone_id', $zoneIds)
+            ->where('final_approver', $dcrApprover);
+        $this->incomeSummaryApplyDateToCancelForm($cq, $dateFilter, $startDate, $endDate);
+        foreach ($cq->cursor() as $r) {
+            $z = (int) ($r->can_zone_id ?? 0);
+            if (! isset($out[$z])) {
+                continue;
+            }
+            $out[$z]['cancel'] += (float) ($r->can_total ?? 0);
+        }
+
+        foreach ($out as $k => $v) {
+            $out[$k]['discount'] = round($v['discount'], 2);
+            $out[$k]['cancel'] = round($v['cancel'], 2);
+            $out[$k]['refund'] = round($v['refund'], 2);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Replace billing_list discount / cancel / refund columns with HMS form totals per branch.
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $rows
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function incomeSummaryOverlayFormDcrOnRows(Collection $rows, string $dateFilter, $startDate, $endDate, int $dcrApprover = 1): Collection
+    {
+        $zoneIds = $this->incomeSummaryZoneIdsForLocationNames($rows->pluck('location_name'));
+        if ($zoneIds === []) {
+            return $rows;
+        }
+
+        $agg = $this->incomeSummaryFormDcrAggregatesByZoneIds($zoneIds, $dateFilter, $startDate, $endDate, $dcrApprover);
+
+        $nameToZone = [];
+        foreach ($rows as $r) {
+            $nm = trim((string) ($r->location_name ?? ''));
+            if ($nm === '') {
+                continue;
+            }
+            $key = mb_strtolower($nm);
+            if (isset($nameToZone[$key])) {
+                continue;
+            }
+            $loc = TblLocationModel::query()->whereRaw('TRIM(name) = ?', [$nm])->first();
+            if ($loc) {
+                $nameToZone[$key] = (int) $loc->id;
+            }
+        }
+
+        return $rows->map(function ($row) use ($agg, $nameToZone) {
+            $nm = mb_strtolower(trim((string) ($row->location_name ?? '')));
+            $zid = $nameToZone[$nm] ?? null;
+            if ($zid !== null && isset($agg[$zid])) {
+                $row->discount = $agg[$zid]['discount'];
+                $row->cancel_amt = $agg[$zid]['cancel'];
+                $row->refund_amt = $agg[$zid]['refund'];
+            }
+
+            return $row;
+        });
+    }
+
+    /**
+     * Date filter on a datetime column (created_at / can_date) matching income summary presets.
+     */
+    private function incomeSummaryApplyDateToFormColumn($query, string $column, string $dateFilter, $startDate, $endDate): void
+    {
+        if ($dateFilter === 'yesterday') {
+            $y = Carbon::yesterday();
+            $query->whereBetween($column, [$y->copy()->startOfDay(), $y->copy()->endOfDay()]);
+
+            return;
+        }
+
+        if ($dateFilter === 'today') {
+            $t = now();
+            $query->whereBetween($column, [$t->copy()->startOfDay(), $t->copy()->endOfDay()]);
+
+            return;
+        }
+
+        if ($dateFilter === 'custom' && $startDate && $endDate) {
+            $query->whereBetween($column, [
+                Carbon::parse($startDate)->startOfDay(),
+                Carbon::parse($endDate)->endOfDay(),
+            ]);
+
+            return;
+        }
+
+        if ($dateFilter === 'this_month') {
+            $query->whereBetween($column, [
+                now()->copy()->startOfMonth(),
+                now()->copy()->endOfMonth(),
+            ]);
+
+            return;
+        }
+
+        if ($dateFilter === 'last_2_months') {
+            $query->whereBetween($column, [
+                now()->subMonths(2)->startOfMonth(),
+                now()->endOfMonth(),
+            ]);
+
+            return;
+        }
+
+        if ($dateFilter === 'last_3_months') {
+            $query->whereBetween($column, [
+                now()->subMonths(3)->startOfMonth(),
+                now()->endOfMonth(),
+            ]);
+        }
+    }
+
+    /**
+     * Cancel form: prefer business can_date, else created_at (aligned with cancel dashboard).
+     */
+    private function incomeSummaryApplyDateToCancelForm($query, string $dateFilter, $startDate, $endDate): void
+    {
+        $expr = 'COALESCE(DATE(hms_cancelbill_form.can_date), DATE(hms_cancelbill_form.created_at))';
+        if ($dateFilter === 'yesterday') {
+            $d = Carbon::yesterday()->toDateString();
+            $query->whereRaw("$expr = ?", [$d]);
+
+            return;
+        }
+        if ($dateFilter === 'today') {
+            $d = now()->toDateString();
+            $query->whereRaw("$expr = ?", [$d]);
+
+            return;
+        }
+        if ($dateFilter === 'custom' && $startDate && $endDate) {
+            $query->whereRaw("$expr BETWEEN ? AND ?", [
+                Carbon::parse($startDate)->toDateString(),
+                Carbon::parse($endDate)->toDateString(),
+            ]);
+
+            return;
+        }
+        if ($dateFilter === 'this_month') {
+            $query->whereRaw('YEAR('.$expr.') = ? AND MONTH('.$expr.') = ?', [(int) now()->year, (int) now()->month]);
+
+            return;
+        }
+        if ($dateFilter === 'last_2_months') {
+            $query->whereRaw($expr.' >= ?', [now()->subMonths(2)->startOfMonth()->toDateString()])
+                ->whereRaw($expr.' <= ?', [now()->endOfMonth()->toDateString()]);
+
+            return;
+        }
+        if ($dateFilter === 'last_3_months') {
+            $query->whereRaw($expr.' >= ?', [now()->subMonths(3)->startOfMonth()->toDateString()])
+                ->whereRaw($expr.' <= ?', [now()->endOfMonth()->toDateString()]);
+        }
+    }
+
+    /**
+     * Discount / Cancel / Refund drill-down from hms_discount_form, hms_cancelbill_form, hms_refund_form
+     * (same branch linkage as discount / cancel / refund dashboards: tbl_locations via *_zone_id).
+     *
+     * @return array<string, mixed>
+     */
+    private function buildIncomeDcrDrilldownPayload(Request $request, string $kind): array
+    {
+        $locationId = $request->input('location_id');
+        $locationName = trim((string) $request->input('location_name', ''));
+        $dateFilter = (string) $request->input('date_filter', 'yesterday');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 50;
+
+        $empty = static fn (): array => [
+            'view' => 'list',
+            'drill_kind' => strtolower($kind),
+            'rows' => [],
+            'total' => 0,
+            'page' => 1,
+            'last_page' => 1,
+            'per_page' => $perPage,
+            'grand_total' => 0.0,
+            'type_groups' => [],
+        ];
+
+        $branchIds = $this->incomeDrilldownResolveBranchIds($locationName, $locationId);
+        if ($branchIds === []) {
+            return $empty();
+        }
+
+        $dcrApprover = $this->incomeSummaryDcrApproverValue($request);
+
+        $formatDt = static function ($v): string {
+            if (! $v) {
+                return '—';
+            }
+            try {
+                return Carbon::parse($v)->format('d/m/Y');
+            } catch (\Throwable $e) {
+                return '—';
+            }
+        };
+
+        if ($kind === 'Discount') {
+            $base = DiscountFormModel::query()
+                ->select([
+                    'hms_discount_form.dis_id',
+                    'hms_discount_form.dis_branch_no',
+                    'hms_discount_form.created_at',
+                    'hms_discount_form.dis_wife_mrd_no',
+                    'hms_discount_form.dis_husband_mrd_no',
+                    'hms_discount_form.dis_wife_name',
+                    'hms_discount_form.dis_husband_name',
+                    'hms_discount_form.dis_service_name',
+                    'hms_discount_form.dis_counselled_by',
+                    'hms_discount_form.dis_post_discount',
+                    'hms_discount_form.dis_total_bill',
+                    'hms_discount_form.dis_form_status',
+                    'tbl_locations.name as location_name',
+                    'users.user_fullname as user_name',
+                ])
+                ->join('tbl_locations', 'hms_discount_form.dis_zone_id', '=', 'tbl_locations.id')
+                ->leftJoin('users', 'hms_discount_form.created_by', '=', 'users.id')
+                ->whereIn('hms_discount_form.dis_zone_id', $branchIds)
+                ->where('hms_discount_form.final_approver', $dcrApprover);
+
+            $this->incomeSummaryApplyDateToFormColumn($base, 'hms_discount_form.created_at', $dateFilter, $startDate, $endDate);
+
+            $total = (clone $base)->count();
+            $grandTotal = 0.0;
+            foreach ((clone $base)->cursor() as $row) {
+                $grandTotal += self::incomeFormParseMoney($row->dis_post_discount ?? 0);
+            }
+
+            $records = (clone $base)
+                ->orderBy('hms_discount_form.created_at', 'desc')
+                ->offset(($page - 1) * $perPage)
+                ->limit($perPage)
+                ->get();
+
+            $rows = $records->map(function ($r, $idx) use ($page, $perPage, $formatDt) {
+                $wife = trim((string) ($r->dis_wife_name ?? ''));
+                $hus = trim((string) ($r->dis_husband_name ?? ''));
+                $patient = $wife !== '' && $hus !== '' ? $wife . ' / ' . $hus : ($wife !== '' ? $wife : ($hus !== '' ? $hus : '—'));
+                $mrd = (string) ($r->dis_wife_mrd_no ?? '');
+                if ($mrd === '') {
+                    $mrd = (string) ($r->dis_husband_mrd_no ?? '');
+                }
+                $amt = self::incomeFormParseMoney($r->dis_post_discount ?? 0);
+
+                return [
+                    'sno' => ($page - 1) * $perPage + $idx + 1,
+                    'location' => $r->location_name,
+                    'date' => $formatDt($r->created_at),
+                    'bill_no' => $r->dis_branch_no ? (string) $r->dis_branch_no : ('DIS-' . $r->dis_id),
+                    'phid' => $mrd !== '' ? $mrd : '—',
+                    'patient' => $patient,
+                    'consultant' => $r->dis_counselled_by ? (string) $r->dis_counselled_by : '—',
+                    'amount' => number_format($amt, 2),
+                    'grand_total' => number_format(self::incomeFormParseMoney($r->dis_total_bill ?? 0), 2),
+                    'discount' => number_format($amt, 2),
+                    'bill_type' => 'Discount',
+                    'pay_type' => (string) ($r->dis_form_status ?? '—'),
+                    'user' => (string) ($r->user_name ?? '—'),
+                ];
+            });
+
+            return [
+                'view' => 'list',
+                'drill_kind' => 'discount',
+                'rows' => $rows,
+                'total' => $total,
+                'page' => $page,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'grand_total' => round($grandTotal, 2),
+                'type_groups' => [],
+            ];
+        }
+
+        if ($kind === 'Refund') {
+            $base = RefundFormModel::query()
+                ->select([
+                    'hms_refund_form.ref_id',
+                    'hms_refund_form.ref_branch_no',
+                    'hms_refund_form.created_at',
+                    'hms_refund_form.ref_wife_mrd_no',
+                    'hms_refund_form.ref_husband_mrd_no',
+                    'hms_refund_form.ref_wife_name',
+                    'hms_refund_form.ref_husband_name',
+                    'hms_refund_form.ref_service_name',
+                    'hms_refund_form.ref_counselled_by',
+                    'hms_refund_form.ref_total_bill',
+                    'hms_refund_form.ref_final_auth',
+                    'hms_refund_form.ref_form_status',
+                    'tbl_locations.name as location_name',
+                    'users.user_fullname as user_name',
+                ])
+                ->join('tbl_locations', 'hms_refund_form.ref_zone_id', '=', 'tbl_locations.id')
+                ->leftJoin('users', 'hms_refund_form.created_by', '=', 'users.id')
+                ->whereIn('hms_refund_form.ref_zone_id', $branchIds)
+                ->where('hms_refund_form.final_approver', $dcrApprover);
+
+            $this->incomeSummaryApplyDateToFormColumn($base, 'hms_refund_form.created_at', $dateFilter, $startDate, $endDate);
+
+            $total = (clone $base)->count();
+            $grandTotal = (float) (clone $base)->sum('ref_final_auth');
+
+            $records = (clone $base)
+                ->orderBy('hms_refund_form.created_at', 'desc')
+                ->offset(($page - 1) * $perPage)
+                ->limit($perPage)
+                ->get();
+
+            $rows = $records->map(function ($r, $idx) use ($page, $perPage, $formatDt) {
+                $wife = trim((string) ($r->ref_wife_name ?? ''));
+                $hus = trim((string) ($r->ref_husband_name ?? ''));
+                $patient = $wife !== '' && $hus !== '' ? $wife . ' / ' . $hus : ($wife !== '' ? $wife : ($hus !== '' ? $hus : '—'));
+                $mrd = (string) ($r->ref_wife_mrd_no ?? '');
+                if ($mrd === '') {
+                    $mrd = (string) ($r->ref_husband_mrd_no ?? '');
+                }
+                $amt = (float) ($r->ref_final_auth ?? 0);
+
+                return [
+                    'sno' => ($page - 1) * $perPage + $idx + 1,
+                    'location' => $r->location_name,
+                    'date' => $formatDt($r->created_at),
+                    'bill_no' => $r->ref_branch_no ? (string) $r->ref_branch_no : ('REF-' . $r->ref_id),
+                    'phid' => $mrd !== '' ? $mrd : '—',
+                    'patient' => $patient,
+                    'consultant' => $r->ref_counselled_by ? (string) $r->ref_counselled_by : '—',
+                    'amount' => number_format($amt, 2),
+                    'grand_total' => number_format((float) ($r->ref_total_bill ?? 0), 2),
+                    'discount' => '—',
+                    'bill_type' => 'Refund',
+                    'pay_type' => (string) ($r->ref_form_status ?? '—'),
+                    'user' => (string) ($r->user_name ?? '—'),
+                ];
+            });
+
+            return [
+                'view' => 'list',
+                'drill_kind' => 'refund',
+                'rows' => $rows,
+                'total' => $total,
+                'page' => $page,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'grand_total' => round($grandTotal, 2),
+                'type_groups' => [],
+            ];
+        }
+
+        // Cancel
+        $base = CancelbillFormModel::query()
+            ->select([
+                'hms_cancelbill_form.can_bill_no',
+                'hms_cancelbill_form.can_date',
+                'hms_cancelbill_form.created_at',
+                'hms_cancelbill_form.can_mrdno',
+                'hms_cancelbill_form.can_name',
+                'hms_cancelbill_form.can_consultant',
+                'hms_cancelbill_form.can_total',
+                'hms_cancelbill_form.can_payment_type',
+                'hms_cancelbill_form.can_form_status',
+                'tbl_locations.name as location_name',
+                'users.user_fullname as user_name',
+            ])
+            ->join('tbl_locations', 'hms_cancelbill_form.can_zone_id', '=', 'tbl_locations.id')
+            ->leftJoin('users', 'hms_cancelbill_form.created_by', '=', 'users.id')
+            ->whereIn('hms_cancelbill_form.can_zone_id', $branchIds)
+            ->where('hms_cancelbill_form.final_approver', $dcrApprover);
+
+        $this->incomeSummaryApplyDateToCancelForm($base, $dateFilter, $startDate, $endDate);
+
+        $total = (clone $base)->count();
+        $grandTotal = (float) (clone $base)->sum('can_total');
+
+        $records = (clone $base)
+            ->orderByDesc('hms_cancelbill_form.created_at')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
+
+        $rows = $records->map(function ($r, $idx) use ($page, $perPage, $formatDt) {
+            $amt = (float) ($r->can_total ?? 0);
+            $bizDate = $r->can_date ?? $r->created_at;
+
+            return [
+                'sno' => ($page - 1) * $perPage + $idx + 1,
+                'location' => $r->location_name,
+                'date' => $formatDt($bizDate),
+                'bill_no' => $r->can_bill_no ? (string) $r->can_bill_no : '—',
+                'phid' => $r->can_mrdno ? (string) $r->can_mrdno : '—',
+                'patient' => $r->can_name ? (string) $r->can_name : '—',
+                'consultant' => $r->can_consultant ? (string) $r->can_consultant : '—',
+                'amount' => number_format($amt, 2),
+                'grand_total' => number_format($amt, 2),
+                'discount' => '—',
+                'bill_type' => 'Cancel',
+                'pay_type' => (string) ($r->can_payment_type ?? $r->can_form_status ?? '—'),
+                'user' => (string) ($r->user_name ?? '—'),
+            ];
+        });
+
+        return [
+            'view' => 'list',
+            'drill_kind' => 'cancel',
+            'rows' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'last_page' => max(1, (int) ceil($total / $perPage)),
+            'per_page' => $perPage,
+            'grand_total' => round($grandTotal, 2),
+            'type_groups' => [],
+        ];
+    }
+
+    /**
+     * @return int[]
+     */
+    private function incomeSummaryIntListFromRequest(Request $request, string $key): array
+    {
+        $v = $request->input($key);
+        if ($v === null || $v === '' || $v === []) {
+            return [];
+        }
+        if (is_array($v)) {
+            return array_values(array_unique(array_filter(array_map('intval', $v), static fn (int $x): bool => $x > 0)));
+        }
+        if (is_numeric($v)) {
+            $n = (int) $v;
+
+            return $n > 0 ? [$n] : [];
+        }
+        $parts = array_filter(array_map('trim', explode(',', (string) $v)));
+
+        return array_values(array_unique(array_filter(array_map('intval', $parts), static fn (int $x): bool => $x > 0)));
+    }
+
+    /**
+     * Intersected billing_list.location_id variants from state / zone / branch / single location filters.
+     *
+     * @return string[]|null null = no geo filter; [] = impossible match
+     */
+    private function incomeSummaryResolveLocationVariants(Request $request): ?array
+    {
+        $sets = [];
+
+        if ($request->filled('state_id')) {
+            $state_ids = $this->incomeSummaryIntListFromRequest($request, 'state_id');
+            $zoneIds = [];
+            $branchIds = [];
+            foreach ($state_ids as $sid) {
+                if ($sid === 1) {
+                    $zoneIds = array_merge($zoneIds, ['2', '4', '6', '7', '8', '9']);
+                }
+                if ($sid === 2) {
+                    $zoneIds[] = '3';
+                }
+                if ($sid === 3) {
+                    $zoneIds[] = '5';
+                }
+                if ($sid === 4) {
+                    $zoneIds[] = '10';
+                }
+                if ($sid === 5) {
+                    $branchIds[] = '30';
+                }
+            }
+            $zoneIds = array_unique($zoneIds);
+            $branchIds = array_unique($branchIds);
+            if ($zoneIds === [] && $branchIds === []) {
+                $sets[] = [];
+            } else {
+                $locQuery = TblLocationModel::query();
+                $locQuery->where(function ($q) use ($zoneIds, $branchIds) {
+                    if ($zoneIds !== []) {
+                        $q->whereIn('zone_id', $zoneIds);
+                    }
+                    if ($branchIds !== []) {
+                        $q->orWhereIn('id', $branchIds);
+                    }
+                });
+                $rows = $locQuery->get();
+                $sets[] = MocdocLocationKeys::billingLocationIdVariantsForBranches($rows);
+            }
+        }
+
+        $zonePick = array_merge(
+            $this->incomeSummaryIntListFromRequest($request, 'zone_ids'),
+            $this->incomeSummaryIntListFromRequest($request, 'zone_id')
+        );
+        if ($zonePick !== []) {
+            $zonePick = array_unique($zonePick);
+            $rows = TblLocationModel::whereIn('zone_id', $zonePick)->get();
+            $sets[] = MocdocLocationKeys::billingLocationIdVariantsForBranches($rows);
+        }
+
+        $branchPick = array_merge(
+            $this->incomeSummaryIntListFromRequest($request, 'branch_ids'),
+            $this->incomeSummaryIntListFromRequest($request, 'branch_id')
+        );
+        if ($branchPick !== []) {
+            $branchPick = array_unique($branchPick);
+            $rows = TblLocationModel::whereIn('id', $branchPick)->get();
+            $sets[] = MocdocLocationKeys::billingLocationIdVariantsForBranches($rows);
+        }
+
+        if ($request->filled('location')) {
+            $loc = TblLocationModel::find((int) $request->input('location'));
+            if ($loc) {
+                $sets[] = MocdocLocationKeys::billingLocationIdVariantsForBranch($loc);
+            }
+        }
+
+        if ($sets === []) {
+            return null;
+        }
+
+        $out = $sets[0];
+        for ($i = 1, $n = count($sets); $i < $n; $i++) {
+            $out = array_values(array_intersect($out, $sets[$i]));
+        }
+
+        return $out;
+    }
+
+    private function incomeSummaryApplyDateToQuery($query, string $dateFilter, $startDate, $endDate): void
+    {
+        $dateCol = DB::raw("STR_TO_DATE(billing_list.billdate, '%Y%m%d%H:%i:%s')");
+
+        if ($dateFilter === 'yesterday') {
+            $y = Carbon::yesterday();
+            $query->whereBetween($dateCol, [$y->copy()->startOfDay(), $y->copy()->endOfDay()]);
+
+            return;
+        }
+
+        if ($dateFilter === 'today') {
+            $t = now();
+            $query->whereBetween($dateCol, [$t->copy()->startOfDay(), $t->copy()->endOfDay()]);
+
+            return;
+        }
+
+        if ($dateFilter === 'custom' && $startDate && $endDate) {
+            $query->whereBetween($dateCol, [
+                $startDate . ' 00:00:00',
+                $endDate . ' 23:59:59',
+            ]);
+
+            return;
+        }
+
+        if ($dateFilter === 'this_month') {
+            $query->whereMonth($dateCol, now()->month);
+
+            return;
+        }
+
+        if ($dateFilter === 'last_2_months') {
+            $query->whereBetween($dateCol, [
+                now()->subMonths(2)->startOfMonth(),
+                now()->endOfMonth(),
+            ]);
+
+            return;
+        }
+
+        if ($dateFilter === 'last_3_months') {
+            $query->whereBetween($dateCol, [
+                now()->subMonths(3)->startOfMonth(),
+                now()->endOfMonth(),
+            ]);
+        }
+    }
 
   public function vendorincomeReport(Request $request)
     {
         $admin = auth()->user();
-        $limit_access = $admin->access_limits;
 
         $dateFilter = $request->input('date_filter');
+        if ($dateFilter === null || $dateFilter === '') {
+            $dateFilter = 'yesterday';
+        }
+
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $locationFilter = $request->input('location');
-        $perPage = $request->input('perPage', 31);
+        if ($dateFilter === 'yesterday' && ! $startDate && ! $endDate) {
+            $y = Carbon::yesterday()->format('Y-m-d');
+            $startDate = $y;
+            $endDate = $y;
+        }
+        if ($dateFilter === 'custom' && (! $startDate || ! $endDate)) {
+            $y = Carbon::yesterday()->format('Y-m-d');
+            $startDate = $startDate ?: $y;
+            $endDate = $endDate ?: $y;
+        }
 
-        $incomeData = collect(); // default empty collection
-        $grandTotal = 0;
+        $locationFilter = $request->input('location');
+        $perPage = (int) $request->input('perPage', 100);
+
+        $zones = TblZonesModel::orderBy('name')->get();
+        $branchOptions = TblLocationModel::orderBy('name')->get();
+        $stateOptions = [
+            ['id' => 1, 'name' => 'Tamil Nadu'],
+            ['id' => 2, 'name' => 'Karnataka'],
+            ['id' => 3, 'name' => 'Kerala'],
+            ['id' => 4, 'name' => 'International'],
+            ['id' => 5, 'name' => 'Tirupati (branch)'],
+        ];
+
+        $summary = [
+            'total_discount' => 0.0,
+            'total_cancel' => 0.0,
+            'total_refund' => 0.0,
+        ];
+
+        $dcrApprover = $this->incomeSummaryDcrApproverValue($request);
+        $dcrStatus = strtolower(trim((string) $request->input('dcr_status', 'approved')));
+        if (! in_array($dcrStatus, ['approved', 'pending', 'rejected'], true)) {
+            $dcrStatus = 'approved';
+        }
+
+        $incomeData = collect();
+        $grandTotal = 0.0;
 
         if ($dateFilter === 'today') {
-            // 🔹 Fetch live API data for today only (no DB insert/merge)
             $apiData = $this->fetchTodayApiDataForDisplay($locationFilter);
-            $incomeData = collect($apiData);
-            $grandTotal = $incomeData->sum('total');
+            $incomeData = $this->incomeSummaryMergeRowsByLocationName(collect($apiData));
+            $incomeData = $this->incomeSummaryOverlayFormDcrOnRows($incomeData, (string) $dateFilter, $startDate, $endDate, $dcrApprover);
+            $grandTotal = (float) $incomeData->sum(function ($row) {
+                return (float) ($row->cash ?? 0) + (float) ($row->card ?? 0) + (float) ($row->cheque ?? 0)
+                    + (float) ($row->dd ?? 0) + (float) ($row->neft ?? 0) + (float) ($row->credit ?? 0) + (float) ($row->upi ?? 0);
+            });
+            foreach ($incomeData as $row) {
+                $summary['total_discount'] += (float) ($row->discount ?? 0);
+                $summary['total_cancel'] += (float) ($row->cancel_amt ?? 0);
+                $summary['total_refund'] += (float) ($row->refund_amt ?? 0);
+            }
+            $summary['total_discount'] = round($summary['total_discount'], 2);
+            $summary['total_cancel'] = round($summary['total_cancel'], 2);
+            $summary['total_refund'] = round($summary['total_refund'], 2);
             session(['today_income_export_data' => $incomeData]);
-            // manual pagination
-            // $page = $request->input('page', 1);
-            // $incomeData = $incomeData->slice(($page - 1) * $perPage, $perPage)->values();
-
         } else {
-            // 🔹 Use DB for all other filters
-            $query = BillingListModel::select(
-                'location_id',
-                'location_name',
-                DB::raw('SUM(CASE WHEN paymenttype = "Cash" THEN amt ELSE 0 END) as cash'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Card" THEN amt ELSE 0 END) as card'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Cheque" THEN amt ELSE 0 END) as cheque'),
-                DB::raw('SUM(CASE WHEN paymenttype = "DD" THEN amt ELSE 0 END) as dd'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Neft" THEN amt ELSE 0 END) as neft'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Credit" THEN amt ELSE 0 END) as credit'),
-                DB::raw('SUM(CASE WHEN type = "Advance" THEN amt ELSE 0 END) as upi'),
-                DB::raw('SUM(amt) as subtotal'),
-                DB::raw('SUM(amt) as total')
+            $ap = $this->incomeSummarySqlApproved();
+            $cx = $this->incomeSummarySqlCancel();
+            $rf = $this->incomeSummarySqlRefund();
+
+            $base = BillingListModel::query();
+            $this->incomeSummaryApplyDateToQuery($base, $dateFilter, $startDate, $endDate);
+
+            $variants = $this->incomeSummaryResolveLocationVariants($request);
+            if ($variants !== null) {
+                if ($variants === []) {
+                    $incomeData = new \Illuminate\Pagination\LengthAwarePaginator(
+                        collect(),
+                        0,
+                        max(1, $perPage),
+                        max(1, (int) $request->input('page', 1)),
+                        ['path' => $request->url(), 'query' => $request->query()]
+                    );
+                    if ($request->ajax()) {
+                        return response()->json([
+                            'html' => view('vendor.partials.table.income_table_rows', compact('incomeData', 'grandTotal', 'summary'))->render(),
+                            'total' => 0,
+                            'summary' => $summary,
+                        ]);
+                    }
+
+                    return view('vendor.income_summary', compact(
+                        'incomeData', 'grandTotal', 'summary', 'admin', 'dateFilter', 'startDate', 'endDate', 'locationFilter',
+                        'zones', 'branchOptions', 'stateOptions', 'dcrStatus'
+                    ));
+                }
+                $base->whereIn('billing_list.location_id', $variants);
+            }
+
+            $query = (clone $base)->select(
+                DB::raw('MIN(billing_list.location_id) as location_id'),
+                'billing_list.location_name',
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Cash" THEN billing_list.amt ELSE 0 END) as cash'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Card" THEN billing_list.amt ELSE 0 END) as card'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Cheque" THEN billing_list.amt ELSE 0 END) as cheque'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "DD" THEN billing_list.amt ELSE 0 END) as dd'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Neft" THEN billing_list.amt ELSE 0 END) as neft'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Credit" THEN billing_list.amt ELSE 0 END) as credit'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "UPI" THEN billing_list.amt ELSE 0 END) as upi'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' THEN COALESCE(billing_list.granddiscountvalue,0) ELSE 0 END) as discount'),
+                DB::raw('SUM(CASE WHEN ' . $cx . ' THEN COALESCE(billing_list.amt,0) ELSE 0 END) as cancel_amt'),
+                DB::raw('SUM(CASE WHEN ' . $rf . ' THEN COALESCE(billing_list.amt,0) ELSE 0 END) as refund_amt'),
+                DB::raw('SUM(CASE WHEN ' . $ap . ' THEN billing_list.amt ELSE 0 END) as total')
             );
 
-            if ($dateFilter === 'custom' && $startDate && $endDate) {
-                $query->whereBetween(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), [
-                    $startDate . " 00:00:00",
-                    $endDate . " 23:59:59"
-                ]);
-            }
+            $collection = $query->groupBy('billing_list.location_name')
+                ->orderBy('billing_list.location_name')
+                ->get();
+            $collection = $this->incomeSummaryMergeRowsByLocationName($collection);
+            $collection = $this->incomeSummaryOverlayFormDcrOnRows($collection, (string) $dateFilter, $startDate, $endDate, $dcrApprover);
 
-            if ($dateFilter === 'this_month') {
-                $query->whereMonth(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), now()->month);
-            }
+            $summary['total_discount'] = round((float) $collection->sum(fn ($r) => (float) ($r->discount ?? 0)), 2);
+            $summary['total_cancel'] = round((float) $collection->sum(fn ($r) => (float) ($r->cancel_amt ?? 0)), 2);
+            $summary['total_refund'] = round((float) $collection->sum(fn ($r) => (float) ($r->refund_amt ?? 0)), 2);
 
-            if ($dateFilter === 'last_2_months') {
-                $query->whereBetween(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), [
-                    now()->subMonths(2)->startOfMonth(),
-                    now()->endOfMonth()
-                ]);
-            }
+            $grandTotal = (float) $collection->sum(function ($row) {
+                return (float) $row->cash + (float) $row->card + (float) $row->cheque + (float) $row->dd
+                    + (float) $row->neft + (float) $row->credit + (float) $row->upi;
+            });
 
-            if ($dateFilter === 'last_3_months') {
-                $query->whereBetween(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), [
-                    now()->subMonths(3)->startOfMonth(),
-                    now()->endOfMonth()
-                ]);
-            }
+            $page = max(1, (int) $request->input('page', 1));
+            $slice = $collection->slice(($page - 1) * $perPage, $perPage)->values();
 
-            if ($locationFilter) {
-                $query->where('location_id', $locationFilter);
-            }
-
-            $incomeData = $query->groupBy('location_id', 'location_name')
-                                ->orderBy('location_name')
-                                ->paginate($perPage);
-
-            $grandTotal = $incomeData->sum('total');
+            $incomeData = new \Illuminate\Pagination\LengthAwarePaginator(
+                $slice,
+                $collection->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
         }
 
         if ($request->ajax()) {
             return response()->json([
-                'html' => view('vendor.partials.table.income_table_rows', compact('incomeData', 'grandTotal'))->render(),
-                'total' => $grandTotal
+                'html' => view('vendor.partials.table.income_table_rows', compact('incomeData', 'grandTotal', 'summary'))->render(),
+                'total' => $grandTotal,
+                'summary' => $summary,
             ]);
         }
 
         return view('vendor.income_summary', compact(
-            'incomeData', 'grandTotal', 'admin', 'dateFilter', 'startDate', 'endDate', 'locationFilter'
+            'incomeData', 'grandTotal', 'summary', 'admin', 'dateFilter', 'startDate', 'endDate', 'locationFilter',
+            'zones', 'branchOptions', 'stateOptions', 'dcrStatus'
         ));
     }
 
@@ -7959,20 +8961,52 @@ public function getprofessionalsummary(Request $request)
                     'upi' => 0,
                     'subtotal' => 0,
                     'total' => 0,
+                    'discount' => 0,
+                    'cancel_amt' => 0,
+                    'refund_amt' => 0,
                 ];
 
                 foreach ($response['billinglist'] as $item) {
-                    $amt = $item['amt'] ?? 0;
-                    switch ($item['paymenttype'] ?? '') {
-                        case 'Cash': $summary['cash'] += $amt; break;
-                        case 'Card': $summary['card'] += $amt; break;
-                        case 'Cheque': $summary['cheque'] += $amt; break;
-                        case 'DD': $summary['dd'] += $amt; break;
-                        case 'Neft': $summary['neft'] += $amt; break;
-                        case 'Credit': $summary['credit'] += $amt; break;
+                    $amt = (float) ($item['amt'] ?? 0);
+                    $bt = strtolower(trim((string) ($item['billtype'] ?? '')));
+                    $ty = strtolower((string) ($item['type'] ?? ''));
+                    $isCancel = $bt === 'cancelled' || $bt === 'cancel' || str_contains($ty, 'cancel');
+                    $isRefund = $bt === 'refund' || $bt === 'refunded' || str_contains($ty, 'refund');
+                    if ($isCancel) {
+                        $summary['cancel_amt'] += $amt;
+
+                        continue;
                     }
-                    if (($item['type'] ?? '') === 'Advance') {
-                        $summary['upi'] += $amt;
+                    if ($isRefund) {
+                        $summary['refund_amt'] += $amt;
+
+                        continue;
+                    }
+
+                    $summary['discount'] += (float) ($item['granddiscountvalue'] ?? 0);
+
+                    switch ($item['paymenttype'] ?? '') {
+                        case 'Cash':
+                            $summary['cash'] += $amt;
+                            break;
+                        case 'Card':
+                            $summary['card'] += $amt;
+                            break;
+                        case 'Cheque':
+                            $summary['cheque'] += $amt;
+                            break;
+                        case 'DD':
+                            $summary['dd'] += $amt;
+                            break;
+                        case 'Neft':
+                            $summary['neft'] += $amt;
+                            break;
+                        case 'Credit':
+                            $summary['credit'] += $amt;
+                            break;
+                        case 'UPI':
+                            $summary['upi'] += $amt;
+                            break;
                     }
                     $summary['subtotal'] += $amt;
                     $summary['total'] += $amt;
@@ -8057,77 +9091,195 @@ public function getprofessionalsummary(Request $request)
     }
    public function exportIncomeSummary(Request $request)
     {
-        // get filters
         $dateFilter = $request->input('date_filter');
-        $startDate  = $request->input('start_date');
-        $endDate    = $request->input('end_date');
-        $location   = $request->input('location');
+        if ($dateFilter === null || $dateFilter === '') {
+            $dateFilter = 'yesterday';
+        }
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        if ($dateFilter === 'yesterday' && ! $startDate && ! $endDate) {
+            $y = Carbon::yesterday()->format('Y-m-d');
+            $startDate = $y;
+            $endDate = $y;
+        }
+        if ($dateFilter === 'custom' && (! $startDate || ! $endDate)) {
+            $y = Carbon::yesterday()->format('Y-m-d');
+            $startDate = $startDate ?: $y;
+            $endDate = $endDate ?: $y;
+        }
+        $location = $request->input('location');
+        $dcrApprover = $this->incomeSummaryDcrApproverValue($request);
 
-        // build same query logic (database part)
         if ($dateFilter === 'today') {
             if (session()->has('today_income_export_data')) {
-                $incomeData = session('today_income_export_data');
-                // dd($incomeData);
+                $incomeData = collect(session('today_income_export_data'));
             } else {
-                dd(12);
                 $incomeData = collect($this->fetchTodayApiDataForDisplay($location));
             }
+            $incomeData = $this->incomeSummaryMergeRowsByLocationName($incomeData);
+            $incomeData = $this->incomeSummaryOverlayFormDcrOnRows($incomeData, (string) $dateFilter, $startDate, $endDate, $dcrApprover);
         } else {
+            $ap = $this->incomeSummarySqlApproved();
+            $cx = $this->incomeSummarySqlCancel();
+            $rf = $this->incomeSummarySqlRefund();
 
-            $query = BillingListModel::select(
-                'location_id',
-                'location_name',
-                DB::raw('SUM(CASE WHEN paymenttype = "Cash" THEN amt ELSE 0 END) as cash'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Card" THEN amt ELSE 0 END) as card'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Cheque" THEN amt ELSE 0 END) as cheque'),
-                DB::raw('SUM(CASE WHEN paymenttype = "DD" THEN amt ELSE 0 END) as dd'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Neft" THEN amt ELSE 0 END) as neft'),
-                DB::raw('SUM(CASE WHEN paymenttype = "Credit" THEN amt ELSE 0 END) as credit'),
-                DB::raw('SUM(CASE WHEN type = "Advance" THEN amt ELSE 0 END) as upi'),
-                DB::raw('SUM(amt) as subtotal'),
-                DB::raw('SUM(amt) as total')
-            );
+            $base = BillingListModel::query();
+            $this->incomeSummaryApplyDateToQuery($base, $dateFilter, $startDate, $endDate);
 
-            if ($dateFilter === 'custom' && $startDate && $endDate) {
-                $query->whereBetween(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), [
-                    $startDate . " 00:00:00",
-                    $endDate . " 23:59:59"
-                ]);
+            $variants = $this->incomeSummaryResolveLocationVariants($request);
+            if ($variants !== null && $variants === []) {
+                $incomeData = collect();
+            } else {
+                if ($variants !== null) {
+                    $base->whereIn('billing_list.location_id', $variants);
+                }
+                $query = (clone $base)->select(
+                    DB::raw('MIN(billing_list.location_id) as location_id'),
+                    'billing_list.location_name',
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Cash" THEN billing_list.amt ELSE 0 END) as cash'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Card" THEN billing_list.amt ELSE 0 END) as card'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Cheque" THEN billing_list.amt ELSE 0 END) as cheque'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "DD" THEN billing_list.amt ELSE 0 END) as dd'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Neft" THEN billing_list.amt ELSE 0 END) as neft'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "Credit" THEN billing_list.amt ELSE 0 END) as credit'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' AND billing_list.paymenttype = "UPI" THEN billing_list.amt ELSE 0 END) as upi'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' THEN COALESCE(billing_list.granddiscountvalue,0) ELSE 0 END) as discount'),
+                    DB::raw('SUM(CASE WHEN ' . $cx . ' THEN COALESCE(billing_list.amt,0) ELSE 0 END) as cancel_amt'),
+                    DB::raw('SUM(CASE WHEN ' . $rf . ' THEN COALESCE(billing_list.amt,0) ELSE 0 END) as refund_amt'),
+                    DB::raw('SUM(CASE WHEN ' . $ap . ' THEN billing_list.amt ELSE 0 END) as total')
+                );
+                $incomeData = $this->incomeSummaryMergeRowsByLocationName(collect(
+                    $query->groupBy('billing_list.location_name')
+                        ->orderBy('billing_list.location_name')
+                        ->get()
+                ));
+                $incomeData = $this->incomeSummaryOverlayFormDcrOnRows($incomeData, (string) $dateFilter, $startDate, $endDate, $dcrApprover);
             }
-
-            if ($dateFilter === 'this_month') {
-                $query->whereMonth(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), now()->month);
-            }
-
-            if ($dateFilter === 'last_2_months') {
-                $query->whereBetween(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), [
-                    now()->subMonths(2)->startOfMonth(),
-                    now()->endOfMonth()
-                ]);
-            }
-
-            if ($dateFilter === 'last_3_months') {
-                $query->whereBetween(DB::raw("STR_TO_DATE(billdate, '%Y%m%d%H:%i:%s')"), [
-                    now()->subMonths(3)->startOfMonth(),
-                    now()->endOfMonth()
-                ]);
-            }
-
-            if ($location) {
-                $query->where('location_id', $location);
-            }
-
-            $incomeData = collect(
-                $query->groupBy('location_id', 'location_name')->get()
-            );
         }
         $fileName = 'Vendor_Income_' . now()->format('d_m_Y_His');
 
         if ($request->export_type == 'csv') {
             return Excel::download(new VendorIncomeExport($incomeData), $fileName . '.csv');
-        } else {
-            return Excel::download(new VendorIncomeExport($incomeData), $fileName . '.xlsx');
         }
+
+        return Excel::download(new VendorIncomeExport($incomeData), $fileName . '.xlsx');
+    }
+
+    /**
+     * Drill-down AJAX: individual billing records for a location (+ optional payment type).
+     * Returns JSON { html, summary, grandTotal }
+     */
+    public function vendorIncomeDrilldown(Request $request)
+    {
+        $paymentType = $request->input('payment_type');
+        if ($paymentType === null || $paymentType === '') {
+            return response()->json($this->buildIncomeBranchMatrixPayload($request));
+        }
+
+        if (in_array($paymentType, ['Discount', 'Cancel', 'Refund'], true)) {
+            return response()->json($this->buildIncomeDcrDrilldownPayload($request, $paymentType));
+        }
+
+        $locationId   = $request->input('location_id');
+        $locationName = trim((string) $request->input('location_name', ''));
+        $dateFilter  = $request->input('date_filter', 'yesterday');
+        $startDate   = $request->input('start_date');
+        $endDate     = $request->input('end_date');
+        $page        = max(1, (int) $request->input('page', 1));
+        $perPage     = 50;
+
+        $ap = $this->incomeSummarySqlApproved();
+
+        $query = BillingListModel::query()
+            ->select(
+                'billing_list.location_name',
+                'billing_list.billdate',
+                'billing_list.billno',
+                'billing_list.phid',
+                'billing_list.patientname',
+                'billing_list.consultant',
+                'billing_list.amt',
+                'billing_list.grandtotal',
+                'billing_list.granddiscountvalue',
+                'billing_list.billtype',
+                'billing_list.type',
+                'billing_list.paymenttype',
+                'billing_list.user_name'
+            );
+
+        // Date filter
+        $this->incomeSummaryApplyDateToQuery($query, $dateFilter, $startDate, $endDate);
+
+        // Location filter — prefer exact branch name (covers duplicate location_id formats in billing_list)
+        if ($locationName !== '') {
+            $query->whereRaw('TRIM(billing_list.location_name) = ?', [$locationName]);
+        } elseif ($locationId) {
+            $query->where(function ($q) use ($locationId) {
+                $q->where('billing_list.location_id', $locationId)
+                  ->orWhere('billing_list.location_name', $locationId);
+            });
+        }
+
+        // Payment type filter (UPI = literal paymenttype UPI only — not type=Advance with Cash/Card/etc.)
+        if ($paymentType) {
+            $query->where('billing_list.paymenttype', $paymentType);
+        }
+
+        // Only approved rows for payment-type drill-down; for branch total show all
+        if ($paymentType) {
+            $query->whereRaw($ap);
+        }
+
+        $total   = (clone $query)->count();
+        $records = $query->orderByRaw("STR_TO_DATE(billing_list.billdate, '%Y%m%d%H:%i:%s') DESC")
+                         ->offset(($page - 1) * $perPage)
+                         ->limit($perPage)
+                         ->get();
+
+        $typeGroups = [];
+
+        // Format date helper
+        $formatDate = function ($raw) {
+            if (!$raw) return '—';
+            try {
+                return \Carbon\Carbon::createFromFormat('Ymd', substr($raw, 0, 8))->format('d/m/Y');
+            } catch (\Throwable $e) {
+                return substr($raw, 0, 8);
+            }
+        };
+
+        $grandTotal  = $records->sum(fn ($r) => (float) $r->amt);
+        $lastPage    = (int) ceil($total / $perPage);
+
+        $rows = $records->map(function ($r, $idx) use ($formatDate, $page, $perPage) {
+            return [
+                'sno'         => ($page - 1) * $perPage + $idx + 1,
+                'location'    => $r->location_name,
+                'date'        => $formatDate($r->billdate),
+                'bill_no'     => $r->billno ?: '—',
+                'phid'        => $r->phid ?: '—',
+                'patient'     => $r->patientname ?: '—',
+                'consultant'  => $r->consultant ?: '—',
+                'amount'      => number_format((float) $r->amt, 2),
+                'grand_total' => number_format((float) $r->grandtotal, 2),
+                'discount'    => number_format((float) $r->granddiscountvalue, 2),
+                'bill_type'   => $r->billtype ?: ($r->type ?: '—'),
+                'pay_type'    => $r->paymenttype ?: '—',
+                'user'        => $r->user_name ?: '—',
+            ];
+        });
+
+        return response()->json([
+            'view'        => 'list',
+            'drill_kind'  => null,
+            'rows'        => $rows,
+            'total'       => $total,
+            'page'        => $page,
+            'last_page'   => $lastPage,
+            'grand_total' => round($grandTotal, 2),
+            'type_groups' => $typeGroups,
+            'per_page'    => $perPage,
+        ]);
     }
 
     // public function exportBills(Request $request)

@@ -619,6 +619,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     //income
     Route::get('/superadmin/income', [VendorController::class, 'vendorincomeReport'])->name('superadmin.vendorincomeReport');
     Route::get('/income-summary/export', [VendorController::class, 'exportIncomeSummary'])->name('incomeSummary.export');
+    Route::get('/income-summary/drilldown', [VendorController::class, 'vendorIncomeDrilldown'])->name('incomeSummary.drilldown');
 
 
     //Branch financial module
@@ -688,6 +689,8 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/upload', [BankStatementController::class, 'upload'])->name('upload');
         // Get bank statements with filters
         Route::get('/statements', [BankStatementController::class, 'getStatements'])->name('statements');
+        Route::get('/drilldown/by-nature', [BankStatementController::class, 'drilldownStatementsByNature'])->name('drilldown.by-nature');
+        Route::get('/drilldown/by-zone', [BankStatementController::class, 'drilldownStatementsByZone'])->name('drilldown.by-zone');
         Route::get('/statements-export', [BankStatementController::class, 'exportStatements'])->name('statements-export');
         Route::get('/matched-by-options', [BankStatementController::class, 'listMatchedByUsersForFilter'])->name('matched-by-options');
         Route::get('/quick-filter-options', [BankStatementController::class, 'statementQuickFilterOptions'])->name('quick-filter-options');
@@ -724,6 +727,11 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/upload-batches', [BankStatementController::class, 'listUploadBatches'])->name('upload-batches');
         Route::get('/batch-file/{uploadBatchId}', [BankStatementController::class, 'downloadBatchFile'])->name('batch-file');
         Route::get('/batch-preview/{uploadBatchId}', [BankStatementController::class, 'previewBatch'])->name('batch-preview');
+        // Match attachment document types (PO, Quotation, …) — master + dropdown JSON
+        Route::get('/match-attachment-types', [BankStatementController::class, 'listMatchAttachmentTypes'])->name('match-attachment-types.index');
+        Route::post('/match-attachment-types', [BankStatementController::class, 'storeMatchAttachmentType'])->name('match-attachment-types.store');
+        Route::post('/match-attachment-types/{id}', [BankStatementController::class, 'updateMatchAttachmentType'])->name('match-attachment-types.update');
+        Route::delete('/match-attachment-types/{id}', [BankStatementController::class, 'destroyMatchAttachmentType'])->name('match-attachment-types.destroy');
     });
 
     //income new stats
