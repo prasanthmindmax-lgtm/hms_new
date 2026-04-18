@@ -19,15 +19,16 @@
   .sm-modal-title { font-size:16px; font-weight:700; color:#1f2937; display:flex; align-items:center; gap:8px; }
   .sm-modal-close { width:30px;height:30px;border-radius:50%;background:#f3f4f6;border:none;cursor:pointer;font-size:18px;color:#6b7280;display:flex;align-items:center;justify-content:center; }
   .sm-modal-close:hover { background:#e5e7eb; }
-  .sm-form-row { display:flex; gap:14px; margin-bottom:16px; }
-  .sm-form-group { flex:1; }
+  .sm-form-row { display:flex; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .sm-form-group { flex:1; min-width:200px; }
   .sm-form-group label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:6px; }
   .sm-form-group .form-control,
   .sm-form-group select { border-radius:8px; border:1px solid #d1d5db; font-size:13px; padding:8px 12px; width:100%; }
-  .sm-form-group input[type="time"].form-control { min-height:42px; cursor:pointer; }
   .sm-modal-footer { display:flex; gap:10px; margin-top:22px; justify-content:flex-end; }
   .sm-btn-primary { padding:9px 22px; background:linear-gradient(135deg,#4f6ef7,#7c3aed); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
   .sm-btn-cancel { padding:9px 22px; background:#f3f4f6; color:#374151; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+  .ld-catalog-key-hint { font-size:12px; color:#6b7280; margin-top:4px; }
+  .ld-catalog-key-hint code { font-size:11px; background:#f3f4f6; padding:2px 6px; border-radius:4px; }
 </style>
 
 <body style="overflow-x: hidden;">
@@ -42,11 +43,11 @@
 
       <div class="qd-header">
         <div class="qd-header-title">
-          <i class="bi bi-diagram-3"></i> Ticket Category Master
+          <i class="bi bi-file-earmark-medical"></i> Licence document master
         </div>
         <div class="qd-header-actions">
-          <button class="btn btn-primary btn-sm new_categories">
-            <i class="bi bi-plus-lg me-1"></i>New Ticket Category
+          <button type="button" class="btn btn-primary btn-sm" id="btnNewCatalogSlot">
+            <i class="bi bi-plus-lg me-1"></i>New document
           </button>
         </div>
       </div>
@@ -54,7 +55,7 @@
       <div class="qd-search-row">
         <div class="qd-search-wrap">
           <i class="bi bi-search"></i>
-          <input type="text" id="tableSearch" placeholder="Search ticket category name...">
+          <input type="text" id="tableSearch" placeholder="Search by key or label...">
         </div>
       </div>
 
@@ -63,53 +64,51 @@
           <thead class="qdt-head">
             <tr>
               <th class="qdt-th-check"><input type="checkbox" id="selectAll"></th>
-              <th>DEPARTMENT</th>
-              <th>CATEGORY</th>
-              <th>SLA TIME</th>
+              <th>LEVEL</th>
+              {{--  <th>DOCUMENT KEY</th>  --}}
+              <th>DOCUMENT NAME</th>
               <th>STATUS</th>
               <th class="text-center">ACTION</th>
             </tr>
           </thead>
           <tbody>
-            @forelse ($ticketCategories as $ticketCategory)
-              <tr class="qdt-row type-row" data-id="{{ $ticketCategory->id }}" data-type='@json($ticketCategory)'>
+            @forelse ($items as $row)
+              <tr class="qdt-row type-row" data-id="{{ $row->id }}" data-type='@json($row)'>
                 <td class="qdt-td-check"><input type="checkbox" class="row-check"></td>
-                <td style="font-weight:600;color:#1f2937;">{{ $ticketCategory->department->name }}</td>
-                <td style="font-weight:600;color:#1f2937;">{{ $ticketCategory->name }}</td>
-                <td style="font-weight:600;color:#1f2937;">{{ $ticketCategory->sla_time }}</td>
+                <td style="font-weight:600;color:#1f2937;">
+                  <span class="badge {{ $row->level === 2 ? 'bg-success' : 'bg-primary' }}">Level {{ $row->level }}</span>
+                </td>
+                {{--  <td style="font-weight:600;color:#1f2937;"><code class="small">{{ $row->document_key }}</code></td>  --}}
+                <td style="font-weight:600;color:#1f2937;">{{ $row->label }}</td>
                 <td>
-                  @if($ticketCategory->is_active == 1)
-                    <span style="font-size:12px;background:#ecfdf3;color:#15803d;padding:3px 10px;border-radius:20px;font-weight:500;">
-                      Active
-                    </span>
+                  @if($row->is_active)
+                    <span style="font-size:12px;background:#ecfdf3;color:#15803d;padding:3px 10px;border-radius:20px;font-weight:500;">Active</span>
                   @else
-                    <span style="font-size:12px;background:#fef2f2;color:#b91c1c;padding:3px 10px;border-radius:20px;font-weight:500;">
-                      Inactive
-                    </span>
+                    <span style="font-size:12px;background:#fef2f2;color:#b91c1c;padding:3px 10px;border-radius:20px;font-weight:500;">Inactive</span>
                   @endif
                 </td>
                 <td class="text-center">
-                  <button class="btn btn-sm edit-btn"
+                  <button type="button" class="btn btn-sm edit-btn"
                     style="font-size:11px;padding:4px 14px;border:1px solid #4f6ef7;color:#4f6ef7;border-radius:6px;background:#fff;">
                     <i class="bi bi-pencil me-1"></i>Edit
                   </button>
                 </td>
               </tr>
             @empty
-              <tr><td colspan="5" class="text-center py-5 text-muted">
-                <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No Ticket Categories found
+              <tr><td colspan="6" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No document slots found. Run migrations or add a new slot.
               </td></tr>
             @endforelse
           </tbody>
         </table>
 
-        @if($ticketCategories->total() > 10)
+        @if($items->total() > 10)
         <div class="qd-pagination d-flex justify-content-between align-items-center mt-2 px-1">
-          <div>{{ $ticketCategories->links('pagination::bootstrap-4') }}</div>
+          <div>{{ $items->links('pagination::bootstrap-4') }}</div>
           <div style="display:flex;align-items:center;gap:6px;">
             <select id="per_page" class="form-control form-control-sm" style="width:70px;">
               @foreach([10,25,50,100] as $size)
-                <option value="{{ $size }}" {{ $perPage==$size ? 'selected' : '' }}>{{ $size }}</option>
+                <option value="{{ $size }}" {{ (int)$perPage === $size ? 'selected' : '' }}>{{ $size }}</option>
               @endforeach
             </select>
             <span style="font-size:13px;color:#6c757d;">entries</span>
@@ -123,62 +122,50 @@
 </div>
 
 <div class="sm-modal-overlay" id="modalOverlay"></div>
-<div class="sm-modal" id="categoryModal">
+<div class="sm-modal" id="catalogModal">
   <div class="sm-modal-box">
     <div class="sm-modal-header">
-      <div class="sm-modal-title"><i class="bi bi-diagram-3" style="color:#4f6ef7;"></i> Ticket Category</div>
-      <button class="sm-modal-close close-modal">&times;</button>
+      <div class="sm-modal-title"><i class="bi bi-file-earmark-medical" style="color:#4f6ef7;"></i> Licence document slot</div>
+      <button type="button" class="sm-modal-close close-modal" aria-label="Close">&times;</button>
     </div>
-    <input type="hidden" class="categories_id" id="categories_id">
-    <div class="sm-form-row">
-        <div class="sm-form-group">
-            <label>Department <span style="color:red">*</span></label>
-            <select class="form-control department_id" id="department_id">
-                <option value="">Select Department</option>
-                @foreach($departments as $department)
-                    <option value="{{ $department->id }}">{{ $department->name }}</option>
-                @endforeach
-            </select>
-        </div>
-    </div>
+    <input type="hidden" id="catalog_id" value="">
     <div class="sm-form-row">
       <div class="sm-form-group">
-        <label>Issue Category <span style="color:red">*</span></label>
-        <input type="text" class="form-control name" placeholder="e.g. Network Issue" autocomplete="off">
+        <label>Level <span style="color:red">*</span></label>
+        <select class="form-control" id="catalog_level">
+          <option value="">Select level</option>
+          <option value="1">Level 1</option>
+          <option value="2">Level 2</option>
+        </select>
+      </div>
+      <div class="sm-form-group" id="catalog_key_row" style="display:none;">
+        <label>System key</label>
+        <div class="ld-catalog-key-hint" id="catalog_key_hint"></div>
       </div>
     </div>
     <div class="sm-form-row">
-      <div class="sm-form-group">
-        <label>SLA Time <span style="color:red">*</span></label>
-        <input type="time" class="form-control sla_time" id="sla_time" step="60" title="Target response time (hours and minutes)" autocomplete="off">
+      <div class="sm-form-group" style="flex:1 1 100%;">
+        <label>Document name <span style="color:red">*</span></label>
+        <input type="text" class="form-control" id="catalog_label" placeholder="e.g. Drug licence" autocomplete="off">
       </div>
-    </div>
-    <div class="sm-form-row">
-        <div class="sm-form-group">
-            <label>Description</label>
-            <textarea class="form-control description"
-            placeholder="Enter description"
-            rows="2"></textarea>
-        </div>
     </div>
     <div class="sm-form-row">
       <div class="sm-form-group">
         <label>Status <span style="color:red">*</span></label>
-        <select class="form-control is_active" id="is_active">
+        <select class="form-control" id="catalog_is_active">
           <option value="1">Active</option>
           <option value="0">Inactive</option>
         </select>
       </div>
     </div>
     <div class="sm-modal-footer">
-      <button class="sm-btn-cancel close-modal">Cancel</button>
-      <button class="sm-btn-primary department_save">Save</button>
+      <button type="button" class="sm-btn-cancel close-modal">Cancel</button>
+      <button type="button" class="sm-btn-primary" id="catalogSaveBtn">Save</button>
     </div>
   </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="{{ asset('/assets/js/plugins/dropzone-amd-module.min.js') }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script>
 $(document).ready(function () {
@@ -192,71 +179,62 @@ $(document).ready(function () {
 
   $('#tableSearch').on('keyup', function () {
     const q = $(this).val().toLowerCase();
-    $('#mainTable tbody tr').each(function () {
+    $('#mainTable tbody tr.type-row').each(function () {
       $(this).toggle($(this).text().toLowerCase().includes(q));
     });
   });
 
   function openModal() {
-    $('#categoryModal').addClass('show');
+    $('#catalogModal').addClass('show');
     $('#modalOverlay').addClass('show');
     $('body').css('overflow','hidden');
   }
 
   function closeModal() {
-    $('#categoryModal').removeClass('show');
+    $('#catalogModal').removeClass('show');
     $('#modalOverlay').removeClass('show');
     $('body').css('overflow','auto');
   }
 
-  function slaTimeToInputValue(s) {
-    if (s == null || s === '') return '';
-    var t = String(s).trim();
-    var m = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-    if (!m) return '';
-    var h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
-    var mi = Math.min(59, Math.max(0, parseInt(m[2], 10)));
-    return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
-  }
-
-  $('.new_categories').on('click', function () {
-    $('#categories_id').val('');
-    $('#department_id').val('');
-    $('.name').val('');
-    $('.sla_time').val('');
-    $('.description').val('');
-    $('#is_active').val('1');
+  $('#btnNewCatalogSlot').on('click', function () {
+    $('#catalog_id').val('');
+    $('#catalog_level').val('').prop('disabled', false);
+    $('#catalog_key_row').hide();
+    $('#catalog_key_hint').empty();
+    $('#catalog_label').val('');
+    $('#catalog_is_active').val('1');
     openModal();
   });
 
   $(document).on('click', '.edit-btn', function () {
     const d = $(this).closest('tr').data('type');
-    $('#categories_id').val(d.id);
-    $('#department_id').val(d.department_id);
-    $('.name').val(d.name);
-    $('.sla_time').val(slaTimeToInputValue(d.sla_time));
-    $('#is_active').val(d.is_active);
-    $('.description').val(d.description);
+    $('#catalog_id').val(d.id);
+    $('#catalog_level').val(String(d.level)).prop('disabled', true);
+    $('#catalog_key_row').show();
+    $('#catalog_key_hint').html('Stored identifier: <code>' + $('<div/>').text(d.document_key).html() + '</code>');
+    $('#catalog_label').val(d.label);
+    $('#catalog_is_active').val(d.is_active ? '1' : '0');
     openModal();
   });
 
   $(document).on('click', '.close-modal, #modalOverlay', closeModal);
 
-  $(document).on('click', '.department_save', function (e) {
+  $('#catalogSaveBtn').on('click', function (e) {
     e.preventDefault();
     const fd = new FormData();
-    fd.append('id', $('#categories_id').val());
-    fd.append('department_id', $('#department_id').val());
-    fd.append('name', $('.name').val());
-    fd.append('sla_time', $('.sla_time').val());
-    fd.append('description', $('.description').val());
-    fd.append('is_active', $('#is_active').val());
+    const id = $('#catalog_id').val();
+    fd.append('id', id || '');
+    if (!id) {
+      fd.append('level', $('#catalog_level').val());
+    }
+    fd.append('label', ($('#catalog_label').val() || '').trim());
+    fd.append('is_active', $('#catalog_is_active').val());
     $.ajax({
-      url:'{{ route("superadmin.ticket.categories.store") }}',
-      type:'POST',
-      data:fd,
-      processData:false,
-      contentType:false,
+      url: '{{ route("superadmin.licence_documents.catalog.store") }}',
+      type: 'POST',
+      data: fd,
+      processData: false,
+      contentType: false,
       headers: {
         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
       },
@@ -264,7 +242,7 @@ $(document).ready(function () {
         if (res.success) {
           toastr.success(res.message);
           closeModal();
-          setTimeout(()=>window.location.reload(),800);
+          setTimeout(function () { window.location.reload(); }, 600);
         }
       },
       error: function (err) {
@@ -272,6 +250,8 @@ $(document).ready(function () {
           $.each(err.responseJSON.errors, function (k, v) {
             toastr.error(v[0]);
           });
+        } else if (err.responseJSON && err.responseJSON.message) {
+          toastr.error(err.responseJSON.message);
         } else {
           toastr.error('Something went wrong.');
         }

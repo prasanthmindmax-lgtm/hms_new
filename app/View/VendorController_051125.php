@@ -1139,7 +1139,7 @@ public function statementprint(Request $request, $id)
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
         $Tblvendor = Tblvendor::orderBy('id', 'asc')->get();
         $Tblaccount = Tblaccount::orderBy('id', 'asc')->get();
-        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments'])->orderBy('id', 'desc');
+        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments', 'department'])->orderBy('id', 'desc');
 
         // Apply filters
         if ($request->filled('date_from') && $request->filled('date_to')) {

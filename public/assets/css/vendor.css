@@ -1889,24 +1889,24 @@ input:focus {
 }
 
 /* Tax list scrolls */
-.tax-list ,.tax-tcs-list ,.tax-gst-list,.account-list,.zone-list,.branch-list,.tds-section-list,.company-list,.category-list,.vendor-list,.status-list,.state-list,.financial-year-list,.delivery-list{
+.tax-list ,.tax-tcs-list ,.tax-gst-list,.account-list,.zone-list,.branch-list,.tds-section-list,.company-list,.category-list,.vendor-list,.status-list,.state-list,.financial-year-list,.delivery-list,.department-list,.user-list{
   max-height: 150px;
   overflow-y: auto;
 }
 
 /* Tax items */
-.tax-list div ,.tax-tcs-list div ,.tax-gst-list div ,.account-list div,.zone-list div,.branch-list div,.tds-section-list div,.company-list div,.category-list div,.vendor-list div,.status-list div,.state-list div,.financial-year-list div,.delivery-list div{
+.tax-list div ,.tax-tcs-list div ,.tax-gst-list div ,.account-list div,.zone-list div,.branch-list div,.tds-section-list div,.company-list div,.category-list div,.vendor-list div,.status-list div,.state-list div,.financial-year-list div,.delivery-list div,.department-list div,.user-list div{
   padding: 8px;
   cursor: pointer;
 }
 
 .tax-list div:hover ,.tax-tcs-list div:hover ,.tax-gst-list div:hover ,.account-list div:hover,.zone-list div:hover,.branch-list div:hover ,.tds-section-list div:hover,.company-list div:hover,.category-list div:hover,.vendor-list div:hover,.status-list div:hover,.state-list div:hover,
-.financial-year-list div:hover,.delivery-list div:hover {
+.financial-year-list div:hover,.delivery-list div:hover,.department-list div:hover,.user-list div:hover {
   background-color: #f0f0f0;
 }
 
 /* Footer link */
-.manage-tds-link , .manage-tcs-link,.manage-gst-link,.manage-account-link,.manage-tds-section,.manage-delivery-link,.manage-category-link{
+.manage-tds-link , .manage-tcs-link,.manage-gst-link,.manage-account-link,.manage-tds-section,.manage-delivery-link,.manage-category-link,.manage-department-link{
   padding: 8px;
   text-align: center;
   font-size: 13px;
@@ -2673,6 +2673,7 @@ hr {
 /* new filter css */
 /* ===================== Universal Dropdown Item Styles ===================== */
 .zone-list div,
+.user-list div,
 .branch-list div,
 .company-list div,
 .account-list div,
@@ -2687,6 +2688,7 @@ hr {
 }
 
 .zone-list div:hover,
+.user-list div:hover,
 .branch-list div:hover,
 .company-list div:hover,
 .account-list div:hover,
@@ -2698,6 +2700,7 @@ hr {
 }
 
 .zone-list div.selected,
+.user-list div.selected,
 .branch-list div.selected,
 .company-list div.selected,
 .account-list div.selected,
@@ -2710,6 +2713,7 @@ hr {
 }
 
 .zone-list div.selected::after,
+.user-list div.selected::after,
 .branch-list div.selected::after,
 .company-list div.selected::after,
 .account-list div.selected::after,

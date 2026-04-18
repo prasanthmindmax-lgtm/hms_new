@@ -53,7 +53,7 @@
                     <!-- Vendor Name -->
                     <div class="col-md-6">
                         <div class="row mb-2 align-items-start">
-                            <label for="vendor-search" class="col-md-4  fw-semibold">Vendor Name*</label>
+                            <label for="vendor-search" class="col-md-4  fw-semibold">Vendor Name <span class="text-danger">*</span></label>
                             <input type="hidden" name="id" id="id">
                             <div class="col-md-8">
                                 <div class="search-dropdown">
@@ -89,7 +89,7 @@
 
 
                 <div class="row mb-3">
-                    <label for="grn_number" class="col-md-2 ">GRN Number *</label>
+                    <label for="grn_number" class="col-md-2 ">GRN Number <span class="text-danger">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="grn_number" name="grn_number" autocomplete="off" autocorrect="off" value={{$grn_id ?? ''}}  readonly required>
                     </div>
@@ -97,14 +97,14 @@
                 <!-- Row 2: Bill#, Order Number -->
                 {{-- @if($type == "bill")
                 <div class="row mb-3">
-                    <label for="bill_number" class="col-md-2 ">Bill#*</label>
+                    <label for="bill_number" class="col-md-2 ">Bill# <span class="text-danger">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="bill_number" name="bill_number"  readonly required>
                     </div>
                 </div>
                 @else
                 <div class="row mb-3">
-                    <label for="purchase_no" class="col-md-2 ">Quotation no#*</label>
+                    <label for="purchase_no" class="col-md-2 ">Quotation no# <span class="text-danger">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control" id="purchase_no" name="purchase_no"  readonly required>
                     </div>
@@ -120,14 +120,14 @@
 
                 <!-- Row 4: Bill Date, Due Date -->
                 <div class="row mb-3">
-                    <label for="bill_date" class="col-md-2 ">Bill Date*</label>
+                    <label for="bill_date" class="col-md-2 ">Bill Date <span class="text-danger">*</span></label>
                     <div class="col-md-4">
                         <input type="text" class="form-control datepicker" id="bill_date" name="bill_date" autocomplete="off" autocorrect="off" placeholder="dd/MM/yyyy" required>
                     </div>
                 </div>
                 <!-- Row 5: Payment Terms -->
                 <div class="row mb-3">
-                    <label for="zone" class="col-md-2 ">Zones</label>
+                    <label for="zone" class="col-md-2 ">Zones <span class="text-danger">*</span></label>
                     <div class="col-md-4">
                         {{-- <input type="text" class="form-control datepicker" id="due_date" name="due_date" > --}}
                       <div class="tax-dropdown-wrapper account-section" style="width:343px">
@@ -144,7 +144,7 @@
                         </div>
                     </div>
 
-                    <label for="branch" class="col-md-2 ">Branch</label>
+                    <label for="branch" class="col-md-2 ">Branch <span class="text-danger">*</span></label>
                     <div class="col-md-4">
                         {{-- <input type="text" class="form-control datepicker" id="due_date" name="due_date" > --}}
                       <div class="tax-dropdown-wrapper account-section" style="width:343px">
@@ -176,6 +176,21 @@
                             </div>
                           </div>
                           <span class="error_zone" style="color:red"></span>
+                        </div>
+                    </div>
+                    <label for="department" class="col-md-2 ">Department <span class="text-danger">*</span></label>
+                    <div class="col-md-4">
+                      <div class="tax-dropdown-wrapper department-section" style="width:343px">
+                          <input type="text" class="form-control department-search-input" name="department_name" autocomplete="off" autocorrect="off" placeholder="Select a Department" readonly required>
+                          <input type="hidden" name="department_id" class="department_id">
+                          <div class="dropdown-menu tax-dropdown">
+                            <div class="inner-search-container">
+                              <input type="text" class="department-inner-search" placeholder="Search...">
+                            </div>
+                            <div class="department-list">
+                            </div>
+                          </div>
+                          <span class="error_department" style="color:red"></span>
                         </div>
                     </div>
                 </div>
@@ -410,6 +425,7 @@
                 const gsttax = @json($gsttax);
                 const TblZonesModel = @json($TblZonesModel);
                 const Tblcompany = @json($Tblcompany);
+                const Tbldepartment = @json($Tbldepartment);
                 // alert(JSON.stringify(Tbltdstaxs));
                 Tbltdstaxs.data.forEach(Tbltdstax => {
                         const item = $(`
@@ -440,6 +456,12 @@
                             <div data-value="${Tblcompany.company_name}" data-id="${Tblcompany.id}">${Tblcompany.company_name}</div>
                         `);
                         $('.company-list').append(item);
+                    });
+                    (Array.isArray(Tbldepartment) ? Tbldepartment : (Tbldepartment.data || [])).forEach(dept => {
+                        const item = $(`
+                            <div data-value="${dept.name}" data-id="${dept.id}">${dept.name}</div>
+                        `);
+                        $('.department-list').append(item);
                     });
                 //  initCustomerSearch($('.item-row:first .search-customer-dropdown'));
                 const $searchInput = $('#vendor-search');
@@ -749,6 +771,52 @@
                       wrapper.find('.company_id').val(selectedid);
                       $dropdown.hide();
                   });
+                  //department
+                  $(document).on('click', '.department-search-input', function (e) {
+                      e.stopPropagation();
+                      $(this).val('');
+                      $('.dropdown-menu.tax-dropdown').hide();
+
+                      const $input = $(this);
+                      let $dropdown = $input.data('dropdown');
+
+                      if (!$dropdown) {
+                          $dropdown = $input.siblings('.dropdown-menu').clone(true);
+                          $('body').append($dropdown);
+                          $input.data('dropdown', $dropdown);
+                      }
+
+                      $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper'));
+                      $dropdown.data('row', $input.closest('tr'));
+
+                      const offset = $input.offset();
+                      $dropdown.css({
+                          position: 'absolute',
+                          top: offset.top + $input.outerHeight(),
+                          left: offset.left,
+                          width: $input.outerWidth(),
+                          zIndex: 999
+                      }).show();
+
+                      $(this).removeAttr('readonly');
+                  });
+                  $(document).on('click', '.department-list div', function () {
+                      const selectedText = $(this).text().trim();
+                      const selectedid = $(this).data('id');
+
+                      const $dropdown = $(this).closest('.dropdown-menu.tax-dropdown');
+                      const wrapper = $dropdown.data('wrapper');
+                      const row = $dropdown.data('row');
+
+                      if (!wrapper || !row) {
+                          console.warn("Wrapper or row not found — department selection failed.");
+                          $dropdown.hide();
+                          return;
+                      }
+                      wrapper.find('.department-search-input').val(selectedText);
+                      wrapper.find('.department_id').val(selectedid);
+                      $dropdown.hide();
+                  });
 
               $('.zone_id').on('click', function () {
                 var id=$('.zone_id').val();
@@ -821,6 +889,28 @@
                         $(this).toggle(itemText.includes(searchText));
                       });
                     }
+                  });
+
+                  $('.department-search-input').on('keyup', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const $dropdown = $(this).data('dropdown');
+
+                    if ($dropdown) {
+                      const list = $dropdown.find('.department-list div');
+                      list.each(function () {
+                        const itemText = $(this).text().toLowerCase();
+                        $(this).toggle(itemText.includes(searchText));
+                      });
+                    }
+                  });
+
+                  $(document).on('keyup', '.department-inner-search', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const list = $(this).closest('.dropdown-menu.tax-dropdown').find('.department-list div');
+                    list.each(function () {
+                      const itemText = $(this).text().toLowerCase();
+                      $(this).toggle(itemText.includes(searchText));
+                    });
                   });
 
                 $(document).on('click', function (e) {
@@ -976,9 +1066,13 @@
               $(document).ready(function () {
 
               function submitBillForm(saveStatus, $btn) {
-                $btn.prop('disabled', true);
-                 // Save original button text
                     let originalText = $btn.html();
+                    var depId = $('.department_id').val();
+                    if (!depId || String(depId).trim() === '') {
+                        toastr.error('Please select a department.');
+                        return;
+                    }
+                $btn.prop('disabled', true);
                     // Show loader on button
                     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
 
@@ -1007,6 +1101,14 @@
                       },
                       error: function (xhr) {
                           console.error("Error saving form:", xhr);
+                          if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                              $.each(xhr.responseJSON.errors, function (k, v) {
+                                  toastr.error(v[0]);
+                              });
+                          } else {
+                              toastr.error('Something went wrong.');
+                          }
+                          $btn.prop('disabled', false).html(originalText);
                       },
                       // complete: function () {
                       //       // Reset button back
@@ -1117,6 +1219,8 @@ $(document).ready(function () {
                       $('#purchase_id').val(grnedit_header[0].purchase_id);
                       $('.company-search-input').val(grnedit_header[0].company_name);
                       $('.company_id').val(grnedit_header[0].company_id);
+                      $('.department-search-input').val(grnedit_header[0].department_name != null ? grnedit_header[0].department_name : '');
+                      $('.department_id').val(grnedit_header[0].department_id != null ? grnedit_header[0].department_id : '');
 
                       let isFirst = true;
                       console.log("grnedit_lines",grnedit_lines);

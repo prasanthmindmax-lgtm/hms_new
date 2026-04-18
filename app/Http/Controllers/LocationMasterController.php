@@ -31,7 +31,7 @@ class LocationMasterController extends Controller
         $makeBase = function () use ($search, $zoneFilter) {
             $q = DB::table('tbl_locations as l')
                 ->join('tblzones as z', 'l.zone_id', '=', 'z.id')
-                ->select('l.id', 'l.name', 'l.zone_id', 'l.status', 'z.name as zone_name');
+                ->select('l.id', 'l.name', 'l.zone_id', 'l.status', 'l.level', 'z.name as zone_name');
 
             if ($zoneFilter !== null && $zoneFilter !== '') {
                 $q->where('l.zone_id', (int) $zoneFilter);
@@ -58,6 +58,13 @@ class LocationMasterController extends Controller
         $data = $rows->map(function ($row, $i) use ($start) {
             $st = (int) ($row->status ?? 0);
             $statusLabel = $st === 1 ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>';
+            $lvl = (int) ($row->level ?? 1);
+            if ($lvl !== 2) {
+                $lvl = 1;
+            }
+            $levelLabel = $lvl === 2
+                ? '<span class="badge rounded-pill" style="background:#ecfdf5;color:#047857;font-weight:600;">Level 2</span>'
+                : '<span class="badge rounded-pill" style="background:#eef2ff;color:#4338ca;font-weight:600;">Level 1</span>';
 
             return [
                 'DT_RowIndex' => $start + $i + 1,
@@ -65,6 +72,7 @@ class LocationMasterController extends Controller
                 'zone_name' => e($row->zone_name),
                 'name' => e($row->name),
                 'name_plain' => $row->name,
+                'level' => $levelLabel,
                 'status' => $statusLabel,
                 'status_raw' => $st,
                 'zone_id' => $row->zone_id,
@@ -144,6 +152,7 @@ class LocationMasterController extends Controller
             'zone_id' => 'required|integer|exists:tblzones,id',
             'name' => 'required|string|max:191',
             'status' => 'nullable|in:0,1',
+            'level' => 'required|in:1,2',
         ]);
         if ($v->fails()) {
             return response()->json(['success' => false, 'errors' => $v->errors()->all()], 422);
@@ -153,6 +162,7 @@ class LocationMasterController extends Controller
             'zone_id' => (int) $request->zone_id,
             'name' => trim($request->name),
             'status' => (int) ($request->status ?? 1),
+            'level' => (int) $request->level,
         ]);
 
         return response()->json(['success' => true, 'message' => 'Branch (location) created.']);
@@ -172,6 +182,7 @@ class LocationMasterController extends Controller
                 'name' => $loc->name,
                 'zone_id' => $loc->zone_id,
                 'status' => (int) ($loc->status ?? 1),
+                'level' => (int) ($loc->level ?? 1),
             ],
         ]);
     }
@@ -187,6 +198,7 @@ class LocationMasterController extends Controller
             'zone_id' => 'required|integer|exists:tblzones,id',
             'name' => 'required|string|max:191',
             'status' => 'nullable|in:0,1',
+            'level' => 'required|in:1,2',
         ]);
         if ($v->fails()) {
             return response()->json(['success' => false, 'errors' => $v->errors()->all()], 422);
@@ -195,6 +207,7 @@ class LocationMasterController extends Controller
         $loc->zone_id = (int) $request->zone_id;
         $loc->name = trim($request->name);
         $loc->status = (int) ($request->status ?? 1);
+        $loc->level = (int) $request->level;
         $loc->save();
 
         return response()->json(['success' => true, 'message' => 'Branch updated.']);
