@@ -1913,7 +1913,7 @@ input:focus {
   border-top: 1px solid #ddd;
   color: #007bff;
   cursor: pointer;
-
+}
 .tds-modal {
   display: none;
   position: fixed;

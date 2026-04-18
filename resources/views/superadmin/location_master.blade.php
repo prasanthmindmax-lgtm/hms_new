@@ -412,6 +412,7 @@ body { font-family: var(--lm-font); background: var(--lm-bg); }
                     <th>#</th>
                     <th>Zone</th>
                     <th>Branch name</th>
+                    <th>Level</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -485,7 +486,16 @@ body { font-family: var(--lm-font); background: var(--lm-bg); }
           <label class="lm-label">Branch / location name <span style="color:var(--lm-coral)">*</span></label>
           <input type="text" class="lm-input" id="locNameInput" maxlength="191" placeholder="As used in bills &amp; MIS">
         </div>
-        <div>
+        <div class="mb-3">
+          <label class="lm-label">Level <span style="color:var(--lm-coral)">*</span></label>
+          <select class="lm-select" id="locLevelSelect" required>
+              <option value="">Select Level 1 or 2</option>
+              <option value="1">Level 1</option>
+              <option value="2">Level 2</option>
+          </select>
+          <div class="small text-muted mt-1" style="font-size:.72rem;">Each branch uses one pack only. License Documents module follows this setting.</div>
+        </div>
+        <div class="mb-3">
           <label class="lm-label">Status</label>
           <select class="lm-select" id="locStatusSelect">
             <option value="1">✅ Active</option>
@@ -584,6 +594,7 @@ body { font-family: var(--lm-font); background: var(--lm-bg); }
         }
       },
       { data:'name', render:function(d){ return '<span class="loc-name-cell">' + d + '</span>'; } },
+      { data:'level', orderable:false, searchable:false, width:'110px', render:function(h){ return h; } },
       { data:'status', orderable:false, searchable:false, render:function(h){ return h; } },
       {
         data:'id', orderable:false, searchable:false,
@@ -676,6 +687,7 @@ body { font-family: var(--lm-font); background: var(--lm-bg); }
     $('#locationModalTitle').text('Add branch');
     $('#locationEditId').val('');
     $('#locNameInput').val('');
+    $('#locLevelSelect').val('');
     $('#locStatusSelect').val('1');
     var fz = $('#filterZone').val();
     if (fz) $('#locZoneSelect').val(fz);
@@ -693,6 +705,7 @@ body { font-family: var(--lm-font); background: var(--lm-bg); }
       $('#locationEditId').val(L.id);
       $('#locZoneSelect').val(String(L.zone_id));
       $('#locNameInput').val(L.name);
+      $('#locLevelSelect').val(String(L.level));
       $('#locStatusSelect').val(String(L.status));
       showErrors($('#locationModalErrors'), []);
       $('#locationModal').modal('show');
@@ -706,10 +719,14 @@ body { font-family: var(--lm-font); background: var(--lm-bg); }
     var payload = {
       zone_id: $('#locZoneSelect').val(),
       name:    $('#locNameInput').val().trim(),
+      level:   $('#locLevelSelect').val(),
       status:  $('#locStatusSelect').val(),
       _token:  CSRF
     };
     if (!payload.name) { showErrors($('#locationModalErrors'),['Branch name is required.']); btn.prop('disabled',false); return; }
+    if (!payload.level || (payload.level !== '1' && payload.level !== '2')) {
+      showErrors($('#locationModalErrors'),['Select Level 1 or Level 2.']); btn.prop('disabled',false); return;
+    }
     var url = id ? (ROUTES.locBase+'/'+id) : ROUTES.locStore;
     if (id) payload._method = 'PUT';
     $.ajax({ url:url, type:'POST', data:payload })

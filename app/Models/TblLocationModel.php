@@ -17,6 +17,7 @@ class TblLocationModel extends Model
         'id',
         'name',
         'zone_id',
+        'level',
         'status',
     ];
 

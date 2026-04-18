@@ -24,6 +24,8 @@ use App\Http\Controllers\RadiantMismatchAlertController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\IndentController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\LicenceDocumentCatalogController;
+use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
 use Illuminate\Support\Facades\Route;
@@ -848,6 +850,13 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('superadmin/tickets/status', [TicketController::class, 'updateStatus'])->name('superadmin.tickets.status');
     Route::get('superadmin/tickets/{ticket}/timeline', [TicketController::class, 'timeline'])->name('superadmin.tickets.timeline');
     Route::get('superadmin/tickets/attachment', [TicketController::class, 'viewAttachment'])->name('superadmin.tickets.attachment');
+
+    // Licence Documents Routes
+    Route::get('superadmin/licence-documents', [LicenceDocumentController::class, 'index'])->name('superadmin.licence_documents.index');
+    Route::get('superadmin/licence-documents-catalog', [LicenceDocumentCatalogController::class, 'index'])->name('superadmin.licence_documents.catalog.index');
+    Route::post('superadmin/licence-documents-catalog', [LicenceDocumentCatalogController::class, 'store'])->name('superadmin.licence_documents.catalog.store');
+    Route::get('superadmin/licence-documents/branch/{branch}', [LicenceDocumentController::class, 'branch'])->name('superadmin.licence_documents.branch');
+    Route::post('superadmin/licence-documents/save', [LicenceDocumentController::class, 'save'])->name('superadmin.licence_documents.save');
 
     // Asset Category Routes
     Route::get('superadmin/asset-categories', [AssetController::class, 'getAssetCategories'])->name('superadmin.asset.categories.index');
