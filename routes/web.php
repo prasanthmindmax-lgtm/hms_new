@@ -745,6 +745,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     //income new stats
     Route::get('/billing-stats',  [BillingStatsController::class, 'index'])->name('superadmin.billingstats');
     Route::get('/billing-export/excel', [BillingStatsController::class, 'export'])->name('superadmin.billingexport');
+    Route::post('/billing-stats/fetch-insert', [BillingStatsController::class, 'fetchAndInsert'])->name('superadmin.billingstats.fetchinsert');
 
     // Bill Category routes
     Route::get('superadmin/bill_category', [VendorController::class, 'getBillCategory'])->name('superadmin.billcategory.index');

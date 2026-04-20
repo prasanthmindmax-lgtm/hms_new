@@ -338,4 +338,220 @@ class BillingStatsController extends Controller
             'Content-Disposition' => "attachment; filename=\"$filename\"",
         ]);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // FETCH MISSED MOCDOC DATA  — call API + insert into billing_list
+    // ─────────────────────────────────────────────────────────────
+    public function fetchAndInsert(Request $request)
+    {
+        $request->validate([
+            'date'      => 'required|date',
+            'branch_id' => 'required|integer|exists:tbl_locations,id',
+        ]);
+
+        $date     = Carbon::parse($request->date)->format('Ymd');
+        $branch   = TblLocationModel::find((int) $request->branch_id);
+        if (! $branch) {
+            return response()->json(['success' => false, 'message' => 'Branch not found.'], 404);
+        }
+
+        // Resolve the MocDoc location key (e.g. "location20") from the branch name
+        $variants = MocdocLocationKeys::billingLocationIdVariantsForBranch($branch);
+        $locationKey = collect($variants)->first(fn ($v) => str_starts_with((string) $v, 'location'));
+
+        if (! $locationKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Branch "' . $branch->name . '" is not mapped to a MocDoc location key. Update MocdocLocationKeys.',
+            ], 422);
+        }
+
+        $locName = MocdocLocationKeys::locationKeyToNameMap()[$locationKey] ?? $branch->name;
+
+        // Call MocDoc API
+        $response = $this->callMocdocApi(
+            'https://mocdoc.in/api/get/billlist/draravinds-ivf',
+            $date,
+            $locationKey
+        );
+
+        if ($response === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'MocDoc API call failed or returned no response. Check server logs.',
+            ], 502);
+        }
+
+        $billingList = $response['billinglist'] ?? [];
+        if (empty($billingList)) {
+            return response()->json([
+                'success'  => true,
+                'inserted' => 0,
+                'skipped'  => 0,
+                'message'  => 'No billing records returned from MocDoc for ' . $locName . ' on ' . Carbon::parse($request->date)->format('d M Y') . '. Nothing to insert.',
+            ]);
+        }
+
+        $inserted = 0;
+        $skipped  = 0;
+        $errors   = 0;
+        $dateFmt  = Carbon::parse($request->date)->format('Ymd');
+
+        foreach ($billingList as $item) {
+            try {
+                $billNo    = $item['billno'] ?? null;
+                $receiptNo = $item['receiptno'] ?? null;
+                $itemDate  = $item['billdate'] ?? $item['receivedat'] ?? null;
+                $billKey   = $item['billkey'] ?? null;
+
+                // Duplicate check: same location + same billdate + same billno (or billkey)
+                $exists = BillingListModel::where('location_id', $locationKey)
+                    ->where(function ($q) use ($dateFmt, $itemDate) {
+                        if ($itemDate) {
+                            $q->whereRaw('LEFT(billdate,8) = ?', [substr((string) $itemDate, 0, 8)]);
+                        } else {
+                            $q->whereRaw('LEFT(billdate,8) = ?', [$dateFmt]);
+                        }
+                    })
+                    ->where(function ($q) use ($billNo, $receiptNo, $billKey) {
+                        $q->when($billNo,    fn ($qq) => $qq->orWhere('billno',    $billNo))
+                          ->when($receiptNo, fn ($qq) => $qq->orWhere('receiptno', $receiptNo))
+                          ->when($billKey,   fn ($qq) => $qq->orWhere('billkey',   $billKey));
+                    })
+                    ->exists();
+
+                if ($exists) {
+                    $skipped++;
+                    continue;
+                }
+
+                BillingListModel::create([
+                    'location_id'        => $locationKey,
+                    'location_name'      => $locName,
+                    'type'               => $item['type'] ?? null,
+                    'paymenttype'        => $item['paymenttype'] ?? null,
+                    'amt'                => $item['amt'] ?? 0,
+                    'billno'             => $billNo,
+                    'billdate'           => $item['billdate'] ?? $item['receivedat'] ?? null,
+                    'user_name'          => $item['user'] ?? $item['receivedby'] ?? null,
+                    'userid'             => $item['userid'] ?? $item['receivedbyid'] ?? null,
+                    'phid'               => $item['phid'] ?? null,
+                    'extphid'            => $item['extphid'] ?? null,
+                    'gender'             => $item['gender'] ?? null,
+                    'age'                => $item['age'] ?? null,
+                    'mobile'             => $item['mobile'] ?? null,
+                    'ptsource'           => $item['ptsource'] ?? null,
+                    'isdcode'            => $item['isdcode'] ?? null,
+                    'dob'                => $item['dob'] ?? null,
+                    'email'              => $item['email'] ?? null,
+                    'patientname'        => $item['patientname'] ?? null,
+                    'patientkey'         => $item['patientkey'] ?? null,
+                    'consultant'         => $item['consultant'] ?? null,
+                    'consultantkey'      => $item['consultantkey'] ?? null,
+                    'referredbykey'      => $item['referredbykey'] ?? null,
+                    'referredby'         => $item['referredby'] ?? null,
+                    'provider'           => $item['provider'] ?? null,
+                    'billkey'            => $billKey,
+                    'billtype'           => $item['billtype'] ?? null,
+                    'tax'                => $item['grandtax'] ?? $item['tax'] ?? 0,
+                    'opno'               => $item['ipno'] ?? $item['opno'] ?? null,
+                    'receiptno'          => $receiptNo,
+                    'receivedat'         => $item['receivedat'] ?? null,
+                    'grandtotal'         => $item['grandtotal'] ?? 0,
+                    'granddiscountvalue' => $item['granddiscountvalue'] ?? 0,
+                    'grandprodvalue'     => $item['grandprodvalue'] ?? 0,
+                    'paymentinfo'        => isset($item['paymentinfo']) ? json_encode($item['paymentinfo']) : null,
+                ]);
+
+                $inserted++;
+            } catch (\Throwable $e) {
+                \Log::error('BillingStatsController::fetchAndInsert failed for one row: ' . $e->getMessage(), ['item' => $item]);
+                $errors++;
+            }
+        }
+
+        $dateLabel = Carbon::parse($request->date)->format('d M Y');
+        $msg = "Fetched " . count($billingList) . " records from MocDoc for {$locName} on {$dateLabel}. "
+             . "Inserted: {$inserted}, Skipped (duplicate): {$skipped}"
+             . ($errors ? ", Errors: {$errors}" : '') . '.';
+
+        return response()->json([
+            'success'  => true,
+            'inserted' => $inserted,
+            'skipped'  => $skipped,
+            'errors'   => $errors,
+            'total_api'=> count($billingList),
+            'message'  => $msg,
+        ]);
+    }
+
+    /**
+     * cURL POST to MocDoc API with retry & backoff.
+     */
+    private function callMocdocApi(string $url, string $date, string $locationId, int $maxRetries = 3): ?array
+    {
+        ini_set('max_execution_time', 300);
+        $postFields = "date={$date}&entitylocation={$locationId}";
+        $headers    = [
+            'md-authorization: MD 7b40af0edaf0ad75:0yAJg5vPzhav8JdUyBmFq8sQvy8=',
+            'Date: Fri, 07 Mar 2025 10:07:52 GMT',
+            'Content-Type: application/x-www-form-urlencoded',
+            'Cookie: SRV=s1',
+        ];
+
+        $retry  = 0;
+        $backoff = 1;
+
+        do {
+            $curl = curl_init();
+            curl_setopt_array($curl, [
+                CURLOPT_URL            => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $postFields,
+                CURLOPT_HTTPHEADER     => $headers,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS      => 10,
+            ]);
+
+            $response = curl_exec($curl);
+            $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            curl_close($curl);
+
+            if ($response === false) {
+                \Log::error("BillingStats cURL error for {$locationId} on {$date}");
+                $retry++;
+                sleep($backoff);
+                $backoff *= 2;
+                continue;
+            }
+
+            if ($httpCode === 429) {
+                \Log::warning("BillingStats HTTP 429 for {$locationId} on {$date}, backing off {$backoff}s");
+                sleep($backoff);
+                $backoff *= 2;
+                $retry++;
+                continue;
+            }
+
+            if ($httpCode !== 200) {
+                \Log::warning("BillingStats API returned HTTP {$httpCode} for {$locationId} on {$date}");
+                return null;
+            }
+
+            $decoded = json_decode($response, true);
+            if ($decoded === null) {
+                \Log::warning("BillingStats JSON decode failed for {$locationId} on {$date}");
+                return null;
+            }
+
+            return $decoded;
+
+        } while ($retry < $maxRetries);
+
+        \Log::error("BillingStats API failed after {$maxRetries} retries for {$locationId} on {$date}");
+        return null;
+    }
 }

@@ -1271,6 +1271,9 @@ body{font-family:var(--font);background:#f1f5f9;}
       </span>
     </div>
 
+    {{-- Alert banner (shown after comparison loads) --}}
+    <div id="cmpAlertBanner" style="display:none;padding:0 20px 8px;"></div>
+
     {{-- 3-panel body --}}
     <div class="cmp-body" id="cmpBody">
       {{-- Loading spinner shown initially --}}
@@ -2042,6 +2045,7 @@ body{font-family:var(--font);background:#f1f5f9;}
     function resetCmpModal() {
         $('#cmpSpinner').show();
         $('#cmpPanelRCP, #cmpPanelBFR, #cmpPanelBank').hide();
+        $('#cmpAlertBanner').hide().html('');
         $('#cmpLocationText').text('—');
         ['#cmpPillRCP','#cmpPillBFR','#cmpPillBank'].forEach(function(id) {
             $(id).attr('class','cmp-match-pill cmp-pill-nodata');
@@ -2051,11 +2055,73 @@ body{font-family:var(--font);background:#f1f5f9;}
         $('#cmpPillBank').html('<i class="bi bi-bank2"></i> Bank Statement: —');
     }
 
+    /* ── Match source badge helper ── */
+    function matchSourceBadge(sources) {
+        if (!sources || !sources.length) return '';
+        var badges = sources.map(function(s) {
+            var map = {
+                direct_link : ['🔗 Direct Link',  'background:#0d9488;color:#fff;'],
+                keyword     : ['🔑 Keyword',        'background:#8b5cf6;color:#fff;'],
+                description : ['📝 Description',   'background:#3b82f6;color:#fff;'],
+            };
+            var info = map[s] || [s, 'background:#94a3b8;color:#fff;'];
+            return '<span style="font-size:.63rem;font-weight:700;padding:2px 8px;border-radius:20px;' + info[1] + 'margin-right:4px;">' + info[0] + '</span>';
+        });
+        return badges.join('');
+    }
+
+    /* ── Comparison alert banner ── */
+    function renderCmpAlertBanner(cmp, p) {
+        if (!cmp) return '';
+        var isMismatch = cmp.has_mismatch;
+        var bg   = isMismatch ? 'linear-gradient(135deg,#7f1d1d,#b91c1c)' : 'linear-gradient(135deg,#064e3b,#059669)';
+        var icon = isMismatch ? '⚠️' : '✅';
+        var title = isMismatch ? 'MISMATCH DETECTED' : 'ALL MATCHED';
+        var statusRow = function(label, status, expected, actual) {
+            var statusMap = {
+                match   : ['✓ Match',    '#a7f3d0', '#065f46'],
+                close   : ['~ Close',    '#fde68a', '#92400e'],
+                mismatch: ['✗ Mismatch', '#fecaca', '#991b1b'],
+                no_data : ['– No Data',  '#e2e8f0', '#475569'],
+            };
+            var s = statusMap[status] || statusMap['no_data'];
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.1);">' +
+                '<span style="color:rgba(255,255,255,.75);font-size:.72rem;">' + label + '</span>' +
+                '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<span style="font-size:.75rem;font-weight:700;color:#fff;">' + fmtINR2(actual) + '</span>' +
+                '<span style="font-size:.63rem;font-weight:700;padding:2px 8px;border-radius:20px;background:' + s[1] + ';color:' + s[2] + ';">' + s[0] + '</span>' +
+                '</div></div>';
+        };
+
+        var sourceInfo = '';
+        if (cmp.direct_link_count) sourceInfo += '<span style="font-size:.65rem;color:rgba(255,255,255,.7);margin-right:8px;">🔗 ' + cmp.direct_link_count + ' direct-link</span>';
+        if (cmp.keyword_count)     sourceInfo += '<span style="font-size:.65rem;color:rgba(255,255,255,.7);margin-right:8px;">🔑 ' + cmp.keyword_count + ' keyword</span>';
+        if (cmp.description_count) sourceInfo += '<span style="font-size:.65rem;color:rgba(255,255,255,.7);">📝 ' + cmp.description_count + ' description</span>';
+
+        return '<div style="background:' + bg + ';border-radius:12px;padding:14px 18px;margin-bottom:16px;">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+            '<span style="font-size:1.4rem;">' + icon + '</span>' +
+            '<div><div style="color:#fff;font-weight:800;font-size:.95rem;letter-spacing:.3px;">' + title + '</div>' +
+            '<div style="color:rgba(255,255,255,.65);font-size:.7rem;">RCP: ' + fmtINR2(p.pickup_amount) + ' &nbsp;|&nbsp; Location: ' + $('<div/>').text(p.location || '—').html() + '</div>' +
+            '</div></div>' +
+            statusRow('Branch Financial Report', cmp.bfr_status, p.pickup_amount, cmp.bfr_total) +
+            statusRow('Bank Statement', cmp.bank_status, p.pickup_amount, cmp.bank_total) +
+            (sourceInfo ? '<div style="margin-top:8px;">Bank matched via: ' + sourceInfo + '</div>' : '') +
+            '</div>';
+    }
+
     function renderCmpModal(res) {
         var p   = res.pickup;
         var bfr = res.branch_reports || [];
         var bk  = res.bank_entries  || [];
         var mb  = res.matched_branch;
+        var cmp = res.comparison || null;
+
+        /* ── Alert banner ── */
+        // var $banner = $('#cmpAlertBanner');
+        // if ($banner.length) {
+        //     $banner.html(renderCmpAlertBanner(cmp, p)).show();
+        // }
 
         /* ── Location badge ── */
         $('#cmpLocationText').text((p.location || '—') + (mb ? '  →  ' + mb.name + ' [' + (mb.zone || '') + ']' : '  (no master match)'));
@@ -2132,14 +2198,25 @@ body{font-family:var(--font);background:#f1f5f9;}
                 '</div>';
             var bkHtml = bkTotalBar;
             bk.forEach(function(e) {
+                var srcBadges = matchSourceBadge(e.match_sources || []);
+                var keywordInfo = e.radiant_match_against
+                    ? '<span style="font-size:.65rem;color:#8b5cf6;margin-left:4px;">keyword: <em>' + $('<div/>').text(e.radiant_match_against).html() + '</em></span>'
+                    : '';
+                var directInfo = e.radiant_cash_pickup_id
+                    ? '<span style="font-size:.65rem;color:#0d9488;margin-left:4px;">pickup #' + e.radiant_cash_pickup_id + '</span>'
+                    : '';
                 bkHtml +=
                     '<div class="cmp-bank-row">' +
+                    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">' +
                     '<div class="cmp-bank-desc">' + $('<div/>').text(e.description).html() + '</div>' +
-                    '<div class="cmp-bank-amt">+ ' + fmtINR2(e.deposit) + '</div>' +
-                    '<div class="cmp-bank-meta">' +
-                    '<i class="bi bi-calendar3"></i> ' + (e.transaction_date || '—') +
-                    (e.reference_number ? ' &nbsp;·&nbsp; Ref: ' + e.reference_number : '') +
-                    (e.match_status ? ' &nbsp;·&nbsp; <em>' + e.match_status + '</em>' : '') +
+                    '<div class="cmp-bank-amt" style="flex-shrink:0;">+ ' + fmtINR2(e.deposit) + '</div>' +
+                    '</div>' +
+                    '<div class="cmp-bank-meta" style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;">' +
+                    srcBadges +
+                    '<span><i class="bi bi-calendar3"></i> ' + (e.transaction_date || '—') + '</span>' +
+                    (e.reference_number ? '<span>&nbsp;·&nbsp; Ref: ' + e.reference_number + '</span>' : '') +
+                    (e.match_status ? '<span>&nbsp;·&nbsp; <em>' + e.match_status + '</em></span>' : '') +
+                    keywordInfo + directInfo +
                     '</div></div>';
             });
             $('#cmpBankBody').html(bkHtml);
@@ -2147,7 +2224,7 @@ body{font-family:var(--font);background:#f1f5f9;}
             $('#cmpBankBody').html(
                 '<div class="cmp-no-data">' +
                 '<i class="bi bi-search"></i>' +
-                '<p>No bank entries matched<br><em>"BY CASH — ' + $('<div/>').text(p.location || '').html() + '"</em><br>in ±1 day window</p>' +
+                '<p>No bank entries matched via description, keyword,<br>or direct pickup link for<br><em>' + $('<div/>').text(p.location || '').html() + '</em></p>' +
                 '</div>'
             );
         }

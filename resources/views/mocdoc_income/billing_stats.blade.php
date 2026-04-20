@@ -245,6 +245,74 @@
     /* ── Empty state ─────────────────────────────────── */
     .empty-state { text-align: center; padding: 48px 24px; color: #94a3b8; }
     .empty-state i { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+    /* ── Fetch Modal ─────────────────────────────────── */
+    .fetch-modal-overlay {
+        position: fixed; inset: 0; background: rgba(15,23,42,.55);
+        z-index: 9000; display: flex; align-items: center; justify-content: center;
+        opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .fetch-modal-overlay.show { opacity: 1; pointer-events: all; }
+    .fetch-modal {
+        background: #fff; border-radius: 16px; width: 100%; max-width: 500px;
+        box-shadow: 0 20px 60px rgba(15,23,42,.18);
+        transform: translateY(-16px) scale(.98);
+        transition: transform .2s, opacity .2s;
+        opacity: 0;
+    }
+    .fetch-modal-overlay.show .fetch-modal { transform: translateY(0) scale(1); opacity: 1; }
+    .fetch-modal-header {
+        background: linear-gradient(135deg,#4f46e5,#7c3aed);
+        color: #fff; padding: 20px 24px; border-radius: 16px 16px 0 0;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .fetch-modal-header h5 { margin: 0; font-size: 1rem; font-weight: 700; }
+    .fetch-modal-body   { padding: 24px; }
+    .fetch-modal-footer { padding: 0 24px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .fetch-close-btn {
+        background: rgba(255,255,255,.2); border: none; color: #fff;
+        border-radius: 8px; width: 32px; height: 32px; font-size: 1rem;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: background .15s;
+    }
+    .fetch-close-btn:hover { background: rgba(255,255,255,.35); }
+    .fetch-result {
+        margin-top: 16px; padding: 14px 16px; border-radius: 10px;
+        font-size: .875rem; font-weight: 600; display: none;
+    }
+    .fetch-result.success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .fetch-result.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .fetch-result.warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .fetch-result-stats {
+        display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .fetch-stat-pill {
+        padding: 4px 12px; border-radius: 20px; font-size: .72rem;
+        font-weight: 700; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .fetch-stat-inserted { background: #dcfce7; color: #166534; }
+    .fetch-stat-skipped  { background: #fef9c3; color: #854d0e; }
+    .fetch-stat-error    { background: #fee2e2; color: #991b1b; }
+    .fetch-btn-primary {
+        background: #4f46e5; color: #fff; border: none; border-radius: 8px;
+        padding: 9px 22px; font-weight: 600; font-size: .875rem; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 7px; transition: background .2s;
+    }
+    .fetch-btn-primary:hover:not(:disabled) { background: #4338ca; }
+    .fetch-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .fetch-btn-secondary {
+        background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;
+        border-radius: 8px; padding: 9px 18px; font-weight: 600; font-size: .875rem;
+        cursor: pointer; transition: all .15s;
+    }
+    .fetch-btn-secondary:hover { background: #e2e8f0; }
+    .fetch-mocdoc-btn {
+        background: linear-gradient(135deg,#7c3aed,#4f46e5); color: #fff; border: none;
+        border-radius: 8px; padding: 9px 18px; font-size: .875rem;
+        font-weight: 600; cursor: pointer; display: inline-flex;
+        align-items: center; gap: 8px; transition: opacity .2s;
+    }
+    .fetch-mocdoc-btn:hover { opacity: .88; }
 </style>
 
 <body style="overflow-x:hidden;">
@@ -270,6 +338,9 @@
           <button class="filter-toggle-btn" id="filterToggleBtn">
             <i class="bi bi-funnel-fill"></i> Filters
             <span id="filterBadge" style="display:none;background:rgba(255,255,255,.3);border-radius:10px;padding:1px 7px;font-size:.68rem;"></span>
+          </button>
+          <button class="fetch-mocdoc-btn" id="fetchMocdocBtn">
+            <i class="bi bi-cloud-download-fill"></i> Fetch Missing Data
           </button>
         </div>
       </div>
@@ -532,6 +603,66 @@
       </div>
 
     </div>{{-- /stats-wrapper --}}
+  </div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════
+     FETCH MISSING MOCDOC DATA MODAL
+══════════════════════════════════════════════════════════ --}}
+<div class="fetch-modal-overlay" id="fetchModalOverlay">
+  <div class="fetch-modal" id="fetchModalBox">
+    <div class="fetch-modal-header">
+      <div>
+        <h5><i class="bi bi-cloud-download-fill me-2"></i>Fetch Missing MocDoc Data</h5>
+        <small style="opacity:.75;font-size:.75rem;">Select a date &amp; branch — data will be fetched from MocDoc API and inserted.</small>
+      </div>
+      <button class="fetch-close-btn" id="fetchModalClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="fetch-modal-body">
+      <div class="row g-3">
+        {{-- Date picker --}}
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">
+            <i class="bi bi-calendar3 me-1 text-primary"></i>Date
+          </label>
+          <div class="fp-wrap">
+            <input type="text" id="fetchDate" class="form-control" placeholder="dd/mm/yyyy" autocomplete="off" readonly>
+            <i class="bi bi-calendar3 fp-icon"></i>
+          </div>
+        </div>
+        {{-- Branch single-select --}}
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold" style="font-size:.8rem;">
+            <i class="bi bi-geo-alt-fill me-1 text-danger"></i>Branch
+          </label>
+          <select id="fetchBranch" class="form-select" style="border-radius:8px;font-size:.875rem;border:1px solid #cbd5e1;">
+            <option value="">— Select Branch —</option>
+            @foreach($branches as $br)
+              <option value="{{ $br->id }}">{{ $br->name }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+
+      {{-- Info note --}}
+      <div style="margin-top:14px;padding:10px 14px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:.78rem;color:#1e40af;">
+        <i class="bi bi-info-circle-fill me-1"></i>
+        Only records that don't already exist in the database will be inserted (duplicate-safe).
+        Existing records with the same Bill No / Receipt No / Bill Key for the same location and date are skipped.
+      </div>
+
+      {{-- Result area --}}
+      <div class="fetch-result" id="fetchResult">
+        <span id="fetchResultMsg"></span>
+        <div class="fetch-result-stats" id="fetchResultStats"></div>
+      </div>
+    </div>
+    <div class="fetch-modal-footer">
+      <button class="fetch-btn-secondary" id="fetchModalCancel">Cancel</button>
+      <button class="fetch-btn-primary" id="fetchSubmitBtn">
+        <i class="bi bi-cloud-download-fill"></i> Fetch &amp; Insert
+      </button>
+    </div>
   </div>
 </div>
 
@@ -989,6 +1120,126 @@ $(function () {
 
     /* ── OVERLAY ───────────────────────────────────────────────── */
     function overlay(on){ $('#tblLoading').toggleClass('show', on); }
+
+    /* ══════════════════════════════════════════════════════════
+       FETCH MISSING MOCDOC DATA MODAL
+    ══════════════════════════════════════════════════════════ */
+    var FETCH_URL   = '{{ route("superadmin.billingstats.fetchinsert") }}';
+    var CSRF_TOKEN  = $('meta[name="csrf-token"]').attr('content');
+    var fetchInFlight = false;
+
+    // Flatpickr for fetch modal date
+    var fetchFp = flatpickr('#fetchDate', {
+        dateFormat:  'Y-m-d',
+        altInput:    true,
+        altFormat:   'd/m/Y',
+        allowInput:  false,
+        maxDate:     'today',
+        onChange: function() {
+            // Reset result on date change
+            resetFetchResult();
+        }
+    });
+
+    function openFetchModal() {
+        resetFetchResult();
+        $('#fetchDate').val('');
+        if (fetchFp) fetchFp.clear();
+        $('#fetchBranch').val('');
+        $('#fetchModalOverlay').addClass('show');
+        $('body').css('overflow', 'hidden');
+    }
+    function closeFetchModal() {
+        $('#fetchModalOverlay').removeClass('show');
+        $('body').css('overflow', '');
+    }
+    function resetFetchResult() {
+        $('#fetchResult').hide().removeClass('success error warning');
+        $('#fetchResultMsg').text('');
+        $('#fetchResultStats').html('');
+    }
+    function showFetchResult(type, msg, inserted, skipped, errors, totalApi) {
+        var $r = $('#fetchResult').removeClass('success error warning').addClass(type).show();
+        $('#fetchResultMsg').text(msg);
+        var stats = '';
+        if (totalApi != null) {
+            stats += '<span class="fetch-stat-pill" style="background:#e0e7ff;color:#3730a3;">📥 Total from API: ' + totalApi + '</span>';
+        }
+        if (inserted != null) {
+            stats += '<span class="fetch-stat-pill fetch-stat-inserted">✓ Inserted: ' + inserted + '</span>';
+        }
+        if (skipped != null) {
+            stats += '<span class="fetch-stat-pill fetch-stat-skipped">⟳ Skipped: ' + skipped + '</span>';
+        }
+        if (errors) {
+            stats += '<span class="fetch-stat-pill fetch-stat-error">✗ Errors: ' + errors + '</span>';
+        }
+        $('#fetchResultStats').html(stats);
+    }
+
+    $('#fetchMocdocBtn').on('click', openFetchModal);
+    $('#fetchModalClose, #fetchModalCancel').on('click', closeFetchModal);
+    $('#fetchModalOverlay').on('click', function(e) {
+        if (e.target === this) closeFetchModal();
+    });
+
+    $('#fetchSubmitBtn').on('click', function() {
+        if (fetchInFlight) return;
+
+        var dateVal   = $('#fetchDate').val();
+        var branchVal = $('#fetchBranch').val();
+
+        if (!dateVal) {
+            toastr.warning('Please select a date.');
+            return;
+        }
+        if (!branchVal) {
+            toastr.warning('Please select a branch.');
+            return;
+        }
+
+        fetchInFlight = true;
+        resetFetchResult();
+        var $btn = $(this);
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Fetching…');
+
+        $.ajax({
+            url:  FETCH_URL,
+            type: 'POST',
+            data: {
+                _token:    CSRF_TOKEN,
+                date:      dateVal,
+                branch_id: branchVal,
+            },
+            timeout: 120000, // 2 min — API can be slow
+        }).done(function(res) {
+            if (res && res.success) {
+                var type = res.inserted > 0 ? 'success' : (res.skipped > 0 ? 'warning' : 'warning');
+                showFetchResult(type, res.message, res.inserted, res.skipped, res.errors, res.total_api);
+                if (res.inserted > 0) {
+                    toastr.success(res.inserted + ' record(s) inserted from MocDoc.');
+                    fetchAll(); // Refresh the main table & stats
+                } else {
+                    toastr.info(res.message);
+                }
+            } else {
+                var errMsg = (res && res.message) ? res.message : 'Fetch failed. Try again.';
+                showFetchResult('error', errMsg, null, null, null, null);
+                toastr.error(errMsg);
+            }
+        }).fail(function(xhr) {
+            var errMsg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Server error. Check logs.';
+            if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                var errs = Object.values(xhr.responseJSON.errors).flat().join(' ');
+                errMsg = errs;
+            }
+            showFetchResult('error', errMsg, null, null, null, null);
+            toastr.error(errMsg);
+        }).always(function() {
+            fetchInFlight = false;
+            $btn.prop('disabled', false).html('<i class="bi bi-cloud-download-fill"></i> Fetch &amp; Insert');
+        });
+    });
 
     /* ── INIT ──────────────────────────────────────────────────── */
     fetchAll();
