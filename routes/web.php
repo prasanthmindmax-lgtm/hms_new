@@ -694,6 +694,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/statements-export', [BankStatementController::class, 'exportStatements'])->name('statements-export');
         Route::get('/matched-by-options', [BankStatementController::class, 'listMatchedByUsersForFilter'])->name('matched-by-options');
         Route::get('/quick-filter-options', [BankStatementController::class, 'statementQuickFilterOptions'])->name('quick-filter-options');
+        Route::get('/user-history', [BankStatementController::class, 'listBankReconUserHistory'])->name('user-history');
         Route::get('/chart-accounts', [BankStatementController::class, 'listChartAccounts'])->name('chart-accounts');
         // Search bills by amount
         Route::post('/search-bills', [BankStatementController::class, 'searchBills'])->name('search-bills');
@@ -717,6 +718,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/income-tag/zones', [BankStatementController::class, 'incomeTagZones'])->name('income-tag.zones');
         Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');
         Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
+        Route::get('/radiant-cash-pickups-for-date', [BankStatementController::class, 'radiantCashPickupsForTransactionDate'])->name('radiant-cash-pickups-for-date');
         Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
         Route::post('/radiant-unmatch/{id}', [BankStatementController::class, 'unmatchRadiant'])->name('radiant-unmatch');
         // Bank account master & batch history

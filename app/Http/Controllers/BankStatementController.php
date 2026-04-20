@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use App\Models\Tblaccount;
+use App\Models\TblLocationModel;
+use App\Support\MocdocLocationKeys;
+use App\Support\BankReconIncomeRequiredAttachments;
 
 class BankStatementController extends Controller
 {
@@ -49,7 +52,10 @@ class BankStatementController extends Controller
                 ->all();
         }
 
-        return view('bank-reconciliation.index', compact('admin', 'bankAccountsEnabled', 'chartAccountsForSelect'));
+        $bankReconSuperAdmin = $admin
+            && (int) ($admin->access_limits ?? 0) === 1;
+
+        return view('bank-reconciliation.index', compact('admin', 'bankAccountsEnabled', 'chartAccountsForSelect', 'bankReconSuperAdmin'));
     }
 
     /**
@@ -288,6 +294,15 @@ class BankStatementController extends Controller
             if ($duplicateCount > 0) {
                 $message .= " {$duplicateCount} duplicate(s) were skipped (same date & description already exist).";
             }
+
+            $this->logBankReconUserHistory('import_statement', null, [
+                'file_name'   => $originalName,
+                'batch_id'    => $batchId,
+                'imported'    => $insertedCount,
+                'duplicates'  => $duplicateCount,
+                'skipped'     => $skippedCount,
+            ]);
+
             return response()->json([
                 'success'         => true,
                 'message'         => $message,
@@ -319,6 +334,7 @@ class BankStatementController extends Controller
         $paginator = $this->bankStatementsFilteredQuery($request)->paginate($perPage);
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
+            $this->hydrateIncomeBillingListForStatementRow($row);
 
             return $row;
         });
@@ -407,6 +423,7 @@ class BankStatementController extends Controller
         $paginator = $query->paginate($perPage);
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
+            $this->hydrateIncomeBillingListForStatementRow($row);
 
             return $row;
         });
@@ -441,6 +458,7 @@ class BankStatementController extends Controller
         $paginator = $query->paginate($perPage);
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
+            $this->hydrateIncomeBillingListForStatementRow($row);
 
             return $row;
         });
@@ -585,6 +603,270 @@ class BankStatementController extends Controller
             : null;
     }
 
+    /**
+     * Approved / non-cancelled billing_list rows (aligned with income summary in VendorController).
+     */
+    private function billingListIncomeApprovedWhereSql(): string
+    {
+        return '( (billing_list.billtype IS NULL OR TRIM(billing_list.billtype) = \'\' OR LOWER(TRIM(billing_list.billtype)) NOT IN (\'cancelled\',\'cancel\',\'refund\',\'refunded\')) '
+            .'AND (billing_list.type IS NULL OR (LOWER(billing_list.type) NOT LIKE \'%cancel%\' AND LOWER(billing_list.type) NOT LIKE \'%refund%\')) )';
+    }
+
+    /**
+     * Map income-tag mode to billing_list.paymenttype values (case-insensitive match in SQL).
+     *
+     * @return list<string>
+     */
+    private function incomeTagModeToBillingPaymentLowerCases(string $mode): array
+    {
+        $m = strtolower(trim($mode));
+
+        return match ($m) {
+            'cash' => ['cash'],
+            'card' => ['card'],
+            'upi' => ['upi'],
+            'neft' => ['neft'],
+            'other' => ['cheque', 'dd', 'credit'],
+            default => [],
+        };
+    }
+
+    /**
+     * When income_match_split_json has no modes (legacy rows), infer from income_reconciliation_table bank id columns.
+     *
+     * @return list<string>
+     */
+    private function inferIncomeTagModesFromReconciliation(int $statementId, int $reconId): array
+    {
+        if ($reconId <= 0 || $statementId <= 0 || ! Schema::hasTable('income_reconciliation_table')) {
+            return [];
+        }
+        $rec = DB::table('income_reconciliation_table')->where('id', $reconId)->first();
+        if (! $rec) {
+            return [];
+        }
+        $modes = [];
+        if (isset($rec->cash_bank_id) && (int) $rec->cash_bank_id === $statementId) {
+            $modes[] = 'cash';
+        }
+        if (isset($rec->card_upi_bank_id) && (int) $rec->card_upi_bank_id === $statementId) {
+            $modes[] = 'card';
+            $modes[] = 'upi';
+        }
+        if (isset($rec->neft_bank_id) && (int) $rec->neft_bank_id === $statementId) {
+            $modes[] = 'neft';
+        }
+        if (isset($rec->other_bank_id) && (int) $rec->other_bank_id === $statementId) {
+            $modes[] = 'other';
+        }
+
+        return array_values(array_unique($modes));
+    }
+
+    /**
+     * Match billing_list rows to an income-tag branch: exact name, MOC location keys, tbl_locations id, or substring.
+     * Stored labels often differ (e.g. "Chengalpattu" vs "Chennai - Chengalpattu" vs location48).
+     */
+    private function applyBillingListBranchFilter(Builder $query, string $branch): void
+    {
+        $branch = trim($branch);
+        if ($branch === '') {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where(function (Builder $q) use ($branch) {
+            $q->whereRaw('TRIM(billing_list.location_name) = ?', [$branch])
+                ->orWhereRaw('LOWER(TRIM(billing_list.location_name)) = LOWER(?)', [$branch]);
+
+            if (Schema::hasTable('tbl_locations')) {
+                $locRow = DB::table('tbl_locations')
+                    ->whereRaw('LOWER(TRIM(name)) = LOWER(?)', [$branch])
+                    ->first();
+                if ($locRow) {
+                    $locModel = TblLocationModel::query()->find($locRow->id);
+                    if ($locModel) {
+                        foreach (MocdocLocationKeys::billingLocationIdVariantsForBranch($locModel) as $variant) {
+                            $q->orWhere('billing_list.location_id', $variant);
+                        }
+                    }
+                }
+            }
+
+            foreach (MocdocLocationKeys::locationKeyToNameMap() as $key => $label) {
+                $label = trim((string) $label);
+                if ($label !== '' && strcasecmp($label, $branch) === 0) {
+                    $q->orWhere('billing_list.location_id', $key);
+                    if (preg_match('/^location(\d+)$/', (string) $key, $m)) {
+                        $q->orWhere('billing_list.location_id', $m[1]);
+                    }
+                    $q->orWhereRaw('TRIM(billing_list.location_name) = ?', [$label]);
+                }
+            }
+
+            $like = '%'.addcslashes($branch, '%_\\').'%';
+            if (strlen($branch) >= 3) {
+                $q->orWhere('billing_list.location_name', 'LIKE', $like);
+            }
+        });
+    }
+
+    /**
+     * billdate is usually YYYYMMDDHHMMSS; some rows may be date-only YYYYMMDD.
+     */
+    private function billingListBillDateEqualsYmdExpr(): string
+    {
+        return 'DATE(STR_TO_DATE(billing_list.billdate, \'%Y%m%d%H:%i:%s\')) = ? '
+            .'OR (CHAR_LENGTH(TRIM(billing_list.billdate)) >= 8 AND DATE(STR_TO_DATE(LEFT(TRIM(billing_list.billdate), 8), \'%Y%m%d\')) = ?)';
+    }
+
+    /**
+     * Load billing_list income lines for an income-tagged bank row (branch + collection date(s) + payment mode(s)).
+     */
+    private function queryBillingListRowsForIncomeTag(string $branch, array $datesYmd, array $modes): array
+    {
+        $paymentsLower = [];
+        foreach ($modes as $mode) {
+            foreach ($this->incomeTagModeToBillingPaymentLowerCases((string) $mode) as $plc) {
+                $paymentsLower[$plc] = true;
+            }
+        }
+        $paymentsList = array_keys($paymentsLower);
+        if ($paymentsList === [] || $datesYmd === []) {
+            return ['rows' => [], 'total' => 0.0];
+        }
+
+        $q = DB::table('billing_list')
+            ->whereRaw($this->billingListIncomeApprovedWhereSql());
+        $this->applyBillingListBranchFilter($q, $branch);
+        $q->where(function (Builder $outer) use ($datesYmd, $paymentsList) {
+            foreach ($datesYmd as $ymd) {
+                $outer->orWhere(function (Builder $inner) use ($ymd, $paymentsList) {
+                    $inner->whereRaw($this->billingListBillDateEqualsYmdExpr(), [$ymd, $ymd])
+                        ->whereIn(DB::raw('LOWER(TRIM(billing_list.paymenttype))'), $paymentsList);
+                });
+            }
+        });
+
+        $rows = $q->orderBy('billing_list.billdate')
+            ->orderBy('billing_list.id')
+            ->select([
+                'billing_list.id',
+                'billing_list.billno',
+                'billing_list.billdate',
+                'billing_list.paymenttype',
+                'billing_list.amt',
+                'billing_list.type',
+                'billing_list.location_name',
+                'billing_list.patientname',
+            ])
+            ->limit(500)
+            ->get();
+
+        $out = [];
+        $total = 0.0;
+        foreach ($rows as $r) {
+            $amt = isset($r->amt) ? (float) $r->amt : 0.0;
+            $total += $amt;
+            $out[] = [
+                'id' => (string) $r->id,
+                'billno' => $r->billno,
+                'billdate' => $r->billdate,
+                'paymenttype' => $r->paymenttype,
+                'amount' => round($amt, 2),
+                'type' => $r->type,
+                'location_name' => $r->location_name,
+                'patientname' => $r->patientname ?? null,
+            ];
+        }
+
+        return ['rows' => $out, 'total' => round($total, 2)];
+    }
+
+    /**
+     * Attach billing_list-derived income bill lines for API consumers (bank reconciliation grid).
+     */
+    private function hydrateIncomeBillingListForStatementRow(object $row): void
+    {
+        $row->income_billing_list = null;
+        $row->income_billing_list_total = null;
+
+        if (! Schema::hasTable('billing_list')) {
+            return;
+        }
+        if (($row->income_match_status ?? '') !== 'income_matched') {
+            return;
+        }
+
+        $branch = trim((string) ($row->income_matched_branch ?? ''));
+        if ($branch === '') {
+            return;
+        }
+
+        $datesYmd = [];
+        $split = null;
+        $rawSplit = $row->income_match_split_json ?? null;
+        if ($rawSplit !== null && $rawSplit !== '') {
+            if (is_string($rawSplit)) {
+                try {
+                    $split = json_decode($rawSplit, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\Throwable $e) {
+                    $split = null;
+                }
+            } elseif (is_array($rawSplit)) {
+                $split = $rawSplit;
+            }
+        }
+        if (is_array($split) && ! empty($split['dates_ymd']) && is_array($split['dates_ymd'])) {
+            foreach ($split['dates_ymd'] as $ymd) {
+                $ymd = trim((string) $ymd);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+                    $datesYmd[] = $ymd;
+                }
+            }
+        }
+        if ($datesYmd === [] && ! empty($row->income_matched_date)) {
+            try {
+                $datesYmd[] = Carbon::createFromFormat('d/m/Y', trim((string) $row->income_matched_date))->format('Y-m-d');
+            } catch (\Exception $e) {
+                try {
+                    $datesYmd[] = Carbon::parse($row->income_matched_date)->format('Y-m-d');
+                } catch (\Exception $e2) {
+                    $datesYmd = [];
+                }
+            }
+        }
+        $datesYmd = array_values(array_unique($datesYmd));
+        if ($datesYmd === []) {
+            return;
+        }
+
+        $modes = [];
+        if (is_array($split) && ! empty($split['modes']) && is_array($split['modes'])) {
+            foreach ($split['modes'] as $m) {
+                $m = strtolower(trim((string) $m));
+                if ($m !== '') {
+                    $modes[] = $m;
+                }
+            }
+            $modes = array_values(array_unique($modes));
+        }
+        if ($modes === []) {
+            $modes = $this->inferIncomeTagModesFromReconciliation(
+                (int) ($row->id ?? 0),
+                (int) ($row->income_reconciliation_id ?? 0)
+            );
+        }
+        if ($modes === []) {
+            return;
+        }
+
+        $result = $this->queryBillingListRowsForIncomeTag($branch, $datesYmd, $modes);
+        $row->income_billing_list = $result['rows'];
+        $row->income_billing_list_total = $result['total'];
+    }
+
     private function applyBankStatementBillJoins(Builder $query): void
     {
         if (Schema::hasTable('bank_bill_matches')) {
@@ -661,6 +943,179 @@ class BankStatementController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<string> Y-m-d values for filtering income-tag / Mocdoc collection dates (multi-select in quick filter).
+     */
+    private function requestIncomeCollectionDatesYmd(Request $request): array
+    {
+        $raw = $request->input('income_collection_dates', []);
+        if (! is_array($raw)) {
+            $raw = $raw !== null && $raw !== '' ? [(string) $raw] : [];
+        }
+        $out = [];
+        foreach ($raw as $d) {
+            $d = trim((string) $d);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+                $out[] = $d;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Tokens to match bank narrative text (MESPOS / card slips often use short city or location{N} ids, not full tbl_locations.name).
+     *
+     * @return list<string>
+     */
+    private function branchDescriptionMatchTokens(string $branchNameFromDb): array
+    {
+        $name = trim($branchNameFromDb);
+        if ($name === '') {
+            return [];
+        }
+        $tokens = [];
+        $push = static function (string $t) use (&$tokens): void {
+            $t = trim($t);
+            if ($t !== '' && ! in_array($t, $tokens, true)) {
+                $tokens[] = $t;
+            }
+        };
+        $push($name);
+
+        foreach (preg_split('/\s*[-–—,\/|]\s*/u', $name) as $part) {
+            $part = trim((string) $part);
+            if (mb_strlen($part) >= 2) {
+                $push($part);
+            }
+        }
+
+        foreach (MocdocLocationKeys::locationKeyToNameMap() as $key => $label) {
+            $labelTrim = trim((string) $label);
+            if ($labelTrim === '') {
+                continue;
+            }
+            $matched = strcasecmp($labelTrim, $name) === 0;
+            if (! $matched) {
+                foreach (preg_split('/\s*[-–—,\/|]\s*/u', $labelTrim) as $seg) {
+                    $seg = trim((string) $seg);
+                    if ($seg !== '' && strcasecmp($seg, $name) === 0) {
+                        $matched = true;
+                        break;
+                    }
+                }
+            }
+            if (! $matched) {
+                continue;
+            }
+            $push($key);
+            if (preg_match('/^location(\d+)$/', $key, $m)) {
+                $push($m[1]);
+            }
+            foreach (preg_split('/\s*[-–—,\/|]\s*/u', $labelTrim) as $part) {
+                $part = trim((string) $part);
+                if (mb_strlen($part) >= 2) {
+                    $push($part);
+                }
+            }
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * Zone/branch quick filter: include vendor bill rows AND income-tagged / untagged rows matched by branch name in description.
+     */
+    private function applyInclusiveZoneBranchFilter(Builder $query, Request $request): void
+    {
+        $zoneIds = $this->requestIntIdArray($request, 'zone_ids');
+        $branchIds = $this->requestIntIdArray($request, 'branch_ids');
+        if (count($zoneIds) === 0 && count($branchIds) === 0) {
+            return;
+        }
+
+        if (! Schema::hasTable('tbl_locations')) {
+            if (count($zoneIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'zone_id')) {
+                $query->whereIn('bill.zone_id', $zoneIds);
+            }
+            if (count($branchIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'branch_id')) {
+                $query->whereIn('bill.branch_id', $branchIds);
+            }
+
+            return;
+        }
+
+        $locQuery = DB::table('tbl_locations')->select('id', 'name', 'zone_id');
+        if (count($branchIds) > 0) {
+            $locQuery->whereIn('id', $branchIds);
+            if (count($zoneIds) > 0) {
+                $locQuery->whereIn('zone_id', $zoneIds);
+            }
+        } elseif (count($zoneIds) > 0) {
+            $locQuery->whereIn('zone_id', $zoneIds);
+        } else {
+            return;
+        }
+
+        $locs = $locQuery->get();
+        if ($locs->isEmpty()) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $locIds = $locs->pluck('id')->unique()->values()->all();
+
+        $query->where(function ($outer) use ($locs, $locIds, $zoneIds, $branchIds) {
+            if (Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'branch_id') && $locIds !== []) {
+                $outer->orWhereIn('bill.branch_id', $locIds);
+            }
+            if (count($branchIds) === 0 && count($zoneIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'zone_id')) {
+                $outer->orWhereIn('bill.zone_id', $zoneIds);
+            }
+
+            foreach ($locs as $loc) {
+                $name = trim((string) ($loc->name ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $tokens = $this->branchDescriptionMatchTokens($name);
+                $outer->orWhere(function ($q) use ($name, $tokens) {
+                    $q->whereRaw('LOWER(TRIM(IFNULL(bs.income_matched_branch, ""))) = LOWER(?)', [$name]);
+                    foreach ($tokens as $tok) {
+                        $pat = '%'.addcslashes($tok, '%_\\').'%';
+                        $q->orWhereRaw('LOWER(bs.description) LIKE LOWER(?)', [$pat]);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Filter rows where income tag collection date(s) overlap selected calendar dates (Mocdoc / split JSON).
+     */
+    private function applyIncomeCollectionDatesFilter(Builder $query, array $datesYmd): void
+    {
+        if ($datesYmd === [] || ! Schema::hasColumn('bank_statements', 'income_match_status')) {
+            return;
+        }
+
+        $query->where('bs.income_match_status', '=', 'income_matched');
+        $query->where(function ($outer) use ($datesYmd) {
+            foreach ($datesYmd as $d) {
+                $outer->orWhere(function ($q) use ($d) {
+                    $q->whereRaw(
+                        "DATE(STR_TO_DATE(NULLIF(TRIM(bs.income_matched_date), ''), '%d/%m/%Y')) = ?",
+                        [$d]
+                    );
+                    if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
+                        $q->orWhere('bs.income_match_split_json', 'LIKE', '%"'.$d.'"%');
+                    }
+                });
+            }
+        });
     }
 
     private function applyIncomeMatchValueToQuery(Builder $query, string $val): void
@@ -1030,15 +1485,7 @@ class BankStatementController extends Controller
             });
         }
 
-        $zoneIds = $this->requestIntIdArray($request, 'zone_ids');
-        if (count($zoneIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'zone_id')) {
-            $query->whereIn('bill.zone_id', $zoneIds);
-        }
-
-        $branchIds = $this->requestIntIdArray($request, 'branch_ids');
-        if (count($branchIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'branch_id')) {
-            $query->whereIn('bill.branch_id', $branchIds);
-        }
+        $this->applyInclusiveZoneBranchFilter($query, $request);
 
         $categories = $this->requestStringList($request, 'categories');
         if (count($categories) > 0 && Schema::hasColumn('bank_statements', 'category')) {
@@ -1103,12 +1550,25 @@ class BankStatementController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
-                $q->where('bs.description', 'LIKE', "%{$search}%")
-                    ->orWhere('bs.reference_number', 'LIKE', "%{$search}%")
-                    ->orWhere('bs.cheque_number', 'LIKE', "%{$search}%");
+                $q->where('bs.description', 'LIKE', '%'.$search.'%')
+                    ->orWhere('bs.reference_number', 'LIKE', '%'.$search.'%')
+                    ->orWhere('bs.cheque_number', 'LIKE', '%'.$search.'%')
+                    ->orWhere('bs.transaction_id', 'LIKE', '%'.$search.'%');
+                if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+                    $q->orWhere('bs.radiant_match_against', 'LIKE', '%'.$search.'%');
+                }
+                $digits = preg_replace('/\s+/', '', $search);
+                if ($digits !== '' && ctype_digit($digits)) {
+                    $q->orWhere('bs.id', (int) $digits);
+                }
             });
+        }
+
+        $incomeCollectionYmd = $this->requestIncomeCollectionDatesYmd($request);
+        if (count($incomeCollectionYmd) > 0) {
+            $this->applyIncomeCollectionDatesFilter($query, $incomeCollectionYmd);
         }
 
         if ($request->filled('matched_date_from')) {
@@ -1536,11 +1996,158 @@ class BankStatementController extends Controller
     }
     
     /**
+     * Super Admin:  access_limits = 1 (matches superadmin ticket pattern).
+     */
+    private function bankReconIsSuperAdmin(): bool
+    {
+        $u = Auth::user();
+        if (! $u) {
+            return false;
+        }
+
+        return (int) ($u->access_limits ?? 0) === 1;
+    }
+
+    /**
+     * @param  array<string, mixed>  $details
+     */
+    private function logBankReconUserHistory(string $action, ?int $bankStatementId, array $details = []): void
+    {
+        if (! Schema::hasTable('bank_reconciliation_user_histories')) {
+            return;
+        }
+        try {
+            DB::table('bank_reconciliation_user_histories')->insert([
+                'user_id'             => Auth::id(),
+                'action'              => $action,
+                'bank_statement_id'   => $bankStatementId,
+                'details'             => $details !== [] ? json_encode($details, JSON_UNESCAPED_UNICODE) : null,
+                'ip_address'          => request()->ip(),
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('logBankReconUserHistory failed', ['action' => $action, 'e' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Paginated audit log (Super Admin only) with search & filters.
+     */
+    public function listBankReconUserHistory(Request $request)
+    {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+        if (! Schema::hasTable('bank_reconciliation_user_histories')) {
+            return response()->json([
+                'data'         => [],
+                'current_page' => 1,
+                'last_page'    => 1,
+                'per_page'     => 30,
+                'total'        => 0,
+            ]);
+        }
+
+        $perPage  = max(5, min(100, (int) $request->get('per_page', 30)));
+        $search   = trim((string) $request->get('search', ''));
+        $action   = trim((string) $request->get('action', ''));
+        $dateFrom = trim((string) $request->get('date_from', ''));
+        $dateTo   = trim((string) $request->get('date_to', ''));
+
+        $q = DB::table('bank_reconciliation_user_histories as h')
+            ->leftJoin('users as u', 'u.id', '=', 'h.user_id')
+            ->leftJoin('bank_statements as bs', 'bs.id', '=', 'h.bank_statement_id')
+            ->orderByDesc('h.id')
+            ->select([
+                'h.id',
+                'h.user_id',
+                'h.action',
+                'h.bank_statement_id',
+                'h.details',
+                'h.ip_address',
+                'h.created_at',
+                'u.user_fullname as user_fullname',
+                'u.username as username',
+                'bs.description as stmt_description',
+                'bs.transaction_date as stmt_transaction_date',
+                'bs.deposit as stmt_deposit',
+                'bs.withdrawal as stmt_withdrawal',
+            ]);
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $q->where(function ($sub) use ($like) {
+                $sub->where('u.user_fullname', 'like', $like)
+                    ->orWhere('u.username', 'like', $like)
+                    ->orWhere('h.action', 'like', $like)
+                    ->orWhere('h.details', 'like', $like)
+                    ->orWhere('h.ip_address', 'like', $like)
+                    ->orWhereRaw('CAST(h.bank_statement_id AS CHAR) LIKE ?', [$like]);
+            });
+        }
+
+        if ($action !== '') {
+            $q->where('h.action', $action);
+        }
+
+        if ($dateFrom !== '') {
+            try {
+                $q->whereDate('h.created_at', '>=', \Carbon\Carbon::parse($dateFrom)->toDateString());
+            } catch (\Throwable $e) { /* ignore bad date */ }
+        }
+
+        if ($dateTo !== '') {
+            try {
+                $q->whereDate('h.created_at', '<=', \Carbon\Carbon::parse($dateTo)->toDateString());
+            } catch (\Throwable $e) { /* ignore bad date */ }
+        }
+
+        $paginator = $q->paginate($perPage);
+
+        $rows = collect($paginator->items())->map(function ($row) {
+            $details = [];
+            if ($row->details) {
+                $decoded = json_decode($row->details, true);
+                if (is_array($decoded)) {
+                    $details = $decoded;
+                }
+            }
+            return [
+                'id'                    => (int) $row->id,
+                'user_fullname'         => $row->user_fullname ?? 'Unknown',
+                'username'              => $row->username ?? '',
+                'action'                => $row->action,
+                'bank_statement_id'     => $row->bank_statement_id,
+                'stmt_description'      => $row->stmt_description ?? null,
+                'stmt_transaction_date' => $row->stmt_transaction_date ?? null,
+                'stmt_deposit'          => isset($row->stmt_deposit) ? (float) $row->stmt_deposit : null,
+                'stmt_withdrawal'       => isset($row->stmt_withdrawal) ? (float) $row->stmt_withdrawal : null,
+                'details'               => $details,
+                'ip_address'            => $row->ip_address,
+                'created_at'            => $row->created_at,
+            ];
+        });
+
+        return response()->json([
+            'data'         => $rows->values(),
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+            'per_page'     => $paginator->perPage(),
+            'total'        => $paginator->total(),
+        ]);
+    }
+
+    /**
      * Match bank statement with bill.
      * Creates a bill_pay (bill made) record like VendorController::savebillmade, so the payment appears in Bill Made.
      */
     public function matchBill(Request $request)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         $request->validate([
             'bank_statement_id' => 'required|integer',
             'bill_id' => 'required|integer',
@@ -1849,6 +2456,12 @@ class BankStatementController extends Controller
             }
 
             DB::commit();
+
+            $this->logBankReconUserHistory('match_bill', (int) $statementId, [
+                'bill_id'         => (int) $billId,
+                'matched_amount'  => $matchedAmount,
+                'match_type'      => $matchType,
+            ]);
             
             return response()->json([
                 'success' => true,
@@ -1973,6 +2586,177 @@ class BankStatementController extends Controller
     }
 
     /**
+     * Store income-tag (or extra) match files on bank_statements.attachments_json, merging with existing JSON rows.
+     */
+    private function mergeBankStatementAttachmentsFromUpload(Request $request, int $statementId): void
+    {
+        if (! $request->hasFile('attachments') || ! Schema::hasTable('bank_statements')
+            || ! Schema::hasColumn('bank_statements', 'attachments_json')) {
+            return;
+        }
+        $files = $request->file('attachments');
+        if ($files === null) {
+            return;
+        }
+        if (! is_array($files)) {
+            $files = [$files];
+        }
+        $files = array_values(array_filter($files));
+        if ($files === []) {
+            return;
+        }
+
+        $existing = [];
+        $prev = DB::table('bank_statements')->where('id', $statementId)->value('attachments_json');
+        if ($prev !== null && $prev !== '') {
+            $decoded = json_decode((string) $prev, true);
+            if (is_array($decoded)) {
+                $existing = $decoded;
+            }
+        }
+
+        $tagInputs = $request->input('attachment_tags', []);
+        if (! is_array($tagInputs)) {
+            $tagInputs = [];
+        }
+        $typeIdInputs = $request->input('attachment_type_ids', []);
+        if (! is_array($typeIdInputs)) {
+            $typeIdInputs = [];
+        }
+
+        $destDir = public_path('bank_recon_match_files/'.$statementId);
+        if (! File::isDirectory($destDir)) {
+            File::makeDirectory($destDir, 0755, true);
+        }
+
+        $newRows = [];
+        $idx = 0;
+        foreach ($files as $file) {
+            if (! $file || ! $file->isValid()) {
+                $idx++;
+
+                continue;
+            }
+            $origName = $file->getClientOriginalName();
+            $ext = $file->getClientOriginalExtension() ?: 'bin';
+            $base = Str::slug(pathinfo($origName, PATHINFO_FILENAME)) ?: 'file';
+            $safe = $base.'-'.Str::random(6).'.'.$ext;
+            $file->move($destDir, $safe);
+            $relative = 'bank_recon_match_files/'.$statementId.'/'.$safe;
+            $tagLabel = isset($tagInputs[$idx]) ? trim((string) $tagInputs[$idx]) : '';
+            if ($tagLabel === '') {
+                $tagLabel = 'Unspecified';
+            }
+            $tid = isset($typeIdInputs[$idx]) ? (int) $typeIdInputs[$idx] : 0;
+            $row = [
+                'name' => $origName,
+                'url'  => $this->bankReconMatchAttachmentPublicUrl($relative),
+                'path' => $relative,
+                'tag'  => $tagLabel,
+            ];
+            if ($tid > 0) {
+                $row['tag_type_id'] = $tid;
+            }
+            $newRows[] = $row;
+            $idx++;
+        }
+
+        if ($newRows === []) {
+            return;
+        }
+
+        $merged = array_merge($existing, $newRows);
+        DB::table('bank_statements')->where('id', $statementId)->update([
+            'attachments_json' => json_encode($merged),
+            'updated_at'       => now(),
+        ]);
+    }
+
+    /**
+     * Income tag requires three configured attachment types (MOCDOC screenshot, Radiant slip, collection ledger)
+     * and one uploaded file per type (identified via attachment_type_ids).
+     */
+    private function validateIncomeTagMandatoryAttachmentSlots(Request $request): ?string
+    {
+        if (! Schema::hasTable('bank_recon_match_attachment_types')) {
+            return null;
+        }
+
+        $catalogErr = $this->incomeMandatoryAttachmentCatalogGapMessage();
+        if ($catalogErr !== null) {
+            return $catalogErr;
+        }
+
+        $files = $request->file('attachments');
+        if (! is_array($files)) {
+            $files = $files ? [$files] : [];
+        }
+        $typeIdsRaw = $request->input('attachment_type_ids', []);
+        if (! is_array($typeIdsRaw)) {
+            $typeIdsRaw = [];
+        }
+
+        $slotsFilled = [];
+        foreach ($files as $i => $file) {
+            if (! $file || ! $file->isValid()) {
+                continue;
+            }
+            $tid = isset($typeIdsRaw[$i]) ? (int) $typeIdsRaw[$i] : 0;
+            if ($tid <= 0) {
+                continue;
+            }
+            $row = DB::table('bank_recon_match_attachment_types')->where('id', $tid)->first();
+            if (! $row) {
+                continue;
+            }
+            $slot = BankReconIncomeRequiredAttachments::slotForTypeName((string) ($row->name ?? ''));
+            if ($slot !== null) {
+                $slotsFilled[$slot] = true;
+            }
+        }
+
+        foreach (BankReconIncomeRequiredAttachments::SLOTS as $slot) {
+            if (empty($slotsFilled[$slot])) {
+                return 'Missing required document: '.BankReconIncomeRequiredAttachments::slotLabel($slot)
+                    .'. Add one file for each of the three types (MOCDOC screenshot, Radiant slip, collection ledger) and set the document type on each file.';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string|null Error message if one of the three mandatory income attachment patterns is missing from the catalog.
+     */
+    private function incomeMandatoryAttachmentCatalogGapMessage(): ?string
+    {
+        $q = DB::table('bank_recon_match_attachment_types')->where('is_active', true);
+        if (Schema::hasColumn('bank_recon_match_attachment_types', 'match_context')) {
+            $q->where(function ($w) {
+                $w->where('match_context', 'income')
+                    ->orWhere('match_context', 'both');
+            });
+        }
+        $rows = $q->get();
+        $have = ['mocdoc' => false, 'radiant' => false, 'ledger' => false];
+        foreach ($rows as $r) {
+            $slot = BankReconIncomeRequiredAttachments::slotForTypeName((string) ($r->name ?? ''));
+            if ($slot !== null) {
+                $have[$slot] = true;
+            }
+        }
+        foreach (BankReconIncomeRequiredAttachments::SLOTS as $slot) {
+            if (empty($have[$slot])) {
+                return 'Configure attachment types under Bank Accounts → Attachment types (active; scope Income or Both): '
+                    .'add a name matching '.BankReconIncomeRequiredAttachments::slotLabel($slot).' '
+                    .'(you need all three: MOCDOC + SCREEN/SHOT, RADIANT, and COLLECTION or BRANCH + LEDGER).';
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Absolute URL for files under public/bank_recon_match_files/….
      * When APP_URL points at the project folder (e.g. https://…/hms) instead of …/hms/public, {@see asset()}
      * omits the /public/ segment and links 404; insert /public/ before bank_recon_match_files for that layout.
@@ -2076,6 +2860,10 @@ class BankStatementController extends Controller
      */
     public function unmatch($id)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -2203,8 +2991,13 @@ class BankStatementController extends Controller
             DB::table('bank_statements')
                 ->where('id', $id)
                 ->update($stmtReset);
-            
+
             DB::commit();
+
+            $this->logBankReconUserHistory('unmatch_bill', (int) $id, array_filter([
+                'bill_id'        => $match ? (int) $match->bill_id : null,
+                'matched_amount' => $match && isset($match->matched_amount) ? (float) $match->matched_amount : null,
+            ]));
             
             return response()->json([
                 'success' => true,
@@ -2259,12 +3052,17 @@ class BankStatementController extends Controller
         }
 
         $this->hydrateStatementBillDisplayFields($stmt);
+        $this->hydrateIncomeBillingListForStatementRow($stmt);
 
         return response()->json(['success' => true, 'data' => $stmt]);
     }
 
     public function destroy($id)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         try {
             // Check if matched
             $statement = DB::table('bank_statements')->where('id', $id)->first();
@@ -2284,6 +3082,10 @@ class BankStatementController extends Controller
             }
             
             DB::table('bank_statements')->where('id', $id)->delete();
+
+            $this->logBankReconUserHistory('delete_statement', (int) $id, [
+                'reference' => $statement->reference_number ?? null,
+            ]);
             
             return response()->json([
                 'success' => true,
@@ -2303,6 +3105,10 @@ class BankStatementController extends Controller
      */
     public function deleteBatch(Request $request)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         $batchId = $request->batch_id;
         
         try {
@@ -2326,6 +3132,11 @@ class BankStatementController extends Controller
             if (Schema::hasTable('bank_statement_upload_batches')) {
                 DB::table('bank_statement_upload_batches')->where('upload_batch_id', $batchId)->delete();
             }
+
+            $this->logBankReconUserHistory('delete_batch', null, [
+                'upload_batch_id'  => $batchId,
+                'deleted_count'    => $deletedCount,
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -3461,20 +4272,38 @@ class BankStatementController extends Controller
      */
     public function applyIncomeTag(Request $request)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         $request->validate([
             'bank_statement_id' => 'required|integer',
-            'zone'              => 'required|string',
-            'branch'            => 'required|string',
-            'date'              => 'nullable|string',
-            'dates'             => 'nullable|array',
-            'dates.*'           => 'nullable|string',
-            'mode'              => 'nullable|in:cash,card,upi,neft,other',
-            'modes'             => 'nullable|array',
-            'modes.*'           => 'nullable|in:cash,card,upi,neft,other',
-            'date_amounts'      => 'nullable|array',
+            'zone'                => 'required|string',
+            'branch'              => 'required|string',
+            'date'                => 'nullable|string',
+            'dates'               => 'nullable|array',
+            'dates.*'             => 'nullable|string',
+            'mode'                => 'nullable|in:cash,card,upi,neft,other',
+            'modes'               => 'nullable|array',
+            'modes.*'             => 'nullable|in:cash,card,upi,neft,other',
+            'date_amounts'        => 'nullable|array',
             'acknowledge_income_amount_mismatch' => 'nullable|boolean',
             'income_amount_mismatch_remark'      => 'nullable|string|max:2000',
+            'attachments'         => 'required|array|min:1',
+            'attachments.*'       => 'file|max:15360',
+            'attachment_tags'     => 'nullable|array',
+            'attachment_tags.*'   => 'nullable|string|max:255',
+            'attachment_type_ids' => 'nullable|array',
+            'attachment_type_ids.*' => 'nullable|integer',
+        ], [
+            'attachments.required' => 'Add at least one supporting document for this income tag (types: Income or Both).',
+            'attachments.min'      => 'Add at least one supporting document for this income tag.',
         ]);
+
+        $incomeAttErr = $this->validateIncomeTagMandatoryAttachmentSlots($request);
+        if ($incomeAttErr !== null) {
+            return response()->json(['success' => false, 'message' => $incomeAttErr], 422);
+        }
 
         $modes = [];
         if ($request->filled('modes') && is_array($request->modes)) {
@@ -3633,15 +4462,13 @@ class BankStatementController extends Controller
                 'income_matched_at'        => now(),
                 'updated_at'               => now(),
             ];
-            if ($n > 1 && Schema::hasColumn('bank_statements', 'income_match_split_json')) {
+            if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
                 $incomeUpdate['income_match_split_json'] = json_encode([
                     'dates_ymd'    => $sortedYmd,
                     'recon_ids'    => $reconIdsByYmd,
                     'amounts_ymd'  => $amountByYmd,
                     'modes'        => $modes,
                 ]);
-            } elseif (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
-                $incomeUpdate['income_match_split_json'] = null;
             }
 
             if (Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark')) {
@@ -3659,6 +4486,8 @@ class BankStatementController extends Controller
             if (!empty($safeUpdate)) {
                 DB::table('bank_statements')->where('id', $stmt->id)->update($safeUpdate);
             }
+
+            $this->mergeBankStatementAttachmentsFromUpload($request, (int) $stmt->id);
 
             DB::commit();
         } catch (\Exception $e) {
@@ -3679,6 +4508,14 @@ class BankStatementController extends Controller
         $message = ($parts ? implode('; ', $parts) : 'Income tag applied')
             . ' for ' . $n . ' collection date(s), modes: ' . implode(', ', $modes);
 
+        $this->logBankReconUserHistory('income_tag', (int) $request->bank_statement_id, [
+            'branch'   => $branch,
+            'modes'    => $modes,
+            'dates'    => $sortedYmd,
+            'created'  => $created,
+            'updated'  => $updated,
+        ]);
+
         return response()->json([
             'success'                    => true,
             'message'                    => $message,
@@ -3697,6 +4534,10 @@ class BankStatementController extends Controller
      */
     public function unmatchIncome($id)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         DB::beginTransaction();
         try {
             $stmt = DB::table('bank_statements')->find($id);
@@ -3808,6 +4649,12 @@ class BankStatementController extends Controller
 
             DB::commit();
 
+            $this->logBankReconUserHistory('income_unmatch', (int) $id, array_filter([
+                'branch'   => isset($stmt->income_matched_branch) ? (string) $stmt->income_matched_branch : null,
+                'date'     => isset($stmt->income_matched_date) ? (string) $stmt->income_matched_date : null,
+                'amount'   => isset($stmt->deposit) ? (float) $stmt->deposit : null,
+            ]));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Income tag removed and reconciliation record cleared',
@@ -3823,10 +4670,69 @@ class BankStatementController extends Controller
     }
 
     /**
+     * Pickups from radiant_cash_pickups for the bank line's transaction date (searchable Radiant match dropdown).
+     */
+    public function radiantCashPickupsForTransactionDate(Request $request)
+    {
+        if (! Schema::hasTable('radiant_cash_pickups')) {
+            return response()->json(['data' => []]);
+        }
+
+        $request->validate([
+            'transaction_date' => 'required|date',
+        ]);
+
+        try {
+            $date = Carbon::parse($request->input('transaction_date'))->startOfDay();
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Invalid transaction_date'], 422);
+        }
+
+        $ymd = $date->format('Y-m-d');
+        $dmy = $date->format('d/m/Y');
+
+        $rows = DB::table('radiant_cash_pickups')
+            ->where(function ($w) use ($ymd, $dmy) {
+                $w->whereDate('pickup_date_parsed', $ymd)
+                    ->orWhere('pickup_date', $dmy)
+                    ->orWhere('pickup_date', $ymd);
+            })
+            ->orderBy('location')
+            ->orderBy('id')
+            ->limit(1000)
+            ->get();
+
+        $data = $rows->map(function ($row) {
+            $branch = trim((string) ($row->location ?? ''));
+            if ($branch === '') {
+                $branch = trim((string) ($row->customer_name ?? ''));
+            }
+            if ($branch === '') {
+                $branch = 'Pickup #'.$row->id;
+            }
+            $amt = $row->total !== null ? (float) $row->total : (float) ($row->pickup_amount ?? 0);
+            $label = $branch.' - ₹'.number_format($amt, 2, '.', ',');
+
+            return [
+                'id'        => (int) $row->id,
+                'label'     => $label,
+                'location'  => (string) ($row->location ?? ''),
+                'amount'    => $amt,
+            ];
+        })->values()->all();
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
      * Save Radiant keyword and/or link to radiant_cash_pickups (marks radiant_matched like income tag).
      */
     public function saveRadiantMatchAgainst(Request $request)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         if (! Schema::hasColumn('bank_statements', 'radiant_match_against')) {
             return response()->json([
                 'success' => false,
@@ -3939,6 +4845,11 @@ class BankStatementController extends Controller
             $msgParts[] = 'pickup link cleared';
         }
 
+        $this->logBankReconUserHistory('radiant_match', (int) $stmt->id, array_filter([
+            'keyword'               => $keyword,
+            'radiant_cash_pickup_id' => $pickupId,
+        ]));
+
         return response()->json([
             'success'                      => true,
             'message'                      => implode(' — ', $msgParts).'.',
@@ -3958,6 +4869,10 @@ class BankStatementController extends Controller
      */
     public function unmatchRadiant($id)
     {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
         if (! Schema::hasColumn('bank_statements', 'radiant_match_status')) {
             return response()->json([
                 'success' => false,
@@ -3993,6 +4908,12 @@ class BankStatementController extends Controller
             }
         }
         DB::table('bank_statements')->where('id', $id)->update($safe);
+
+        $this->logBankReconUserHistory('radiant_unmatch', (int) $id, array_filter([
+            'keyword'                => $stmt->radiant_match_against ?? null,
+            'radiant_cash_pickup_id' => $stmt->radiant_cash_pickup_id ?? null,
+            'location'               => $stmt->radiant_matched_location ?? null,
+        ]));
 
         return response()->json([
             'success' => true,
@@ -4253,14 +5174,29 @@ class BankStatementController extends Controller
             $q->where('is_active', true);
         }
 
+        $scope = strtolower(trim((string) $request->input('scope', '')));
+        if (Schema::hasColumn('bank_recon_match_attachment_types', 'match_context')) {
+            if ($scope === 'bill' || $scope === 'income') {
+                $q->where(function ($w) use ($scope) {
+                    $w->where('match_context', $scope)
+                        ->orWhere('match_context', 'both');
+                });
+            }
+        }
+
         $rows = $q->get();
 
         return response()->json($rows->map(function ($r) {
             $path = isset($r->sample_file_path) ? (string) $r->sample_file_path : '';
+            $ctx = 'both';
+            if (isset($r->match_context) && $r->match_context !== '') {
+                $ctx = (string) $r->match_context;
+            }
 
             return [
                 'id'               => (int) $r->id,
                 'name'             => (string) ($r->name ?? ''),
+                'match_context'    => $ctx,
                 'sort_order'       => (int) ($r->sort_order ?? 0),
                 'is_active'        => (bool) ($r->is_active ?? true),
                 'sample_file_path' => $path !== '' ? $path : null,
@@ -4275,12 +5211,17 @@ class BankStatementController extends Controller
             return response()->json(['success' => false, 'message' => 'Run migrations to enable attachment types.'], 503);
         }
         $request->validate([
-            'name'       => 'required|string|max:191',
-            'sort_order' => 'nullable|integer|min:0|max:65535',
-            'sample_file'=> 'nullable|file|max:5120',
+            'name'          => 'required|string|max:191',
+            'sort_order'    => 'nullable|integer|min:0|max:65535',
+            'match_context' => 'nullable|in:bill,income,both',
+            'sample_file'   => 'nullable|file|max:5120',
         ]);
 
         $sort = (int) $request->input('sort_order', 0);
+        $ctx = strtolower(trim((string) $request->input('match_context', 'both')));
+        if (! in_array($ctx, ['bill', 'income', 'both'], true)) {
+            $ctx = 'both';
+        }
         $path = null;
         if ($request->hasFile('sample_file') && $request->file('sample_file')->isValid()) {
             $file = $request->file('sample_file');
@@ -4296,14 +5237,18 @@ class BankStatementController extends Controller
             $path = 'bank_recon_attachment_type_samples/'.$safe;
         }
 
-        $id = DB::table('bank_recon_match_attachment_types')->insertGetId([
+        $insert = [
             'name'             => trim((string) $request->name),
             'sort_order'       => $sort,
             'is_active'        => true,
             'sample_file_path' => $path,
             'created_at'       => now(),
             'updated_at'       => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('bank_recon_match_attachment_types', 'match_context')) {
+            $insert['match_context'] = $ctx;
+        }
+        $id = DB::table('bank_recon_match_attachment_types')->insertGetId($insert);
 
         $row = DB::table('bank_recon_match_attachment_types')->where('id', $id)->first();
 
@@ -4313,6 +5258,7 @@ class BankStatementController extends Controller
             'type'    => [
                 'id'               => (int) $row->id,
                 'name'             => (string) $row->name,
+                'match_context'    => isset($row->match_context) ? (string) $row->match_context : 'both',
                 'sort_order'       => (int) $row->sort_order,
                 'sample_file_path' => $row->sample_file_path,
                 'sample_url'       => $row->sample_file_path ? asset($row->sample_file_path) : null,
@@ -4330,15 +5276,20 @@ class BankStatementController extends Controller
             return response()->json(['success' => false, 'message' => 'Not found'], 404);
         }
         $request->validate([
-            'name'       => 'sometimes|required|string|max:191',
-            'sort_order' => 'nullable|integer|min:0|max:65535',
-            'is_active'  => 'sometimes|boolean',
-            'sample_file'=> 'nullable|file|max:5120',
+            'name'          => 'sometimes|required|string|max:191',
+            'sort_order'    => 'nullable|integer|min:0|max:65535',
+            'is_active'     => 'sometimes|boolean',
+            'match_context' => 'nullable|in:bill,income,both',
+            'sample_file'   => 'nullable|file|max:5120',
         ]);
 
         $update = ['updated_at' => now()];
         if ($request->has('name')) {
             $update['name'] = trim((string) $request->name);
+        }
+        if ($request->has('match_context') && Schema::hasColumn('bank_recon_match_attachment_types', 'match_context')) {
+            $mc = strtolower(trim((string) $request->input('match_context')));
+            $update['match_context'] = in_array($mc, ['bill', 'income', 'both'], true) ? $mc : 'both';
         }
         if ($request->has('sort_order')) {
             $update['sort_order'] = (int) $request->sort_order;
@@ -4377,6 +5328,7 @@ class BankStatementController extends Controller
             'type'    => [
                 'id'               => (int) $row->id,
                 'name'             => (string) $row->name,
+                'match_context'    => isset($row->match_context) ? (string) $row->match_context : 'both',
                 'sort_order'       => (int) $row->sort_order,
                 'is_active'        => (bool) $row->is_active,
                 'sample_file_path' => $row->sample_file_path,
