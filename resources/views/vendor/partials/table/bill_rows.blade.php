@@ -19,6 +19,7 @@
         <th>BILL #</th>
         <th>REF NO</th>
         <th>Bill Category</th>
+        <th>Department</th>
         <th>NATURE</th>
         <th>VENDOR</th>
         <th>OTHER REASON</th>
@@ -114,6 +115,7 @@
             <td>{{ $bill->bill_number ?? '-' }}</td>
             <td>{{ $bill->order_number ?? '-' }}</td>
             <td>{{ $bill->category->name ?? '-' }}</td>
+            <td>{{ $bill->department->name ?? '-' }}</td>
             <td>{{ $bill->BillLines->pluck('account')->unique()->sort()->implode(', ') }}</td>
 
             <td class="vendor_link">

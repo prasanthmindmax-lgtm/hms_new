@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\File;
@@ -24,31 +25,195 @@ class TicketController extends Controller
 
     private const OWN_ROWS = [4, 5];
 
+    /**
+     * Department IDs the signed-in user is limited to for tickets / masters (empty = no department-based restriction).
+     *
+     * @return list<int>
+     */
+    protected function ticketDepartmentRestrictionIds(?int $userId = null): array
+    {
+        $userId = $userId ?? (int) auth()->id();
+        if ($userId <= 0) {
+            return [];
+        }
+
+        if (! Schema::hasTable('department_user')) {
+            return [];
+        }
+
+        return DB::table('department_user')
+            ->where('user_id', $userId)
+            ->pluck('department_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function ticketUserHasDepartmentRestriction(): bool
+    {
+        return $this->ticketDepartmentRestrictionIds() !== [];
+    }
+
+    protected function departmentsForCurrentUser()
+    {
+        $q = Department::query()->orderBy('id');
+        $ids = $this->ticketDepartmentRestrictionIds();
+        if ($ids !== []) {
+            $q->whereIn('id', $ids);
+        }
+
+        return $q;
+    }
+
+    protected function assertDepartmentsAllowedForUser(int $fromDepartmentId, int $toDepartmentId): ?JsonResponse
+    {
+        $allowed = $this->ticketDepartmentRestrictionIds();
+        if ($allowed === []) {
+            return null;
+        }
+
+        $okFrom = in_array($fromDepartmentId, $allowed, true);
+        $okTo = in_array($toDepartmentId, $allowed, true);
+        if (!$okFrom || !$okTo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only raise or edit tickets for departments you are assigned to.',
+            ], 422);
+        }
+
+        return null;
+    }
+
     public function getDepartments(Request $request)
     {
         $admin   = auth()->user();
         $perPage = $request->get('per_page', 10);
 
-        $departments = Department::query()
-            ->orderBy('id', 'asc')
+        $deptQuery = $this->departmentsForCurrentUser();
+        if (Schema::hasTable('department_user')) {
+            $deptQuery->with(['assignedUsers:id,user_fullname']);
+        }
+
+        $departments = $deptQuery
             ->paginate($perPage)
             ->appends(['per_page' => $perPage]);
+
+        $departmentUsersList = $this->ticketUserHasDepartmentRestriction()
+            ? collect()
+            : usermanagementdetails::query()
+                ->orderBy('user_fullname')
+                ->get(['id', 'user_fullname']);
 
         return view('superadmin.tickets.departments', [
             'admin'       => $admin,
             'departments' => $departments,
             'perPage'     => $perPage,
+            'departmentUsersList' => $departmentUsersList,
+            'canAssignDepartmentUsers' => ! $this->ticketUserHasDepartmentRestriction(),
+        ]);
+    }
+
+    public function departmentAssignedUsers(Request $request)
+    {
+        if ($this->ticketUserHasDepartmentRestriction()) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        $request->validate([
+            'department_id' => 'required|integer|exists:departments,id',
+        ]);
+
+        $departmentId = (int) $request->department_id;
+        $userIds = Schema::hasTable('department_user')
+            ? DB::table('department_user')
+                ->where('department_id', $departmentId)
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all()
+            : [];
+
+        return response()->json([
+            'success' => true,
+            'user_ids' => $userIds,
+        ]);
+    }
+
+    public function syncDepartmentUsers(Request $request)
+    {
+        if ($this->ticketUserHasDepartmentRestriction()) {
+            return response()->json(['success' => false, 'message' => 'You cannot manage department user assignments.'], 403);
+        }
+
+        $validated = $request->validate([
+            'department_id' => 'required|integer|exists:departments,id',
+            'user_ids' => ['nullable', 'array'],
+            'user_ids.*' => 'integer|exists:users,id',
+        ]);
+
+        if (! Schema::hasTable('department_user')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Assignments table is missing. Run database migrations.',
+            ], 500);
+        }
+
+        $departmentId = (int) $validated['department_id'];
+        $userIds = array_values(array_unique(array_map('intval', $validated['user_ids'] ?? [])));
+
+        $now = now();
+        DB::transaction(function () use ($departmentId, $userIds, $now) {
+            DB::table('department_user')->where('department_id', $departmentId)->delete();
+            foreach ($userIds as $uid) {
+                if ($uid <= 0) {
+                    continue;
+                }
+                DB::table('department_user')->insert([
+                    'department_id' => $departmentId,
+                    'user_id' => $uid,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Users assigned to this department successfully.',
         ]);
     }
 
     public function storeDepartments(Request $request)
     {
-        $request->validate([
-            'name'      => 'required|string|max:255',
+        $rules = [
+            'name' => 'required|string|max:255',
             'is_active' => ['required', Rule::in([0, 1])],
-        ]);
+        ];
+        if (! $this->ticketUserHasDepartmentRestriction()) {
+            $rules['user_ids'] = ['nullable', 'array'];
+            $rules['user_ids.*'] = ['integer', 'exists:users,id'];
+        }
+        $request->validate($rules);
+
+        if ($this->ticketUserHasDepartmentRestriction() && ! $request->filled('id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot create new departments.',
+            ], 403);
+        }
 
         $id = $request->id;
+
+        if ($this->ticketUserHasDepartmentRestriction() && $id !== null && $id !== '') {
+            $allowed = $this->ticketDepartmentRestrictionIds();
+            if (! in_array((int) $id, $allowed, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot edit this department.',
+                ], 403);
+            }
+        }
 
         $data = [
             'name'       => $request->name,
@@ -66,6 +231,31 @@ class TicketController extends Controller
             $message = 'Department created successfully!';
         }
 
+        if (! $this->ticketUserHasDepartmentRestriction()
+            && Schema::hasTable('department_user')
+            && $departments) {
+            $deptId = (int) $departments->id;
+            $userIds = array_values(array_unique(array_map(
+                'intval',
+                $request->input('user_ids', [])
+            )));
+            $now = now();
+            DB::transaction(function () use ($deptId, $userIds, $now) {
+                DB::table('department_user')->where('department_id', $deptId)->delete();
+                foreach ($userIds as $uid) {
+                    if ($uid <= 0) {
+                        continue;
+                    }
+                    DB::table('department_user')->insert([
+                        'department_id' => $deptId,
+                        'user_id' => $uid,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            });
+        }
+
         return response()->json([
             'success'  => true,
             'message'  => $message,
@@ -77,9 +267,15 @@ class TicketController extends Controller
     {
         $admin   = auth()->user();
         $perPage = $request->get('per_page', 10);
-        $departments = Department::orderBy('id', 'asc')->get();
+        $departments = $this->departmentsForCurrentUser()->orderBy('id', 'asc')->get();
 
-        $ticketCategories = TicketCategory::orderBy('id', 'asc')->paginate($perPage)
+        $catQuery = TicketCategory::query()->with('department')->orderBy('id', 'asc');
+        $allowedDept = $this->ticketDepartmentRestrictionIds();
+        if ($allowedDept !== []) {
+            $catQuery->whereIn('department_id', $allowedDept);
+        }
+
+        $ticketCategories = $catQuery->paginate($perPage)
             ->appends(['per_page' => $perPage]);
 
         return view('superadmin.tickets.categories', [
@@ -106,6 +302,15 @@ class TicketController extends Controller
             'is_active' => ['required', Rule::in([0, 1])],
         ]);
 
+        $deptId = (int) $request->department_id;
+        $allowedDept = $this->ticketDepartmentRestrictionIds();
+        if ($allowedDept !== [] && ! in_array($deptId, $allowedDept, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot manage categories for this department.',
+            ], 403);
+        }
+
         $id = $request->id;
 
         $data = [
@@ -118,6 +323,13 @@ class TicketController extends Controller
         ];
 
         if (!empty($id)) {
+            $existing = TicketCategory::find($id);
+            if ($existing && $allowedDept !== [] && ! in_array((int) $existing->department_id, $allowedDept, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot edit this ticket category.',
+                ], 403);
+            }
             TicketCategory::where('id', $id)->update($data);
             $ticketCategories = TicketCategory::find($id);
             $message = 'Ticket Category updated successfully!';
@@ -240,7 +452,13 @@ class TicketController extends Controller
 
         // department
         $dept = $this->getIds($request, 'to_department_id', Department::class, ['is_active' => 1]);
-        if ($dept) $query->whereIn('to_department_id', $dept);
+        $restrictedDeptIds = $this->ticketDepartmentRestrictionIds($userId);
+        if ($restrictedDeptIds !== [] && $dept !== []) {
+            $dept = array_values(array_intersect($dept, $restrictedDeptIds));
+        }
+        if ($dept) {
+            $query->whereIn('to_department_id', $dept);
+        }
 
         // status
         $status = $this->getIds($request, 'status');
@@ -427,7 +645,7 @@ class TicketController extends Controller
             'admin' => $admin,
             'zones' => $data['zones'],
             'locations' => $data['locations'],
-            'departments' => Department::where('is_active', 1)->get(),
+            'departments' => $this->departmentsForCurrentUser()->where('is_active', 1)->orderBy('name')->get(),
             'statuses' => Ticket::STATUSES,
             'priorities' => Ticket::PRIORITIES,
         ]);
@@ -439,8 +657,17 @@ class TicketController extends Controller
             'department_id' => 'required|integer',
         ]);
 
+        $departmentId = (int) $request->department_id;
+        $allowedDept = $this->ticketDepartmentRestrictionIds();
+        if ($allowedDept !== [] && ! in_array($departmentId, $allowedDept, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot load categories for this department.',
+            ], 403);
+        }
+
         $rows = TicketCategory::query()
-            ->where('department_id', $request->department_id)
+            ->where('department_id', $departmentId)
             ->where('is_active', 1)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -587,6 +814,10 @@ class TicketController extends Controller
             return $locDenied;
         }
 
+        if ($denied = $this->assertDepartmentsAllowedForUser((int) $validated['from_department_id'], (int) $validated['to_department_id'])) {
+            return $denied;
+        }
+
         $paths = $this->uploadAttachments($request->file('attachments'));
         $ticket = Ticket::create([
             'ticket_no' => 'TKT-TMP-' . uniqid('', true),
@@ -651,6 +882,10 @@ class TicketController extends Controller
 
         if ($locDenied) {
             return $locDenied;
+        }
+
+        if ($denied = $this->assertDepartmentsAllowedForUser((int) $validated['from_department_id'], (int) $validated['to_department_id'])) {
+            return $denied;
         }
 
         $category = TicketCategory::query()
@@ -744,6 +979,13 @@ class TicketController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'You are not allowed to update status for this ticket.'
+            ], 403);
+        }
+
+        if (! $this->ticketAccessAllows($access, $ticket)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not allowed to update status for this ticket.',
             ], 403);
         }
 
@@ -980,17 +1222,26 @@ class TicketController extends Controller
     protected function ticketAccessApplyScope(object $user, Builder $q): void
     {
         $ids = $this->ticketAccessAllowedLocationIds($user);
-        if ($ids === null) {
-            return;
-        }
-        if ($ids === []) {
-            $q->whereRaw('0 = 1');
+        if ($ids !== null) {
+            if ($ids === []) {
+                $q->whereRaw('0 = 1');
 
-            return;
+                return;
+            }
+            $q->whereIn('location_id', $ids);
+            if (in_array($this->ticketAccessLevel($user), self::OWN_ROWS, true)) {
+                $q->where('created_by', (int) $user->id);
+            }
         }
-        $q->whereIn('location_id', $ids);
-        if (in_array($this->ticketAccessLevel($user), self::OWN_ROWS, true)) {
-            $q->where('created_by', (int) $user->id);
+
+        // Always apply department_user limits when the user is assigned to departments
+        // (including users with "open" location access — they must not see other departments' tickets).
+        $deptIds = $this->ticketDepartmentRestrictionIds((int) $user->id);
+        if ($deptIds !== []) {
+            $q->where(function (Builder $sub) use ($deptIds) {
+                $sub->whereIn('to_department_id', $deptIds)
+                    ->orWhereIn('from_department_id', $deptIds);
+            });
         }
     }
 
@@ -998,16 +1249,33 @@ class TicketController extends Controller
     {
         $ids = $this->ticketAccessAllowedLocationIds($user);
         if ($ids === null) {
-            return true;
-        }
-        if ($ids === [] || ! in_array((int) $ticket->location_id, $ids, true)) {
-            return false;
-        }
-        if (in_array($this->ticketAccessLevel($user), self::OWN_ROWS, true)) {
-            return (int) $ticket->created_by === (int) $user->id;
+            $locationOk = true;
+        } elseif ($ids === [] || ! in_array((int) $ticket->location_id, $ids, true)) {
+            $locationOk = false;
+        } else {
+            $locationOk = true;
         }
 
-        return true;
+        if (! $locationOk) {
+            return false;
+        }
+
+        if (in_array($this->ticketAccessLevel($user), self::OWN_ROWS, true)) {
+            if ((int) $ticket->created_by !== (int) $user->id) {
+                return false;
+            }
+        }
+
+        $deptIds = $this->ticketDepartmentRestrictionIds((int) $user->id);
+        if ($deptIds === []) {
+            return true;
+        }
+
+        $to = (int) $ticket->to_department_id;
+        $from = (int) $ticket->from_department_id;
+
+        return in_array($to, $deptIds, true)
+            || in_array($from, $deptIds, true);
     }
 
     protected function ticketAccessLocationError(object $user, int $locationId): ?JsonResponse

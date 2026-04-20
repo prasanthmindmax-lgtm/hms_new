@@ -24,13 +24,13 @@ use App\Models\AdminUserDepartments;
 use App\Models\BillCategory;
 use App\Models\BillingListModel;
 use App\Models\CategoryModel;
+use App\Models\ConsumableStore;
 use App\Models\Customer;
 use App\Models\CancelbillFormModel;
 use App\Models\DiscountFormModel;
 use App\Models\ExpenseCategory;
-use App\Models\ExpenseType;
 use App\Models\ExpenseReport;
-use App\Models\PettyCashHistory;
+use App\Models\ExpenseType;
 use App\Models\HrmUsers;
 use App\Models\ImageModel;
 use App\Models\LocationModel;
@@ -71,9 +71,10 @@ use App\Models\TblVendorHistory;
 use App\Models\TblVendortype;
 use App\Models\TblZonesModel;
 use App\Models\TicketActivitiesModel;
+use App\Models\Department;
+use App\Models\PettyCashHistory;
 use App\Models\TicketActivityModel;
 use App\Models\TicketDetails;
-
 use App\Models\TicketModel;
 use App\Models\User;
 use App\Models\UserDepartments;
@@ -83,9 +84,9 @@ use App\Models\UserProfile;
 use App\Providers\RouteServiceProvider;
 use App\Support\MocdocLocationKeys;
 use Barryvdh\DomPDF\Facade\Pdf;
+
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -1735,6 +1736,7 @@ public function statementprint(Request $request, $id)
          $gsttax = Tblgsttax::orderBy('id', 'desc')->get();
         $Tblaccount = Tblaccount::orderBy('id', 'desc')->get();
         $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
+        $Tbldepartment = Department::orderBy('id', 'asc')->get();
         $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails'])->where('active_status', 0)->get();
         $customer = Tblcustomer::with(['billingAddress', 'shippingAddress', 'contacts'])->get();
         $Tbltdssection = Tbltdssection::orderBy('id', 'asc')->paginate(10);
@@ -1772,13 +1774,13 @@ public function statementprint(Request $request, $id)
                 return view('vendor.bill_create', compact(
                     'admin','locations','vendor','customer',
                     'Tbltdstax','tdstax','Tbltcstax','Tblgsttax','Tblaccount','Tbltdssection',
-                    'TblQuotation','TblZonesModel','purchaselist','bill','perPage','Tblcompany','gsttax','type', 'billcategories'
+                    'TblQuotation','TblZonesModel','purchaselist','bill','perPage','Tblcompany','gsttax','type', 'billcategories', 'Tbldepartment'
                 ));
             }else{
                 return view('vendor.bill_create', compact(
                     'admin','locations','vendor','customer',
                     'Tbltdstax','tdstax','Tbltcstax','Tblgsttax','Tblaccount','Tbltdssection',
-                    'TblQuotation','TblZonesModel','serial','purchaselist','bill','perPage','Tblcompany','gsttax','type', 'billcategories'
+                    'TblQuotation','TblZonesModel','serial','purchaselist','bill','perPage','Tblcompany','gsttax','type', 'billcategories', 'Tbldepartment'
                 ));
 
             }
@@ -1786,7 +1788,7 @@ public function statementprint(Request $request, $id)
             return view('vendor.bill_create', compact(
                 'admin','locations','vendor','customer',
                 'Tbltdstax','tdstax','Tbltcstax','Tblgsttax','Tblaccount','Tbltdssection',
-                'TblQuotation','TblZonesModel','purchaselist','serial','perPage','Tblcompany','gsttax','type','billcategories'
+                'TblQuotation','TblZonesModel','purchaselist','serial','perPage','Tblcompany','gsttax','type','billcategories', 'Tbldepartment'
             ));
         }
     }
@@ -2008,6 +2010,7 @@ public function statementprint(Request $request, $id)
             'due_date' => $request->due_date,
             'zone_id' => $request->zone_id,
             'zone_name' => $request->zone,
+            'department_id' => $request->department_id,
             'branch_name' => $request->branch,
             'branch_id' => $request->branch_id,
             'company_name' => $request->company_name,
@@ -5254,6 +5257,7 @@ public function getgrncreate()
     $gsttax = Tblgsttax::orderBy('id', 'desc')->get();
     $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
     $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
+    $Tbldepartment = Department::orderBy('id', 'asc')->get();
     $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails'])->get();
     $customer = Tblcustomer::with(['billingAddress', 'shippingAddress', 'contacts'])->get();
     $TblQuotation = TblQuotation::with(['BillLines','Tblvendor','TblBilling'])
@@ -5298,6 +5302,7 @@ public function getgrncreate()
         'grndata' => $grndata,
         'type' => $type,
         'Tblcompany' => $Tblcompany,
+        'Tbldepartment' => $Tbldepartment,
         'gsttax' => $gsttax,
         'users' => $users,
     ]);
@@ -5309,6 +5314,10 @@ public function savegrn(Request $request)
         $now = now();
         $user_id = auth()->user()->id;
         $admin = auth()->user();
+
+        $request->validate([
+            'department_id'   => 'required|integer|exists:departments,id',
+        ]);
 
         $data = [
             'user_id' => $user_id,
@@ -5322,6 +5331,7 @@ public function savegrn(Request $request)
             'branch_id' => $request->branch_id,
             'company_name' => $request->company_name,
             'company_id' => $request->company_id,
+            'department_id' => $request->department_id,
             'grn_number' => $request->grn_number,
             'order_number' => $request->order_number,
             'bill_date' => $request->bill_date,
@@ -5447,6 +5457,27 @@ public function savegrn(Request $request)
                 }
             }
         }
+
+        // Post GRN lines to Consumable Store when saved as Open, not draft.
+        if ($request->input('save_status') === 'save' && $request->has('linesdata')) {
+            ConsumableStore::where('grn_id', $grn_id)->delete();
+            $deptId = $request->department_id;
+            foreach ($request->linesdata as $linesData) {
+                $itemName = trim((string) ($linesData['item_details'] ?? ''));
+                if ($itemName === '') {
+                    continue;
+                }
+                $qty = (float) ($linesData['acceptable_quantity'] ?? $linesData['receivable_quantity'] ?? $linesData['quantity'] ?? 0);
+                ConsumableStore::create([
+                    'grn_id' => $grn_id,
+                    'grn_number' => $grn->grn_number,
+                    'department_id' => $deptId,
+                    'item_name' => $itemName,
+                    'quantity' => $qty,
+                ]);
+            }
+        }
+
          return response()->json([
             'success' => true,
             'message' => $isUpdate ? 'GRN Data updated successfully!' : 'GRN Data saved successfully!'

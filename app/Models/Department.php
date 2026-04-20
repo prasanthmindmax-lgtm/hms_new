@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Department extends Model
 {
@@ -17,4 +18,14 @@ class Department extends Model
         'description',
         'created_by',
     ];
+
+    public function assignedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            usermanagementdetails::class,
+            'department_user',
+            'department_id',
+            'user_id'
+        )->withTimestamps();
+    }
 }

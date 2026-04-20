@@ -1,30 +1,36 @@
 <?php
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\SuperAdminController;
-use App\Http\Controllers\MarketController;
-use App\Http\Controllers\AgentController;
+use App\Exports\QuotationTemplateExport;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\VendorController;
+use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AiCompareController;
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\BankStatementController;
+use App\Http\Controllers\BillingStatsController;
+use App\Http\Controllers\BranchFinancialController;
+use App\Http\Controllers\EmailMasterController;
+use App\Http\Controllers\FinancialReportController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\IncomeReconciliationController;
-use App\Http\Controllers\AuthenticatedSessionController;
-use App\Http\Controllers\BranchFinancialController;
-use App\Http\Controllers\FinancialReportController;
-use App\Http\Controllers\BankStatementController;
+use App\Http\Controllers\LocationMasterController;
 use App\Http\Controllers\LogController;
-use App\Http\Controllers\BillingStatsController;
-use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\ManagementController;
+use App\Http\Controllers\MarketController;
 use App\Http\Controllers\MenuMasterController;
 use App\Http\Controllers\PettyCashController;
-use App\Http\Controllers\TicketController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadiantCashPickupController;
 use App\Http\Controllers\RadiantMismatchAlertController;
-use App\Http\Controllers\LocationMasterController;
-use App\Http\Controllers\EmailMasterController;
-use App\Exports\QuotationTemplateExport;
+use App\Http\Controllers\SuperAdminController;
+use App\Http\Controllers\IndentController;
+use App\Http\Controllers\TicketController;
+use App\Http\Controllers\LicenceDocumentCatalogController;
+use App\Http\Controllers\LicenceDocumentController;
+use App\Http\Controllers\VendorController;
+use App\Http\Controllers\WebNotificationController;
+use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -106,7 +112,7 @@ Route::middleware(['auth','role_id:1','log.activity'])->group(function () {
 
     //vasanth -  Master Access
     Route::get('/superadmin/masteraccess',[SuperAdminController::class,'masteraccess'])->name('superadmin.masteraccess');
-    Route::get('/superadmin/employee-data', [SuperAdminController::class,'getEmployeeData']);
+    Route::get('/superadmin/employee-data', [SuperAdminController::class, 'getEmployeeData'])->name('superadmin.employee-data');
     Route::post('/superadmin/update-user-status', [SuperAdminController::class, 'updateUserStatus'])->name('update.status');
     Route::get('/superadmin/get-menu-permissions', [SuperAdminController::class,'getMenuPermissions']);
     Route::post('/superadmin/save-permissions', [SuperAdminController::class,'savePermissions']);
@@ -841,6 +847,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     // Department Routes
     Route::get('superadmin/departments', [TicketController::class, 'getDepartments'])->name('superadmin.departments.index');
     Route::post('superadmin/departments', [TicketController::class, 'storeDepartments'])->name('superadmin.departments.store');
+    Route::get('superadmin/departments/users', [TicketController::class, 'departmentAssignedUsers'])->name('superadmin.departments.users');
 
     // Ticket Category Routes
     Route::get('superadmin/ticket-categories', [TicketController::class, 'getTicketCategories'])->name('superadmin.ticket.categories.index');
@@ -856,6 +863,42 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('superadmin/tickets/status', [TicketController::class, 'updateStatus'])->name('superadmin.tickets.status');
     Route::get('superadmin/tickets/{ticket}/timeline', [TicketController::class, 'timeline'])->name('superadmin.tickets.timeline');
     Route::get('superadmin/tickets/attachment', [TicketController::class, 'viewAttachment'])->name('superadmin.tickets.attachment');
+
+    // Licence Documents Routes
+    Route::get('superadmin/licence-documents', [LicenceDocumentController::class, 'index'])->name('superadmin.licence_documents.index');
+    Route::get('superadmin/licence-documents-catalog', [LicenceDocumentCatalogController::class, 'index'])->name('superadmin.licence_documents.catalog.index');
+    Route::post('superadmin/licence-documents-catalog', [LicenceDocumentCatalogController::class, 'store'])->name('superadmin.licence_documents.catalog.store');
+    Route::get('superadmin/licence-documents/branch/{branch}', [LicenceDocumentController::class, 'branch'])->name('superadmin.licence_documents.branch');
+    Route::post('superadmin/licence-documents/save', [LicenceDocumentController::class, 'save'])->name('superadmin.licence_documents.save');
+
+    // Asset Category Routes
+    Route::get('superadmin/asset-categories', [AssetController::class, 'getAssetCategories'])->name('superadmin.asset.categories.index');
+    Route::post('superadmin/asset-categories', [AssetController::class, 'storeAssetCategories'])->name('superadmin.asset.categories.store');
+
+    // Assets Routes
+    Route::get('superadmin/assets-dashboard', [AssetController::class, 'getAssets'])->name('superadmin.assets.dashboard');
+    Route::get('superadmin/assets/data', [AssetController::class, 'assetsData'])->name('superadmin.assets.data');
+    Route::get('superadmin/assets/create', [AssetController::class, 'createAsset'])->name('superadmin.assets.create');
+    Route::post('superadmin/assets', [AssetController::class, 'storeAsset'])->name('superadmin.assets.store');
+    Route::get('superadmin/assets/{asset}/edit', [AssetController::class, 'editAsset'])->name('superadmin.assets.edit')->whereNumber('asset');
+    Route::post('superadmin/assets/update', [AssetController::class, 'updateAsset'])->name('superadmin.assets.update');
+    Route::get('superadmin/assets/export', [AssetController::class, 'exportAssets'])->name('superadmin.assets.export');
+    Route::get('superadmin/assets/import-template', [AssetController::class, 'downloadAssetImportTemplate'])->name('superadmin.assets.import.template');
+    Route::post('superadmin/assets/import', [AssetController::class, 'importAssetsExcel'])->name('superadmin.assets.import');
+
+    // Consumable store Routes
+    Route::get('/superadmin/consumable-store', [AssetController::class, 'getConsumableStoreDashboard'])->name('superadmin.consumable-store.dashboard');
+
+    // Indents Routes
+    Route::get('superadmin/indents/create', [IndentController::class, 'create'])->name('superadmin.indents.create');
+    Route::get('superadmin/indents/data', [IndentController::class, 'data'])->name('superadmin.indents.data');
+    Route::get('superadmin/indents/stock', [IndentController::class, 'stockOptions'])->name('superadmin.indents.stock');
+    Route::post('superadmin/indents', [IndentController::class, 'store'])->name('superadmin.indents.store');
+    Route::post('superadmin/indents/{indent}/status', [IndentController::class, 'updateStatus'])->name('superadmin.indents.status');
+    Route::post('superadmin/indents/{indent}/issue', [IndentController::class, 'issue'])->name('superadmin.indents.issue');
+    Route::get('superadmin/indents/{indent}/history', [IndentController::class, 'history'])->name('superadmin.indents.history');
+    Route::get('superadmin/indents/{indent}/detail', [IndentController::class, 'show'])->name('superadmin.indents.show');
+    Route::get('superadmin/indents', [IndentController::class, 'index'])->name('superadmin.indents.index');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
