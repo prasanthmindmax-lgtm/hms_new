@@ -25,4 +25,9 @@ class TblLocationModel extends Model
     {
         return $this->belongsTo(TblZonesModel::class, 'zone_id');
     }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 1);
+    }
 }

@@ -121,7 +121,11 @@ class LicenceDocumentController extends Controller
 
         if ($admin->access_limits == 1) {
             $zones = TblZonesModel::select('name', 'id')->orderBy('name')->get();
-            $locations = TblLocationModel::select('name', 'id', 'zone_id', 'level')->orderBy('name')->get();
+            $locations = TblLocationModel::query()
+                ->active()
+                ->select('name', 'id', 'zone_id', 'level')
+                ->orderBy('name')
+                ->get();
         } elseif ($admin->access_limits == 2) {
             $zoneIds = [];
 
@@ -135,17 +139,23 @@ class LicenceDocumentController extends Controller
 
                 $zoneIds = array_unique(array_merge([$admin->zone_id], $locationsFromMulti));
 
-                $locations = TblLocationModel::select('name', 'id', 'zone_id', 'level')
+                $locations = TblLocationModel::query()
+                    ->active()
+                    ->select('name', 'id', 'zone_id', 'level')
                     ->where('zone_id', $admin->zone_id)
                     ->get();
 
-                $specificLocations = TblLocationModel::select('name', 'id', 'zone_id', 'level')
+                $specificLocations = TblLocationModel::query()
+                    ->active()
+                    ->select('name', 'id', 'zone_id', 'level')
                     ->whereIn('id', $multiLocations)
                     ->get();
 
                 $locations = $locations->merge($specificLocations)->unique('id');
             } else {
-                $locations = TblLocationModel::select('name', 'id', 'zone_id', 'level')
+                $locations = TblLocationModel::query()
+                    ->active()
+                    ->select('name', 'id', 'zone_id', 'level')
                     ->where('zone_id', $admin->zone_id)
                     ->get();
 
@@ -164,11 +174,15 @@ class LicenceDocumentController extends Controller
                 $multiLocations = explode(',', $admin->multi_location);
                 $branchIds = array_merge($branchIds, $multiLocations);
 
-                $locations = TblLocationModel::select('name', 'id', 'zone_id', 'level')
+                $locations = TblLocationModel::query()
+                    ->active()
+                    ->select('name', 'id', 'zone_id', 'level')
                     ->whereIn('id', $branchIds)
                     ->get();
             } else {
-                $locations = TblLocationModel::select('name', 'id', 'zone_id', 'level')
+                $locations = TblLocationModel::query()
+                    ->active()
+                    ->select('name', 'id', 'zone_id', 'level')
                     ->where('id', $admin->branch_id)
                     ->get();
             }
@@ -191,6 +205,7 @@ class LicenceDocumentController extends Controller
 
         if ($admin->access_limits == 2) {
             $ids = TblLocationModel::query()
+                ->active()
                 ->where('zone_id', $admin->zone_id)
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
@@ -201,7 +216,7 @@ class LicenceDocumentController extends Controller
                 $ids = array_values(array_unique(array_merge($ids, $extra)));
             }
 
-            return $ids;
+            return $this->filterToActiveBranchIds($ids);
         }
 
         $ids = [(int) $admin->branch_id];
@@ -209,14 +224,30 @@ class LicenceDocumentController extends Controller
             $ids = array_merge($ids, array_map('intval', explode(',', $admin->multi_location)));
         }
 
-        return array_values(array_unique($ids));
+        return $this->filterToActiveBranchIds(array_values(array_unique($ids)));
+    }
+
+    private function filterToActiveBranchIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $active = TblLocationModel::query()
+            ->active()
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_values(array_unique($active));
     }
 
     private function canAccessBranch($admin, int $branchId): bool
     {
         $allowed = $this->allowedBranchIdList($admin);
         if ($allowed === null) {
-            return TblLocationModel::whereKey($branchId)->exists();
+            return TblLocationModel::query()->active()->whereKey($branchId)->exists();
         }
 
         return in_array($branchId, $allowed, true);
@@ -449,7 +480,7 @@ class LicenceDocumentController extends Controller
             abort(403);
         }
 
-        $branch = TblLocationModel::with('zone')->find($branchId);
+        $branch = TblLocationModel::query()->active()->with('zone')->find($branchId);
         if (! $branch) {
             abort(404);
         }
@@ -532,7 +563,7 @@ class LicenceDocumentController extends Controller
             abort(403);
         }
 
-        $branch = TblLocationModel::find($branchId);
+        $branch = TblLocationModel::query()->active()->find($branchId);
         if (! $branch) {
             abort(404);
         }

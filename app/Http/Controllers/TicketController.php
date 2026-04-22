@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TblLocationModel;
 use App\Models\TblZonesModel;
+use App\Models\IssueCategory;
 use App\Models\TicketCategory;
 use App\Models\usermanagementdetails;
 use App\Exports\TicketExport;
@@ -21,15 +22,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class TicketController extends Controller
 {
-    private const OPEN = [1, 2, 3, 6];
+    private const OPEN = [1, 2, 6];
 
-    private const OWN_ROWS = [4, 5];
+    private const OWN_ROWS = [3, 4, 5];
 
-    /**
-     * Department IDs the signed-in user is limited to for tickets / masters (empty = no department-based restriction).
-     *
-     * @return list<int>
-     */
     protected function ticketDepartmentRestrictionIds(?int $userId = null): array
     {
         $userId = $userId ?? (int) auth()->id();
@@ -265,28 +261,122 @@ class TicketController extends Controller
 
     public function getTicketCategories(Request $request)
     {
-        $admin   = auth()->user();
+        $admin = auth()->user();
         $perPage = $request->get('per_page', 10);
-        $departments = $this->departmentsForCurrentUser()->orderBy('id', 'asc')->get();
 
-        $catQuery = TicketCategory::query()->with('department')->orderBy('id', 'asc');
-        $allowedDept = $this->ticketDepartmentRestrictionIds();
-        if ($allowedDept !== []) {
-            $catQuery->whereIn('department_id', $allowedDept);
-        }
+        $departments = Department::query()->where('is_active', 1)->orderBy('id')->get();
 
-        $ticketCategories = $catQuery->paginate($perPage)
+        $rows = TicketCategory::query()
+            ->with(['createdBy:id,user_fullname'])
+            ->where('is_active', 1)
+            ->orderBy('id', 'desc')
+            ->paginate($perPage)
             ->appends(['per_page' => $perPage]);
 
-        return view('superadmin.tickets.categories', [
-            'admin'            => $admin,
-            'departments'       => $departments,
-            'ticketCategories' => $ticketCategories,
-            'perPage'          => $perPage,
+        return view('superadmin.tickets.ticket_categories', [
+            'admin' => $admin,
+            'ticketCategories' => $rows,
+            'perPage' => $perPage,
+            'departments' => $departments,
         ]);
     }
 
     public function storeTicketCategories(Request $request)
+    {
+        $request->validate([
+            'id' => 'nullable|integer|exists:ticket_categories,id',
+            'department_id' => 'required|integer|exists:departments,id',
+            'name' => 'required|string|max:255',
+            'is_active' => ['required', Rule::in([0, 1])],
+        ]);
+
+        $id = $request->input('id');
+
+        if (! empty($id)) {
+            $row = TicketCategory::findOrFail($id);
+            $row->department_id = $request->department_id;
+            $row->name = $request->name;
+            $row->is_active = $request->is_active;
+            $row->created_by = auth()->id();
+            $row->save();
+            $message = 'Ticket Category updated successfully!';
+        } else {
+            $row = TicketCategory::create([
+                'department_id' => $request->department_id,
+                'name' => $request->name,
+                'is_active' => $request->is_active,
+                'created_by' => auth()->id(),
+            ]);
+            $message = 'Ticket Category created successfully!';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'ticketCategory' => $row,
+        ]);
+    }
+
+    /**
+     * Ticket categories for an issue: global (no department) plus categories for this department.
+     */
+    public function getTicketCategoriesByDepartment($department_id)
+    {
+        $departmentId = (int) $department_id;
+
+        $categories = TicketCategory::query()
+            ->where('is_active', true)
+            ->where(function (Builder $q) use ($departmentId) {
+                $q->whereNull('department_id')
+                    ->orWhere('department_id', $departmentId);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id']);
+
+        return response()->json($categories);
+    }
+
+    public function getIssueCategories(Request $request)
+    {
+        $admin = auth()->user();
+        $perPage = $request->get('per_page', 10);
+        $departments = $this->departmentsForCurrentUser()->orderBy('id', 'asc')->get();
+        $query = IssueCategory::query()
+            ->with(['department', 'ticketCategory', 'createdBy:id,user_fullname'])
+            ->orderBy('id', 'desc');
+
+        $allowedDept = $this->ticketDepartmentRestrictionIds();
+        if ($allowedDept !== []) {
+            $query->whereIn('department_id', $allowedDept);
+        }
+
+        $issueCategories = $query->paginate($perPage)
+            ->appends(['per_page' => $perPage]);
+
+        $ticketCategoryParents = TicketCategory::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id']);
+
+        return view('superadmin.tickets.issue_categories', [
+            'admin' => $admin,
+            'departments' => $departments,
+            'ticketCategoryParents' => $ticketCategoryParents,
+            'issueCategories' => $issueCategories,
+            'perPage' => $perPage,
+        ]);
+    }
+
+    protected function hasApplicableTicketCategoriesForDepartment(int $departmentId): bool
+    {
+        return TicketCategory::query()
+            ->where(function (Builder $q) use ($departmentId) {
+                $q->whereNull('department_id')
+                    ->orWhere('department_id', $departmentId);
+            })
+            ->exists();
+    }
+
+    public function storeIssueCategories(Request $request)
     {
         $slaRaw = trim((string) $request->input('sla_time', ''));
         if ($slaRaw !== '' && preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $slaRaw, $m)) {
@@ -296,9 +386,9 @@ class TicketController extends Controller
         }
 
         $request->validate([
-            'department_id' => 'required',
-            'name'      => 'required|string|max:255',
-            'sla_time'  => ['required', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
+            'department_id' => 'required|integer|exists:departments,id',
+            'name' => 'required|string|max:255',
+            'sla_time' => ['required', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
             'is_active' => ['required', Rule::in([0, 1])],
         ]);
 
@@ -311,37 +401,60 @@ class TicketController extends Controller
             ], 403);
         }
 
+        $requiresTicket = $this->hasApplicableTicketCategoriesForDepartment($deptId);
+        $request->validate([
+            'ticket_category_id' => $requiresTicket
+                ? 'required|integer|exists:ticket_categories,id'
+                : 'nullable|integer|exists:ticket_categories,id',
+        ]);
+
+        $ticketCategoryId = null;
+        if ($requiresTicket) {
+            $tcRow = TicketCategory::query()->find($request->ticket_category_id);
+            if (! $tcRow) {
+                return response()->json(['success' => false, 'message' => 'Invalid ticket category.'], 422);
+            }
+            if ($tcRow->department_id !== null && (int) $tcRow->department_id !== $deptId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected ticket category does not belong to the selected department.',
+                ], 422);
+            }
+            $ticketCategoryId = (int) $request->ticket_category_id;
+        }
+
         $id = $request->id;
 
         $data = [
+            'ticket_category_id' => $ticketCategoryId,
             'department_id' => $request->department_id,
-            'name'       => $request->name,
-            'sla_time'   => $request->sla_time,
+            'name' => $request->name,
+            'sla_time' => $request->sla_time,
             'description' => $request->description,
-            'is_active'  => $request->is_active,
+            'is_active' => $request->is_active,
             'created_by' => auth()->id(),
         ];
 
-        if (!empty($id)) {
-            $existing = TicketCategory::find($id);
+        if (! empty($id)) {
+            $existing = IssueCategory::find($id);
             if ($existing && $allowedDept !== [] && ! in_array((int) $existing->department_id, $allowedDept, true)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You cannot edit this ticket category.',
+                    'message' => 'You cannot edit this issue category.',
                 ], 403);
             }
-            TicketCategory::where('id', $id)->update($data);
-            $ticketCategories = TicketCategory::find($id);
-            $message = 'Ticket Category updated successfully!';
+            IssueCategory::where('id', $id)->update($data);
+            $issueCategories = IssueCategory::find($id);
+            $message = 'Issue Category updated successfully!';
         } else {
-            $ticketCategories = TicketCategory::create($data);
-            $message = 'Ticket Category created successfully!';
+            $issueCategories = IssueCategory::create($data);
+            $message = 'Issue Category created successfully!';
         }
 
         return response()->json([
-            'success'  => true,
-            'message'  => $message,
-            'ticketCategories' => $ticketCategories,
+            'success' => true,
+            'message' => $message,
+            'issueCategories' => $issueCategories,
         ]);
     }
 
@@ -489,6 +602,7 @@ class TicketController extends Controller
                     ->orWhereHas('fromDepartment', fn($dq) => $dq->where('name', 'like', $needle))
                     ->orWhereHas('toDepartment', fn($dq) => $dq->where('name', 'like', $needle))
                     ->orWhereHas('category', fn($cq) => $cq->where('name', 'like', $needle))
+                    ->orWhereHas('category.ticketCategory', fn($pq) => $pq->where('name', 'like', $needle))
                     ->orWhereHas('location.zone', fn($zq) => $zq->where('name', 'like', $needle));
             });
         }
@@ -502,7 +616,8 @@ class TicketController extends Controller
             'location:id,name',
             'fromDepartment:id,name',
             'toDepartment:id,name',
-            'category:id,name,sla_time',
+            'category:id,name,sla_time,ticket_category_id',
+            'category.ticketCategory:id,name',
             'creator:id,user_fullname',
             'statusUpdater:id,user_fullname',
         ]);
@@ -655,9 +770,11 @@ class TicketController extends Controller
     {
         $request->validate([
             'department_id' => 'required|integer',
+            'ticket_category_id' => 'required|integer|exists:ticket_categories,id',
         ]);
 
         $departmentId = (int) $request->department_id;
+        $ticketCategoryId = (int) $request->ticket_category_id;
         $allowedDept = $this->ticketDepartmentRestrictionIds();
         if ($allowedDept !== [] && ! in_array($departmentId, $allowedDept, true)) {
             return response()->json([
@@ -666,13 +783,21 @@ class TicketController extends Controller
             ], 403);
         }
 
-        $rows = TicketCategory::query()
+        $rows = IssueCategory::query()
             ->where('department_id', $departmentId)
+            ->where('ticket_category_id', $ticketCategoryId)
             ->where('is_active', 1)
             ->orderBy('name')
             ->get(['id', 'name']);
 
         return response()->json(['success' => true, 'categories' => $rows]);
+    }
+
+    public function listTicketCategoryParents(Request $request)
+    {
+        $rows = TicketCategory::query()->orderBy('name')->get(['id', 'name']);
+
+        return response()->json(['success' => true, 'ticket_categories' => $rows]);
     }
 
     public function data(Request $request)
@@ -732,7 +857,9 @@ class TicketController extends Controller
                 'location_id' => $t->location_id,
                 'from_department_id' => $t->from_department_id,
                 'to_department_id' => $t->to_department_id,
-                'ticket_category_id' => $t->ticket_category_id,
+                'issue_category_id' => $t->issue_category_id,
+                'ticket_category_id' => $t->category?->ticket_category_id,
+                'ticket_category_name' => $t->category?->ticketCategory?->name ?? '',
                 'location_name' => $t->location->name ?? '',
                 'from_department_name' => $t->fromDepartment->name ?? '',
                 'to_department_name' => $t->toDepartment->name ?? '',
@@ -782,15 +909,18 @@ class TicketController extends Controller
             'location_id' => 'required|integer|exists:tbl_locations,id',
             'from_department_id' => 'required|integer|exists:departments,id',
             'to_department_id' => 'required|integer|exists:departments,id',
-            'ticket_category_id' => 'required|integer|exists:ticket_categories,id',
+            'issue_category_id' => 'required|integer|exists:issue_categories,id',
             'priority' => 'required|string|in:' . implode(',', Ticket::PRIORITIES),
-            'subject' => 'required|string|max:500',
             'description' => 'required|string|max:10000',
-            'attachments.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,pdf,doc,docx,xls,xlsx|max:10240',
+            'attachments' => 'required|array|min:1',
+            'attachments.*' => 'file|mimes:jpeg,png,jpg,gif,webp,pdf,doc,docx,xls,xlsx|max:10240',
+        ], [
+            'attachments.required' => 'Please upload at least one attachment.',
+            'attachments.min' => 'Please upload at least one attachment.',
         ]);
 
-        $category = TicketCategory::query()
-            ->where('id', $validated['ticket_category_id'])
+        $category = IssueCategory::query()
+            ->where('id', $validated['issue_category_id'])
             ->where('department_id', $validated['to_department_id'])
             ->where('is_active', 1)
             ->first();
@@ -798,7 +928,7 @@ class TicketController extends Controller
         if (!$category) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected category must belong to the destination department and be active.',
+                'message' => 'Selected issue category must belong to the destination department and be active.',
             ], 422);
         }
 
@@ -824,9 +954,8 @@ class TicketController extends Controller
             'location_id' => $validated['location_id'],
             'from_department_id' => $validated['from_department_id'],
             'to_department_id' => $validated['to_department_id'],
-            'ticket_category_id' => $validated['ticket_category_id'],
+            'issue_category_id' => $validated['issue_category_id'],
             'priority' => $validated['priority'],
-            'subject' => $validated['subject'],
             'description' => $validated['description'],
             'attachments' => $paths,
             'status' => 'open',
@@ -862,7 +991,7 @@ class TicketController extends Controller
             'location_id' => 'required|integer|exists:tbl_locations,id',
             'from_department_id' => 'required|integer|exists:departments,id',
             'to_department_id' => 'required|integer|exists:departments,id',
-            'ticket_category_id' => 'required|integer|exists:ticket_categories,id',
+            'issue_category_id' => 'required|integer|exists:issue_categories,id',
             'priority' => 'required|string|in:' . implode(',', Ticket::PRIORITIES),
             'subject' => 'required|string|max:500',
             'description' => 'required|string|max:10000',
@@ -888,8 +1017,8 @@ class TicketController extends Controller
             return $denied;
         }
 
-        $category = TicketCategory::query()
-            ->where('id', $validated['ticket_category_id'])
+        $category = IssueCategory::query()
+            ->where('id', $validated['issue_category_id'])
             ->where('department_id', $validated['to_department_id'])
             ->where('is_active', 1)
             ->first();
@@ -897,7 +1026,7 @@ class TicketController extends Controller
         if (!$category) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected category must belong to the destination department and be active.',
+                'message' => 'Selected issue category must belong to the destination department and be active.',
             ], 422);
         }
 
@@ -941,7 +1070,7 @@ class TicketController extends Controller
         $ticket->location_id = $validated['location_id'];
         $ticket->from_department_id = $validated['from_department_id'];
         $ticket->to_department_id = $validated['to_department_id'];
-        $ticket->ticket_category_id = $validated['ticket_category_id'];
+        $ticket->issue_category_id = $validated['issue_category_id'];
         $ticket->priority = $validated['priority'];
         $ticket->subject = $validated['subject'];
         $ticket->description = $validated['description'];
@@ -1024,7 +1153,7 @@ class TicketController extends Controller
         $ticket->solution = $entries;
         $ticket->save();
 
-        $ticket->load(['statusUpdater:id,user_fullname', 'category:id,name,sla_time']);
+        $ticket->load(['statusUpdater:id,user_fullname', 'category:id,name,sla_time,ticket_category_id', 'category.ticketCategory:id,name']);
         $slaSummary = $ticket->slaVersusActualSummary();
 
         return response()->json([

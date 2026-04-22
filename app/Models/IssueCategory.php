@@ -2,31 +2,31 @@
 
 namespace App\Models;
 
-use App\Models\Department;
-use App\Models\IssueCategory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class TicketCategory extends Model
+class IssueCategory extends Model
 {
-    protected $table = 'ticket_categories';
+    protected $table = 'issue_categories';
 
     protected $fillable = [
+        'ticket_category_id',
         'department_id',
         'name',
+        'sla_time',
         'is_active',
+        'description',
         'created_by',
     ];
 
     public function department(): BelongsTo
     {
-        return $this->belongsTo(Department::class, 'department_id');
+        return $this->belongsTo(Department::class);
     }
 
-    public function issueCategories(): HasMany
+    public function ticketCategory(): BelongsTo
     {
-        return $this->hasMany(IssueCategory::class, 'ticket_category_id');
+        return $this->belongsTo(TicketCategory::class, 'ticket_category_id');
     }
 
     public function createdBy(): BelongsTo

@@ -11,13 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-         Schema::create('ticket_categories', function (Blueprint $table) {
+        Schema::create('issue_categories', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('department_id')->nullable();
+            $table->unsignedBigInteger('ticket_category_id');
             $table->string('name');
+            $table->string('sla_time')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->text('description')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
+
+            // Foreign Key
+            $table->foreign('ticket_category_id')->references('id')->on('ticket_categories')->cascadeOnDelete();
         });
     }
 
@@ -26,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('ticket_categories');
+        Schema::dropIfExists('issue_categories');
     }
 };
