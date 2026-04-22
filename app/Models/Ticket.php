@@ -16,7 +16,7 @@ class Ticket extends Model
         'location_id',
         'from_department_id',
         'to_department_id',
-        'ticket_category_id',
+        'issue_category_id',
         'priority',
         'subject',
         'description',
@@ -56,7 +56,7 @@ class Ticket extends Model
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(TicketCategory::class, 'ticket_category_id');
+        return $this->belongsTo(IssueCategory::class, 'issue_category_id');
     }
 
     public function creator(): BelongsTo
