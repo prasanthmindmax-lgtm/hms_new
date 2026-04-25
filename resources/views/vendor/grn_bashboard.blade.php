@@ -15,8 +15,9 @@
   font-size: 12px; overflow-wrap: break-word; cursor: pointer;
 }
 .preview-card img { max-width:100%; max-height:100px; object-fit:cover; margin-bottom:8px; }
-#documentModal1 { z-index: 999999; }
-
+#documentModal1{
+  z-index: 999999;
+}
 /* GRN detail side panel */
 .grn-panel-backdrop {
   position:fixed; inset:0; background:rgba(15,23,42,.45);
@@ -375,12 +376,13 @@
 </div>
 
 {{-- Document viewer modal --}}
-<div class="modal fade" id="documentModal1" tabindex="-1" role="dialog" aria-hidden="true" style="z-index:999999;">
+<div class="modal fade" id="documentModal1" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+  aria-hidden="true">
   <div class="modal-dialog modal-xl" role="document">
     <div class="modal-content">
-      <div class="modal-header" style="background:#080fd399; height:0;">
-        <h5 class="modal-title" style="color:#fff; font-size:12px;">Document Viewer</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" style="background:#fff;"></button>
+      <div class="modal-header" style="background-color: #080fd399;height: 0px;">
+        <h5 class="modal-title" id="exampleModalLabel" style="color: #ffffff;font-size: 12px;">Document Management system</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="background-color: #ffffff;" aria-label="Close"></button>
       </div>
       <div class="row">
         <div class="col-sm-3"><br>
@@ -404,6 +406,9 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ asset('/assets/js/vendor/quotation_search.js') }}"></script>
 
+<script>
+  window.GRN_DOCUMENTS_BASE = @json(rtrim(asset('/public/uploads/vendor/grn'), '/') . '/');
+</script>
 <script>
 $(document).ready(function () {
   // Reset date display to "All Dates" on page load
@@ -706,7 +711,7 @@ $(document).ready(function () {
   $('#closeGrnPanel, #grnPanelBackdrop').on('click', closePanel);
 //   $('#grnDetailPanel').on('click', function (e) { e.stopPropagation(); });
   $('#grnDetailPanel').on('click', function (e) {
-        if (!$(e.target).closest('button, a').length) {
+        if (!$(e.target).closest('button, a, .documentclk, .preview-card').length) {
             e.stopPropagation();
         }
     });
@@ -764,30 +769,50 @@ $(document).ready(function () {
     // Documents
     $('.document-preview-bill').empty();
     if (d.grn_all && d.grn_all.documents) {
-      try {
-        const docs = JSON.parse(d.grn_all.documents);
-        docs.forEach(filename => generatePreviewHtml(filename, '../public/uploads/vendor/grn/', '.document-preview-bill', ''));
-      } catch(e) {}
+      let rawDocs = d.grn_all.documents;
+      if (typeof rawDocs === 'string') {
+        try {
+          rawDocs = JSON.parse(rawDocs);
+        } catch (e) {
+          rawDocs = [];
+        }
+      }
+      if (Array.isArray(rawDocs) && rawDocs.length) {
+        const base = (window.GRN_DOCUMENTS_BASE || '').replace(/\/?$/, '/');
+        rawDocs.forEach(function (fn) {
+          if (!fn) {
+            return;
+          }
+          const filename = String(fn).replace(/^\/+/, '');
+          const fileUrl = base + encodeURIComponent(filename);
+          appendGrnDocumentCard(filename, fileUrl, '.document-preview-bill', '');
+        });
+      } else {
+        $('.document-preview-bill').html('<span class="text-muted small">No documents</span>');
+      }
+    } else {
+      $('.document-preview-bill').html('<span class="text-muted small">No documents</span>');
     }
   }
 
-  function generatePreviewHtml(filename, basePath, containerId, title) {
-    const ext = filename.split('.').pop().toLowerCase();
-    const fileArray = JSON.stringify([basePath + filename]);
-    let iconUrl = ['jpg','jpeg','png','gif','webp'].includes(ext)
-      ? `${basePath}${filename}`
-      : ext === 'pdf'
+  function appendGrnDocumentCard(filename, fileUrl, containerSelector, title) {
+    const ext = (String(filename).split('.').pop() || '').toLowerCase();
+    const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) >= 0;
+    const iconUrl = isImg
+      ? fileUrl
+      : (ext === 'pdf'
         ? 'https://cdn-icons-png.flaticon.com/512/337/337946.png'
-        : 'https://cdn-icons-png.flaticon.com/512/564/564619.png';
-
-    $(containerId).append(`
-      <div>
-        ${title ? '<h6>' + title + '</h6>' : ''}
-        <div class="preview-card documentclk" data-filetype="documents" data-files="${fileArray.replace(/"/g,'&quot;')}">
-          <img src="${iconUrl}" alt="file" style="height:60px;">
-          <div>${filename}</div>
-        </div>
-      </div>`);
+        : 'https://cdn-icons-png.flaticon.com/512/564/564619.png');
+    const $row = $('<div></div>');
+    if (title) {
+      $row.append($('<h6></h6>').text(title));
+    }
+    const $card = $('<div class="preview-card documentclk" role="button" tabindex="0"></div>');
+    $card.data('grnDocUrls', [fileUrl]);
+    $card.append($('<img alt="">').attr('src', iconUrl).css({ height: '60px', objectFit: 'cover' }));
+    $card.append($('<div></div>').text(filename));
+    $row.append($card);
+    $(containerSelector).append($row);
   }
 
   // Edit & PDF from panel
@@ -818,28 +843,28 @@ $(document).ready(function () {
     });
   });
 
-  // Document modal
-  $(document).on('click', '.documentclk', function () {
-    $('#documentModal1').modal('show');
-    const filesData = $(this).attr('data-files');
-    let fileArray = [];
-    try {
-      fileArray = JSON.parse(filesData);
-      if (typeof fileArray === 'string') fileArray = JSON.parse(fileArray);
-    } catch(e) { return; }
+  $(document).on('click', '.documentclk', function (e) {
+    e.stopPropagation();
+    const fileArray = $(this).data('grnDocUrls');
     if (!Array.isArray(fileArray) || !fileArray.length) return;
+    $('#documentModal1').modal('show');
     $('#pdfmain').attr('src', fileArray[0]);
-    let views = '';
-    fileArray.forEach(file => {
-      const fn = file.split('/').pop().trim();
-      views += `<button style="font-size:11px;" type="button" class="btn btn-primary pdf-btn mb-1" data-filepath="${file}">${fn}</button>`;
+    var views = '';
+    fileArray.forEach(function (file) {
+      var fileName = String(file).split('/').pop().split('?')[0].trim();
+      try {
+        fileName = decodeURIComponent(fileName);
+      } catch (err) { /* keep segment as-is */ }
+      fileName = $('<div>').text(fileName).html();
+      views += '<button style="font-size: 11px;" type="button" class="btn btn-primary pdf-btn" data-filepath="' + file + '">' + fileName + '</button>';
     });
     $('#image_pdfs').html(views);
   });
   $(document).on('click', '.pdf-btn', function () {
-    if (!$(this).data('filepath')) return;
-    $('.pdf-btn').removeClass('active'); $(this).addClass('active');
-    $('#pdfmain').attr('src', $(this).data('filepath'));
+    $('.pdf-btn').removeClass('active');
+    $(this).addClass('active');
+    const filePath = $(this).data('filepath');
+    $('#pdfmain').attr('src', filePath);
   });
 
 });

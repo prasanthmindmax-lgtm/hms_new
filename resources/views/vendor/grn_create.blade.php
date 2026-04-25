@@ -345,13 +345,7 @@
                       </div>
                       <div class="row">
                       <div class="col-sm-3"><br>
-                              <div class="btn-group-vertical w-100" id="image_pdfs" style="
-                                  margin-left: 11px;
-                              ">
-                              <button type="button" class="btn btn-primary">Tab 1</button>
-                              <button type="button" class="btn btn-primary">Tab 2</button>
-                              <button type="button" class="btn btn-primary">Tab 3</button>
-                              <!-- More tabs if needed -->
+                              <div class="btn-group-vertical w-100" id="image_pdfs" style="margin-left: 11px;">
                               </div>
                               </div>
                                   <div class="col-sm-9">
@@ -373,6 +367,9 @@
     </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  window.GRN_UPLOADS_BASE = @json(rtrim(asset('public/uploads/vendor/grn'), '/'));
+</script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 <script src="{{ asset('/assets/js/plugins/dropzone-amd-module.min.js') }}"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
@@ -1131,6 +1128,57 @@
 
           });
     </script>
+<script>
+$(function () {
+  $(document).on('click', '.documentclk', function (e) {
+    e.preventDefault();
+    if ($(e.target).is('.remove-file1')) {
+      return;
+    }
+    var filesData = $(this).attr('data-files');
+    var fileArray = [];
+    try {
+      fileArray = JSON.parse(filesData);
+      if (typeof fileArray === 'string') {
+        fileArray = JSON.parse(fileArray);
+      }
+    } catch (err) {
+      $('#image_pdfs').html('<p>Invalid file data</p>');
+      return;
+    }
+    if (!Array.isArray(fileArray) || !fileArray.length) {
+      $('#image_pdfs').html('<p>No files found</p>');
+      return;
+    }
+    var base = (window.GRN_UPLOADS_BASE || '').replace(/\/?$/, '/') || '';
+    function makeUrl (name) {
+      return base + encodeURIComponent(String(name).replace(/^\/+/, ''));
+    }
+    $('#documentModal1').modal('show');
+    $('#pdfmain').attr('src', makeUrl(fileArray[0]));
+    var $list = $('#image_pdfs').empty();
+    fileArray.forEach(function (name) {
+      var u = makeUrl(name);
+      var fn = String(name).split('/').pop().split('?')[0];
+      try {
+        fn = decodeURIComponent(fn);
+      } catch (x) { /* keep */ }
+      var $b = $('<button type="button" class="btn btn-primary pdf-btn" style="font-size: 11px;"></button>');
+      $b.attr('data-filepath', u);
+      $b.text(fn);
+      $list.append($b);
+    });
+  });
+  $(document).on('click', '.pdf-btn', function () {
+    $('.pdf-btn').removeClass('active');
+    $(this).addClass('active');
+    var fp = $(this).attr('data-filepath');
+    if (fp) {
+      $('#pdfmain').attr('src', fp);
+    }
+  });
+});
+</script>
 @if(!empty($grndata))
 <script>
 $(document).ready(function () {
@@ -1191,11 +1239,14 @@ $(document).ready(function () {
     <script>
       $(document).ready(function () {
                       const grnedit_header = @json($grnedit);
+                      const h = grnedit_header[0];
 
-                      console.log("grnedit_header",grnedit_header);
-
-                      const grnedit_lines = @json($grnedit[0]->BillLines);
-                      const vendor_id = grnedit_header[0].vendor_id;
+                      const grnedit_lines = @json(
+                          ($grnedit[0] ?? null) && $grnedit[0]->BillLines
+                          ? $grnedit[0]->BillLines->all()
+                          : []
+                      );
+                      const vendor_id = h.vendor_id;
                       setTimeout(function () {
                           const $vendorItem = $('.vendor-item[data-id="' + vendor_id + '"]');
 
@@ -1205,27 +1256,41 @@ $(document).ready(function () {
                               console.warn('Vendor item not found for ID:', vendor_id);
                           }
                       }, 100);
-                      $('#id').val(grnedit_header[0].id);
-                      $('#grn_number').val(grnedit_header[0].grn_number);
-                      $('#delivery_address').val(grnedit_header[0].delivery_address);
-                      $('#order_number').val(grnedit_header[0].order_number);
-                      $('#bill_date').val(grnedit_header[0].bill_date);
-                      $('#due_date').val(grnedit_header[0].due_date);
-                      $('#payment_terms').val(grnedit_header[0].payment_terms);
-                      $('#qc_checked_by').val(grnedit_header[0].qc_checked_by.id);
-                      $('#qc_ststus').val(grnedit_header[0].qc_ststus);
-                      $('#subject').val(grnedit_header[0].subject);
-                      $('#bill_id').val(grnedit_header[0].bill_id);
-                      $('#purchase_id').val(grnedit_header[0].purchase_id);
-                      $('.company-search-input').val(grnedit_header[0].company_name);
-                      $('.company_id').val(grnedit_header[0].company_id);
-                      $('.department-search-input').val(grnedit_header[0].department_name != null ? grnedit_header[0].department_name : '');
-                      $('.department_id').val(grnedit_header[0].department_id != null ? grnedit_header[0].department_id : '');
+                      $('#id').val(h.id);
+                      $('#grn_number').val(h.grn_number);
+                      if ($('#delivery_address').length) {
+                        $('#delivery_address').val(h.delivery_address);
+                      }
+                      $('#order_number').val(h.order_number);
+                      $('#bill_date').val(h.bill_date);
+                      $('#due_date').val(h.due_date);
+                      $('#payment_terms').val(h.payment_terms);
+                      (function setQcCheckedBy() {
+                        var qc = h.qc_checked_by;
+                        if (qc != null && qc !== '' && typeof qc === 'object' && qc.id != null) {
+                          $('#qc_checked_by').val(qc.id);
+                        } else if (qc != null && qc !== '') {
+                          $('#qc_checked_by').val(qc);
+                        } else {
+                          $('#qc_checked_by').val('');
+                        }
+                      })();
+                      $('#qc_ststus').val(h.qc_ststus);
+                      $('#subject').val(h.subject);
+                      $('#bill_id').val(h.bill_id);
+                      $('#purchase_id').val(h.purchase_id);
+                      $('.company-search-input').val(h.company_name);
+                      $('.company_id').val(h.company_id);
+                      var _dept = h.department || h.Department;
+                      if (_dept && _dept.name) {
+                        $('.department-search-input').val(_dept.name);
+                      } else {
+                        $('.department-search-input').val('');
+                      }
+                      $('.department_id').val(h.department_id != null ? h.department_id : '');
 
                       let isFirst = true;
-                      console.log("grnedit_lines",grnedit_lines);
-
-                      grnedit_lines.forEach((lines, index) => {
+                      (Array.isArray(grnedit_lines) ? grnedit_lines : []).forEach((lines, index) => {
                           let currentRow;
 
                           if (isFirst) {
@@ -1250,40 +1315,48 @@ $(document).ready(function () {
                       });
 
 
-                    $('#notes').val(grnedit_header[0].note);
+                    $('#notes').val(h.note);
 
                       // From server
-                      window.existingFiles = JSON.parse(grnedit_header[0].documents); // array of strings
+                      (function initExistingDocFiles() {
+                        window.existingFiles = [];
+                        var raw = h.documents;
+                        if (!raw) { return; }
+                        try {
+                          var parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                          if (Array.isArray(parsed)) { window.existingFiles = parsed; }
+                        } catch (e) { window.existingFiles = []; }
+                      })();
                       // console.log("window.existingFiles",window.existingFiles);
 
                       window.selectedFiles = []; // New files chosen
                       $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
-                      // Render existing files
                       function renderExistingFiles() {
                         $('#fileList').empty();
                         $.each(window.existingFiles, function (index, name) {
-                          $('#fileList').append(`
-                            <li>
-                              ${name}
-                              <span class="remove-file1" data-type="existing" data-index="${index}" style="cursor:pointer; color:red;">❌</span>
-                            </li>
-                          `);
+                          var files = Array.isArray(name) ? name : [name];
+                          $('#fileList').append(
+                            '<li class="documentclk" data-filetype="document" data-files="' +
+                              JSON.stringify(files).replace(/"/g, '&quot;') + '">' + $('<div>').text(name).html() + ' ' +
+                              '<span class="remove-file1" data-type="existing" data-index="' + index +
+                              '" style="cursor:pointer; color:red;">❌</span></li>'
+                          );
                         });
                         $.each(window.selectedFiles, function (index, file) {
-                          $('#fileList').append(`
-                            <li>
-                              ${file.name}
-                              <span class="remove-file1" data-type="new" data-index="${index}" style="cursor:pointer; color:red;">❌</span>
-                            </li>
-                          `);
+                          $('#fileList').append(
+                            '<li><span class="file-name" data-index="' + index +
+                            '" style="cursor:pointer; color:blue; text-decoration:underline;">' +
+                            $('<div>').text(file.name).html() +
+                            '</span><span class="remove-file1" data-type="new" data-index="' + index +
+                            '" style="cursor:pointer; color:red;">❌</span></li>'
+                          );
                         });
                         $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                       }
 
                       renderExistingFiles();
 
-                      // New file input change
-                      $('#fileInput').on('change', function (e) {
+                      $('#fileInput').off('change').on('change', function (e) {
                         window.selectedFiles = Array.from(e.target.files); // overwrite
                         renderExistingFiles();
                       });

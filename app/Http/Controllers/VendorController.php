@@ -5282,7 +5282,7 @@ public function getgrncreate()
                         ->first();
         }
         else{
-            $grnedit = Tblgrn::with(['TblBilling', 'BillLines', 'Tblvendor', 'QcCheckedBy'])->where('id',$id)->get();
+            $grnedit = Tblgrn::with(['TblBilling', 'BillLines', 'Tblvendor', 'QcCheckedBy', 'Department'])->where('id', $id)->get();
         }
     }
 
