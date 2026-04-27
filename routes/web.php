@@ -854,11 +854,17 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('superadmin/ticket-categories', [TicketController::class, 'getTicketCategories'])->name('superadmin.ticket.categories.index');
     Route::post('superadmin/ticket-categories', [TicketController::class, 'storeTicketCategories'])->name('superadmin.ticket.categories.store');
 
+    // Issue Category (department, SLA, linked to Ticket Category)
+    Route::get('superadmin/issue-categories', [TicketController::class, 'getIssueCategories'])->name('superadmin.issue.categories.index');
+    Route::post('superadmin/issue-categories', [TicketController::class, 'storeIssueCategories'])->name('superadmin.issue.categories.store');
+    Route::get('get-ticket-categories/{department_id}', [TicketController::class, 'getTicketCategoriesByDepartment'])->name('superadmin.ticket.categories.by-department');
+
     // Support tickets
     Route::get('superadmin/tickets', [TicketController::class, 'index'])->name('superadmin.tickets.index');
     Route::get('superadmin/tickets/data', [TicketController::class, 'data'])->name('superadmin.tickets.data');
     Route::get('superadmin/tickets/export', [TicketController::class, 'export'])->name('superadmin.tickets.export');
     Route::get('superadmin/tickets/categories-by-department', [TicketController::class, 'categoriesByDepartment'])->name('superadmin.tickets.categories');
+    Route::get('superadmin/tickets/ticket-category-list', [TicketController::class, 'listTicketCategoryParents'])->name('superadmin.tickets.ticket-category-list');
     Route::post('superadmin/tickets', [TicketController::class, 'store'])->name('superadmin.tickets.store');
     Route::post('superadmin/tickets/update', [TicketController::class, 'update'])->name('superadmin.tickets.update');
     Route::post('superadmin/tickets/status', [TicketController::class, 'updateStatus'])->name('superadmin.tickets.status');
