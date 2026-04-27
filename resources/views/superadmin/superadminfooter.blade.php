@@ -1059,3 +1059,31 @@
     }));
   });
 </script>
+@php
+  $cfdCfg = config('create_form_duration', []);
+  $smMark = $cfdCfg['sm_modal_mark'] ?? [];
+  $cfdData = [
+    'autoTrackPostForms' => (bool) ($cfdCfg['auto_track_post_forms'] ?? true),
+    'excludedPathSubstrings' => array_values($cfdCfg['excluded_path_substrings'] ?? []),
+    'maxMs' => (int) config('create_form_duration.max_ms', 172800000),
+    'inputName' => (string) config('create_form_duration.input_name', 'create_form_duration_ms'),
+    'smModalMark' => [
+      'enabled' => (bool) ($smMark['enabled'] ?? true),
+      'includeSubstrings' => array_values($smMark['include_substrings'] ?? []),
+      'excludeSubstrings' => array_values($smMark['exclude_substrings'] ?? []),
+      'includeRegexes' => array_values($smMark['include_regexes'] ?? []),
+    ],
+  ];
+@endphp
+<script>
+  window.__CREATE_FORM_DURATION = @json($cfdData);
+</script>
+<script src="{{ asset('assets/js/create_form_duration.js') }}?v=4" defer></script>
+{{-- Optional: adds data-cfd to all .sm-modal so vendor blades (gst/tds/vendor type/…) need not be edited --}}
+<script src="{{ asset('assets/js/create_form_duration_sm_modal_automark.js') }}?v=1" defer></script>
+{{-- data-cfd on .sm-modal modals: auto time-on-form for jQuery FormData saves (no per-blade session JS) --}}
+<script src="{{ asset('assets/js/create_form_duration_modal.js') }}?v=3" defer></script>
+@if(config('user_activity.beacon_logout_on_unload', true) && auth()->check())
+<script>window.__UAP_BEACON_END = @json(route('user_activity.beacon_session_end'));</script>
+@endif
+<script src="{{ asset('assets/js/user_activity.js') }}?v=1"></script>
