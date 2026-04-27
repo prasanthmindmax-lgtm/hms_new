@@ -3432,11 +3432,26 @@ body > .daterangepicker {
     position: relative;
     padding-top: 2px;
 }
-.br-income-tag-detail-btn {
+.br-income-tag-card-actions {
     position: absolute;
     top: 0;
     right: 0;
     z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+.br-income-tag-card-actions .br-income-tag-detail-btn {
+    position: static;
+}
+.br-income-tag-ro-btn {
+    font-size: 0.68rem;
+    line-height: 1.1;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.br-income-tag-detail-btn {
     width: 28px;
     height: 28px;
     border: none;
@@ -3490,7 +3505,7 @@ body > .daterangepicker {
 }
 
 .br-income-tag-card-wrap .br-income-tag-card {
-    padding-right: 30px;
+    padding-right: 76px;
 }
 
 .br-income-tag-card {
@@ -3503,7 +3518,7 @@ body > .daterangepicker {
     border-radius: 4px;
     padding: 6px 10px;
     width: 100%;
-    min-width: 270px;
+    min-width: 300px;
     box-sizing: border-box;
 }
 
@@ -3541,7 +3556,39 @@ body > .daterangepicker {
     font-size: 0.82rem;
 }
 
-/* DOC rows container */
+/* Highlighted mode of collection (income tag card) */
+.br-income-tag-modes--highlight {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 6px !important;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: linear-gradient(120deg, #fff7ed 0%, #ffedd5 45%, #fef3c7 100%);
+    border: 1px solid #fdba74;
+    box-shadow: 0 1px 3px rgba(234, 88, 12, 0.12);
+}
+.br-income-tag-modes--highlight .br-income-tag-modes-lbl {
+    font-weight: 700;
+    color: #9a3412;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.br-income-tag-modes--highlight .br-income-tag-modes-val {
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: #c2410c;
+    letter-spacing: 0.02em;
+}
+
+.br-mocdoc-date-cell {
+    max-width: 118px;
+    vertical-align: middle;
+}
+
+/* MDOC collection rows container */
 .br-income-tag-doc-rows {
     display: flex;
     flex-direction: column;
@@ -4327,6 +4374,50 @@ body > .daterangepicker {
 }
 
 /* ================================================================
+   INCOME BILLS card (billing_list in matched bill cell)
+   ================================================================ */
+.br-income-billing-card {
+    text-align: left;
+}
+.br-income-billing-card--interactive {
+    cursor: pointer;
+    border-radius: 10px;
+    border: 1px solid rgba(37, 99, 235, 0.22);
+    background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+    padding: 8px 10px 10px;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.br-income-billing-card--interactive:hover {
+    border-color: rgba(37, 99, 235, 0.45);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+}
+.br-income-billing-card--interactive:focus {
+    outline: none;
+}
+.br-income-billing-card--interactive:focus-visible {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+    border-color: #3b82f6;
+}
+.br-income-billing-card-ft {
+    border-top: 1px dashed rgba(37, 99, 235, 0.28);
+    padding-top: 6px;
+    margin-top: 6px;
+}
+.br-income-billing-open-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(37, 99, 235, 0.12);
+    font-size: 0.95rem;
+}
+.br-income-billing-in-card-ro-btn {
+    font-size: 0.68rem;
+}
+
+/* ================================================================
    USER HISTORY MODAL
    ================================================================ */
 .br-history-dialog {
@@ -4372,23 +4463,102 @@ body > .daterangepicker {
 }
 
 .br-stmt-desc {
-    max-width: 200px;
+    max-width: 100%;
     font-size: 0.82rem;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
+
+/* History modal: keep columns stable; inner cells wrap instead of spilling into neighbours */
+.br-history-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.br-history-table-fixed {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 860px;
+}
+
+.br-history-table-fixed col.br-hist-col-num    { width: 4%; }
+.br-history-table-fixed col.br-hist-col-date   { width: 12%; }
+.br-history-table-fixed col.br-hist-col-user   { width: 12%; }
+.br-history-table-fixed col.br-hist-col-action { width: 12%; }
+.br-history-table-fixed col.br-hist-col-stmt   { width: 26%; }
+.br-history-table-fixed col.br-hist-col-details{ width: 25%; }
+.br-history-table-fixed col.br-hist-col-ip     { width: 9%; }
 
 .br-history-table tbody tr:hover {
     background: #f0f6ff;
 }
 
 .br-history-table tbody td {
-    vertical-align: middle;
+    vertical-align: top;
     padding: 10px 12px;
     font-size: 0.825rem;
 }
 
+.br-hist-modes-val {
+    display: inline-block;
+    font-weight: 800;
+    color: #c2410c;
+    background: linear-gradient(120deg, #fff7ed, #ffedd5);
+    border: 1px solid #fdba74;
+    border-radius: 6px;
+    padding: 1px 8px;
+    white-space: normal;
+    word-break: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+.br-history-details-inner {
+    max-width: 100%;
+}
+
+.br-hist-detail-row {
+    display: block;
+    line-height: 1.55;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    padding: 1px 0;
+}
+
 .br-history-details-cell {
-    max-width: 340px;
-    line-height: 1.6;
+    line-height: 1.55;
+    overflow: hidden;
+}
+
+.br-history-stmt-cell {
+    overflow: hidden;
+}
+
+.br-history-stmt-cell-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.br-history-ip-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.br-hist-sep {
+    display: inline;
+    padding: 0 0.2em;
+    color: #94a3b8;
+    font-weight: 400;
 }
 
 .br-hist-detail-key {
@@ -4435,4 +4605,300 @@ body > .daterangepicker {
     background: #0f3460;
     border-color: #0f3460;
     color: #fff;
+}
+
+/* Salary UTR match column */
+.br-salary-tag-card {
+    max-width: 220px;
+    padding: 6px 8px;
+    border: 1px solid rgba(13, 110, 90, 0.25);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #f0fff9, #e8f7f0);
+    line-height: 1.35;
+}
+.br-salary-tag-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0d4f3a;
+    margin-bottom: 4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(13, 79, 58, 0.1);
+    border: 1px solid rgba(13, 79, 58, 0.2);
+}
+.br-salary-line {
+    word-break: break-word;
+}
+.br-salary-cell-empty {
+    display: inline-block;
+    min-width: 1em;
+    text-align: center;
+}
+
+.br-salary-upload-area {
+    background: #fafbfc;
+    border-color: #dee2e6 !important;
+}
+
+/* Salary: grid status/category + matched-by + readonly modal */
+.br-badge-salary-status {
+    background: #0d6a4a !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+}
+.br-cat-salary {
+    background: linear-gradient(180deg, #0d6a4a, #0a5a3f) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+}
+.br-matched-by-chip.br-matched-by-salary {
+    border-color: rgba(13, 90, 63, 0.28);
+    background: linear-gradient(180deg, #f4fdf9, #eef8f1);
+}
+.br-matched-by-chip.br-matched-by-salary .br-matched-by-chip-label {
+    color: #0d4f3a;
+}
+.br-matched-date-line--salary .br-matched-date-tag {
+    color: #0d4f3a;
+    background: rgba(13, 79, 58, 0.12);
+    border: 1px solid rgba(13, 79, 58, 0.2);
+}
+.br-salary-ro-sec {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    background: #fcfdfd;
+}
+.br-salary-ro-sec-t {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+}
+/* ── Salary readonly modal: card wrapper ── */
+.br-salary-ro-card {
+    border-radius: 16px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 16px 48px rgba(13, 79, 58, 0.14), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* ── Salary readonly modal: header ── */
+.br-salary-ro-header {
+    background: linear-gradient(135deg, #0d5c40 0%, #1a8a60 60%, #27ae88 100%);
+    padding: 1.1rem 1.5rem 1.4rem;
+    color: #fff;
+    align-items: flex-start;
+}
+.br-salary-ro-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.8;
+}
+.br-salary-ro-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.br-salary-ro-header .modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+.br-salary-ro-header .text-muted {
+    color: rgba(255,255,255,0.75) !important;
+    font-size: 0.82rem;
+}
+
+/* ── Hero employee banner ── */
+.br-salary-ro-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    background: linear-gradient(135deg, #f0fdf7, #e6f9f0);
+    border: 1px solid rgba(13, 106, 74, 0.18);
+    border-radius: 12px;
+    margin-bottom: 0.25rem;
+}
+.br-salary-ro-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+.br-salary-ro-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0d5c40, #1a8a60);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+.br-salary-ro-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0d2e1e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+.br-salary-ro-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+.br-salary-ro-tag {
+    font-size: 0.72rem;
+    background: rgba(13, 79, 58, 0.1);
+    border: 1px solid rgba(13, 79, 58, 0.18);
+    color: #0d4f3a;
+    padding: 1px 7px;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+.br-salary-ro-amount {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #0d6a4a;
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.1;
+}
+.br-salary-ro-amount-lbl {
+    font-size: 0.7rem;
+    color: #6c757d;
+    font-weight: 400;
+    text-align: right;
+}
+
+/* ── Salary readonly: grid ── */
+.br-salary-ro-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.br-salary-ro-kv {
+    background: #f8fafb;
+    border: 1px solid #e8ecef;
+    border-radius: 8px;
+    padding: 7px 12px;
+    min-width: 120px;
+    flex: 1 1 auto;
+}
+.br-salary-ro-kv--wide {
+    flex: 2 1 100%;
+}
+.br-salary-ro-k {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.br-salary-ro-v {
+    font-size: 0.88rem;
+    color: #1a1a2e;
+    word-break: break-all;
+}
+.br-utr-code {
+    font-size: 0.8rem;
+    background: #e9f4ff;
+    color: #0d3460;
+    padding: 2px 6px;
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+/* ── Salary readonly: section ── */
+.br-salary-ro-sec {
+    border: 1px solid #eef1f5;
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    background: #fdfdff;
+}
+.br-salary-ro-sec-t {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+/* ── Salary readonly: matched-by row ── */
+.br-salary-ro-matched-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.br-salary-ro-matched-who {
+    font-size: 0.9rem;
+}
+.br-salary-ro-matched-at {
+    white-space: nowrap;
+}
+
+/* ── Salary readonly: source file row ── */
+.br-salary-ro-file-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 0.82rem;
+    padding: 6px 10px;
+    background: #f6f8fb;
+    border: 1px solid #e4e8ed;
+    border-radius: 8px;
+}
+
+/* ── Old shim for backward compat ── */
+.br-salary-ro-ico { color: #0d6a4a; }
+
+/* Data grid: keep tall cells (salary / bill cards) top-aligned to headers */
+#statementsTable tbody td,
+#statementsTable thead th {
+    vertical-align: top;
+}
+
+/* Salary history log modal header */
+.br-salary-hist-header {
+    background: linear-gradient(90deg, #dde9e3, #25cb8b);
+    border-bottom: 2px solid rgba(13, 106, 74, 0.14);
+    padding: 0.85rem 1.25rem;
+}
+.br-salary-hist-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0d5c40, #1a8a60);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
 }

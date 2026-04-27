@@ -720,6 +720,14 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/income-unmatch/{id}', [BankStatementController::class, 'unmatchIncome'])->name('income-unmatch');
         // Fetch single bank statement by ID (for income recon ref-number click)
         Route::get('/statement/{id}', [BankStatementController::class, 'getBankStatementById'])->name('statement.show');
+        // Salary UTR sheet: auto-match by UTR in description
+        Route::post('/salary-utr-upload', [BankStatementController::class, 'uploadSalaryUtr'])->name('salary-utr-upload');
+        Route::get('/salary-utr-uploads', [BankStatementController::class, 'listSalaryUtrUploads'])->name('salary-utr-uploads');
+        Route::get('/salary-utr-uploads/{id}/rows', [BankStatementController::class, 'salaryUtrUploadRows'])->name('salary-utr-uploads.rows');
+        Route::delete('/salary-utr-uploads/{id}', [BankStatementController::class, 'deleteSalaryUpload'])->name('salary-utr-uploads.delete');
+        Route::get('/salary-master', [BankStatementController::class, 'salaryMasterPage'])->name('salary-master');
+        Route::get('/salary-master/data', [BankStatementController::class, 'salaryMasterData'])->name('salary-master.data');
+        Route::get('/salary-master/export', [BankStatementController::class, 'exportSalaryMaster'])->name('salary-master.export');
         // Income Tag supporting dropdowns
         Route::get('/income-tag/zones', [BankStatementController::class, 'incomeTagZones'])->name('income-tag.zones');
         Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');

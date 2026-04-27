@@ -1158,9 +1158,13 @@ $(function () {
         $('#fetchResultMsg').text('');
         $('#fetchResultStats').html('');
     }
-    function showFetchResult(type, msg, inserted, skipped, errors, totalApi) {
+    function showFetchResult(type, msg, inserted, skipped, errors, totalApi, logHint) {
         var $r = $('#fetchResult').removeClass('success error warning').addClass(type).show();
-        $('#fetchResultMsg').text(msg);
+        var $msg = $('#fetchResultMsg').empty();
+        $msg.append($('<div/>').text(msg || ''));
+        if (logHint) {
+            $msg.append($('<div class="small mt-2" style="opacity:.88;"></div>').text(logHint));
+        }
         var stats = '';
         if (totalApi != null) {
             stats += '<span class="fetch-stat-pill" style="background:#e0e7ff;color:#3730a3;">📥 Total from API: ' + totalApi + '</span>';
@@ -1211,11 +1215,11 @@ $(function () {
                 date:      dateVal,
                 branch_id: branchVal,
             },
-            timeout: 120000, // 2 min — API can be slow
+            timeout: 180000, // 3 min — server cURL can run up to 120s
         }).done(function(res) {
             if (res && res.success) {
                 var type = res.inserted > 0 ? 'success' : (res.skipped > 0 ? 'warning' : 'warning');
-                showFetchResult(type, res.message, res.inserted, res.skipped, res.errors, res.total_api);
+                showFetchResult(type, res.message, res.inserted, res.skipped, res.errors, res.total_api, res.log_hint);
                 if (res.inserted > 0) {
                     toastr.success(res.inserted + ' record(s) inserted from MocDoc.');
                     fetchAll(); // Refresh the main table & stats

@@ -77,7 +77,7 @@
             border-bottom: none;
         }
         .summary-row .label {
-            font-weight: <?php echo $balance > 0 ? 'bold' : 'normal'; ?>;
+            font-weight: <?php echo (float) $balance > 0 ? 'bold' : 'normal'; ?>;
         }
         .summary-row .value {
             font-family: 'dejavusans', sans-serif;
@@ -166,11 +166,11 @@
         <!-- Vendor Info (Left) -->
         <div class="vendor-info">
             <div style="font-weight: bold; margin-bottom: 10px;">To</div>
-            <div class="vendor-name">{{ $vendor->display_name ?? 'NADESA SERVICE SATATION' }}</div>
+            <div class="vendor-name">{{ $vendor?->display_name ?? 'Vendor' }}</div>
             <div class="vendor-address">
-                {{ $billing->address ?? 'null' }}<br>
-                {{ $billing->city ?? 'null' }}<br>
-                {{ ($billing->state ?? 'null') . ' ' . ($billing->zip_code ?? 'null') }}
+                {{ $billing?->address ?? '—' }}<br>
+                {{ $billing?->city ?? '—' }}<br>
+                {{ ($billing?->state ?? '—') . ' ' . ($billing?->zip_code ?? '') }}
             </div>
         </div>
         
@@ -203,8 +203,12 @@
             <span class="value"> :  {{ number_format($billed, 2) }}</span>
         </div>
         <div class="summary-row">
-            <span class="label">Amount Paid</span>
-            <span class="value"> :  {{ number_format($paid, 2) }}</span>
+            <span class="label">Tax / Withheld</span>
+            <span class="value"> :  {{ number_format($withheld_tax ?? 0, 2) }}</span>
+        </div>
+        <div class="summary-row">
+            <span class="label">Payments (against bills)</span>
+            <span class="value"> :  {{ number_format($cash_payments ?? 0, 2) }}</span>
         </div>
         <div class="summary-row">
             <span class="label" style="font-weight: bold;">Balance Due</span>

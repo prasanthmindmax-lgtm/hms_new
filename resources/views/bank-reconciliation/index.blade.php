@@ -315,6 +315,15 @@
                                         <button type="button" class="btn btn-light btn-sm" id="headerUploadBtn" title="Open bank statement Excel upload">
                                             <i class="bi bi-upload me-1"></i>Upload
                                         </button>
+                                        <button type="button" class="btn btn-light btn-sm" id="btnBankReconSalaryUpload" title="Upload salary Excel; UTR values are matched in statement descriptions">
+                                            <i class="bi bi-file-earmark-excel me-1"></i>Salary UTR
+                                        </button>
+                                        <!--                                         <button type="button" class="btn btn-outline-light btn-sm" id="btnBankReconSalaryHistory" title="Salary file uploads and match results">
+                                            <i class="bi bi-journal-text me-1"></i>Salary log
+                                        </button>
+                                        <a href="{{ route('bank-reconciliation.salary-master') }}" class="btn btn-outline-light btn-sm" title="All salary Excel rows: filter &amp; export">
+                                            <i class="bi bi-table me-1"></i>Salary master
+                                        </a> -->
                                         <button type="button" class="btn btn-outline-light btn-sm" id="btnOpenBatchUploadView" title="Open batch list (no page reload)">
                                             <i class="bi bi-collection me-1"></i>Batch uploads
                                         </button>
@@ -472,6 +481,9 @@
                                     <i class="bi bi-clock-history me-1"></i>History
                                 </button>
                                 @endif
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnBankReconSalaryHistory" title="Salary file uploads and match results">
+                                    <i class="bi bi-journal-text me-1"></i>Salary log
+                                </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" id="qfResetBtn">
                                     <i class="bi bi-x-circle me-1"></i>Reset
                                 </button>
@@ -584,9 +596,11 @@
                             </div>
                             @endif
 
-                            {{-- Zone --}}
+                            {{-- Zone (bills + income narrative + salary UTR branch) --}}
                             <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-map"></i> Zone</div>
+                                <div class="bank-recon-qf-field-label" title="Filters vendor bill zone, income-tag branch / description, and salary sheet branch (UTR upload).">
+                                    <i class="bi bi-map"></i> Zone
+                                </div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-zone"
                                             data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
@@ -607,9 +621,11 @@
                                 <select id="qfZone" multiple class="d-none"></select>
                             </div>
 
-                            {{-- Branch --}}
+                            {{-- Branch (bills + income + salary UTR) --}}
                             <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-building"></i> Branch</div>
+                                <div class="bank-recon-qf-field-label" title="Filters vendor bill branch, income-tag branch / description, and salary Excel branch column.">
+                                    <i class="bi bi-building"></i> Branch
+                                </div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-branch"
                                             data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
@@ -804,6 +820,42 @@
                                 </select>
                             </div>
 
+                            {{-- Salary UTR (sheet match to bank line) --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label" title="Filter lines by salary UTR tagging from the salary Excel upload.">
+                                    <i class="bi bi-cash-coin"></i> Salary UTR
+                                </div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-salaryTag"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-salaryTag">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfSalaryTag_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfSalaryTag_all">All</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfSalaryTag_tagged" value="tagged">
+                                                    <label class="qf-menu-item-text" for="brqf_qfSalaryTag_tagged">Salary UTR matched</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfSalaryTag_not" value="not_tagged">
+                                                    <label class="qf-menu-item-text" for="brqf_qfSalaryTag_not">No salary UTR</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="qfSalaryTag" multiple class="d-none">
+                                    <option value="tagged">Salary UTR matched</option>
+                                    <option value="not_tagged">No salary UTR</option>
+                                </select>
+                            </div>
+
                             {{-- Matched By --}}
                             <div class="col-6 col-md-4 col-xl">
                                 <div class="bank-recon-qf-field-label"><i class="bi bi-person"></i> Matched By</div>
@@ -892,11 +944,11 @@
 
                     {{-- Bank Statements Table with Filter Button --}}
                     <div class="card shadow-sm bank-recon-statements-card">
-                        <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2" style="padding:10px !important;">
                             <div class="d-flex align-items-center flex-wrap gap-2 flex-grow-1 min-w-0 me-2">
                                 <h5 class="mb-0 text-nowrap"><i class="bi bi-table me-2"></i>Bank Statements</h5>
                                 @if(!empty($bankAccountsEnabled))
-                                <div id="bankReconToolbarAccountChips" class="bank-recon-toolbar-account-chips d-flex align-items-center flex-wrap gap-1" aria-label="Filter by bank account"></div>
+                                <!-- <div id="bankReconToolbarAccountChips" class="bank-recon-toolbar-account-chips d-flex align-items-center flex-wrap gap-1" aria-label="Filter by bank account"></div> -->
                                 @endif
                             </div>
                             <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end flex-shrink-0">
@@ -961,7 +1013,9 @@
                                             <th>Matched date</th>
                                             <th>Nature / files</th>
                                             <th>Income Tag</th>
+                                            <th class="text-nowrap">MocDoc date</th>
                                             <th>Radiant</th>
+                                            <th>Salary</th>
                                             @if(!empty($bankReconSuperAdmin))
                                             <th>Actions</th>
                                             @endif
@@ -969,7 +1023,7 @@
                                     </thead>
                                     <tbody id="statementsTableBody">
                                         <tr class="br-skel-row">
-                                            <td colspan="{{ !empty($bankReconSuperAdmin) ? 17 : 16 }}" class="text-center py-5 border-0">
+                                            <td colspan="{{ !empty($bankReconSuperAdmin) ? 19 : 18 }}" class="text-center py-5 border-0">
                                                 <div class="br-table-skeleton">
                                                     <div class="br-skel-shimmer-row" style="--w:55%"></div>
                                                     <div class="br-skel-shimmer-row" style="--w:80%"></div>
@@ -1447,6 +1501,7 @@
                                 <option value="radiant_unmatch">Radiant Unmatch</option>
                                 <option value="delete_statement">Delete Statement</option>
                                 <option value="delete_batch">Delete Batch</option>
+                                <option value="salary_upload">Salary UTR upload</option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -1473,17 +1528,26 @@
 
                 {{-- Table --}}
                 <div class="modal-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 br-history-table">
+                    <div class="table-responsive br-history-table-scroll">
+                        <table class="table table-sm table-hover mb-0 br-history-table br-history-table-fixed">
+                            <colgroup>
+                                <col class="br-hist-col-num" />
+                                <col class="br-hist-col-date" />
+                                <col class="br-hist-col-user" />
+                                <col class="br-hist-col-action" />
+                                <col class="br-hist-col-stmt" />
+                                <col class="br-hist-col-details" />
+                                <col class="br-hist-col-ip" />
+                            </colgroup>
                             <thead class="br-history-thead">
                                 <tr>
-                                    <th style="width:45px;" class="text-center">#</th>
-                                    <th style="width:150px;">Action Date</th>
-                                    <th style="width:155px;">User</th>
-                                    <th style="width:150px;">Action</th>
-                                    <th style="min-width:220px;">Statement</th>
+                                    <th class="text-center">#</th>
+                                    <th>Action Date</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Statement</th>
                                     <th>Details</th>
-                                    <th style="width:110px;">IP Address</th>
+                                    <th>IP Address</th>
                                 </tr>
                             </thead>
                             <tbody id="bankReconUserHistoryBody">
@@ -1501,6 +1565,177 @@
         </div>
     </div>
     @endif
+
+    {{-- Salary UTR upload (match by UTR in description) --}}
+    <div class="modal fade" id="bankReconSalaryUploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2"></i>Import salary UTR sheet</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="bankReconSalaryUploadForm" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">First row must be column headers, including a <strong>UTR</strong> column. Each UTR is searched in <strong>bank statement descriptions</strong> for the <strong>company and account</strong> you select below. Matched lines are tagged; category is set to <code>salary</code>.</p>
+                        @if(!empty($bankAccountsEnabled))
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><i class="bi bi-building me-1"></i>Company <span class="text-danger">*</span></label>
+                            <select class="form-select" name="company_id" id="salaryUploadCompany" required>
+                                <option value="">Select company…</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><i class="bi bi-bank me-1"></i>Bank account <span class="text-danger">*</span></label>
+                            <select class="form-select bank-account-select" name="bank_account_id" id="salaryUploadBankAccount" required disabled>
+                                <option value="">Select company first…</option>
+                            </select>
+                            <small class="text-muted">UTR matching runs only on statements for this account (same as statement upload).</small>
+                        </div>
+                        @endif
+                        <div class="upload-area-mini br-salary-upload-area border rounded p-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-cloud-upload-fill text-primary me-2" style="font-size: 2rem;"></i>
+                                    <div>
+                                        <div class="fw-semibold">Salary Excel file</div>
+                                        <div class="text-muted small">.xlsx or .xls — max 15MB</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <input type="file" name="salary_file" id="bankReconSalaryFile" accept=".xlsx,.xls" class="d-none">
+                                    <button type="button" class="btn btn-primary btn-sm" id="bankReconSalaryBrowseBtn"><i class="bi bi-folder2-open me-1"></i>Browse</button>
+                                </div>
+                            </div>
+                            <div class="file-name-display mt-2" id="bankReconSalaryFileNameWrap" style="display: none;">
+                                <div class="alert alert-success py-2 mb-0 d-flex justify-content-between align-items-center">
+                                    <span class="text-break small" id="bankReconSalaryFileName"></span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="bankReconSalaryFileRemove" type="button"><i class="bi bi-x-circle"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-success" id="bankReconSalaryUploadSubmit" disabled>
+                            <i class="bi bi-cloud-upload me-1"></i>Upload &amp; match
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankReconSalaryHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                    <div class="modal-header br-salary-hist-header flex-wrap gap-2 align-items-center">
+                        <div class="d-flex align-items-center gap-2 min-w-0">
+                            <div class="br-salary-hist-icon flex-shrink-0"><i class="bi bi-journal-text"></i></div>
+                            <h5 class="modal-title mb-0 fw-bold text-truncate">Salary UTR — upload log</h5>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 ms-auto">
+                            <a href="{{ route('bank-reconciliation.salary-master') }}" class="btn btn-sm btn-light text-success fw-semibold shadow-sm d-inline-flex align-items-center gap-1" title="Open all salary rows: filter and export">
+                                <i class="bi bi-table"></i><span>Salary master</span>
+                            </a>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="p-3 border-bottom bg-light">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label form-label-sm mb-0">Search file name</label>
+                                    <input type="text" class="form-control form-control-sm" id="brSalaryHistSearch" placeholder="…">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label form-label-sm mb-0">From</label>
+                                    <input type="date" class="form-control form-control-sm" id="brSalaryHistFrom">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label form-label-sm mb-0">To</label>
+                                    <input type="date" class="form-control form-control-sm" id="brSalaryHistTo">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-sm btn-success w-100" id="brSalaryHistApply"><i class="bi bi-search me-1"></i>Filter</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center">#</th>
+                                        <th>File</th>
+                                        <th class="text-center">Rows</th>
+                                        <th class="text-center">Matched</th>
+                                        <th>Uploaded at</th>
+                                        <th>By</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="brSalaryHistBody">
+                                    <tr><td colspan="7" class="text-center text-muted py-4">Open this dialog to load…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankReconSalaryDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-list-columns me-2"></i>Salary rows</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    <th>UTR</th>
+                                    <th>Name</th>
+                                    <th>Branch</th>
+                                    <th>Net</th>
+                                    <th>Status</th>
+                                    <th>Stmt line</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brSalaryDetailBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankReconSalaryReadonlyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content br-salary-ro-card">
+                <div class="modal-header br-salary-ro-header border-0 pb-0">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="br-salary-ro-icon-wrap">
+                            <i class="bi bi-cash-coin"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title mb-0 fw-bold" id="bankReconSalaryReadonlyTitle">Salary UTR match</h5>
+                            <div class="small text-muted" id="bankReconSalaryReadonlySubtitle">View only</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="bankReconSalaryReadonlyBody"></div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- Match Transaction Modal - Right Side Drawer --}}
     <div class="modal fade right" id="matchTransactionModal" tabindex="-1" data-bs-backdrop="static">
@@ -1726,7 +1961,7 @@
                                     <label class="income-tag-label">
                                         <span class="income-tag-label-dot" style="background:#7c3aed;"></span>SUPPORTING DOCUMENTS <span class="text-danger">*</span>
                                     </label>
-                                    <p class="text-muted small mb-2">Upload <strong>three</strong> files — <strong>MOCDOC COLLECTION SCREEN SHOT</strong>, <strong>RADIANT SLIP</strong>, and <strong>COLLECTION LEDGER</strong> — and set each document type. Add matching names under <em>Bank Accounts → Attachment types</em> (scope <strong>Income tag</strong> or <strong>Both</strong>).</p>
+                                    <p class="text-muted small mb-2"><strong>Cash only</strong> (single selected mode): upload <strong>three</strong> files — <strong>MOCDOC COLLECTION SCREEN SHOT</strong>, <strong>RADIANT SLIP</strong>, and <strong>COLLECTION LEDGER</strong> — one per type. <strong>Card, UPI, NEFT, Others</strong> (or any mix that is not cash-only): upload <strong>MOCDOC collection screenshot only</strong> and set its type. Configure matching names under <em>Bank Accounts → Attachment types</em> (scope <strong>Income tag</strong> or <strong>Both</strong>).</p>
                                     <input type="file" class="form-control form-control-sm mb-2" id="incomeTagAttachmentsInput" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.doc,.docx">
                                     <div id="incomeTagAttachmentStaging" class="bank-match-attachment-staging"></div>
                                 </div>
@@ -2140,6 +2375,11 @@
             chartAccounts: "{{ route('bank-reconciliation.chart-accounts') }}",
             quickFilterOptions: "{{ route('bank-reconciliation.quick-filter-options') }}",
             userHistory: "{{ route('bank-reconciliation.user-history') }}",
+            salaryUtrUpload: "{{ route('bank-reconciliation.salary-utr-upload') }}",
+            salaryUtrUploads: "{{ route('bank-reconciliation.salary-utr-uploads') }}",
+            salaryUtrUploadRows: "{{ url('/bank-reconciliation/salary-utr-uploads') }}/:id/rows",
+            salaryUtrUploadDelete: "{{ url('/bank-reconciliation/salary-utr-uploads') }}/:id",
+            statementShow: "{{ url('/bank-reconciliation/statement') }}/:id",
             matchAttachmentTypes: "{{ route('bank-reconciliation.match-attachment-types.index') }}",
             matchAttachmentTypesStore: "{{ route('bank-reconciliation.match-attachment-types.store') }}",
             matchAttachmentTypesUpdateBase: "{{ url('/bank-reconciliation/match-attachment-types') }}",

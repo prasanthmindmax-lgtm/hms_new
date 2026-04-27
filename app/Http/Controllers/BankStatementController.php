@@ -791,6 +791,7 @@ class BankStatementController extends Controller
     {
         $row->income_billing_list = null;
         $row->income_billing_list_total = null;
+        $row->income_tag_billing_modes = null;
 
         if (! Schema::hasTable('billing_list')) {
             return;
@@ -861,6 +862,8 @@ class BankStatementController extends Controller
         if ($modes === []) {
             return;
         }
+
+        $row->income_tag_billing_modes = array_values($modes);
 
         $result = $this->queryBillingListRowsForIncomeTag($branch, $datesYmd, $modes);
         $row->income_billing_list = $result['rows'];
@@ -1089,6 +1092,23 @@ class BankStatementController extends Controller
                         $q->orWhereRaw('LOWER(bs.description) LIKE LOWER(?)', [$pat]);
                     }
                 });
+                // Salary UTR row: match Excel "branch" column to zone/branch (tbl_locations) names
+                if (Schema::hasTable('bank_recon_salary_rows')) {
+                    $outer->orWhere(function ($q) use ($name, $tokens) {
+                        $q->whereNotNull('bsr.id')
+                            ->where('bsr.match_status', 'matched')
+                            ->where(function ($q2) use ($name, $tokens) {
+                                $q2->whereRaw('LOWER(TRIM(IFNULL(bsr.branch, ""))) = LOWER(?)', [$name]);
+                                foreach ($tokens as $tok) {
+                                    if ($tok === '') {
+                                        continue;
+                                    }
+                                    $pat = '%'.addcslashes($tok, '%_\\').'%';
+                                    $q2->orWhereRaw('LOWER(bsr.branch) LIKE LOWER(?)', [$pat]);
+                                }
+                            });
+                    });
+                }
             }
         });
     }
@@ -1355,6 +1375,33 @@ class BankStatementController extends Controller
                   AND TRIM(IFNULL(bl.account, '')) <> '') AS bill_line_account_names");
         }
 
+        if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
+            $select[] = 'bsr.id as salary_recon_row_id';
+            $select[] = 'bsr.utr as salary_utr';
+            $select[] = 'bsr.ec_id as salary_ec_id';
+            $select[] = 'bsr.employee_name as salary_employee_name';
+            $select[] = 'bsr.designation as salary_designation';
+            $select[] = 'bsr.branch as salary_branch';
+            $select[] = 'bsr.employee_category as salary_employee_category';
+            $select[] = 'bsr.pf as salary_pf';
+            $select[] = 'bsr.esi as salary_esi';
+            $select[] = 'bsr.tds as salary_tds';
+            $select[] = 'bsr.net_paid as salary_net_paid';
+            $select[] = 'bsr.credited_date as salary_credited_date';
+            $select[] = 'bsr.matched_at as salary_row_matched_at';
+            $select[] = 'bsr.match_status as salary_row_match_status';
+            $select[] = 'bsr.match_note as salary_match_note';
+            $select[] = 'bsu.id as salary_upload_id';
+            $select[] = 'bsu.file_name as salary_upload_file_name';
+            $select[] = 'bsu.created_at as salary_uploaded_at';
+            $select[] = 'salary_uploader.user_fullname as salary_uploaded_by_name';
+            $select[] = 'salary_uploader.username as salary_uploaded_by_username';
+        }
+        if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+            $select[] = 'salary_stmt_matcher.user_fullname as salary_stmt_matched_by_name';
+            $select[] = 'salary_stmt_matcher.username as salary_stmt_matched_by_username';
+        }
+
         $query = DB::table('bank_statements as bs')
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
             ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
@@ -1362,6 +1409,14 @@ class BankStatementController extends Controller
             ->leftJoin('bank_reconciliation_accounts as bra', 'bs.bank_account_id', '=', 'bra.id');
 
         $this->applyBankStatementBillJoins($query);
+        if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
+            $query->leftJoin('bank_recon_salary_rows as bsr', 'bsr.bank_statement_id', '=', 'bs.id')
+                ->leftJoin('bank_recon_salary_uploads as bsu', 'bsr.salary_upload_id', '=', 'bsu.id')
+                ->leftJoin('users as salary_uploader', 'bsu.user_id', '=', 'salary_uploader.id');
+        }
+        if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+            $query->leftJoin('users as salary_stmt_matcher', 'bs.salary_matched_by', '=', 'salary_stmt_matcher.id');
+        }
 
         $query->select($select);
 
@@ -1564,6 +1619,23 @@ class BankStatementController extends Controller
                     $q->orWhere('bs.id', (int) $digits);
                 }
             });
+        }
+
+        if (Schema::hasTable('bank_recon_salary_rows')) {
+            $salaryTag = trim((string) $request->get('salary_tag', ''));
+            if ($salaryTag === '') {
+                $legacy = trim((string) $request->get('salary_match', ''));
+                if ($legacy === 'matched') {
+                    $salaryTag = 'tagged';
+                } elseif ($legacy === 'unmatched') {
+                    $salaryTag = 'not_tagged';
+                }
+            }
+            if ($salaryTag === 'tagged') {
+                $query->where('bsr.match_status', 'matched');
+            } elseif ($salaryTag === 'not_tagged') {
+                $query->whereNull('bsr.id');
+            }
         }
 
         $incomeCollectionYmd = $this->requestIncomeCollectionDatesYmd($request);
@@ -2144,10 +2216,6 @@ class BankStatementController extends Controller
      */
     public function matchBill(Request $request)
     {
-        if (! $this->bankReconIsSuperAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
-        }
-
         $request->validate([
             'bank_statement_id' => 'required|integer',
             'bill_id' => 'required|integer',
@@ -2673,8 +2741,8 @@ class BankStatementController extends Controller
     }
 
     /**
-     * Income tag requires three configured attachment types (MOCDOC screenshot, Radiant slip, collection ledger)
-     * and one uploaded file per type (identified via attachment_type_ids).
+     * Income tag: attachment slots depend on mode of collection — cash only → MOCDOC + Radiant + ledger;
+     * any other selection → MOCDOC screenshot only.
      */
     private function validateIncomeTagMandatoryAttachmentSlots(Request $request): ?string
     {
@@ -2682,7 +2750,22 @@ class BankStatementController extends Controller
             return null;
         }
 
-        $catalogErr = $this->incomeMandatoryAttachmentCatalogGapMessage();
+        $modes = [];
+        if ($request->filled('modes') && is_array($request->modes)) {
+            foreach ($request->modes as $m) {
+                $m = strtolower(trim((string) $m));
+                if ($m !== '') {
+                    $modes[] = $m;
+                }
+            }
+            $modes = array_values(array_unique($modes));
+        } elseif ($request->filled('mode')) {
+            $modes = [strtolower(trim((string) $request->input('mode')))];
+        }
+
+        $slotsRequired = BankReconIncomeRequiredAttachments::requiredSlotsForIncomeModes($modes);
+
+        $catalogErr = $this->incomeMandatoryAttachmentCatalogGapMessage($slotsRequired);
         if ($catalogErr !== null) {
             return $catalogErr;
         }
@@ -2715,10 +2798,13 @@ class BankStatementController extends Controller
             }
         }
 
-        foreach (BankReconIncomeRequiredAttachments::SLOTS as $slot) {
+        $suffix = count($slotsRequired) === 3
+            ? 'Add one file for each: MOCDOC screenshot, Radiant slip, and collection ledger, and set the document type on each file.'
+            : 'Add at least one MOCDOC collection screenshot and set its document type.';
+
+        foreach ($slotsRequired as $slot) {
             if (empty($slotsFilled[$slot])) {
-                return 'Missing required document: '.BankReconIncomeRequiredAttachments::slotLabel($slot)
-                    .'. Add one file for each of the three types (MOCDOC screenshot, Radiant slip, collection ledger) and set the document type on each file.';
+                return 'Missing required document: '.BankReconIncomeRequiredAttachments::slotLabel($slot).'. '.$suffix;
             }
         }
 
@@ -2726,9 +2812,10 @@ class BankStatementController extends Controller
     }
 
     /**
-     * @return string|null Error message if one of the three mandatory income attachment patterns is missing from the catalog.
+     * @param  list<string>  $slotsRequired  e.g. ['mocdoc'] or ['mocdoc','radiant','ledger']
+     * @return string|null Error message if a required income attachment pattern is missing from the catalog.
      */
-    private function incomeMandatoryAttachmentCatalogGapMessage(): ?string
+    private function incomeMandatoryAttachmentCatalogGapMessage(array $slotsRequired): ?string
     {
         $q = DB::table('bank_recon_match_attachment_types')->where('is_active', true);
         if (Schema::hasColumn('bank_recon_match_attachment_types', 'match_context')) {
@@ -2745,11 +2832,14 @@ class BankStatementController extends Controller
                 $have[$slot] = true;
             }
         }
-        foreach (BankReconIncomeRequiredAttachments::SLOTS as $slot) {
+        foreach ($slotsRequired as $slot) {
             if (empty($have[$slot])) {
+                $hint = count($slotsRequired) === 3
+                    ? '(for cash-only tags you need MOCDOC + SCREEN/SHOT, RADIANT, and COLLECTION or BRANCH + LEDGER).'
+                    : '(for this mode you need a type matching MOCDOC + SCREEN/SHOT).';
+
                 return 'Configure attachment types under Bank Accounts → Attachment types (active; scope Income or Both): '
-                    .'add a name matching '.BankReconIncomeRequiredAttachments::slotLabel($slot).' '
-                    .'(you need all three: MOCDOC + SCREEN/SHOT, RADIANT, and COLLECTION or BRANCH + LEDGER).';
+                    .'add a name matching '.BankReconIncomeRequiredAttachments::slotLabel($slot).' '.$hint;
             }
         }
 
@@ -3040,10 +3130,44 @@ class BankStatementController extends Controller
             $select[] = 'bbm_matcher.username as bbm_matched_by_username';
             $select[] = 'bbm.matched_at as bank_match_matched_at';
         }
+        if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
+            $select[] = 'bsr.id as salary_recon_row_id';
+            $select[] = 'bsr.utr as salary_utr';
+            $select[] = 'bsr.ec_id as salary_ec_id';
+            $select[] = 'bsr.employee_name as salary_employee_name';
+            $select[] = 'bsr.designation as salary_designation';
+            $select[] = 'bsr.branch as salary_branch';
+            $select[] = 'bsr.employee_category as salary_employee_category';
+            $select[] = 'bsr.pf as salary_pf';
+            $select[] = 'bsr.esi as salary_esi';
+            $select[] = 'bsr.tds as salary_tds';
+            $select[] = 'bsr.net_paid as salary_net_paid';
+            $select[] = 'bsr.credited_date as salary_credited_date';
+            $select[] = 'bsr.matched_at as salary_row_matched_at';
+            $select[] = 'bsr.match_status as salary_row_match_status';
+            $select[] = 'bsr.match_note as salary_match_note';
+            $select[] = 'bsu.id as salary_upload_id';
+            $select[] = 'bsu.file_name as salary_upload_file_name';
+            $select[] = 'bsu.created_at as salary_uploaded_at';
+            $select[] = 'salary_uploader.user_fullname as salary_uploaded_by_name';
+            $select[] = 'salary_uploader.username as salary_uploaded_by_username';
+        }
+        if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+            $select[] = 'salary_stmt_matcher.user_fullname as salary_stmt_matched_by_name';
+            $select[] = 'salary_stmt_matcher.username as salary_stmt_matched_by_username';
+        }
 
         $query = DB::table('bank_statements as bs')
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
             ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id');
+        if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
+            $query->leftJoin('bank_recon_salary_rows as bsr', 'bsr.bank_statement_id', '=', 'bs.id')
+                ->leftJoin('bank_recon_salary_uploads as bsu', 'bsr.salary_upload_id', '=', 'bsu.id')
+                ->leftJoin('users as salary_uploader', 'bsu.user_id', '=', 'salary_uploader.id');
+        }
+        if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+            $query->leftJoin('users as salary_stmt_matcher', 'bs.salary_matched_by', '=', 'salary_stmt_matcher.id');
+        }
         $this->applyBankStatementBillJoins($query);
         $stmt = $query->select($select)->where('bs.id', $id)->first();
 
@@ -4272,9 +4396,6 @@ class BankStatementController extends Controller
      */
     public function applyIncomeTag(Request $request)
     {
-        if (! $this->bankReconIsSuperAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
-        }
 
         $request->validate([
             'bank_statement_id' => 'required|integer',
@@ -4729,10 +4850,6 @@ class BankStatementController extends Controller
      */
     public function saveRadiantMatchAgainst(Request $request)
     {
-        if (! $this->bankReconIsSuperAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
-        }
-
         if (! Schema::hasColumn('bank_statements', 'radiant_match_against')) {
             return response()->json([
                 'success' => false,
@@ -5361,5 +5478,788 @@ class BankStatementController extends Controller
         DB::table('bank_recon_match_attachment_types')->where('id', $id)->delete();
 
         return response()->json(['success' => true, 'message' => 'Deleted']);
+    }
+
+    /**
+     * Upload salary disbursement sheet (XLSX/XLS); UTR column is matched against statement descriptions.
+     */
+    public function uploadSalaryUtr(Request $request)
+    {
+        if (! Schema::hasTable('bank_recon_salary_uploads') || ! Schema::hasTable('bank_recon_salary_rows')) {
+            return response()->json(['success' => false, 'message' => 'Salary upload is not available (run migrations).'], 503);
+        }
+
+        $rules = [
+            'salary_file'        => 'required|mimes:xlsx,xls|max:15360',
+            'bank_account_ids'   => 'nullable|array',
+            'bank_account_ids.*' => 'integer|min:1',
+        ];
+        if (Schema::hasTable('bank_reconciliation_accounts') && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+            $rules['bank_account_id'] = 'required|exists:bank_reconciliation_accounts,id';
+        }
+        if (Schema::hasColumn('bank_reconciliation_accounts', 'company_id') && Schema::hasTable('company_tbl')) {
+            $rules['company_id'] = 'required|integer|exists:company_tbl,id';
+        }
+        $request->validate($rules);
+
+        if (Schema::hasColumn('bank_reconciliation_accounts', 'company_id') && Schema::hasTable('company_tbl')
+            && $request->filled('bank_account_id') && $request->filled('company_id')) {
+            $belongs = DB::table('bank_reconciliation_accounts')
+                ->where('id', (int) $request->bank_account_id)
+                ->where('company_id', (int) $request->company_id)
+                ->exists();
+            if (! $belongs) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected bank account does not belong to the selected company.',
+                ], 422);
+            }
+        }
+
+        $file   = $request->file('salary_file');
+        $userId = (int) Auth::id();
+        $accScope = $this->requestIntIdArray($request, 'bank_account_ids');
+        if (Schema::hasTable('bank_reconciliation_accounts') && Schema::hasColumn('bank_statements', 'bank_account_id') && $request->filled('bank_account_id')) {
+            $accScope = [(int) $request->bank_account_id];
+        }
+
+        try {
+            $parsed = $this->parseSalaryUtrWorkbook($file->getRealPath());
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not read file: '.$e->getMessage(),
+            ], 422);
+        }
+
+        if (empty($parsed['rows'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No data rows found. Ensure the first row has headers and a UTR column.',
+            ], 422);
+        }
+
+        // --- Duplicate check: collect already-matched normalised UTRs ---
+        $allNormUtrs = array_filter(array_map(function ($r) {
+            return $this->salaryUtrNormalized(trim((string) ($r['utr'] ?? '')));
+        }, $parsed['rows']));
+
+        $existingMatched = [];
+        $existingUnmatched = [];
+        if (! empty($allNormUtrs)) {
+            $existingRows = DB::table('bank_recon_salary_rows')
+                ->whereIn('utr_normalized', $allNormUtrs)
+                ->get(['utr_normalized', 'match_status']);
+            foreach ($existingRows as $er) {
+                if ((string) $er->match_status === 'matched') {
+                    $existingMatched[$er->utr_normalized] = true;
+                } else {
+                    $existingUnmatched[$er->utr_normalized] = true;
+                }
+            }
+        }
+
+        $totalRows    = count($parsed['rows']);
+        $skippedCount = 0;
+        $skippedUtrs  = [];
+
+        $uploadId = DB::table('bank_recon_salary_uploads')->insertGetId([
+            'file_name'     => (string) $file->getClientOriginalName(),
+            'user_id'       => $userId,
+            'row_count'     => $totalRows,
+            'matched_count' => 0,
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        $matched = 0;
+        foreach ($parsed['rows'] as $idx => $r) {
+            $utr      = trim((string) ($r['utr'] ?? ''));
+            $utrNorm  = $this->salaryUtrNormalized($utr);
+
+            // Skip UTRs already matched in a previous upload batch
+            if ($utrNorm !== '' && isset($existingMatched[$utrNorm])) {
+                $skippedCount++;
+                $skippedUtrs[] = $utr;
+                continue;
+            }
+
+            $rowId = DB::table('bank_recon_salary_rows')->insertGetId([
+                'salary_upload_id'  => $uploadId,
+                'sheet_row_index'   => (int) ($r['sheet_row_index'] ?? $idx + 2),
+                'utr'               => $utr,
+                'utr_normalized'    => $utrNorm,
+                'serial_no'         => $r['serial_no'] ?? null,
+                'ec_id'             => $r['ec_id'] ?? null,
+                'employee_name'     => $r['employee_name'] ?? null,
+                'designation'      => $r['designation'] ?? null,
+                'branch'            => $r['branch'] ?? null,
+                'employee_category' => $r['employee_category'] ?? null,
+                'pf'                => $r['pf'] ?? null,
+                'esi'               => $r['esi'] ?? null,
+                'tds'               => $r['tds'] ?? null,
+                'net_paid'          => $r['net_paid'] ?? null,
+                'credited_date'     => $r['credited_date'] ?? null,
+                'bank_statement_id' => null,
+                'match_status'      => 'unmatched',
+                'matched_at'        => null,
+                'match_note'        => null,
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+
+            $note = null;
+            $stmtId = $this->findBankStatementIdForSalaryUtr($utr, $r['net_paid'] ?? null, $accScope);
+            if ($stmtId) {
+                DB::table('bank_recon_salary_rows')
+                    ->where('bank_statement_id', $stmtId)
+                    ->where('id', '!=', $rowId)
+                    ->update([
+                        'bank_statement_id' => null,
+                        'match_status'      => 'unmatched',
+                        'matched_at'        => null,
+                        'match_note'        => 'Replaced by newer salary link',
+                        'updated_at'        => now(),
+                    ]);
+
+                if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+                    DB::table('bank_statements')->where('id', $stmtId)->update([
+                        'salary_matched_by'        => null,
+                        'salary_matched_at'        => null,
+                        'bank_recon_salary_row_id' => null,
+                        'updated_at'               => now(),
+                    ]);
+                }
+
+                DB::table('bank_recon_salary_rows')->where('id', $rowId)->update([
+                    'bank_statement_id' => $stmtId,
+                    'match_status'      => 'matched',
+                    'matched_at'        => now(),
+                    'match_note'        => null,
+                    'updated_at'        => now(),
+                ]);
+                $bsSalaryUpdate = [
+                    'updated_at' => now(),
+                ];
+                if (Schema::hasColumn('bank_statements', 'category')) {
+                    $bsSalaryUpdate['category'] = 'salary';
+                }
+                if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+                    $bsSalaryUpdate['salary_matched_by'] = $userId;
+                    $bsSalaryUpdate['salary_matched_at'] = now();
+                }
+                if (Schema::hasColumn('bank_statements', 'bank_recon_salary_row_id')) {
+                    $bsSalaryUpdate['bank_recon_salary_row_id'] = $rowId;
+                }
+                DB::table('bank_statements')->where('id', $stmtId)->update($bsSalaryUpdate);
+                $matched++;
+            } else {
+                $note = 'No bank statement line contains this UTR in the description (and amount check if multiple).';
+                DB::table('bank_recon_salary_rows')->where('id', $rowId)->update([
+                    'match_status' => 'not_found',
+                    'match_note'   => $note,
+                    'updated_at'   => now(),
+                ]);
+            }
+        }
+
+        DB::table('bank_recon_salary_uploads')->where('id', $uploadId)->update([
+            'matched_count' => $matched,
+            'updated_at'    => now(),
+        ]);
+
+        $newRows = $totalRows - $skippedCount;
+        $msgParts = ["Processed {$newRows} new row(s) (matched {$matched})"];
+        if ($skippedCount > 0) {
+            $msgParts[] = "{$skippedCount} row(s) skipped — UTR already matched in a previous upload.";
+        }
+
+        $this->logBankReconUserHistory('salary_upload', null, [
+            'upload_id'   => $uploadId,
+            'file'        => (string) $file->getClientOriginalName(),
+            'rows'        => $totalRows,
+            'new_rows'    => $newRows,
+            'matched'     => $matched,
+            'skipped'     => $skippedCount,
+            'unmatched'   => $newRows - $matched,
+        ]);
+
+        return response()->json([
+            'success'       => true,
+            'message'       => implode(' ', $msgParts),
+            'upload_id'     => $uploadId,
+            'row_count'     => $totalRows,
+            'new_rows'      => $newRows,
+            'matched'       => $matched,
+            'skipped'       => $skippedCount,
+        ]);
+    }
+
+    /**
+     * Paginated list of salary file uploads (for “history” UI).
+     */
+    public function deleteSalaryUpload(int $id)
+    {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can delete salary uploads.'], 403);
+        }
+        if (! Schema::hasTable('bank_recon_salary_uploads') || ! Schema::hasTable('bank_recon_salary_rows')) {
+            return response()->json(['success' => false, 'message' => 'Tables not available.'], 503);
+        }
+        $upload = DB::table('bank_recon_salary_uploads')->where('id', $id)->first();
+        if (! $upload) {
+            return response()->json(['success' => false, 'message' => 'Upload not found.'], 404);
+        }
+        $linkedStmtIds = DB::table('bank_recon_salary_rows')
+            ->where('salary_upload_id', $id)->whereNotNull('bank_statement_id')
+            ->where('match_status', 'matched')
+            ->pluck('bank_statement_id')->filter()->unique()->values()->toArray();
+        if (! empty($linkedStmtIds)) {
+            $bsClear = ['updated_at' => now()];
+            if (Schema::hasColumn('bank_statements', 'salary_matched_by')) {
+                $bsClear['salary_matched_by'] = null;
+                $bsClear['salary_matched_at'] = null;
+            }
+            if (Schema::hasColumn('bank_statements', 'bank_recon_salary_row_id')) {
+                $bsClear['bank_recon_salary_row_id'] = null;
+            }
+            if (Schema::hasColumn('bank_statements', 'category')) {
+                DB::table('bank_statements')->whereIn('id', $linkedStmtIds)
+                    ->where('match_status', 'unmatched')
+                    ->where(function ($q) { $q->where('category', 'salary')->orWhereNull('category'); })
+                    ->update(array_merge($bsClear, ['category' => null]));
+                DB::table('bank_statements')->whereIn('id', $linkedStmtIds)
+                    ->where('match_status', '!=', 'unmatched')->update($bsClear);
+            } else {
+                DB::table('bank_statements')->whereIn('id', $linkedStmtIds)->update($bsClear);
+            }
+        }
+        DB::table('bank_recon_salary_rows')->where('salary_upload_id', $id)->delete();
+        DB::table('bank_recon_salary_uploads')->where('id', $id)->delete();
+        $this->logBankReconUserHistory('salary_upload_delete', null, [
+            'upload_id' => $id, 'file' => $upload->file_name ?? '?', 'unlinked_stmts' => count($linkedStmtIds),
+        ]);
+        return response()->json([
+            'success'        => true,
+            'message'        => 'Salary upload deleted. '.count($linkedStmtIds).' bank statement(s) unlinked.',
+            'unlinked_count' => count($linkedStmtIds),
+        ]);
+    }
+
+    public function listSalaryUtrUploads(Request $request)
+    {
+        if (! Schema::hasTable('bank_recon_salary_uploads')) {
+            return response()->json(['data' => [], 'total' => 0, 'per_page' => 20, 'current_page' => 1, 'last_page' => 1]);
+        }
+        $perPage = max(5, min(100, (int) $request->get('per_page', 20)));
+        $q       = DB::table('bank_recon_salary_uploads as u')
+            ->leftJoin('users as us', 'us.id', '=', 'u.user_id')
+            ->orderByDesc('u.id')
+            ->select([
+                'u.id',
+                'u.file_name',
+                'u.row_count',
+                'u.matched_count',
+                'u.created_at',
+                'us.user_fullname as uploaded_by_name',
+                'us.username as uploaded_by_username',
+            ]);
+        if ($request->filled('search')) {
+            $s = '%'.addcslashes(trim((string) $request->get('search')), '%_\\').'%';
+            $q->where('u.file_name', 'like', $s);
+        }
+        if ($request->filled('date_from')) {
+            $q->whereDate('u.created_at', '>=', $request->get('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $q->whereDate('u.created_at', '<=', $request->get('date_to'));
+        }
+
+        return response()->json($q->paginate($perPage)->toArray());
+    }
+
+    /**
+     * All rows for one upload (for modal table).
+     */
+    public function salaryUtrUploadRows(int $id)
+    {
+        if (! Schema::hasTable('bank_recon_salary_rows')) {
+            return response()->json(['success' => false, 'message' => 'Not available'], 503);
+        }
+        $u = DB::table('bank_recon_salary_uploads')->where('id', $id)->first();
+        if (! $u) {
+            return response()->json(['success' => false, 'message' => 'Upload not found'], 404);
+        }
+        $rows = DB::table('bank_recon_salary_rows as r')
+            ->leftJoin('bank_statements as bs', 'bs.id', '=', 'r.bank_statement_id')
+            ->where('r.salary_upload_id', $id)
+            ->orderBy('r.id')
+            ->select([
+                'r.*',
+                'bs.description as stmt_description',
+                'bs.deposit as stmt_deposit',
+                'bs.transaction_date as stmt_transaction_date',
+            ])
+            ->get();
+
+        return response()->json([
+            'success'  => true,
+            'upload'   => $u,
+            'rows'     => $rows,
+        ]);
+    }
+
+    /**
+     * Salary UTR master (all sheet rows) — page with filters & export.
+     */
+    public function salaryMasterPage()
+    {
+        if (! Schema::hasTable('bank_recon_salary_rows') || ! Schema::hasTable('bank_recon_salary_uploads')) {
+            abort(503, 'Salary UTR tables are not available. Run migrations.');
+        }
+        $admin = Auth::user();
+        $uploaderIds = DB::table('bank_recon_salary_uploads')->distinct()->pluck('user_id')->filter();
+        $uploadUsers = $uploaderIds->isEmpty()
+            ? collect()
+            : DB::table('users as us')
+                ->whereIn('us.id', $uploaderIds->all())
+                ->select('us.id', 'us.user_fullname as name', 'us.username')
+                ->orderBy('us.user_fullname')
+                ->get();
+        $zones = [];
+        if (Schema::hasTable('tblzones')) {
+            $zones = DB::table('tblzones')
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+        }
+
+        return view('bank-reconciliation.salary_master', [
+            'admin'       => $admin,
+            'uploadUsers' => $uploadUsers,
+            'zones'       => $zones,
+        ]);
+    }
+
+    /**
+     * JSON paginated data for salary master (same filters as export).
+     */
+    public function salaryMasterData(Request $request)
+    {
+        if (! Schema::hasTable('bank_recon_salary_rows')) {
+            return response()->json(['data' => [], 'message' => 'Not available'], 503);
+        }
+        $perPage  = max(5, min(200, (int) $request->get('per_page', 25)));
+        $q        = $this->salaryMasterFilteredQuery($request)->orderByDesc('r.id');
+        $paginated = $q->paginate($perPage)->toArray();
+
+        if ($request->boolean('with_stats')) {
+            $sq = $this->salaryMasterFilteredQuery($request);
+            $statRows = $sq->select([
+                'r.match_status',
+                DB::raw('COUNT(*) as cnt'),
+            ])->groupBy('r.match_status')->get();
+            $stats = ['total' => 0, 'matched' => 0, 'not_found' => 0, 'unmatched' => 0];
+            foreach ($statRows as $sr) {
+                $stats['total'] += (int) $sr->cnt;
+                $key = $sr->match_status ?? 'unmatched';
+                if (isset($stats[$key])) {
+                    $stats[$key] = (int) $sr->cnt;
+                }
+            }
+            $paginated['stats'] = $stats;
+        }
+
+        return response()->json($paginated);
+    }
+
+    /**
+     * Export salary master rows (CSV or XLSX) with the same filters as the grid.
+     */
+    public function exportSalaryMaster(Request $request)
+    {
+        if (! Schema::hasTable('bank_recon_salary_rows')) {
+            return response()->json(['success' => false, 'message' => 'Not available'], 503);
+        }
+        $format = strtolower((string) $request->get('format', 'csv'));
+        if (! in_array($format, ['csv', 'xlsx'], true)) {
+            $format = 'csv';
+        }
+        $rows    = $this->salaryMasterFilteredQuery($request)->orderByDesc('r.id')->limit(50000)->get();
+        $headers = [
+            'ID',
+            'Upload file',
+            'Uploaded at',
+            'Uploaded by',
+            'UTR',
+            'EC ID',
+            'Employee',
+            'Designation',
+            'Branch (sheet)',
+            'Category',
+            'Net paid',
+            'Match status',
+            'Matched at',
+            'Bank line ID',
+            'Stmt date',
+            'Account',
+            'Stmt description (preview)',
+        ];
+        $base = 'salary_master_'.date('Y-m-d_His');
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($rows, $headers) {
+                $out = fopen('php://output', 'w');
+                fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+                fputcsv($out, $headers);
+                foreach ($rows as $r) {
+                    fputcsv($out, $this->salaryMasterExportRow($r));
+                }
+                fclose($out);
+            }, $base.'.csv', [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->fromArray($headers, null, 'A1');
+        $rowNum = 2;
+        foreach ($rows as $r) {
+            $sheet->fromArray($this->salaryMasterExportRow($r), null, 'A'.$rowNum);
+            $rowNum++;
+        }
+        foreach (range('A', 'P') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $base.'.xlsx', [
+            'Content-Type'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+
+    private function salaryMasterExportRow($r): array
+    {
+        $by = trim((string) ($r->uploaded_by_name ?? ''));
+        if ($r->uploaded_by_username ?? '') {
+            $by .= ($by !== '' ? ' ' : '').'@'.(string) $r->uploaded_by_username;
+        }
+        $desc = (string) ($r->stmt_description ?? '');
+        if (mb_strlen($desc) > 120) {
+            $desc = mb_substr($desc, 0, 117).'…';
+        }
+
+        return [
+            $r->id ?? '',
+            (string) ($r->upload_file_name ?? ''),
+            (string) ($r->upload_created_at ?? ''),
+            $by,
+            (string) ($r->utr ?? ''),
+            (string) ($r->ec_id ?? ''),
+            (string) ($r->employee_name ?? ''),
+            (string) ($r->designation ?? ''),
+            (string) ($r->branch ?? ''),
+            (string) ($r->employee_category ?? ''),
+            $r->net_paid !== null ? (string) $r->net_paid : '',
+            (string) ($r->match_status ?? ''),
+            (string) ($r->matched_at ?? ''),
+            $r->bank_statement_id !== null ? (string) $r->bank_statement_id : '',
+            (string) ($r->stmt_transaction_date ?? ''),
+            trim((string) ($r->bank_account_number ?? '').' '.(string) ($r->bank_account_bank_name ?? '')),
+            $desc,
+        ];
+    }
+
+    private function salaryMasterFilteredQuery(Request $request): Builder
+    {
+        $q = DB::table('bank_recon_salary_rows as r')
+            ->join('bank_recon_salary_uploads as u', 'u.id', '=', 'r.salary_upload_id')
+            ->leftJoin('users as up', 'up.id', '=', 'u.user_id')
+            ->leftJoin('bank_statements as bs', 'bs.id', '=', 'r.bank_statement_id')
+            ->leftJoin('bank_reconciliation_accounts as bra', 'bra.id', '=', 'bs.bank_account_id')
+            ->select([
+                'r.id',
+                'r.salary_upload_id',
+                'r.sheet_row_index',
+                'r.utr',
+                'r.ec_id',
+                'r.employee_name',
+                'r.designation',
+                'r.branch',
+                'r.employee_category',
+                'r.net_paid',
+                'r.credited_date',
+                'r.match_status',
+                'r.matched_at',
+                'r.match_note',
+                'r.bank_statement_id',
+                'u.file_name as upload_file_name',
+                'u.created_at as upload_created_at',
+                'up.user_fullname as uploaded_by_name',
+                'up.username as uploaded_by_username',
+                'u.user_id as uploaded_by_user_id',
+                'bs.transaction_date as stmt_transaction_date',
+                'bs.description as stmt_description',
+                'bra.account_number as bank_account_number',
+                'bra.bank_name as bank_account_bank_name',
+            ]);
+
+        $userIds = $this->requestIntIdArray($request, 'user_ids');
+        if (count($userIds) > 0) {
+            $q->whereIn('u.user_id', $userIds);
+        } elseif ($request->filled('user_id') && (int) $request->user_id > 0) {
+            $q->where('u.user_id', (int) $request->user_id);
+        }
+
+        $this->applySalaryMasterLocationFilters($q, $request);
+
+        $allowed   = ['matched', 'not_found', 'unmatched'];
+        $statuses  = array_values(array_intersect($allowed, $this->requestStringList($request, 'match_statuses')));
+        if (count($statuses) > 0) {
+            $q->whereIn('r.match_status', $statuses);
+        } elseif ($request->filled('match_status') && in_array((string) $request->match_status, $allowed, true)) {
+            $q->where('r.match_status', (string) $request->match_status);
+        }
+
+        if ($request->filled('search')) {
+            $s = '%'.addcslashes(trim((string) $request->search), '%_\\').'%';
+            $q->where(function ($w) use ($s) {
+                $w->where('r.utr', 'like', $s)
+                    ->orWhere('r.employee_name', 'like', $s)
+                    ->orWhere('r.ec_id', 'like', $s);
+            });
+        }
+        if ($request->filled('uploaded_from')) {
+            $q->whereDate('u.created_at', '>=', $request->uploaded_from);
+        }
+        if ($request->filled('uploaded_to')) {
+            $q->whereDate('u.created_at', '<=', $request->uploaded_to);
+        }
+
+        return $q;
+    }
+
+    /**
+     * Filter salary rows by master zone/branch (tbl_locations) vs sheet branch text.
+     */
+    private function applySalaryMasterLocationFilters(Builder $query, Request $request): void
+    {
+        $zoneIds  = $this->requestIntIdArray($request, 'zone_ids');
+        $branchIds = $this->requestIntIdArray($request, 'branch_ids');
+        if (count($zoneIds) === 0 && count($branchIds) === 0) {
+            return;
+        }
+        if (! Schema::hasTable('tbl_locations')) {
+            return;
+        }
+        $locQuery = DB::table('tbl_locations')->select('id', 'name', 'zone_id');
+        if (count($branchIds) > 0) {
+            $locQuery->whereIn('id', $branchIds);
+            if (count($zoneIds) > 0) {
+                $locQuery->whereIn('zone_id', $zoneIds);
+            }
+        } elseif (count($zoneIds) > 0) {
+            $locQuery->whereIn('zone_id', $zoneIds);
+        } else {
+            return;
+        }
+        $locs = $locQuery->get();
+        if ($locs->isEmpty()) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+        $query->where(function ($outer) use ($locs) {
+            foreach ($locs as $loc) {
+                $name = trim((string) ($loc->name ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $tokens = $this->branchDescriptionMatchTokens($name);
+                $outer->orWhere(function ($w) use ($name, $tokens) {
+                    $w->whereRaw('LOWER(TRIM(IFNULL(r.branch, ""))) = LOWER(?)', [$name]);
+                    foreach ($tokens as $tok) {
+                        if ($tok === '') {
+                            continue;
+                        }
+                        $pat = '%'.addcslashes($tok, '%_\\').'%';
+                        $w->orWhereRaw('LOWER(r.branch) LIKE LOWER(?)', [$pat]);
+                    }
+                });
+            }
+        });
+    }
+
+    private function salaryUtrNormalized(string $utr): string
+    {
+        $s = strtoupper(preg_replace('/\s+/', '', $utr));
+
+        return preg_replace('/[^A-Z0-9]/', '', $s) ?? '';
+    }
+
+    /**
+     * @return array{rows: list<array<string, mixed>>}
+     */
+    private function parseSalaryUtrWorkbook(string $path): array
+    {
+        $spreadsheet = IOFactory::load($path);
+        $sheet       = $spreadsheet->getActiveSheet();
+        $data        = $sheet->toArray();
+        if (count($data) < 2) {
+            return ['rows' => []];
+        }
+
+        $header = array_map(static function ($h) {
+            return trim((string) $h);
+        }, $data[0]);
+        $colByNorm = [];
+        foreach ($header as $i => $h) {
+            if ($h === '') {
+                continue;
+            }
+            $k = mb_strtolower(preg_replace('/\s+/', ' ', $h));
+            $colByNorm[$k] = $i;
+        }
+
+        $getCol = static function (array $colByNorm, array $aliases) {
+            foreach ($aliases as $a) {
+                $a = mb_strtolower($a);
+                if (isset($colByNorm[$a])) {
+                    return $colByNorm[$a];
+                }
+            }
+            foreach ($colByNorm as $k => $idx) {
+                foreach ($aliases as $a) {
+                    if (str_contains($k, mb_strtolower($a))) {
+                        return $idx;
+                    }
+                }
+            }
+
+            return null;
+        };
+
+        $utrCol = $getCol($colByNorm, ['utr', 'utr no', 'utr number', 'utr no.', 'utr#']);
+        if ($utrCol === null) {
+            $utrCol = count($header) > 0 ? count($header) - 1 : 0;
+        }
+
+        $cSerial   = $getCol($colByNorm, ['s no', 's.no', 'sno', 'serial', 'sl no', 'slno']);
+        $cEc       = $getCol($colByNorm, ['ec id', 'ecid', 'ec no', 'employee code']);
+        $cName     = $getCol($colByNorm, ['name', 'employee name', 'emp name']);
+        $cDesig    = $getCol($colByNorm, ['designation', 'desig', 'title']);
+        $cBranch   = $getCol($colByNorm, ['branch', 'location']);
+        $cCategory = $getCol($colByNorm, ['category', 'type', 'emp category']);
+        $cPf       = $getCol($colByNorm, ['pf']);
+        $cEsi      = $getCol($colByNorm, ['esi']);
+        $cTds      = $getCol($colByNorm, ['tds']);
+        $cNet      = $getCol($colByNorm, ['net paid', 'netpay', 'net pay', 'net', 'net amount', 'amount']);
+        $cCred     = $getCol($colByNorm, ['credited date', 'credit date', 'credited', 'date']);
+
+        $out = [];
+        for ($ri = 1; $ri < count($data); $ri++) {
+            $row = $data[$ri];
+            if (! is_array($row)) {
+                continue;
+            }
+            $first = isset($row[0]) ? mb_strtolower(trim((string) $row[0])) : '';
+            if (str_contains($first, 'grand') && str_contains($first, 'total')) {
+                continue;
+            }
+            $utr = isset($row[$utrCol]) ? trim((string) $row[$utrCol]) : '';
+            if ($utr === '' || $this->salaryUtrNormalized($utr) === '') {
+                continue;
+            }
+
+            $g = static function (array $row, ?int $c) {
+                if ($c === null || ! isset($row[$c])) {
+                    return null;
+                }
+                $v = trim((string) $row[$c]);
+
+                return $v === '' ? null : $v;
+            };
+
+            $out[] = [
+                'sheet_row_index'  => $ri + 1,
+                'utr'              => $utr,
+                'serial_no'        => $g($row, $cSerial),
+                'ec_id'            => $g($row, $cEc),
+                'employee_name'    => $g($row, $cName),
+                'designation'      => $g($row, $cDesig),
+                'branch'           => $g($row, $cBranch),
+                'employee_category' => $g($row, $cCategory),
+                'pf'               => $cPf !== null && isset($row[$cPf]) ? $this->parseAmount($row[$cPf]) : null,
+                'esi'              => $cEsi !== null && isset($row[$cEsi]) ? $this->parseAmount($row[$cEsi]) : null,
+                'tds'              => $cTds !== null && isset($row[$cTds]) ? $this->parseAmount($row[$cTds]) : null,
+                'net_paid'         => $cNet !== null && isset($row[$cNet]) ? $this->parseAmount($row[$cNet]) : null,
+                'credited_date'    => $g($row, $cCred),
+            ];
+        }
+
+        return ['rows' => $out];
+    }
+
+    private function findBankStatementIdForSalaryUtr(string $utr, $netPaid, array $accountIds): ?int
+    {
+        $utr = trim($utr);
+        if ($utr === '' || $this->salaryUtrNormalized($utr) === '') {
+            return null;
+        }
+        $escaped = addcslashes($utr, '%_\\');
+        $like    = '%'.$escaped.'%';
+        $q       = DB::table('bank_statements as bs')
+            ->where('bs.description', 'LIKE', $like);
+        if (count($accountIds) > 0 && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+            $q->whereIn('bs.bank_account_id', $accountIds);
+        }
+        $candidates = $q->orderByDesc('bs.deposit')
+            ->orderByDesc('bs.id')
+            ->select(['bs.id', 'bs.deposit', 'bs.withdrawal', 'bs.description'])
+            ->get();
+        if ($candidates->isEmpty()) {
+            $norm = $this->salaryUtrNormalized($utr);
+            if ($norm !== '' && $norm !== str_replace(' ', '', strtoupper($utr))) {
+                $q2 = DB::table('bank_statements as bs')
+                    ->whereRaw("REPLACE(UPPER(bs.description), ' ', '') LIKE ?", ['%'.$norm.'%']);
+                if (count($accountIds) > 0 && Schema::hasColumn('bank_statements', 'bank_account_id')) {
+                    $q2->whereIn('bs.bank_account_id', $accountIds);
+                }
+                $candidates = $q2->orderByDesc('bs.deposit')
+                    ->orderByDesc('bs.id')
+                    ->select(['bs.id', 'bs.deposit', 'bs.withdrawal', 'bs.description'])
+                    ->get();
+            }
+        }
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+        if ($candidates->count() === 1) {
+            return (int) $candidates->first()->id;
+        }
+
+        $net = is_numeric($netPaid) ? (float) $netPaid : null;
+        if ($net !== null && $net > 0) {
+            $best = null;
+            $bestDiff = null;
+            foreach ($candidates as $c) {
+                $d = (float) ($c->deposit ?? 0);
+                if ($d <= 0) {
+                    continue;
+                }
+                $diff = abs($d - $net);
+                if ($best === null || $diff < $bestDiff) {
+                    $best = $c;
+                    $bestDiff = $diff;
+                }
+            }
+            if ($best !== null) {
+                return (int) $best->id;
+            }
+        }
+
+        return (int) $candidates->first()->id;
     }
 }

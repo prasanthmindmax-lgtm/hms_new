@@ -1287,26 +1287,178 @@ public function getvendorchart(Request $request)
 }
 
 
-public function showStatement(Request $request)
+protected function formatVendorStatementDate(?string $dateStr, Carbon $fallback): string
 {
-    // dd($request);
-    $id = $request->id;
-    $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails'])->where('delete_status',0)
-        ->where('vendor_id', $id);
-
-    if ($request->filled('date_from') && $request->filled('date_to')) {
-        $from = Carbon::createFromFormat('d/m/Y', $request->date_from)->startOfDay();
-        $to   = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
-    } else {
-        // Default to current month
-        $from = Carbon::now()->startOfMonth();
-        $to   = Carbon::now()->endOfMonth();
+    if ($dateStr !== null && $dateStr !== '') {
+        try {
+            return Carbon::createFromFormat('d/m/Y', trim($dateStr))->format('d/m/Y');
+        } catch (\Throwable $e) {
+            try {
+                return Carbon::parse($dateStr)->format('d/m/Y');
+            } catch (\Throwable $e2) {
+                return (string) $dateStr;
+            }
+        }
     }
 
-    $query->whereBetween('created_at', [$from, $to]);
-    $bills = $query->orderBy('id', 'asc')->get();
-    // dd($bills);
-    return view('vendor.statement.statement_view', compact('bills','id','from','to'))->render();
+    return $fallback->format('d/m/Y');
+}
+
+/**
+ * Bills in the date range plus ledger rows (bills, tax withheld, payments against each bill).
+ *
+ * @return array{
+ *   bills: \Illuminate\Support\Collection,
+ *   transactions: array<int, array{date:string,type:string,details:string,amount:float,payment:float,balance:float}>,
+ *   vendor: ?Tblvendor,
+ *   billing: ?TblBilling,
+ *   billed: float,
+ *   cashPayments: float,
+ *   withheldTax: float,
+ *   creditsTotal: float,
+ *   balanceDue: float
+ * }
+ */
+protected function buildVendorStatementLedger(int|string $vendorId, Carbon $from, Carbon $to): array
+{
+    $bills = Tblbill::with([
+        'BillLines',
+        'Tblvendor',
+        'TblBilling',
+        'Tblbankdetails',
+        'billPayments' => function ($q) {
+            $q->where('delete_status', 0);
+        },
+        'billPayments.billPayLines',
+    ])
+        ->where('delete_status', 0)
+        ->where('vendor_id', $vendorId)
+        ->whereBetween('created_at', [$from, $to])
+        ->orderBy('id', 'asc')
+        ->get();
+
+    $vendor = Tblvendor::find($vendorId);
+    $billing = TblBilling::where('vendor_id', $vendorId)->first();
+    if ($bills->isNotEmpty()) {
+        $vendor = $vendor ?? $bills->first()->Tblvendor;
+        $billing = $billing ?? $bills->first()->TblBilling;
+    }
+
+    $transactions = [];
+    $runningBalance = 0.0;
+    $billed = 0.0;
+    $cashPayments = 0.0;
+    $withheldTax = 0.0;
+
+    foreach ($bills as $bill) {
+        $grandTotal = (float) $bill->grand_total_amount;
+        $billed += $grandTotal;
+        $runningBalance += $grandTotal;
+
+        $billDateStr = $this->formatVendorStatementDate($bill->bill_date, $bill->created_at);
+
+        $billDetail = trim(implode(' ', array_filter([
+            $bill->bill_gen_number ?? '',
+            $bill->bill_number ?? '',
+            $bill->due_date ? 'due on ' . $bill->due_date : '',
+        ])));
+
+        $transactions[] = [
+            'date' => $billDateStr,
+            'type' => 'Bill',
+            'details' => $billDetail,
+            'amount' => $grandTotal,
+            'payment' => 0.0,
+            'balance' => $runningBalance,
+        ];
+
+        if (!empty($bill->tax_type) && (float) $bill->tax_amount > 0) {
+            $taxAmt = (float) $bill->tax_amount;
+            $withheldTax += $taxAmt;
+            $runningBalance -= $taxAmt;
+            $transactions[] = [
+                'date' => $billDateStr,
+                'type' => (string) ($bill->tax_type ?? 'Tax Withheld'),
+                'details' => 'Bill Number - ' . ($bill->bill_number ?? $bill->bill_gen_number ?? $bill->id),
+                'amount' => 0.0,
+                'payment' => $taxAmt,
+                'balance' => $runningBalance,
+            ];
+        }
+
+        foreach ($bill->billPayments->unique('id') as $billPay) {
+            $payAmt = (float) $billPay->billPayLines
+                ->where('bill_id', $bill->id)
+                ->sum('amount');
+            if ($payAmt <= 0) {
+                continue;
+            }
+            $cashPayments += $payAmt;
+            $runningBalance -= $payAmt;
+            $payFallback = $billPay->created_at
+                ? Carbon::parse((string) $billPay->created_at)
+                : Carbon::now();
+            $payDate = $this->formatVendorStatementDate($billPay->payment_date ?? null, $payFallback);
+            $detailParts = array_filter([
+                $billPay->payment_gen_order ? 'Payment ' . $billPay->payment_gen_order : null,
+                $billPay->payment_mode ? 'Mode: ' . $billPay->payment_mode : null,
+                $billPay->reference ? 'Ref: ' . $billPay->reference : null,
+                'Against ' . ($bill->bill_gen_number ?? $bill->bill_number ?? 'Bill #' . $bill->id),
+            ]);
+            $transactions[] = [
+                'date' => $payDate,
+                'type' => 'Payment',
+                'details' => implode(' · ', $detailParts),
+                'amount' => 0.0,
+                'payment' => $payAmt,
+                'balance' => $runningBalance,
+            ];
+        }
+    }
+
+    $creditsTotal = $withheldTax + $cashPayments;
+    $balanceDue = $runningBalance;
+
+    return [
+        'bills' => $bills,
+        'transactions' => $transactions,
+        'vendor' => $vendor,
+        'billing' => $billing,
+        'billed' => $billed,
+        'cashPayments' => $cashPayments,
+        'withheldTax' => $withheldTax,
+        'creditsTotal' => $creditsTotal,
+        'balanceDue' => $balanceDue,
+    ];
+}
+
+public function showStatement(Request $request)
+{
+    $id = $request->id;
+    if ($request->filled('date_from') && $request->filled('date_to')) {
+        $from = Carbon::createFromFormat('d/m/Y', $request->date_from)->startOfDay();
+        $to = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
+    } else {
+        $from = Carbon::now()->startOfMonth();
+        $to = Carbon::now()->endOfMonth();
+    }
+
+    $ledger = $this->buildVendorStatementLedger($id, $from, $to);
+
+    return view('vendor.statement.statement_view', [
+        'bills' => $ledger['bills'],
+        'id' => $id,
+        'from' => $from,
+        'to' => $to,
+        'vendor' => $ledger['vendor'],
+        'billing' => $ledger['billing'],
+        'transactions' => $ledger['transactions'],
+        'billed' => $ledger['billed'],
+        'cashPayments' => $ledger['cashPayments'],
+        'withheldTax' => $ledger['withheldTax'],
+        'creditsTotal' => $ledger['creditsTotal'],
+        'balanceDue' => $ledger['balanceDue'],
+    ])->render();
 }
 
 // public function statementprint(Request $request, $id)
@@ -1384,76 +1536,29 @@ public function showStatement(Request $request)
 
 public function statementprint(Request $request, $id)
 {
-    $billsQuery = Tblbill::with(['BillLines', 'Tblvendor', 'TblBilling', 'Tblbankdetails'])
-        ->where('delete_status', 0)
-        ->where('vendor_id', $id);
-
     if ($request->filled('date_from') && $request->filled('date_to')) {
-        // Fix: Use createFromFormat to parse the custom date format
         $from = Carbon::createFromFormat('d/m/Y', $request->date_from)->startOfDay();
-        $to   = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
+        $to = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
     } else {
         $from = Carbon::now()->startOfMonth();
-        $to   = Carbon::now()->endOfMonth();
+        $to = Carbon::now()->endOfMonth();
     }
 
-    $billsQuery->whereBetween('created_at', [$from, $to]);
-    $bills = $billsQuery->orderBy('id', 'asc')->get();
+    $ledger = $this->buildVendorStatementLedger($id, $from, $to);
 
-    if ($bills->isEmpty()) {
-        abort(404, 'No bills found in this period.');
+    if ($ledger['vendor'] === null && $ledger['billing'] === null && $ledger['bills']->isEmpty()) {
+        abort(404, 'No statement data found for this vendor in the selected period.');
     }
 
-    $vendor  = $bills->first()->Tblvendor ?? null;
-    $billing = $bills->first()->TblBilling ?? null;
-
-    $billed  = $bills->sum('grand_total_amount');
-    $paid    = $bills->sum('tax_amount');
-    $balance = $billed - $paid;
-
-    $runningBalance = 0;
-    $transactions   = [];
-
-    foreach ($bills as $bill) {
-        $grandTotal = (float) $bill->grand_total_amount;
-        $runningBalance += $grandTotal;
-
-        // Fix: Handle bill_date if it exists and format it properly
-        $billDate = '';
-        if ($bill->bill_date) {
-            try {
-                // Try to parse bill_date if it's in d/m/Y format
-                $billDate = Carbon::createFromFormat('d/m/Y', $bill->bill_date)->format('d/m/Y');
-            } catch (\Exception $e) {
-                // If parsing fails, use the original or created_at
-                $billDate = $bill->bill_date ?? $bill->created_at->format('d/m/Y');
-            }
-        } else {
-            $billDate = $bill->created_at->format('d/m/Y');
-        }
-
-        $transactions[] = [
-            'date'     => $billDate,
-            'type'     => 'Bill',
-            'details'  => ($bill->bill_gen_number ?? $bill->bill_number ?? '') .
-                         ($bill->due_date ? ' - due on ' . $bill->due_date : ''),
-            'amount'   => $grandTotal,
-            'payment'  => 0,
-            'balance'  => $runningBalance
-        ];
-
-        if (!empty($bill->tax_type) && (float) $bill->tax_amount > 0) {
-            $runningBalance -= (float) $bill->tax_amount;
-            $transactions[] = [
-                'date'     => $billDate,
-                'type'     => $bill->tax_type ?? 'TDS',
-                'details'  => 'Bill Number - ' . ($bill->bill_number ?? $bill->bill_gen_number ?? $bill->id),
-                'amount'   => 0,
-                'payment'  => (float) $bill->tax_amount,
-                'balance'  => $runningBalance
-            ];
-        }
-    }
+    $vendor = $ledger['vendor'];
+    $billing = $ledger['billing'];
+    $bills = $ledger['bills'];
+    $billed = $ledger['billed'];
+    $paid = $ledger['creditsTotal'];
+    $balance = $ledger['balanceDue'];
+    $transactions = $ledger['transactions'];
+    $cashPayments = $ledger['cashPayments'];
+    $withheldTax = $ledger['withheldTax'];
 
     // Prepare data for the view
     $data = [
@@ -1462,6 +1567,8 @@ public function statementprint(Request $request, $id)
         'billing' => $billing,
         'billed' => $billed,
         'paid' => $paid,
+        'cash_payments' => $cashPayments,
+        'withheld_tax' => $withheldTax,
         'balance' => $balance,
         'transactions' => $transactions,
         'from' => $from,
@@ -1479,11 +1586,14 @@ public function statementprint(Request $request, $id)
     ]);
 
     // Handle PDF output
+    $vendorSlug = $vendor?->display_name ?? 'vendor';
+    $vendorSlug = preg_replace('/[^A-Za-z0-9_-]+/', '-', $vendorSlug);
+    $vendorSlug = trim($vendorSlug, '-') ?: 'vendor';
     if ($request->download == 'pdf') {
-        return $pdf->download('statement-'.($vendor->display_name ?? 'vendor').'-'.$from->format('d-m-Y').'.pdf');
-    } else {
-        return $pdf->stream('statement-'.($vendor->display_name ?? 'vendor').'-'.$from->format('d-m-Y').'.pdf');
+        return $pdf->download('statement-'.$vendorSlug.'-'.$from->format('d-m-Y').'.pdf');
     }
+
+    return $pdf->stream('statement-'.$vendorSlug.'-'.$from->format('d-m-Y').'.pdf');
 }
 //bill making
 

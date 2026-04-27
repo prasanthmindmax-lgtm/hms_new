@@ -378,17 +378,27 @@ class BillingStatsController extends Controller
         if ($response === null) {
             return response()->json([
                 'success' => false,
-                'message' => 'MocDoc API call failed or returned no response. Check server logs.',
+                'message' => 'MocDoc API call failed or returned no response. Check storage/logs/laravel.log for "BillingStats MocDoc".',
             ], 502);
         }
 
-        $billingList = $response['billinglist'] ?? [];
+        $billingList = $this->extractMocdocBillingListFromDecoded($response);
         if (empty($billingList)) {
+            \Log::warning('BillingStats MocDoc: empty billing list after successful HTTP response', [
+                'context'       => 'fetchAndInsert',
+                'date_ymd'      => $date,
+                'location_key'  => $locationKey,
+                'loc_name'      => $locName,
+                'decoded_keys'  => is_array($response) ? array_keys($response) : null,
+            ]);
+
             return response()->json([
                 'success'  => true,
                 'inserted' => 0,
                 'skipped'  => 0,
+                'total_api'=> 0,
                 'message'  => 'No billing records returned from MocDoc for ' . $locName . ' on ' . Carbon::parse($request->date)->format('d M Y') . '. Nothing to insert.',
+                'log_hint' => 'If Postman returns data for the same date/location, check laravel.log for "BillingStats MocDoc" (timeouts, JSON keys, or response snippet).',
             ]);
         }
 
@@ -486,12 +496,39 @@ class BillingStatsController extends Controller
     }
 
     /**
+     * Normalize MocDoc JSON: billing rows may live under different keys or nested under "data".
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function extractMocdocBillingListFromDecoded(?array $decoded): array
+    {
+        if (! is_array($decoded)) {
+            return [];
+        }
+        foreach (['billinglist', 'billingList', 'BillingList'] as $k) {
+            if (! empty($decoded[$k]) && is_array($decoded[$k])) {
+                return array_values($decoded[$k]);
+            }
+        }
+        if (! empty($decoded['data']) && is_array($decoded['data'])) {
+            foreach (['billinglist', 'billingList'] as $k) {
+                if (! empty($decoded['data'][$k]) && is_array($decoded['data'][$k])) {
+                    return array_values($decoded['data'][$k]);
+                }
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * cURL POST to MocDoc API with retry & backoff.
      */
-    private function callMocdocApi(string $url, string $date, string $locationId, int $maxRetries = 3): ?array
+    private function callMocdocApi(string $url, string $date, string $locationId, int $maxRetries = 5): ?array
     {
-        ini_set('max_execution_time', 300);
+        ini_set('max_execution_time', 360);
         $postFields = "date={$date}&entitylocation={$locationId}";
+        // Keep Date aligned with other MocDoc callers (md-authorization may be bound to this value).
         $headers    = [
             'md-authorization: MD 7b40af0edaf0ad75:0yAJg5vPzhav8JdUyBmFq8sQvy8=',
             'Date: Fri, 07 Mar 2025 10:07:52 GMT',
@@ -499,7 +536,7 @@ class BillingStatsController extends Controller
             'Cookie: SRV=s1',
         ];
 
-        $retry  = 0;
+        $retry   = 0;
         $backoff = 1;
 
         do {
@@ -507,51 +544,113 @@ class BillingStatsController extends Controller
             curl_setopt_array($curl, [
                 CURLOPT_URL            => $url,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 30,
-                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_TIMEOUT        => 120,
+                CURLOPT_CONNECTTIMEOUT => 25,
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $postFields,
                 CURLOPT_HTTPHEADER     => $headers,
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_MAXREDIRS      => 10,
+                CURLOPT_ENCODING       => '',
             ]);
 
             $response = curl_exec($curl);
-            $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $httpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $curlErrno = curl_errno($curl);
+            $curlError = curl_error($curl);
+            $downloaded = curl_getinfo($curl, CURLINFO_SIZE_DOWNLOAD);
             curl_close($curl);
 
             if ($response === false) {
-                \Log::error("BillingStats cURL error for {$locationId} on {$date}");
+                \Log::error('BillingStats MocDoc: cURL transport error', [
+                    'location_id' => $locationId,
+                    'date_ymd'    => $date,
+                    'post_fields' => $postFields,
+                    'curl_errno'  => $curlErrno,
+                    'curl_error'  => $curlError,
+                    'attempt'     => $retry + 1,
+                    'max_retries' => $maxRetries,
+                ]);
                 $retry++;
                 sleep($backoff);
-                $backoff *= 2;
+                $backoff = min($backoff * 2, 30);
                 continue;
             }
 
             if ($httpCode === 429) {
-                \Log::warning("BillingStats HTTP 429 for {$locationId} on {$date}, backing off {$backoff}s");
+                \Log::warning('BillingStats MocDoc: HTTP 429 rate limit', [
+                    'location_id' => $locationId,
+                    'date_ymd'    => $date,
+                    'backoff_s'   => $backoff,
+                ]);
                 sleep($backoff);
-                $backoff *= 2;
+                $backoff = min($backoff * 2, 30);
                 $retry++;
                 continue;
             }
 
             if ($httpCode !== 200) {
-                \Log::warning("BillingStats API returned HTTP {$httpCode} for {$locationId} on {$date}");
+                $snippet = is_string($response) ? \Illuminate\Support\Str::limit(preg_replace('/\s+/u', ' ', $response), 600, '…') : '';
+                \Log::warning('BillingStats MocDoc: non-200 HTTP response', [
+                    'location_id'       => $locationId,
+                    'date_ymd'          => $date,
+                    'post_fields'       => $postFields,
+                    'http_code'         => $httpCode,
+                    'bytes_downloaded'  => $downloaded,
+                    'response_snippet'  => $snippet,
+                ]);
+                if (in_array($httpCode, [502, 503, 504], true) && $retry < $maxRetries - 1) {
+                    $retry++;
+                    sleep($backoff);
+                    $backoff = min($backoff * 2, 30);
+                    continue;
+                }
+
                 return null;
             }
 
             $decoded = json_decode($response, true);
-            if ($decoded === null) {
-                \Log::warning("BillingStats JSON decode failed for {$locationId} on {$date}");
-                return null;
+            if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
+                \Log::warning('BillingStats MocDoc: JSON decode failed', [
+                    'location_id'      => $locationId,
+                    'date_ymd'         => $date,
+                    'json_error'       => json_last_error_msg(),
+                    'body_length'      => strlen((string) $response),
+                    'body_snippet'     => \Illuminate\Support\Str::limit(preg_replace('/\s+/u', ' ', (string) $response), 600, '…'),
+                ]);
+                $retry++;
+                sleep($backoff);
+                $backoff = min($backoff * 2, 30);
+                continue;
             }
 
-            return $decoded;
+            $rows = $this->extractMocdocBillingListFromDecoded(is_array($decoded) ? $decoded : []);
+            if ($rows !== []) {
+                \Log::info('BillingStats MocDoc: OK', [
+                    'location_id'  => $locationId,
+                    'date_ymd'     => $date,
+                    'billing_rows' => count($rows),
+                ]);
+            } elseif (is_array($decoded)) {
+                \Log::info('BillingStats MocDoc: HTTP 200 but no billinglist array (empty day or unexpected shape)', [
+                    'location_id'   => $locationId,
+                    'date_ymd'      => $date,
+                    'post_fields'   => $postFields,
+                    'decoded_keys'  => array_keys($decoded),
+                    'body_length'   => strlen((string) $response),
+                    'body_snippet'  => \Illuminate\Support\Str::limit(preg_replace('/\s+/u', ' ', (string) $response), 800, '…'),
+                ]);
+            }
 
+            return is_array($decoded) ? $decoded : [];
         } while ($retry < $maxRetries);
 
-        \Log::error("BillingStats API failed after {$maxRetries} retries for {$locationId} on {$date}");
+        \Log::error('BillingStats MocDoc: exhausted retries', [
+            'location_id' => $locationId,
+            'date_ymd'    => $date,
+            'post_fields' => $postFields,
+        ]);
+
         return null;
     }
 }

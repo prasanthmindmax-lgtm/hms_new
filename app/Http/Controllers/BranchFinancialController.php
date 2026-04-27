@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class BranchFinancialController extends Controller
 {
@@ -98,15 +100,26 @@ class BranchFinancialController extends Controller
             'branch_id' => 'required|integer',
             'acknowledgement_agreed' => 'required|accepted',
         ]);
-        
+
         // Handle file uploads
         $radiantFiles = $this->uploadFiles($request, 'radiant_collection_files');
+        $radiantLedgerFiles = $this->uploadFiles($request, 'radiant_ledger_book_files');
         $actualCardFiles = $this->uploadFiles($request, 'actual_card_files');
         $upiFiles = $this->uploadFiles($request, 'upi_files');
         $depositFiles = $this->uploadFiles($request, 'deposit_files');
         $bankDepositFiles = $this->uploadFiles($request, 'bank_deposit_files');
         $cashierInfoFiles = $this->uploadFiles($request, 'cashier_info_files');
         $additionalAmountsFiles = $this->uploadFiles($request, 'additional_amounts_files');
+
+        $this->validateBranchFinancialRequiredAttachments(
+            $request,
+            $radiantFiles,
+            $radiantLedgerFiles,
+            $depositFiles,
+            $actualCardFiles,
+            $upiFiles,
+            $bankDepositFiles
+        );
         
         // Prepare data
         $data = [
@@ -124,6 +137,7 @@ class BranchFinancialController extends Controller
             'radiant_not_collected' => $request->radiant_not_collected ? 1 : 0,
             'radiant_not_collected_remarks' => $request->radiant_not_collected_remarks,
             'radiant_collection_files' => json_encode($radiantFiles),
+            'radiant_ledger_book_files' => json_encode($radiantLedgerFiles),
             
             // Actual Card
             'actual_card_amount' => $request->actual_card_amount ?? 0,
@@ -165,6 +179,10 @@ class BranchFinancialController extends Controller
             'updated_at' => now(),
         ];
         
+        if (! Schema::hasColumn('branch_financial_reports', 'radiant_ledger_book_files')) {
+            unset($data['radiant_ledger_book_files']);
+        }
+
         $id = DB::table('branch_financial_reports')->insertGetId($data);
         
         // Get the created record
@@ -176,6 +194,7 @@ class BranchFinancialController extends Controller
             'data' => $record,
             'files' => [
                 'radiant_collection' => $radiantFiles,
+                'radiant_ledger_book' => $radiantLedgerFiles,
                 'actual_card' => $actualCardFiles,
                 'upi' => $upiFiles,
                 'deposit' => $depositFiles,
@@ -203,6 +222,7 @@ class BranchFinancialController extends Controller
         
         // Handle file uploads
         $radiantFiles = $this->uploadFiles($request, 'radiant_collection_files');
+        $radiantLedgerFiles = $this->uploadFiles($request, 'radiant_ledger_book_files');
         $actualCardFiles = $this->uploadFiles($request, 'actual_card_files');
         $upiFiles = $this->uploadFiles($request, 'upi_files');
         $depositFiles = $this->uploadFiles($request, 'deposit_files');
@@ -213,6 +233,10 @@ class BranchFinancialController extends Controller
         // Merge with existing files if no new files uploaded
         if (empty($radiantFiles)) {
             $radiantFiles = json_decode($existing->radiant_collection_files, true) ?? [];
+        }
+        if (empty($radiantLedgerFiles)) {
+            $ledgerJson = property_exists($existing, 'radiant_ledger_book_files') ? $existing->radiant_ledger_book_files : null;
+            $radiantLedgerFiles = $ledgerJson ? (json_decode($ledgerJson, true) ?? []) : [];
         }
         if (empty($actualCardFiles)) {
             $actualCardFiles = json_decode($existing->actual_card_files, true) ?? [];
@@ -232,6 +256,16 @@ class BranchFinancialController extends Controller
         if (empty($additionalAmountsFiles)) {
             $additionalAmountsFiles = json_decode($existing->additional_amounts_files, true) ?? [];
         }
+
+        $this->validateBranchFinancialRequiredAttachments(
+            $request,
+            $radiantFiles,
+            $radiantLedgerFiles,
+            $depositFiles,
+            $actualCardFiles,
+            $upiFiles,
+            $bankDepositFiles
+        );
         
         // Update edit history
         $editHistory = json_decode($existing->edit_history, true) ?? [];
@@ -257,6 +291,7 @@ class BranchFinancialController extends Controller
             'radiant_not_collected' => $request->radiant_not_collected ? 1 : 0,
             'radiant_not_collected_remarks' => $request->radiant_not_collected_remarks,
             'radiant_collection_files' => json_encode($radiantFiles),
+            'radiant_ledger_book_files' => json_encode($radiantLedgerFiles),
             
             // Actual Card
             'actual_card_amount' => $request->actual_card_amount ?? 0,
@@ -296,6 +331,10 @@ class BranchFinancialController extends Controller
             'edit_history' => json_encode($editHistory),
             'updated_at' => now(),
         ];
+
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('branch_financial_reports', 'radiant_ledger_book_files')) {
+            unset($data['radiant_ledger_book_files']);
+        }
         
         DB::table('branch_financial_reports')->where('id', $id)->update($data);
         
@@ -308,6 +347,7 @@ class BranchFinancialController extends Controller
             'data' => $record,
             'files' => [
                 'radiant_collection' => $radiantFiles,
+                'radiant_ledger_book' => $radiantLedgerFiles,
                 'actual_card' => $actualCardFiles,
                 'upi' => $upiFiles,
                 'deposit' => $depositFiles,
@@ -348,6 +388,55 @@ class BranchFinancialController extends Controller
         ]);
     }
     
+    /**
+     * When an amount is &gt; 0, require the corresponding attachment(s).
+     * Radiant: both collection proof and ledger book copy when amount &gt; 0 and not "not collected".
+     */
+    private function validateBranchFinancialRequiredAttachments(
+        Request $request,
+        array $radiantFiles,
+        array $radiantLedgerFiles,
+        array $depositFiles,
+        array $actualCardFiles,
+        array $upiFiles,
+        array $bankDepositFiles
+    ): void {
+        $notCollected = $request->boolean('radiant_not_collected');
+        $radiantAmt = (float) ($request->input('radiant_collection_amount', 0));
+        if (! $notCollected && $radiantAmt > 0) {
+            if (count($radiantFiles) === 0) {
+                $this->attachmentValidationFail(
+                    'Radiant cash collection: upload at least one file under "Collection proof" when the amount is greater than 0.'
+                );
+            }
+            if (Schema::hasColumn('branch_financial_reports', 'radiant_ledger_book_files') && count($radiantLedgerFiles) === 0) {
+                $this->attachmentValidationFail(
+                    'Radiant cash collection: ledger book copy is required when the amount is greater than 0.'
+                );
+            }
+        }
+
+        if ((float) ($request->input('deposit_amount', 0)) > 0 && count($depositFiles) === 0) {
+            $this->attachmentValidationFail('Deposit: at least one attachment is required when deposit amount is greater than 0.');
+        }
+        if ((float) ($request->input('actual_card_amount', 0)) > 0 && count($actualCardFiles) === 0) {
+            $this->attachmentValidationFail('Actual card amount: at least one attachment is required when the amount is greater than 0.');
+        }
+        if ((float) ($request->input('upi_amount', 0)) > 0 && count($upiFiles) === 0) {
+            $this->attachmentValidationFail('UPI collection: at least one attachment is required when the amount is greater than 0.');
+        }
+        if ((float) ($request->input('bank_deposit_amount', 0)) > 0 && count($bankDepositFiles) === 0) {
+            $this->attachmentValidationFail('Direct bank deposit: at least one attachment is required when the amount is greater than 0.');
+        }
+    }
+
+    private function attachmentValidationFail(string $message): void
+    {
+        throw new HttpResponseException(
+            response()->json(['success' => false, 'message' => $message], 422)
+        );
+    }
+
     /**
      * Upload multiple files
      */
