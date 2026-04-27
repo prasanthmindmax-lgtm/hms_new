@@ -398,7 +398,7 @@ public function getvendor(Request $request)
     $perPage = in_array($perPage, [10, 25, 50, 100, 250, 500]) ? $perPage : 10;
 
     // Build base query
-    $query = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails', 'history'])
+    $query = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails', 'history', 'creator'])
                 ->orderBy('id', 'desc');
 
     // ── Filters ──────────────────────────────────────────────

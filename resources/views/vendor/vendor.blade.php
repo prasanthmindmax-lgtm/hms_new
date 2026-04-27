@@ -400,6 +400,10 @@
                                     <span class="vp-info-key"><i class="bi bi-calendar3"></i> Created On</span>
                                     <span class="vp-info-val created_date">—</span>
                                 </div>
+                                <div class="vp-info-row">
+                                    <span class="vp-info-key"><i class="bi bi-person"></i> Created By</span>
+                                    <span class="vp-info-val created_by">—</span>
+                                </div>
                             </div>
                                     </div>
 
@@ -769,6 +773,7 @@
             const customerType = $(this).data('type');
             const customerpayment_terms= $(this).data('payment_terms');
             const customerLanguage = $(this).data('portal_language');
+            const createdByName = $(this).data('createdByName');
             const billing_address = JSON.parse($(this).attr('data-billingaddress'));
             const shippingAddress = JSON.parse($(this).attr('data-shippingaddress'));
             const contacts = JSON.parse($(this).attr('data-contacts'));
@@ -849,6 +854,7 @@
             $('#currency').text(customerCurrency);
             $('.customer_currency').text(customerCurrency);
             $('#customer_language').text(customerLanguage || '—');
+            $('.created_by').text(createdByName != null && String(createdByName).trim() !== '' ? String(createdByName) : '—');
             $('#total-income').text('Total Income — ₹0.00');
             $('#vendor-overview-fy').val('');
             // Reset to overview tab

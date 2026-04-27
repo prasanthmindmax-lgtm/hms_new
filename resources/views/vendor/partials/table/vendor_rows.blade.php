@@ -37,6 +37,8 @@
                   data-created_at="{{ $v->created_at }}"
                   data-remarks="{{ $v->remarks }}"
                   data-history='@json($v->history)'
+                  data-created_by="{{ $v->user_id }}"
+                  data-created-by-name="{{ e(trim((string) ($v->creator?->user_fullname ?? $v->creator?->username ?? '')) ?: '—') }}"
                   data-all_data='@json($v)'
               >
                   <td><input type="checkbox" class="row-checkbox" value="{{ $v->id }}" /></td>

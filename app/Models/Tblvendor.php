@@ -48,32 +48,39 @@ class Tblvendor extends Authenticatable
         'remarks',
         'documents',
     ];
+    
     public function billingAddress()
-{
-    return $this->hasOne(TblBilling::class, 'vendor_id');
-}
+    {
+        return $this->hasOne(TblBilling::class, 'vendor_id');
+    }
 
-public function shippingAddress()
-{
-    return $this->hasOne(TblShipping::class, 'vendor_id');
-}
+    public function shippingAddress()
+    {
+        return $this->hasOne(TblShipping::class, 'vendor_id');
+    }
 
-public function contacts()
-{
-    return $this->hasMany(TblContact::class, 'vendor_id');
-}
-public function bankdetails()
-{
-    return $this->hasMany(Tblbankdetails::class, 'vendor_id');
-}
-public function tdstax()
-{
-    return $this->belongsTo(Tbltdstax::class, 'tds_tax_id');
-}
-public function history()
-{
-    return $this->hasMany(TblVendorHistory::class, 'vendor_id');
-}
+    public function contacts()
+    {
+        return $this->hasMany(TblContact::class, 'vendor_id');
+    }
 
+    public function bankdetails()
+    {
+        return $this->hasMany(Tblbankdetails::class, 'vendor_id');
+    }
 
+    public function tdstax()
+    {
+        return $this->belongsTo(Tbltdstax::class, 'tds_tax_id');
+    }
+
+    public function history()
+    {
+        return $this->hasMany(TblVendorHistory::class, 'vendor_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(usermanagementdetails::class, 'user_id');
+    }
 }
