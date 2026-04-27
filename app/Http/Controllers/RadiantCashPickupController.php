@@ -473,44 +473,119 @@ class RadiantCashPickupController extends Controller
                 ->toArray();
         }
 
-        // ── Bank Statement: description LIKE '%BY CASH%{location}%' ─────────
-        // transaction_date is stored as "04/Feb/2026" string — use STR_TO_DATE in raw SQL
-        // to avoid Carbon cast failures. We also skip Eloquent's date cast by using DB::table.
+        // ── Bank Statements: check via description, radiant_match_against, and radiant_cash_pickup_id ──
         $bankEntries = [];
-        if ($locationName && $pickupDate) {
-            $pd      = Carbon::parse($pickupDate);
-            $bkFrom  = $pd->copy()->subDays(1)->toDateString();
-            $bkTo    = $pd->copy()->addDays(1)->toDateString();
+        if ($pickupDate || $id) {
+            $pd     = $pickupDate ? Carbon::parse($pickupDate) : null;
+            $bkFrom = $pd ? $pd->copy()->subDays(1)->toDateString() : null;
+            $bkTo   = $pd ? $pd->copy()->addDays(1)->toDateString() : null;
 
-            $bankQuery = DB::table('bank_statements')
-                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo]);
-            RadiantMismatchService::applyRadiantBankLocationMatch($bankQuery, $locationName);
-            $rows = $bankQuery->orderBy('transaction_date')->get();
+            // Collect all matching IDs per strategy to determine match_source
+            $descriptionIds  = collect();
+            $keywordIds      = collect();
+            $directLinkIds   = collect();
 
-            $bankEntries = $rows->map(function ($b) {
-                return [
-                    'id'               => $b->id,
-                    'transaction_date' => $b->transaction_date, // raw string e.g. "04/Feb/2026"
-                    'description'      => $b->description,
-                    'deposit'          => (float) ($b->deposit ?? 0),
-                    'withdrawal'       => (float) ($b->withdrawal ?? 0),
-                    'reference_number' => $b->reference_number ?? '',
-                    'match_status'     => $b->match_status ?? '',
-                ];
-            })->toArray();
+            // Strategy 1: description BY CASH / BYCASH + location (date-windowed)
+            if ($locationName !== '' && $bkFrom && $bkTo) {
+                $descriptionIds = DB::table('bank_statements')
+                    ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo])
+                    ->where(function ($q) use ($locationName) {
+                        $q->where('description', 'like', '%BY CASH%'.$locationName.'%')
+                          ->orWhere('description', 'like', '%BYCASH%'.$locationName.'%');
+                    })
+                    ->pluck('id');
+            }
+
+            // Strategy 2: radiant_match_against keyword matches location (date-windowed)
+            if ($locationName !== '' && $bkFrom && $bkTo && Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+                $keywordIds = DB::table('bank_statements')
+                    ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo])
+                    ->whereNotNull('radiant_match_against')
+                    ->where('radiant_match_against', '!=', '')
+                    ->where(function ($q) use ($locationName) {
+                        $q->whereRaw('LOWER(TRIM(radiant_match_against)) = LOWER(?)', [$locationName])
+                          ->orWhereRaw('LOWER(?) LIKE CONCAT("%", LOWER(TRIM(radiant_match_against)), "%")', [$locationName])
+                          ->orWhereRaw('LOWER(TRIM(radiant_match_against)) LIKE CONCAT("%", LOWER(?), "%")', [$locationName]);
+                    })
+                    ->pluck('id');
+            }
+
+            // Strategy 3: direct radiant_cash_pickup_id link (no date constraint)
+            if (Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')) {
+                $directLinkIds = DB::table('bank_statements')
+                    ->where('radiant_cash_pickup_id', $id)
+                    ->pluck('id');
+            }
+
+            $allIds = $descriptionIds->merge($keywordIds)->merge($directLinkIds)->unique()->values();
+
+            if ($allIds->isNotEmpty()) {
+                $rows = DB::table('bank_statements')
+                    ->whereIn('id', $allIds)
+                    ->orderByRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y')")
+                    ->get();
+
+                $descSet   = $descriptionIds->flip();
+                $kwSet     = $keywordIds->flip();
+                $directSet = $directLinkIds->flip();
+
+                $bankEntries = $rows->map(function ($b) use ($descSet, $kwSet, $directSet) {
+                    $sources = [];
+                    if ($directSet->has($b->id))  $sources[] = 'direct_link';
+                    if ($kwSet->has($b->id))       $sources[] = 'keyword';
+                    if ($descSet->has($b->id))     $sources[] = 'description';
+
+                    return [
+                        'id'               => $b->id,
+                        'transaction_date' => $b->transaction_date,
+                        'description'      => $b->description,
+                        'deposit'          => (float) ($b->deposit ?? 0),
+                        'withdrawal'       => (float) ($b->withdrawal ?? 0),
+                        'reference_number' => $b->reference_number ?? '',
+                        'match_status'     => $b->match_status ?? '',
+                        'radiant_match_against'  => $b->radiant_match_against ?? null,
+                        'radiant_cash_pickup_id' => $b->radiant_cash_pickup_id ?? null,
+                        'match_sources'    => $sources,
+                    ];
+                })->toArray();
+            }
         }
 
         $bfrTotalAmt = array_sum(array_column($branchReports, 'radiant_collection_amount'));
+        $bankTotalAmt = array_sum(array_column($bankEntries, 'deposit'));
+        $rcpAmount    = (float) ($pickup->pickup_amount ?? 0);
+
+        $svc = app(\App\Services\RadiantMismatchService::class);
+        $bfrStatus  = count($branchReports) ? $svc->matchStatus($rcpAmount, $bfrTotalAmt)  : 'no_data';
+        $bankStatus = count($bankEntries)   ? $svc->matchStatus($rcpAmount, $bankTotalAmt) : 'no_data';
+
+        $hasMismatch = in_array('mismatch', [$bfrStatus, $bankStatus])
+                    || in_array('no_data',  [$bfrStatus, $bankStatus]);
+
+        $directLinkCount  = count(array_filter($bankEntries, fn ($e) => in_array('direct_link', $e['match_sources'])));
+        $keywordCount     = count(array_filter($bankEntries, fn ($e) => in_array('keyword', $e['match_sources']) && !in_array('direct_link', $e['match_sources'])));
+        $descriptionCount = count(array_filter($bankEntries, fn ($e) => in_array('description', $e['match_sources']) && !in_array('direct_link', $e['match_sources']) && !in_array('keyword', $e['match_sources'])));
 
         return response()->json([
             'success'        => true,
+            'comparison'     => [
+                'rcp_amount'    => $rcpAmount,
+                'bfr_total'     => $bfrTotalAmt,
+                'bank_total'    => $bankTotalAmt,
+                'bfr_status'    => $bfrStatus,
+                'bank_status'   => $bankStatus,
+                'has_mismatch'  => $hasMismatch,
+                'direct_link_count'  => $directLinkCount,
+                'keyword_count'      => $keywordCount,
+                'description_count'  => $descriptionCount,
+            ],
             'pickup'         => [
                 'id'             => $pickup->id,
                 'pickup_date'    => $pickup->pickup_date,
                 'location'       => $pickup->location,
                 'region'         => $pickup->region,
                 'state_name'     => $pickup->state_name,
-                'pickup_amount'  => (float) ($pickup->pickup_amount ?? 0),
+                'pickup_amount'  => $rcpAmount,
                 'hci_slip_no'    => $pickup->hci_slip_no,
                 'deposit_mode'   => $pickup->deposit_mode,
                 'point_id'       => $pickup->point_id,

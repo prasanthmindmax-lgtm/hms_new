@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ asset('/assets/css/bank-reconciliation.css') }}">
 
     
@@ -314,6 +315,15 @@
                                         <button type="button" class="btn btn-light btn-sm" id="headerUploadBtn" title="Open bank statement Excel upload">
                                             <i class="bi bi-upload me-1"></i>Upload
                                         </button>
+                                        <button type="button" class="btn btn-light btn-sm" id="btnBankReconSalaryUpload" title="Upload salary Excel; UTR values are matched in statement descriptions">
+                                            <i class="bi bi-file-earmark-excel me-1"></i>Salary UTR
+                                        </button>
+                                        <!--                                         <button type="button" class="btn btn-outline-light btn-sm" id="btnBankReconSalaryHistory" title="Salary file uploads and match results">
+                                            <i class="bi bi-journal-text me-1"></i>Salary log
+                                        </button>
+                                        <a href="{{ route('bank-reconciliation.salary-master') }}" class="btn btn-outline-light btn-sm" title="All salary Excel rows: filter &amp; export">
+                                            <i class="bi bi-table me-1"></i>Salary master
+                                        </a> -->
                                         <button type="button" class="btn btn-outline-light btn-sm" id="btnOpenBatchUploadView" title="Open batch list (no page reload)">
                                             <i class="bi bi-collection me-1"></i>Batch uploads
                                         </button>
@@ -466,6 +476,14 @@
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                             <span class="bank-recon-qf-badge"><i class="bi bi-funnel-fill"></i> Quick Filters</span>
                             <div class="d-flex flex-wrap align-items-center gap-2">
+                                @if(!empty($bankReconSuperAdmin))
+                                <button type="button" class="btn btn-sm btn-outline-dark" id="btnBankReconUserHistory" title="Super Admin: action audit log">
+                                    <i class="bi bi-clock-history me-1"></i>History
+                                </button>
+                                @endif
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnBankReconSalaryHistory" title="Salary file uploads and match results">
+                                    <i class="bi bi-journal-text me-1"></i>Salary log
+                                </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" id="qfResetBtn">
                                     <i class="bi bi-x-circle me-1"></i>Reset
                                 </button>
@@ -518,6 +536,18 @@
                                 </select>
                             </div>
 
+                            {{-- Income / Mocdoc collection dates (multi) — filters income-tagged rows; independent of Financial Year txn window --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-calendar2-check"></i> Mocdoc collection dates</div>
+                                <input type="text"
+                                       id="qfIncomeCollectionDates"
+                                       class="form-control form-control-sm bank-recon-qf-mocdoc-dates"
+                                       placeholder="Pick one or more dates…"
+                                       autocomplete="off"
+                                       readonly
+                                       aria-label="Filter by Mocdoc or income tag collection dates">
+                            </div>
+
                             {{-- Company → Account Number (conditional) --}}
                             @if(!empty($bankAccountsEnabled))
                             <div class="col-6 col-md-4 col-xl">
@@ -566,9 +596,11 @@
                             </div>
                             @endif
 
-                            {{-- Zone --}}
+                            {{-- Zone (bills + income narrative + salary UTR branch) --}}
                             <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-map"></i> Zone</div>
+                                <div class="bank-recon-qf-field-label" title="Filters vendor bill zone, income-tag branch / description, and salary sheet branch (UTR upload).">
+                                    <i class="bi bi-map"></i> Zone
+                                </div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-zone"
                                             data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
@@ -589,9 +621,11 @@
                                 <select id="qfZone" multiple class="d-none"></select>
                             </div>
 
-                            {{-- Branch --}}
+                            {{-- Branch (bills + income + salary UTR) --}}
                             <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-building"></i> Branch</div>
+                                <div class="bank-recon-qf-field-label" title="Filters vendor bill branch, income-tag branch / description, and salary Excel branch column.">
+                                    <i class="bi bi-building"></i> Branch
+                                </div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-branch"
                                             data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
@@ -611,6 +645,11 @@
                                 </div>
                                 <select id="qfBranch" multiple class="d-none"></select>
                             </div>
+
+                        </div>{{-- /row 1 --}}
+
+                        {{-- Row 2 — Category + PAY IN/OUT + match filters --}}
+                        <div class="row g-2 mb-2">
 
                             {{-- Category (categorized vs uncategorized) --}}
                             <div class="col-6 col-md-4 col-xl">
@@ -668,11 +707,6 @@
                                     <option value="withdrawal">PAY OUT</option>
                                 </select>
                             </div>
-
-                        </div>{{-- /row 1 --}}
-
-                        {{-- Row 2 --}}
-                        <div class="row g-2">
 
                             {{-- Bill Match --}}
                             <div class="col-6 col-md-4 col-xl">
@@ -786,6 +820,42 @@
                                 </select>
                             </div>
 
+                            {{-- Salary UTR (sheet match to bank line) --}}
+                            <div class="col-6 col-md-4 col-xl">
+                                <div class="bank-recon-qf-field-label" title="Filter lines by salary UTR tagging from the salary Excel upload.">
+                                    <i class="bi bi-cash-coin"></i> Salary UTR
+                                </div>
+                                <div class="dropdown">
+                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-salaryTag"
+                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                                        <span class="qf-btn-text">All</span>
+                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
+                                    </button>
+                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-salaryTag">
+                                        <div class="qf-menu-item qf-menu-item-all">
+                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfSalaryTag_all" checked>
+                                            <label class="qf-menu-item-text" for="brqf_qfSalaryTag_all">All</label>
+                                        </div>
+                                        <div class="qf-menu-list">
+                                            <div class="qf-options-inner">
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfSalaryTag_tagged" value="tagged">
+                                                    <label class="qf-menu-item-text" for="brqf_qfSalaryTag_tagged">Salary UTR matched</label>
+                                                </div>
+                                                <div class="qf-menu-item">
+                                                    <input type="checkbox" id="brqf_qfSalaryTag_not" value="not_tagged">
+                                                    <label class="qf-menu-item-text" for="brqf_qfSalaryTag_not">No salary UTR</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="qfSalaryTag" multiple class="d-none">
+                                    <option value="tagged">Salary UTR matched</option>
+                                    <option value="not_tagged">No salary UTR</option>
+                                </select>
+                            </div>
+
                             {{-- Matched By --}}
                             <div class="col-6 col-md-4 col-xl">
                                 <div class="bank-recon-qf-field-label"><i class="bi bi-person"></i> Matched By</div>
@@ -874,11 +944,11 @@
 
                     {{-- Bank Statements Table with Filter Button --}}
                     <div class="card shadow-sm bank-recon-statements-card">
-                        <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="card-header table-header bank-recon-statements-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2" style="padding:10px !important;">
                             <div class="d-flex align-items-center flex-wrap gap-2 flex-grow-1 min-w-0 me-2">
                                 <h5 class="mb-0 text-nowrap"><i class="bi bi-table me-2"></i>Bank Statements</h5>
                                 @if(!empty($bankAccountsEnabled))
-                                <div id="bankReconToolbarAccountChips" class="bank-recon-toolbar-account-chips d-flex align-items-center flex-wrap gap-1" aria-label="Filter by bank account"></div>
+                                <!-- <div id="bankReconToolbarAccountChips" class="bank-recon-toolbar-account-chips d-flex align-items-center flex-wrap gap-1" aria-label="Filter by bank account"></div> -->
                                 @endif
                             </div>
                             <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end flex-shrink-0">
@@ -943,15 +1013,24 @@
                                             <th>Matched date</th>
                                             <th>Nature / files</th>
                                             <th>Income Tag</th>
+                                            <th class="text-nowrap">MocDoc date</th>
                                             <th>Radiant</th>
+                                            <th>Salary</th>
+                                            @if(!empty($bankReconSuperAdmin))
                                             <th>Actions</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody id="statementsTableBody">
-                                        <tr>
-                                            <td colspan="17" class="text-center py-5">
-                                                <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
-                                                <p class="text-muted mt-3">No statements uploaded</p>
+                                        <tr class="br-skel-row">
+                                            <td colspan="{{ !empty($bankReconSuperAdmin) ? 19 : 18 }}" class="text-center py-5 border-0">
+                                                <div class="br-table-skeleton">
+                                                    <div class="br-skel-shimmer-row" style="--w:55%"></div>
+                                                    <div class="br-skel-shimmer-row" style="--w:80%"></div>
+                                                    <div class="br-skel-shimmer-row" style="--w:65%"></div>
+                                                    <div class="br-skel-shimmer-row" style="--w:72%"></div>
+                                                    <div class="br-skel-shimmer-row" style="--w:48%"></div>
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -1189,15 +1268,23 @@
                                     @csrf
                                     <input type="hidden" id="matchAttTypeEditId" value="">
                                     <div class="row g-2 align-items-end">
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <label class="br-form-label small mb-1">Name <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control form-control-sm" id="matchAttTypeName" maxlength="191" placeholder="e.g. Purchase order" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="br-form-label small mb-1">Use for <span class="text-danger">*</span></label>
+                                            <select class="form-select form-select-sm" id="matchAttTypeContext" title="Bill match = vendor bill reconciliation; Income tag = deposit income tagging">
+                                                <option value="both">Both</option>
+                                                <option value="bill">Bill match only</option>
+                                                <option value="income">Income tag only</option>
+                                            </select>
                                         </div>
                                         <div class="col-md-2">
                                             <label class="br-form-label small mb-1">Sort</label>
                                             <input type="number" class="form-control form-control-sm" id="matchAttTypeSort" min="0" max="65535" value="0" placeholder="0">
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-2">
                                             <label class="br-form-label small mb-1">Sample file</label>
                                             <input type="file" class="form-control form-control-sm" id="matchAttTypeSample" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx">
                                         </div>
@@ -1215,6 +1302,7 @@
                                     <thead>
                                         <tr>
                                             <th>Name</th>
+                                            <th style="width: 130px;">Use for</th>
                                             <th class="text-end" style="width: 90px;">Sort</th>
                                             <th style="width: 100px;">Active</th>
                                             <th>Sample</th>
@@ -1222,7 +1310,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="matchAttachmentTypesTableBody">
-                                        <tr><td colspan="5" class="text-center text-muted py-4">Open this tab to load types…</td></tr>
+                                        <tr><td colspan="6" class="text-center text-muted py-4">Open this tab to load types…</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1372,6 +1460,277 @@
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn br-filter-apply-btn" id="applyFiltersBtn">
                         <i class="bi bi-search me-1"></i>Apply filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if(!empty($bankReconSuperAdmin))
+    <div class="modal fade" id="bankReconUserHistoryModal" tabindex="-1" aria-labelledby="bankReconUserHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable br-history-dialog">
+            <div class="modal-content">
+                <div class="modal-header br-history-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="br-history-icon"><i class="bi bi-clock-history"></i></span>
+                        <div>
+                            <h5 class="modal-title mb-0" id="bankReconUserHistoryModalLabel">Action History</h5>
+                            <small class="text-white-50">Bank Reconciliation — Super Admin Audit Log</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                {{-- Search / Filter Bar --}}
+                <div class="br-history-filters p-3 border-bottom bg-light">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-semibold mb-1"><i class="bi bi-search me-1"></i>Search</label>
+                            <input type="text" id="brHistorySearch" class="form-control form-control-sm" placeholder="User, action, details, IP, Stmt #…">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm fw-semibold mb-1"><i class="bi bi-funnel me-1"></i>Action Type</label>
+                            <select id="brHistoryActionFilter" class="form-select form-select-sm">
+                                <option value="">— All Actions —</option>
+                                <option value="import_statement">Import Statement</option>
+                                <option value="match_bill">Match Bill</option>
+                                <option value="unmatch_bill">Unmatch Bill</option>
+                                <option value="income_tag">Income Tag</option>
+                                <option value="income_unmatch">Income Unmatch</option>
+                                <option value="radiant_match">Radiant Match</option>
+                                <option value="radiant_unmatch">Radiant Unmatch</option>
+                                <option value="delete_statement">Delete Statement</option>
+                                <option value="delete_batch">Delete Batch</option>
+                                <option value="salary_upload">Salary UTR upload</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm fw-semibold mb-1"><i class="bi bi-calendar-event me-1"></i>From Date</label>
+                            <input type="date" id="brHistoryDateFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm fw-semibold mb-1"><i class="bi bi-calendar-event me-1"></i>To Date</label>
+                            <input type="date" id="brHistoryDateTo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-1 d-flex gap-1">
+                            <button class="btn btn-sm btn-primary w-100" id="brHistorySearchBtn" title="Apply Filters">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary w-100" id="brHistoryClearBtn" title="Clear Filters">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 d-flex align-items-center gap-2">
+                        <small class="text-muted" id="brHistoryResultCount"></small>
+                    </div>
+                </div>
+
+                {{-- Table --}}
+                <div class="modal-body p-0">
+                    <div class="table-responsive br-history-table-scroll">
+                        <table class="table table-sm table-hover mb-0 br-history-table br-history-table-fixed">
+                            <colgroup>
+                                <col class="br-hist-col-num" />
+                                <col class="br-hist-col-date" />
+                                <col class="br-hist-col-user" />
+                                <col class="br-hist-col-action" />
+                                <col class="br-hist-col-stmt" />
+                                <col class="br-hist-col-details" />
+                                <col class="br-hist-col-ip" />
+                            </colgroup>
+                            <thead class="br-history-thead">
+                                <tr>
+                                    <th class="text-center">#</th>
+                                    <th>Action Date</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Statement</th>
+                                    <th>Details</th>
+                                    <th>IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bankReconUserHistoryBody">
+                                <tr><td colspan="7" class="text-center text-muted py-5">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Loading history…
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{-- Pagination --}}
+                    <div class="br-history-pager-wrap border-top p-3" id="bankReconUserHistoryPager"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Salary UTR upload (match by UTR in description) --}}
+    <div class="modal fade" id="bankReconSalaryUploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2"></i>Import salary UTR sheet</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="bankReconSalaryUploadForm" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">First row must be column headers, including a <strong>UTR</strong> column. Each UTR is searched in <strong>bank statement descriptions</strong> for the <strong>company and account</strong> you select below. Matched lines are tagged; category is set to <code>salary</code>.</p>
+                        @if(!empty($bankAccountsEnabled))
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><i class="bi bi-building me-1"></i>Company <span class="text-danger">*</span></label>
+                            <select class="form-select" name="company_id" id="salaryUploadCompany" required>
+                                <option value="">Select company…</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><i class="bi bi-bank me-1"></i>Bank account <span class="text-danger">*</span></label>
+                            <select class="form-select bank-account-select" name="bank_account_id" id="salaryUploadBankAccount" required disabled>
+                                <option value="">Select company first…</option>
+                            </select>
+                            <small class="text-muted">UTR matching runs only on statements for this account (same as statement upload).</small>
+                        </div>
+                        @endif
+                        <div class="upload-area-mini br-salary-upload-area border rounded p-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-cloud-upload-fill text-primary me-2" style="font-size: 2rem;"></i>
+                                    <div>
+                                        <div class="fw-semibold">Salary Excel file</div>
+                                        <div class="text-muted small">.xlsx or .xls — max 15MB</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <input type="file" name="salary_file" id="bankReconSalaryFile" accept=".xlsx,.xls" class="d-none">
+                                    <button type="button" class="btn btn-primary btn-sm" id="bankReconSalaryBrowseBtn"><i class="bi bi-folder2-open me-1"></i>Browse</button>
+                                </div>
+                            </div>
+                            <div class="file-name-display mt-2" id="bankReconSalaryFileNameWrap" style="display: none;">
+                                <div class="alert alert-success py-2 mb-0 d-flex justify-content-between align-items-center">
+                                    <span class="text-break small" id="bankReconSalaryFileName"></span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="bankReconSalaryFileRemove" type="button"><i class="bi bi-x-circle"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-success" id="bankReconSalaryUploadSubmit" disabled>
+                            <i class="bi bi-cloud-upload me-1"></i>Upload &amp; match
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankReconSalaryHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                    <div class="modal-header br-salary-hist-header flex-wrap gap-2 align-items-center">
+                        <div class="d-flex align-items-center gap-2 min-w-0">
+                            <div class="br-salary-hist-icon flex-shrink-0"><i class="bi bi-journal-text"></i></div>
+                            <h5 class="modal-title mb-0 fw-bold text-truncate">Salary UTR — upload log</h5>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 ms-auto">
+                            <a href="{{ route('bank-reconciliation.salary-master') }}" class="btn btn-sm btn-light text-success fw-semibold shadow-sm d-inline-flex align-items-center gap-1" title="Open all salary rows: filter and export">
+                                <i class="bi bi-table"></i><span>Salary master</span>
+                            </a>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="p-3 border-bottom bg-light">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label form-label-sm mb-0">Search file name</label>
+                                    <input type="text" class="form-control form-control-sm" id="brSalaryHistSearch" placeholder="…">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label form-label-sm mb-0">From</label>
+                                    <input type="date" class="form-control form-control-sm" id="brSalaryHistFrom">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label form-label-sm mb-0">To</label>
+                                    <input type="date" class="form-control form-control-sm" id="brSalaryHistTo">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-sm btn-success w-100" id="brSalaryHistApply"><i class="bi bi-search me-1"></i>Filter</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center">#</th>
+                                        <th>File</th>
+                                        <th class="text-center">Rows</th>
+                                        <th class="text-center">Matched</th>
+                                        <th>Uploaded at</th>
+                                        <th>By</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="brSalaryHistBody">
+                                    <tr><td colspan="7" class="text-center text-muted py-4">Open this dialog to load…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankReconSalaryDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-list-columns me-2"></i>Salary rows</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    <th>UTR</th>
+                                    <th>Name</th>
+                                    <th>Branch</th>
+                                    <th>Net</th>
+                                    <th>Status</th>
+                                    <th>Stmt line</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brSalaryDetailBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankReconSalaryReadonlyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content br-salary-ro-card">
+                <div class="modal-header br-salary-ro-header border-0 pb-0">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="br-salary-ro-icon-wrap">
+                            <i class="bi bi-cash-coin"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title mb-0 fw-bold" id="bankReconSalaryReadonlyTitle">Salary UTR match</h5>
+                            <div class="small text-muted" id="bankReconSalaryReadonlySubtitle">View only</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="bankReconSalaryReadonlyBody"></div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Close
                     </button>
                 </div>
             </div>
@@ -1558,7 +1917,7 @@
                                 {{-- Date of Collection (multi-select: one MOC row per date; bank line split optional) --}}
                                 <div class="mb-3">
                                     <label class="income-tag-label">
-                                        <span class="income-tag-label-dot" style="background:#f59e0b;"></span>DATE OF COLLECTION
+                                        <span class="income-tag-label-dot" style="background:#f59e0b;"></span>DATE OF MOCDOC COLLECTIONS
                                         <span class="text-muted fw-normal ms-1" style="font-size:10px;text-transform:none;">(multi-date)</span>
                                     </label>
                                     <div class="income-tag-date-wrap">
@@ -1597,6 +1956,16 @@
                                     <small class="text-muted" style="font-size:10px;">Card &amp; UPI share the same bank entry. NEFT and Others are tracked separately.</small>
                                 </div>
 
+                                {{-- Income tag supporting documents (types: Income or Both in Bank Accounts → Attachment types) --}}
+                                <div class="mb-3 br-income-tag-att-block">
+                                    <label class="income-tag-label">
+                                        <span class="income-tag-label-dot" style="background:#7c3aed;"></span>SUPPORTING DOCUMENTS <span class="text-danger">*</span>
+                                    </label>
+                                    <p class="text-muted small mb-2"><strong>Cash only</strong> (single selected mode): upload <strong>three</strong> files — <strong>MOCDOC COLLECTION SCREEN SHOT</strong>, <strong>RADIANT SLIP</strong>, and <strong>COLLECTION LEDGER</strong> — one per type. <strong>Card, UPI, NEFT, Others</strong> (or any mix that is not cash-only): upload <strong>MOCDOC collection screenshot only</strong> and set its type. Configure matching names under <em>Bank Accounts → Attachment types</em> (scope <strong>Income tag</strong> or <strong>Both</strong>).</p>
+                                    <input type="file" class="form-control form-control-sm mb-2" id="incomeTagAttachmentsInput" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.doc,.docx">
+                                    <div id="incomeTagAttachmentStaging" class="bank-match-attachment-staging"></div>
+                                </div>
+
                                 {{-- Submit --}}
                                 <div class="d-flex justify-content-end">
                                     <button type="button" class="btn btn-primary btn-sm" id="applyIncomeTagBtn">
@@ -1607,27 +1976,71 @@
                             </div>
                         </div>
 
-                        {{-- Radiant cash pickup: keyword to match this line vs pickup location in alerts --}}
+                        {{-- Radiant cash pickup --}}
                         <div class="tab-pane fade" id="radiant-match-content">
-                            <div class="income-tag-panel">
-                                <p class="income-tag-filter-summary mb-3">
-                                    If this deposit is not found by the usual <strong>BY CASH</strong> + location search in Radiant mismatch alerts, enter the <strong>pickup location name</strong> (or alias) that should match this row.
-                                </p>
-                                <label class="income-tag-label" for="radiantMatchAgainstInput">
-                                    <span class="income-tag-label-dot" style="background:#f97316;"></span>MATCH AGAINST (LOCATION / KEYWORD)
-                                </label>
-                                <input type="text" class="form-control form-control-sm mb-3" id="radiantMatchAgainstInput" maxlength="255" placeholder="e.g. branch name as on Radiant pickup sheet" autocomplete="off">
-                                <label class="income-tag-label" for="radiantCashPickupIdInput">
-                                    <span class="income-tag-label-dot" style="background:#c2410c;"></span>RADIANT PICKUP ID (OPTIONAL)
-                                </label>
-                                <input type="number" class="form-control form-control-sm mb-2" id="radiantCashPickupIdInput" min="1" step="1" placeholder="radiant_cash_pickups.id — links row as &quot;Radiant matched&quot;">
-                                <p class="small text-muted mb-3">Leave pickup id empty and save to clear a link. Keyword and pickup id can be used together.</p>
-                                <div class="d-flex justify-content-end gap-2">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="clearRadiantMatchBtn">Clear</button>
-                                    <button type="button" class="btn btn-primary btn-sm" id="saveRadiantMatchBtn">
-                                        <i class="bi bi-save me-1"></i>Save
+                            <div class="br-radiant-panel">
+
+                                {{-- Header banner --}}
+                                <div class="br-radiant-header">
+                                    <div class="br-radiant-header-icon">
+                                        <i class="bi bi-brightness-high-fill"></i>
+                                    </div>
+                                    <div>
+                                        <div class="br-radiant-header-title">Radiant Cash Pickup</div>
+                                        <div class="br-radiant-header-sub">Link this deposit to a Radiant slip for the same date</div>
+                                    </div>
+                                </div>
+
+                                {{-- Keyword field --}}
+                                <div class="br-radiant-section">
+                                    <label class="br-radiant-field-label" for="radiantMatchAgainstInput">
+                                        <span class="br-radiant-dot" style="background:#f97316;"></span>
+                                        Match Against <span class="br-radiant-field-hint">(location / keyword)</span>
+                                    </label>
+                                    <div class="br-radiant-input-wrap">
+                                        <i class="bi bi-search br-radiant-input-icon"></i>
+                                        <input type="text" class="form-control form-control-sm br-radiant-input" id="radiantMatchAgainstInput"
+                                               maxlength="255" placeholder="e.g. Thiruvallur, Ariyalur…" autocomplete="off">
+                                    </div>
+                                    <p class="br-radiant-hint-text">
+                                        Used in Radiant mismatch alerts when automatic <em>BY CASH + location</em> search fails.
+                                    </p>
+                                </div>
+
+                                {{-- Pickup dropdown --}}
+                                <div class="br-radiant-section">
+                                    <label class="br-radiant-field-label" for="radiantCashPickupSelect">
+                                        <span class="br-radiant-dot" style="background:#c2410c;"></span>
+                                        Radiant Pickup Slip <span class="br-radiant-field-hint">(same date as bank line)</span>
+                                    </label>
+
+                                    {{-- Loading skeleton shown while AJAX fetches --}}
+                                    <div class="br-radiant-pickup-loading" id="radiantPickupLoading" style="display:none;">
+                                        <div class="br-radiant-loading-bar"></div>
+                                        <span class="br-radiant-loading-text">Fetching pickups for this date…</span>
+                                    </div>
+
+                                    <select id="radiantCashPickupSelect" class="form-select form-select-sm br-radiant-pickup-select" data-placeholder="Search branch — amount…" disabled>
+                                        <option value="">— Open a deposit row to load pickups —</option>
+                                    </select>
+
+                                    {{-- Pickup count badge (filled by JS) --}}
+                                    <div class="br-radiant-pickup-meta" id="radiantPickupMeta" style="display:none;">
+                                        <span class="br-radiant-count-badge" id="radiantPickupCount">0</span>
+                                        <span class="br-radiant-count-label">pickups found for this date</span>
+                                    </div>
+                                </div>
+
+                                {{-- Action row --}}
+                                <div class="br-radiant-actions">
+                                    <button type="button" class="btn br-radiant-btn-clear" id="clearRadiantMatchBtn">
+                                        <i class="bi bi-x-circle me-1"></i>Clear
+                                    </button>
+                                    <button type="button" class="btn br-radiant-btn-save" id="saveRadiantMatchBtn">
+                                        <i class="bi bi-check2-circle me-1"></i>Save &amp; Link
                                     </button>
                                 </div>
+
                             </div>
                         </div>
                     </div>
@@ -1653,13 +2066,59 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body br-income-ro-body">
-                    <p class="br-income-ro-hint small mb-3">This is a read-only summary. To change or remove the tag, use <strong>Unmatch Income</strong> on the statement row.</p>
+                    <p class="br-income-ro-hint small mb-3">Read-only summary. To change tags, use <strong>Unmatch Income</strong> and/or <strong>Unmatch Radiant</strong> on the row.</p>
                     <div id="incomeTagReadonlyBody" class="income-tag-panel br-income-ro-panel"></div>
                 </div>
                 <div class="modal-footer br-income-ro-footer border-0">
                     <button type="button" class="btn br-income-ro-close-btn" data-bs-dismiss="modal">
                         <i class="bi bi-x-lg me-1"></i>Close
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- billing_list rows for income-tagged statements (collection date + branch + payment mode) --}}
+    <div class="modal fade" id="incomeBillingListModal" tabindex="-1" aria-labelledby="incomeBillingListModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title mb-1" id="incomeBillingListModalLabel">
+                            <i class="bi bi-receipt-cutoff me-2 text-primary"></i>Income bills (<span class="text-muted small">billing_list</span>)
+                        </h5>
+                        <p class="text-muted small mb-0">
+                            Branch: <strong id="incomeBillingListModalBranch">—</strong>
+                            · <span id="incomeBillingListModalCount">0</span> row(s)
+                        </p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">Bill no.</th>
+                                    <th scope="col">Bill date</th>
+                                    <th scope="col">Payment</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col" class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incomeBillingListModalTableBody"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="5" class="text-end">Total</th>
+                                    <th class="text-end" id="incomeBillingListModalTotal">₹0.00</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -1867,6 +2326,7 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 
     <script>
         window.bankAccountsEnabled = @json(!empty($bankAccountsEnabled));
@@ -1904,6 +2364,7 @@
             incomeTagBranches: "{{ route('bank-reconciliation.income-tag.branches') }}",
             incomeTagResolve: "{{ route('bank-reconciliation.income-tag.resolve-description') }}",
             radiantMatchAgainst: "{{ route('bank-reconciliation.radiant-match-against') }}",
+            radiantCashPickupsForDate: "{{ route('bank-reconciliation.radiant-cash-pickups-for-date') }}",
             radiantUnmatch: "{{ route('bank-reconciliation.radiant-unmatch', ':id') }}",
             accounts: "{{ route('bank-reconciliation.accounts') }}",
             accountsStore: "{{ route('bank-reconciliation.accounts.store') }}",
@@ -1913,6 +2374,12 @@
             matchedByOptions: "{{ route('bank-reconciliation.matched-by-options') }}",
             chartAccounts: "{{ route('bank-reconciliation.chart-accounts') }}",
             quickFilterOptions: "{{ route('bank-reconciliation.quick-filter-options') }}",
+            userHistory: "{{ route('bank-reconciliation.user-history') }}",
+            salaryUtrUpload: "{{ route('bank-reconciliation.salary-utr-upload') }}",
+            salaryUtrUploads: "{{ route('bank-reconciliation.salary-utr-uploads') }}",
+            salaryUtrUploadRows: "{{ url('/bank-reconciliation/salary-utr-uploads') }}/:id/rows",
+            salaryUtrUploadDelete: "{{ url('/bank-reconciliation/salary-utr-uploads') }}/:id",
+            statementShow: "{{ url('/bank-reconciliation/statement') }}/:id",
             matchAttachmentTypes: "{{ route('bank-reconciliation.match-attachment-types.index') }}",
             matchAttachmentTypesStore: "{{ route('bank-reconciliation.match-attachment-types.store') }}",
             matchAttachmentTypesUpdateBase: "{{ url('/bank-reconciliation/match-attachment-types') }}",
@@ -1924,6 +2391,7 @@
             vendorDashboard: "{{ route('superadmin.getvendor') }}",
         };
         var routes = window.bankReconRoutes;
+        window.bankReconSuperAdmin = @json(!empty($bankReconSuperAdmin));
     </script>
     <script>window.BANK_RECON_BATCH_PREVIEW_BASE = "{{ url('/bank-reconciliation/batch-preview') }}";</script>
     <script src="{{ asset('/assets/js/bank-reconciliation/batch-preview-modal.js') }}"></script>
@@ -1996,6 +2464,23 @@
                 window.syncBankReconTransactionDatePickers();
             }
         }
+
+        window.bankReconQfIncomeCollectionFp = window.bankReconQfIncomeCollectionFp || null;
+        window.bankReconInitQfIncomeCollectionFlatpickr = function () {
+            var el = document.getElementById('qfIncomeCollectionDates');
+            if (!el || el._flatpickr || typeof flatpickr === 'undefined') {
+                return;
+            }
+            window.bankReconQfIncomeCollectionFp = flatpickr(el, {
+                mode: 'multiple',
+                altInput: true,
+                altFormat: 'd/m/Y',
+                dateFormat: 'Y-m-d',
+                allowInput: false,
+                clickOpens: true
+            });
+        };
+        window.bankReconInitQfIncomeCollectionFlatpickr();
 
         var filterMatchedDateEl = document.getElementById('filterMatchedDateRange');
         if (filterMatchedDateEl) {

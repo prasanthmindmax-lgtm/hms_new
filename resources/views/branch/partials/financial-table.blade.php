@@ -42,6 +42,29 @@
             </thead>
             <tbody>
                 @forelse($reports as $index => $report)
+                @php
+                    $fRadiant = json_decode($report->radiant_collection_files ?? '[]', true) ?: [];
+                    $fLedger = (isset($report->radiant_ledger_book_files) && $report->radiant_ledger_book_files)
+                        ? (json_decode($report->radiant_ledger_book_files, true) ?: [])
+                        : [];
+                    $fCard = json_decode($report->actual_card_files ?? '[]', true) ?: [];
+                    $fUpi = json_decode($report->upi_files ?? '[]', true) ?: [];
+                    $fDep = json_decode($report->deposit_files ?? '[]', true) ?: [];
+                    $fBank = json_decode($report->bank_deposit_files ?? '[]', true) ?: [];
+                    $fCashier = json_decode($report->cashier_info_files ?? '[]', true) ?: [];
+                    $fAdd = json_decode($report->additional_amounts_files ?? '[]', true) ?: [];
+                    $allAttachmentGroups = array_values(array_filter([
+                        ['title' => 'Radiant – Collection proof', 'files' => $fRadiant],
+                        ['title' => 'Radiant – Ledger book', 'files' => $fLedger],
+                        ['title' => 'Deposit', 'files' => $fDep],
+                        ['title' => 'Actual card', 'files' => $fCard],
+                        ['title' => 'UPI', 'files' => $fUpi],
+                        ['title' => 'Direct bank deposit', 'files' => $fBank],
+                        ['title' => 'Cashier info', 'files' => $fCashier],
+                        ['title' => 'Additional amounts', 'files' => $fAdd],
+                    ], function ($g) { return ! empty($g['files']); }));
+                    $hasAnyAttachment = count($allAttachmentGroups) > 0;
+                @endphp
                 <tr class="report-row">
                     <!-- S.No -->
                     <td class="text-center">{{ $reports->firstItem() + $index }}</td>
@@ -64,10 +87,15 @@
                         <div class="amount-container">
                             <div class="amount-value">
                                 ₹{{ number_format($report->radiant_collection_amount, 2) }}
-                                @if($report->radiant_collection_files && json_decode($report->radiant_collection_files))
-                                <i class="fas fa-paperclip attachment-icon file-preview-trigger" 
-                                   data-files="{{ $report->radiant_collection_files }}"
-                                   data-title="Radiant Collection Files"></i>
+                                @if(count($fRadiant))
+                                <i class="fas fa-paperclip attachment-icon file-preview-trigger text-primary" title="Collection proof"
+                                   data-files='@json($fRadiant)'
+                                   data-title="Radiant – Collection proof"></i>
+                                @endif
+                                @if(count($fLedger))
+                                <i class="fas fa-book attachment-icon file-preview-trigger text-info" title="Ledger book"
+                                   data-files='@json($fLedger)'
+                                   data-title="Radiant – Ledger book copy"></i>
                                 @endif
                             </div>
                             @if($report->radiant_not_collected)
@@ -93,10 +121,10 @@
                         <div class="amount-container">
                             <div class="amount-value">
                                 ₹{{ number_format($report->actual_card_amount, 2) }}
-                                @if($report->actual_card_files && json_decode($report->actual_card_files))
+                                @if(count($fCard))
                                 <i class="fas fa-paperclip attachment-icon file-preview-trigger"
-                                   data-files="{{ $report->actual_card_files }}"
-                                   data-title="Actual Card Files"></i>
+                                   data-files='@json($fCard)'
+                                   data-title="Actual card files"></i>
                                 @endif
                             </div>
                         </div>
@@ -107,10 +135,10 @@
                         <div class="amount-container">
                             <div class="amount-value">
                                 ₹{{ number_format($report->upi_amount ?? 0, 2) }}
-                                @if(isset($report->upi_files) && $report->upi_files && json_decode($report->upi_files))
+                                @if(count($fUpi))
                                 <i class="fas fa-paperclip attachment-icon file-preview-trigger"
-                                   data-files="{{ $report->upi_files }}"
-                                   data-title="UPI Files"></i>
+                                   data-files='@json($fUpi)'
+                                   data-title="UPI files"></i>
                                 @endif
                             </div>
                         </div>
@@ -121,10 +149,10 @@
                         <div class="amount-container">
                             <div class="amount-value">
                                 ₹{{ number_format($report->deposit_amount ?? 0, 2) }}
-                                @if(isset($report->deposit_files) && $report->deposit_files && json_decode($report->deposit_files))
+                                @if(count($fDep))
                                 <i class="fas fa-paperclip attachment-icon file-preview-trigger"
-                                   data-files="{{ $report->deposit_files }}"
-                                   data-title="Deposit Files"></i>
+                                   data-files='@json($fDep)'
+                                   data-title="Deposit files"></i>
                                 @endif
                             </div>
                             @if(isset($report->deposit_date) && $report->deposit_date)
@@ -138,10 +166,10 @@
                         <div class="amount-container">
                             <div class="amount-value">
                                 ₹{{ number_format($report->bank_deposit_amount, 2) }}
-                                @if($report->bank_deposit_files && json_decode($report->bank_deposit_files))
+                                @if(count($fBank))
                                 <i class="fas fa-paperclip attachment-icon file-preview-trigger"
-                                   data-files="{{ $report->bank_deposit_files }}"
-                                   data-title="Bank Deposit Files"></i>
+                                   data-files='@json($fBank)'
+                                   data-title="Direct bank deposit files"></i>
                                 @endif
                             </div>
                         </div>
@@ -187,6 +215,11 @@
                     <!-- Actions -->
                     <td class="actions-cell">
                         <div class="action-buttons">
+                            @if($hasAnyAttachment)
+                            <button type="button" class="btn-action btn-files file-preview-all-trigger" data-groups='@json($allAttachmentGroups)' title="View all attachments">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                            @endif
                             <button class="btn-action btn-edit" data-id="{{ $report->id }}" title="Edit Report">
                                 <i class="fas fa-edit"></i>
                             </button>

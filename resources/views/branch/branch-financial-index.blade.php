@@ -306,9 +306,14 @@
                                     </div>
 
                                     <div class="form-group full-width">
-                                        <label>Attachments</label>
-                                        <input type="file" name="radiant_collection_files[]" id="radiant_collection_files" class="form-control file-input" multiple>
+                                        <label>Collection proof <span class="text-muted">(required if amount &gt; 0)</span></label>
+                                        <input type="file" name="radiant_collection_files[]" id="radiant_collection_files" class="form-control file-input" multiple accept="image/*,.pdf,.doc,.docx,application/pdf">
                                         <div class="file-preview" id="radiant_collection_preview"></div>
+                                    </div>
+                                    <div class="form-group full-width">
+                                        <label>Ledger book copy <span class="text-muted">(required if amount &gt; 0)</span></label>
+                                        <input type="file" name="radiant_ledger_book_files[]" id="radiant_ledger_book_files" class="form-control file-input" multiple accept="image/*,.pdf,.doc,.docx,application/pdf">
+                                        <div class="file-preview" id="radiant_ledger_book_preview"></div>
                                     </div>
                                 </div>
                             </div>
@@ -330,8 +335,8 @@
                                     </div>
 
                                     <div class="form-group full-width">
-                                        <label>Attachments</label>
-                                        <input type="file" name="deposit_files[]" id="deposit_files" class="form-control file-input" multiple>
+                                        <label>Attachments <span class="text-muted">(required if amount &gt; 0)</span></label>
+                                        <input type="file" name="deposit_files[]" id="deposit_files" class="form-control file-input" multiple accept="image/*,.pdf,.doc,.docx,application/pdf">
                                         <div class="file-preview" id="deposit_preview"></div>
                                     </div>
                                 </div>
@@ -349,8 +354,8 @@
                                     </div>
 
                                     <div class="form-group full-width">
-                                        <label>Attachments</label>
-                                        <input type="file" name="actual_card_files[]" id="actual_card_files" class="form-control file-input" multiple>
+                                        <label>Attachments <span class="text-muted">(required if amount &gt; 0)</span></label>
+                                        <input type="file" name="actual_card_files[]" id="actual_card_files" class="form-control file-input" multiple accept="image/*,.pdf,.doc,.docx,application/pdf">
                                         <div class="file-preview" id="actual_card_preview"></div>
                                     </div>
                                 </div>
@@ -368,8 +373,8 @@
                                     </div>
 
                                     <div class="form-group full-width">
-                                        <label>Attachments</label>
-                                        <input type="file" name="upi_files[]" id="upi_files" class="form-control file-input" multiple>
+                                        <label>Attachments <span class="text-muted">(required if amount &gt; 0)</span></label>
+                                        <input type="file" name="upi_files[]" id="upi_files" class="form-control file-input" multiple accept="image/*,.pdf,.doc,.docx,application/pdf">
                                         <div class="file-preview" id="upi_preview"></div>
                                     </div>
                                 </div>
@@ -389,8 +394,8 @@
                                     </div>
 
                                     <div class="form-group full-width">
-                                        <label>Attachments</label>
-                                        <input type="file" name="bank_deposit_files[]" id="bank_deposit_files" class="form-control file-input" multiple>
+                                        <label>Attachments <span class="text-muted">(required if amount &gt; 0)</span></label>
+                                        <input type="file" name="bank_deposit_files[]" id="bank_deposit_files" class="form-control file-input" multiple accept="image/*,.pdf,.doc,.docx,application/pdf">
                                         <div class="file-preview" id="bank_deposit_preview"></div>
                                     </div>
                                 </div>

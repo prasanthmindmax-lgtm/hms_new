@@ -609,6 +609,8 @@ body {
     border-left: 3px solid #22c55e;
     border-radius: 4px;
     padding: 5px 10px;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 /* Bill reference number(s) */
@@ -725,6 +727,10 @@ body {
     background: #fdf4ff;
     border-left-color: #c084fc;
 }
+.br-matched-by-radiant {
+    background: #fffbeb;
+    border-left-color: #f97316;
+}
 
 .br-matched-by-chip-label {
     font-size: 0.6rem;
@@ -735,6 +741,7 @@ body {
 }
 .br-matched-by-expense .br-matched-by-chip-label { color: #0ea5e9; }
 .br-matched-by-income  .br-matched-by-chip-label { color: #a855f7; }
+.br-matched-by-radiant .br-matched-by-chip-label { color: #ea580c; }
 
 .br-matched-by-chip-name {
     font-size: 0.82rem;
@@ -748,7 +755,40 @@ body {
     line-height: 1;
 }
 
-/* ---------- Matched Date cell ---------- */
+/* ---------- Matched Date cell (stacked tags) ---------- */
+.br-matched-date-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 200px;
+}
+.br-matched-date-line {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+.br-matched-date-line--bill   { border-left: 3px solid #38bdf8; }
+.br-matched-date-line--income { border-left: 3px solid #a855f7; }
+.br-matched-date-line--radiant { border-left: 3px solid #f97316; }
+.br-matched-date-tag {
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.br-matched-date-val {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.25;
+    word-break: break-word;
+}
+
 .br-matched-date-cell {
     display: flex;
     flex-direction: column;
@@ -943,6 +983,14 @@ body {
 }
 
 /* Dropdown trigger — looks like a form-select */
+/* Flatpickr multi-date (Mocdoc / income collection) in quick filter row */
+.bank-recon-qf-mocdoc-dates {
+    min-height: 33px;
+    border-radius: 8px;
+    border: 1.5px solid #dde1ee;
+    font-size: 0.79rem;
+}
+
 .bank-recon-qf-btn {
     display: flex;
     align-items: center;
@@ -1297,7 +1345,7 @@ body {
 
 #statementsTable tbody td {
     padding: 12px 12px;
-    vertical-align: top;
+    /* vertical-align: top; */
     font-size: 14px;
 }
 
@@ -3384,11 +3432,26 @@ body > .daterangepicker {
     position: relative;
     padding-top: 2px;
 }
-.br-income-tag-detail-btn {
+.br-income-tag-card-actions {
     position: absolute;
     top: 0;
     right: 0;
     z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+.br-income-tag-card-actions .br-income-tag-detail-btn {
+    position: static;
+}
+.br-income-tag-ro-btn {
+    font-size: 0.68rem;
+    line-height: 1.1;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.br-income-tag-detail-btn {
     width: 28px;
     height: 28px;
     border: none;
@@ -3442,7 +3505,7 @@ body > .daterangepicker {
 }
 
 .br-income-tag-card-wrap .br-income-tag-card {
-    padding-right: 30px;
+    padding-right: 76px;
 }
 
 .br-income-tag-card {
@@ -3455,7 +3518,7 @@ body > .daterangepicker {
     border-radius: 4px;
     padding: 6px 10px;
     width: 100%;
-    min-width: 270px;
+    min-width: 300px;
     box-sizing: border-box;
 }
 
@@ -3493,7 +3556,39 @@ body > .daterangepicker {
     font-size: 0.82rem;
 }
 
-/* DOC rows container */
+/* Highlighted mode of collection (income tag card) */
+.br-income-tag-modes--highlight {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 6px !important;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: linear-gradient(120deg, #fff7ed 0%, #ffedd5 45%, #fef3c7 100%);
+    border: 1px solid #fdba74;
+    box-shadow: 0 1px 3px rgba(234, 88, 12, 0.12);
+}
+.br-income-tag-modes--highlight .br-income-tag-modes-lbl {
+    font-weight: 700;
+    color: #9a3412;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.br-income-tag-modes--highlight .br-income-tag-modes-val {
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: #c2410c;
+    letter-spacing: 0.02em;
+}
+
+.br-mocdoc-date-cell {
+    max-width: 118px;
+    vertical-align: middle;
+}
+
+/* MDOC collection rows container */
 .br-income-tag-doc-rows {
     display: flex;
     flex-direction: column;
@@ -3787,4 +3882,1023 @@ body > .daterangepicker {
     font-weight: 600;
     color: #0f172a;
     word-break: break-word;
+}
+
+#incomeTagReadonlyModal .br-income-ro-radiant-sec {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed #e2e8f0;
+}
+#incomeTagReadonlyModal .br-income-ro-radiant-hd {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #c2410c;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-highlight--radiant {
+    border-left-color: #f97316;
+    margin-top: 10px;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-highlight--radiant .br-income-ro-meta-k {
+    color: #c2410c;
+}
+#incomeTagReadonlyModal .br-income-ro-meta-highlight--radiant .br-income-ro-meta-ico {
+    background: linear-gradient(145deg, #ffedd5 0%, #fed7aa 100%);
+    color: #ea580c;
+}
+
+/* Matched bill column: expense + billing_list stack */
+.br-matched-bill-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+/* Income-tagged deposit: no vendor bill — explanatory card */
+.br-matched-bill-card.br-matched-bill-card--income-only {
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.06) 0%, rgba(99, 102, 241, 0.05) 100%);
+    max-width: 100%;
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.br-matched-bill-card--income-only .br-income-only-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: #475569;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+}
+.br-matched-bill-card--income-only .br-income-only-hint .bi-info-circle {
+    flex-shrink: 0;
+    margin-top: 0.12em;
+    color: #0ea5e9;
+}
+.br-matched-bill-card--income-only .br-income-only-hint > span {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.br-matched-bill-card--income-only .br-income-only-branch {
+    color: #64748b;
+}
+.br-matched-bill-card.br-matched-bill-card--expense .br-bill-sec-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.br-income-billing-card {
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.06) 0%, rgba(99, 102, 241, 0.05) 100%);
+    min-width: 0;
+}
+.br-income-billing-card-hd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+.br-income-billing-card-title {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #0369a1;
+}
+.br-income-billing-line + .br-income-billing-line {
+    margin-top: 2px;
+}
+.br-income-billing-card-ft {
+    border-top: 1px dashed rgba(14, 165, 233, 0.25);
+    padding-top: 6px;
+}
+#incomeBillingListModal .modal-title {
+    font-size: 1.05rem;
+}
+
+/* Income-tagged row: Nature / files — OP-IP-Pharmacy + three doc shortcuts */
+.bank-recon-income-nature .br-income-nature-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #b91c1c;
+    line-height: 1.25;
+}
+.br-income-slot-att,
+.br-income-slot-miss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 1rem;
+    line-height: 1;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.br-income-slot-att {
+    text-decoration: none !important;
+    color: #fff !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+.br-income-slot-att:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.18);
+    color: #fff !important;
+}
+.br-income-slot-miss {
+    opacity: 0.38;
+    cursor: not-allowed;
+    border: 1px dashed rgba(100, 116, 139, 0.5);
+    color: #64748b;
+    background: #f8fafc;
+}
+.br-income-slot-mocdoc.br-income-slot-att {
+    background: linear-gradient(145deg, #16a34a 0%, #059669 100%);
+}
+.br-income-slot-radiant.br-income-slot-att {
+    background: linear-gradient(145deg, #2563eb 0%, #1d4ed8 100%);
+}
+.br-income-slot-ledger.br-income-slot-att {
+    background: linear-gradient(145deg, #d97706 0%, #b45309 100%);
+}
+
+/* ============================================================
+   RADIANT PICKUP PANEL — redesigned
+   ============================================================ */
+
+.br-radiant-panel {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Header */
+.br-radiant-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 14px 14px 0 0;
+    background: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+    margin: -4px -2px 0;
+}
+.br-radiant-header-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.br-radiant-header-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+}
+.br-radiant-header-sub {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.78);
+    margin-top: 2px;
+}
+
+/* Sections */
+.br-radiant-section {
+    padding: 16px 16px 4px;
+    border-left: 1px solid #f1f5f9;
+    border-right: 1px solid #f1f5f9;
+    background: #fff;
+}
+.br-radiant-section:first-of-type {
+    border-top: 1px solid #f1f5f9;
+}
+.br-radiant-section + .br-radiant-section {
+    border-top: 1px dashed #e2e8f0;
+}
+
+/* Field label */
+.br-radiant-field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 8px;
+}
+.br-radiant-dot {
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.br-radiant-field-hint {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #94a3b8;
+    margin-left: 2px;
+}
+.br-radiant-hint-text {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin: 6px 0 10px;
+    line-height: 1.5;
+}
+
+/* Keyword input with icon */
+.br-radiant-input-wrap {
+    position: relative;
+}
+.br-radiant-input-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 0.8rem;
+    pointer-events: none;
+}
+.br-radiant-input {
+    padding-left: 32px !important;
+    border-color: #e2e8f0 !important;
+    border-radius: 8px !important;
+    background: #f8fafc !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+.br-radiant-input:focus {
+    border-color: #f97316 !important;
+    box-shadow: 0 0 0 3px rgba(249,115,22,0.12) !important;
+    background: #fff !important;
+}
+
+/* Pickup loading bar */
+.br-radiant-pickup-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.br-radiant-loading-bar {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #fed7aa 25%, #f97316 50%, #fed7aa 75%);
+    background-size: 200% 100%;
+    animation: br-radiant-shimmer 1.2s infinite;
+}
+@keyframes br-radiant-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.br-radiant-loading-text {
+    font-size: 0.7rem;
+    color: #f97316;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Pickup count badge */
+.br-radiant-pickup-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    margin-bottom: 10px;
+}
+.br-radiant-count-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f97316, #c2410c);
+    color: #fff;
+    min-width: 28px;
+    text-align: center;
+}
+.br-radiant-count-label {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+/* Select2 inside this panel */
+.br-radiant-pickup-select + .select2-container {
+    width: 100% !important;
+}
+.br-radiant-panel .select2-container--default .select2-selection--single {
+    height: 34px;
+    border-color: #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+.br-radiant-panel .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 32px;
+    padding-left: 12px;
+    font-size: 0.875rem;
+    color: #1e293b;
+}
+.br-radiant-panel .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 34px;
+}
+.br-radiant-panel .select2-container--default.select2-container--focus .select2-selection--single {
+    border-color: #f97316;
+    box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
+    background: #fff;
+}
+
+/* Select2 dropdown: prominent search + list (Radiant pickup) */
+#matchTransactionModal .select2-dropdown {
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
+    overflow: hidden;
+}
+#matchTransactionModal .select2-container--default .select2-search--dropdown .select2-search__field {
+    border-radius: 10px !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 9px 12px !important;
+    margin: 8px 8px 4px;
+    width: calc(100% - 16px) !important;
+    font-size: 0.875rem;
+}
+#matchTransactionModal .select2-container--default .select2-search--dropdown .select2-search__field:focus {
+    border-color: #f97316 !important;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    outline: none;
+}
+#matchTransactionModal .select2-results__option {
+    padding: 8px 12px;
+    font-size: 0.84rem;
+}
+#matchTransactionModal .select2-results__option--highlighted.select2-results__option--selectable {
+    background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%) !important;
+    color: #fff !important;
+}
+
+/* Action buttons */
+.br-radiant-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 0 0 14px 14px;
+    margin: 0 -2px -4px;
+}
+.br-radiant-btn-clear {
+    padding: 6px 18px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: #fff;
+    color: #64748b;
+    border: 1.5px solid #e2e8f0;
+    transition: all 0.15s;
+}
+.br-radiant-btn-clear:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+.br-radiant-btn-save {
+    padding: 6px 22px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 8px rgba(249,115,22,0.25);
+    transition: all 0.15s;
+}
+.br-radiant-btn-save:hover {
+    background: linear-gradient(135deg, #ea6c08 0%, #b83b0d 100%);
+    box-shadow: 0 4px 14px rgba(249,115,22,0.35);
+    color: #fff;
+    transform: translateY(-1px);
+}
+.br-radiant-btn-save:disabled,
+.br-radiant-btn-clear:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Select2 modal z-index */
+#matchTransactionModal .select2-container {
+    z-index: 1060;
+}
+.br-radiant-pickup-select.select2-hidden-accessible + .select2-container {
+    width: 100% !important;
+}
+
+/* ============================================================
+   STATEMENTS TABLE — skeleton loading animation
+   ============================================================ */
+
+@keyframes br-skel-pulse {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+.br-table-skeleton {
+    padding: 24px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.br-skel-shimmer-row {
+    width: var(--w, 70%);
+    height: 14px;
+    border-radius: 7px;
+    background: linear-gradient(
+        90deg,
+        #e8ecf1 25%,
+        #d1d8e0 50%,
+        #e8ecf1 75%
+    );
+    background-size: 800px 14px;
+    animation: br-skel-pulse 1.4s ease-in-out infinite;
+    margin: 0 auto;
+}
+
+/* Per-row skeleton in the table body while loading */
+.br-loading-row td {
+    padding: 10px 8px !important;
+}
+.br-skel-cell {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(
+        90deg,
+        #f0f2f5 25%,
+        #dde3ec 50%,
+        #f0f2f5 75%
+    );
+    background-size: 800px 12px;
+    animation: br-skel-pulse 1.4s ease-in-out infinite;
+    display: block;
+    min-width: 32px;
+}
+
+/* ================================================================
+   INCOME BILLS card (billing_list in matched bill cell)
+   ================================================================ */
+.br-income-billing-card {
+    text-align: left;
+}
+.br-income-billing-card--interactive {
+    cursor: pointer;
+    border-radius: 10px;
+    border: 1px solid rgba(37, 99, 235, 0.22);
+    background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+    padding: 8px 10px 10px;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.br-income-billing-card--interactive:hover {
+    border-color: rgba(37, 99, 235, 0.45);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+}
+.br-income-billing-card--interactive:focus {
+    outline: none;
+}
+.br-income-billing-card--interactive:focus-visible {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+    border-color: #3b82f6;
+}
+.br-income-billing-card-ft {
+    border-top: 1px dashed rgba(37, 99, 235, 0.28);
+    padding-top: 6px;
+    margin-top: 6px;
+}
+.br-income-billing-open-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(37, 99, 235, 0.12);
+    font-size: 0.95rem;
+}
+.br-income-billing-in-card-ro-btn {
+    font-size: 0.68rem;
+}
+
+/* ================================================================
+   USER HISTORY MODAL
+   ================================================================ */
+.br-history-dialog {
+    max-width: 1200px;
+}
+
+.br-history-header {
+    background: linear-gradient(135deg, #c3c3e0 0%, #5e80db 50%, #63a7f6 100%);
+    color: #fff;
+    border-bottom: none;
+}
+
+.br-history-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    font-size: 1.3rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.br-history-filters {
+    background: #f8f9fb;
+}
+
+.br-history-thead {
+    background: linear-gradient(90deg, #3a4f6e 0%, #4a5f80 100%);
+}
+
+.br-history-thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+    padding: 10px 12px;
+    white-space: nowrap;
+    color: #d8e4f5 !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+.br-stmt-desc {
+    max-width: 100%;
+    font-size: 0.82rem;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+/* History modal: keep columns stable; inner cells wrap instead of spilling into neighbours */
+.br-history-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.br-history-table-fixed {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 860px;
+}
+
+.br-history-table-fixed col.br-hist-col-num    { width: 4%; }
+.br-history-table-fixed col.br-hist-col-date   { width: 12%; }
+.br-history-table-fixed col.br-hist-col-user   { width: 12%; }
+.br-history-table-fixed col.br-hist-col-action { width: 12%; }
+.br-history-table-fixed col.br-hist-col-stmt   { width: 26%; }
+.br-history-table-fixed col.br-hist-col-details{ width: 25%; }
+.br-history-table-fixed col.br-hist-col-ip     { width: 9%; }
+
+.br-history-table tbody tr:hover {
+    background: #f0f6ff;
+}
+
+.br-history-table tbody td {
+    vertical-align: top;
+    padding: 10px 12px;
+    font-size: 0.825rem;
+}
+
+.br-hist-modes-val {
+    display: inline-block;
+    font-weight: 800;
+    color: #c2410c;
+    background: linear-gradient(120deg, #fff7ed, #ffedd5);
+    border: 1px solid #fdba74;
+    border-radius: 6px;
+    padding: 1px 8px;
+    white-space: normal;
+    word-break: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+.br-history-details-inner {
+    max-width: 100%;
+}
+
+.br-hist-detail-row {
+    display: block;
+    line-height: 1.55;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    padding: 1px 0;
+}
+
+.br-history-details-cell {
+    line-height: 1.55;
+    overflow: hidden;
+}
+
+.br-history-stmt-cell {
+    overflow: hidden;
+}
+
+.br-history-stmt-cell-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.br-history-ip-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.br-hist-sep {
+    display: inline;
+    padding: 0 0.2em;
+    color: #94a3b8;
+    font-weight: 400;
+}
+
+.br-hist-detail-key {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Action badges */
+.br-action-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 50px;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+}
+
+.badge-br-import   { background: #e8f4f8; color: #0077b6; border: 1px solid #90caf9; }
+.badge-br-match    { background: #e6f9f0; color: #1b7943; border: 1px solid #81c995; }
+.badge-br-unmatch  { background: #fff8e1; color: #9a6700; border: 1px solid #ffc107; }
+.badge-br-income   { background: #f3e5f5; color: #7b1fa2; border: 1px solid #ce93d8; }
+.badge-br-iunmatch { background: #fce4ec; color: #ad1457; border: 1px solid #f48fb1; }
+.badge-br-radiant  { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; }
+.badge-br-runmatch { background: #ede7f6; color: #4527a0; border: 1px solid #b39ddb; }
+.badge-br-delete   { background: #ffebee; color: #b71c1c; border: 1px solid #ef9a9a; }
+.badge-br-default  { background: #f5f5f5; color: #555;    border: 1px solid #ccc; }
+
+/* Pagination inside history modal */
+.br-history-pager-wrap {
+    background: #f8f9fb;
+}
+.br-history-pager-wrap .pagination {
+    margin: 0;
+}
+.br-history-pager-wrap .page-link {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    color: #0f3460;
+    border-color: #dee2e6;
+}
+.br-history-pager-wrap .page-item.active .page-link {
+    background: #0f3460;
+    border-color: #0f3460;
+    color: #fff;
+}
+
+/* Salary UTR match column */
+.br-salary-tag-card {
+    max-width: 220px;
+    padding: 6px 8px;
+    border: 1px solid rgba(13, 110, 90, 0.25);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #f0fff9, #e8f7f0);
+    line-height: 1.35;
+}
+.br-salary-tag-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0d4f3a;
+    margin-bottom: 4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(13, 79, 58, 0.1);
+    border: 1px solid rgba(13, 79, 58, 0.2);
+}
+.br-salary-line {
+    word-break: break-word;
+}
+.br-salary-cell-empty {
+    display: inline-block;
+    min-width: 1em;
+    text-align: center;
+}
+
+.br-salary-upload-area {
+    background: #fafbfc;
+    border-color: #dee2e6 !important;
+}
+
+/* Salary: grid status/category + matched-by + readonly modal */
+.br-badge-salary-status {
+    background: #0d6a4a !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+}
+.br-cat-salary {
+    background: linear-gradient(180deg, #0d6a4a, #0a5a3f) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+}
+.br-matched-by-chip.br-matched-by-salary {
+    border-color: rgba(13, 90, 63, 0.28);
+    background: linear-gradient(180deg, #f4fdf9, #eef8f1);
+}
+.br-matched-by-chip.br-matched-by-salary .br-matched-by-chip-label {
+    color: #0d4f3a;
+}
+.br-matched-date-line--salary .br-matched-date-tag {
+    color: #0d4f3a;
+    background: rgba(13, 79, 58, 0.12);
+    border: 1px solid rgba(13, 79, 58, 0.2);
+}
+.br-salary-ro-sec {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    background: #fcfdfd;
+}
+.br-salary-ro-sec-t {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+}
+/* ── Salary readonly modal: card wrapper ── */
+.br-salary-ro-card {
+    border-radius: 16px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 16px 48px rgba(13, 79, 58, 0.14), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* ── Salary readonly modal: header ── */
+.br-salary-ro-header {
+    background: linear-gradient(135deg, #0d5c40 0%, #1a8a60 60%, #27ae88 100%);
+    padding: 1.1rem 1.5rem 1.4rem;
+    color: #fff;
+    align-items: flex-start;
+}
+.br-salary-ro-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.8;
+}
+.br-salary-ro-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.br-salary-ro-header .modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+.br-salary-ro-header .text-muted {
+    color: rgba(255,255,255,0.75) !important;
+    font-size: 0.82rem;
+}
+
+/* ── Hero employee banner ── */
+.br-salary-ro-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    background: linear-gradient(135deg, #f0fdf7, #e6f9f0);
+    border: 1px solid rgba(13, 106, 74, 0.18);
+    border-radius: 12px;
+    margin-bottom: 0.25rem;
+}
+.br-salary-ro-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+.br-salary-ro-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0d5c40, #1a8a60);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+.br-salary-ro-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0d2e1e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+.br-salary-ro-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+.br-salary-ro-tag {
+    font-size: 0.72rem;
+    background: rgba(13, 79, 58, 0.1);
+    border: 1px solid rgba(13, 79, 58, 0.18);
+    color: #0d4f3a;
+    padding: 1px 7px;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+.br-salary-ro-amount {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #0d6a4a;
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.1;
+}
+.br-salary-ro-amount-lbl {
+    font-size: 0.7rem;
+    color: #6c757d;
+    font-weight: 400;
+    text-align: right;
+}
+
+/* ── Salary readonly: grid ── */
+.br-salary-ro-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.br-salary-ro-kv {
+    background: #f8fafb;
+    border: 1px solid #e8ecef;
+    border-radius: 8px;
+    padding: 7px 12px;
+    min-width: 120px;
+    flex: 1 1 auto;
+}
+.br-salary-ro-kv--wide {
+    flex: 2 1 100%;
+}
+.br-salary-ro-k {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.br-salary-ro-v {
+    font-size: 0.88rem;
+    color: #1a1a2e;
+    word-break: break-all;
+}
+.br-utr-code {
+    font-size: 0.8rem;
+    background: #e9f4ff;
+    color: #0d3460;
+    padding: 2px 6px;
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+/* ── Salary readonly: section ── */
+.br-salary-ro-sec {
+    border: 1px solid #eef1f5;
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    background: #fdfdff;
+}
+.br-salary-ro-sec-t {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+/* ── Salary readonly: matched-by row ── */
+.br-salary-ro-matched-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.br-salary-ro-matched-who {
+    font-size: 0.9rem;
+}
+.br-salary-ro-matched-at {
+    white-space: nowrap;
+}
+
+/* ── Salary readonly: source file row ── */
+.br-salary-ro-file-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 0.82rem;
+    padding: 6px 10px;
+    background: #f6f8fb;
+    border: 1px solid #e4e8ed;
+    border-radius: 8px;
+}
+
+/* ── Old shim for backward compat ── */
+.br-salary-ro-ico { color: #0d6a4a; }
+
+/* Data grid: keep tall cells (salary / bill cards) top-aligned to headers */
+#statementsTable tbody td,
+#statementsTable thead th {
+    vertical-align: top;
+}
+
+/* Salary history log modal header */
+.br-salary-hist-header {
+    background: linear-gradient(90deg, #dde9e3, #25cb8b);
+    border-bottom: 2px solid rgba(13, 106, 74, 0.14);
+    padding: 0.85rem 1.25rem;
+}
+.br-salary-hist-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0d5c40, #1a8a60);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
 }
