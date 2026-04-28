@@ -28,6 +28,7 @@ use App\Http\Controllers\LicenceDocumentCatalogController;
 use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\UserActivityController;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -113,6 +114,7 @@ Route::middleware(['auth','role_id:1','log.activity'])->group(function () {
     //vasanth -  Master Access
     Route::get('/superadmin/masteraccess',[SuperAdminController::class,'masteraccess'])->name('superadmin.masteraccess');
     Route::get('/superadmin/employee-data', [SuperAdminController::class, 'getEmployeeData'])->name('superadmin.employee-data');
+    Route::get('/superadmin/masteraccess-export', [SuperAdminController::class, 'exportAccessMaster'])->name('superadmin.masteraccess.export');
     Route::post('/superadmin/update-user-status', [SuperAdminController::class, 'updateUserStatus'])->name('update.status');
     Route::get('/superadmin/get-menu-permissions', [SuperAdminController::class,'getMenuPermissions']);
     Route::post('/superadmin/save-permissions', [SuperAdminController::class,'savePermissions']);
@@ -996,9 +998,34 @@ Route::middleware(['auth','role_id:3'])->group(function () {
 });
 
 
+// Route::middleware('auth')->group(function () {
+//     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+//     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+//     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+// });
+
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/user-activity/client-event', [UserActivityController::class, 'storeClientEvent'])
+        ->name('user_activity.client_event')
+        ->middleware('throttle:30,1');
+    Route::post('/user-activity/beacon-session-end', [UserActivityController::class, 'beaconSessionEnd'])
+        ->name('user_activity.beacon_session_end')
+        ->middleware('throttle:60,1');
 });
+
+Route::middleware(['auth', 'role_id:1', 'log.activity', 'prevent-back-button'])->group(function () {
+    Route::get('/superadmin/user-activity', [UserActivityController::class, 'index'])
+        ->name('user_activity.dashboard');
+    Route::get('/superadmin/user-activity/data', [UserActivityController::class, 'dashboardData'])
+        ->name('user_activity.data');
+    Route::get('/superadmin/user-activity/user/{user}/events/{typeKey}', [UserActivityController::class, 'typeEventsByType'])
+        ->name('user_activity.user.type_events');
+    Route::get('/superadmin/user-activity/user/{user}', [UserActivityController::class, 'userShow'])
+        ->name('user_activity.user');
+});
+
 require __DIR__.'/auth.php';

@@ -366,6 +366,40 @@ class BankStatementController extends Controller
     }
 
     /**
+     * Nature of payment (chart accounts): merged bs/bill br_nature_account_ids must contain at least one selected id (FIND_IN_SET).
+     */
+    private function applyNatureAccountIdsFilterToBankStatementsQuery(Builder $query, Request $request): void
+    {
+        $natureIds = $this->requestIntIdArray($request, 'nature_account_ids');
+        if (count($natureIds) === 0 && $request->filled('nature_account_ids')) {
+            $raw = $request->input('nature_account_ids');
+            if (is_string($raw) && $raw !== '') {
+                $natureIds = array_values(array_unique(array_filter(
+                    array_map(static fn ($x) => (int) $x, preg_split('/\s*,\s*/', $raw)),
+                    static fn (int $x): bool => $x > 0
+                )));
+            }
+        }
+        if (count($natureIds) === 0) {
+            return;
+        }
+
+        $expr = $this->bankReconMergedNatureAccountIdsExpr();
+        if ($expr === null) {
+            return;
+        }
+
+        $query->where(function ($outer) use ($expr, $natureIds) {
+            foreach ($natureIds as $id) {
+                $outer->orWhereRaw(
+                    'FIND_IN_SET(?, REPLACE('.$expr.", ' ', ''))",
+                    [(int) $id]
+                );
+            }
+        });
+    }
+
+    /**
      * Same filters as the main statement list, but without match_status / match_statuses so drill-down can force "matched" only.
      */
     private function bankStatementsFilteredQueryForDrilldown(Request $request): Builder
@@ -1677,6 +1711,8 @@ class BankStatementController extends Controller
                 });
             }
         }
+
+        $this->applyNatureAccountIdsFilterToBankStatementsQuery($query, $request);
 
         $sortBy = (string) $request->get('sort_by', 'transaction_date');
         $sortDir = strtolower((string) $request->get('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
@@ -4159,7 +4195,7 @@ class BankStatementController extends Controller
         }
 
         $refNo = $stmt->reference_number ?: $stmt->transaction_id;
-
+        $transcationNo = $stmt->transaction_id;
         $existing = DB::table('income_reconciliation_table')
             ->where('location_name', $branch)
             ->whereRaw("STR_TO_DATE(date_range, '%d/%m/%Y') = STR_TO_DATE(?, '%d/%m/%Y')", [$dateFormatted])
@@ -4205,7 +4241,7 @@ class BankStatementController extends Controller
                 $updateData['collection_amount'] = $curMocCash ?: $amount;
                 $updateData['date_deposited']    = $txnDate;
                 $updateData['deposite_amount']   = $amount;
-                $updateData['cash_utr_number']   = $refNo;
+                $updateData['cash_utr_number']   = $transcationNo;
                 $curDeposite = $amount;
                 $curCollect  = $updateData['collection_amount'];
             } elseif ($mode === 'card' || $mode === 'upi') {
@@ -4213,7 +4249,7 @@ class BankStatementController extends Controller
                 $updateData['mespos_card']     = $curMocCard;
                 $updateData['mespos_upi']      = $curMocUpi;
                 $updateData['bank_upi_card']   = $amount;
-                $updateData['bank_upi_card_utr']   = $refNo;
+                $updateData['bank_upi_card_utr']   = $transcationNo;
                 $updateData['moc_total_upi_card'] = $curMocCard + $curMocUpi;
                 $curMesCard = $curMocCard;
                 $curMesUpi  = $curMocUpi;
@@ -4221,12 +4257,12 @@ class BankStatementController extends Controller
             } elseif ($mode === 'neft') {
                 $updateData['date_settlement'] = $txnDate;
                 $updateData['bank_neft']       = $amount;
-                $updateData['bank_neft_utr']   = $refNo;
+                $updateData['bank_neft_utr']   = $transcationNo;
                 $curBankNeft = $amount;
             } elseif ($mode === 'other') {
                 $updateData['date_settlement'] = $txnDate;
                 $updateData['bank_others']     = $amount;
-                $updateData['bank_other_utr']   = $refNo;
+                $updateData['bank_other_utr']   = $transcationNo;
                 $curBankOth = $amount;
             }
 
@@ -4289,22 +4325,22 @@ class BankStatementController extends Controller
             $insertData['collection_amount'] = $collectAmt;
             $insertData['date_deposited']    = $txnDate;
             $insertData['deposite_amount']   = $depositeAmt;
-            $insertData['cash_utr_number']   = $refNo;
+            $insertData['cash_utr_number']   = $transcationNo;
         } elseif ($mode === 'card' || $mode === 'upi') {
             $bankUpiCard = $amount;
             $insertData['date_settlement'] = $txnDate;
             $insertData['bank_upi_card']   = $bankUpiCard;
-            $insertData['bank_upi_card_utr']   = $refNo;
+            $insertData['bank_upi_card_utr']   = $transcationNo;
         } elseif ($mode === 'neft') {
             $bankNeft = $amount;
             $insertData['date_settlement'] = $txnDate;
             $insertData['bank_neft']       = $bankNeft;
-            $insertData['bank_neft_utr']   = $refNo;
+            $insertData['bank_neft_utr']   = $transcationNo;
         } elseif ($mode === 'other') {
             $bankOthers = $amount;
             $insertData['date_settlement'] = $txnDate;
             $insertData['bank_others']     = $bankOthers;
-            $insertData['bank_other_utr']   = $refNo;
+            $insertData['bank_other_utr']   = $transcationNo;
         } else {
             $insertData['date_settlement'] = $txnDate;
         }
@@ -4589,6 +4625,7 @@ class BankStatementController extends Controller
                     'recon_ids'    => $reconIdsByYmd,
                     'amounts_ymd'  => $amountByYmd,
                     'modes'        => $modes,
+                    'zone_name'    => trim((string) $zone),
                 ]);
             }
 
@@ -5584,7 +5621,7 @@ class BankStatementController extends Controller
                 continue;
             }
 
-            $rowId = DB::table('bank_recon_salary_rows')->insertGetId([
+            $salaryRow = [
                 'salary_upload_id'  => $uploadId,
                 'sheet_row_index'   => (int) ($r['sheet_row_index'] ?? $idx + 2),
                 'utr'               => $utr,
@@ -5606,7 +5643,12 @@ class BankStatementController extends Controller
                 'match_note'        => null,
                 'created_at'        => now(),
                 'updated_at'        => now(),
-            ]);
+            ];
+            if (Schema::hasColumn('bank_recon_salary_rows', 'narration')) {
+                $n = isset($r['narration']) ? trim(preg_replace('/\s+/', ' ', (string) $r['narration'])) : '';
+                $salaryRow['narration'] = $n !== '' ? $n : null;
+            }
+            $rowId = DB::table('bank_recon_salary_rows')->insertGetId($salaryRow);
 
             $note = null;
             $stmtId = $this->findBankStatementIdForSalaryUtr($utr, $r['net_paid'] ?? null, $accScope);
@@ -6157,6 +6199,7 @@ class BankStatementController extends Controller
         $cTds      = $getCol($colByNorm, ['tds']);
         $cNet      = $getCol($colByNorm, ['net paid', 'netpay', 'net pay', 'net', 'net amount', 'amount']);
         $cCred     = $getCol($colByNorm, ['credited date', 'credit date', 'credited', 'date']);
+        $cNarr     = $getCol($colByNorm, ['narration', 'narrations', 'remarks', 'remark', 'particulars', 'narration text']);
 
         $out = [];
         for ($ri = 1; $ri < count($data); $ri++) {
@@ -6181,6 +6224,17 @@ class BankStatementController extends Controller
 
                 return $v === '' ? null : $v;
             };
+            $gLong = static function (array $row, ?int $c) {
+                if ($c === null || ! isset($row[$c])) {
+                    return null;
+                }
+                $v = trim(preg_replace('/\s+/', ' ', (string) $row[$c]));
+                if ($v === '' || $v === '0') {
+                    return null;
+                }
+
+                return $v;
+            };
 
             $out[] = [
                 'sheet_row_index'  => $ri + 1,
@@ -6196,6 +6250,7 @@ class BankStatementController extends Controller
                 'tds'              => $cTds !== null && isset($row[$cTds]) ? $this->parseAmount($row[$cTds]) : null,
                 'net_paid'         => $cNet !== null && isset($row[$cNet]) ? $this->parseAmount($row[$cNet]) : null,
                 'credited_date'    => $g($row, $cCred),
+                'narration'        => $gLong($row, $cNarr),
             ];
         }
 

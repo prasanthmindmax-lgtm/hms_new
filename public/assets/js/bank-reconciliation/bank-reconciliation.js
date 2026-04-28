@@ -216,6 +216,16 @@ $(document).ready(function() {
         }
         qfRegister('qfMatchedBy',    'qfBtn-matchedBy',    'qfMenu-matchedBy',    'Anyone');
         qfRegister('qfVendor',       'qfBtn-vendor',       'qfMenu-vendor',       'All vendors');
+        if ($('#qfBtn-natureAccount').length) {
+            qfRegister('qfNatureAccount', 'qfBtn-natureAccount', 'qfMenu-natureAccount', 'All natures');
+        }
+        if (_qfReg['qfNatureAccount'] && typeof window.BANK_RECON_CHART_ACCOUNTS !== 'undefined'
+            && window.BANK_RECON_CHART_ACCOUNTS && window.BANK_RECON_CHART_ACCOUNTS.length) {
+            var nopts = window.BANK_RECON_CHART_ACCOUNTS.map(function (a) {
+                return { value: String(a.id), label: a.text || a.name || ('Account #' + a.id) };
+            });
+            qfPopulate('qfNatureAccount', nopts, true);
+        }
     }
 
     /** Return first selected company id (string) from the qf multi-select, or '' */
@@ -633,6 +643,12 @@ $(document).ready(function() {
             f.vendor_names = vend;
         }
 
+        var natureIds = $('#qfNatureAccount').length ? ($('#qfNatureAccount').val() || []) : [];
+        natureIds = natureIds.map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
+        if (natureIds.length) {
+            f.nature_account_ids = natureIds;
+        }
+
         var mb = $('#qfMatchedBy').length ? ($('#qfMatchedBy').val() || []) : [];
         mb = mb.map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
         if (mb.length === 1) {
@@ -675,27 +691,31 @@ $(document).ready(function() {
     };
 
     /**
-     * Modal "Transaction date": flatpickr range mode — reflects window.bankReconDateFrom / To.
+     * Modal and quick-filter "Transaction date": flatpickr range mode — reflects window.bankReconDateFrom / To.
      * Uses bankReconSkipFpChange so programmatic setDate does not recurse into onChange.
      */
     window.syncBankReconTransactionDatePickers = function () {
-        var el = document.getElementById('filterDateRange');
-        if (!el || !el._flatpickr) return;
         var from = window.bankReconDateFrom;
         var to = window.bankReconDateTo;
         window.bankReconSkipFpChange = true;
         try {
-            if (from && to) {
-                el._flatpickr.setDate([
-                    moment(from, 'YYYY-MM-DD').toDate(),
-                    moment(to, 'YYYY-MM-DD').toDate()
-                ], false);
-            } else if (from && !to) {
-                el._flatpickr.setDate([moment(from, 'YYYY-MM-DD').toDate()], false);
-            } else {
-                el._flatpickr.clear();
-                $(el).val('');
-            }
+            ['filterDateRange', 'qfTransactionDateRange'].forEach(function (elId) {
+                var el = document.getElementById(elId);
+                if (!el || !el._flatpickr) {
+                    return;
+                }
+                if (from && to) {
+                    el._flatpickr.setDate([
+                        moment(from, 'YYYY-MM-DD').toDate(),
+                        moment(to, 'YYYY-MM-DD').toDate()
+                    ], false);
+                } else if (from && !to) {
+                    el._flatpickr.setDate([moment(from, 'YYYY-MM-DD').toDate()], false);
+                } else {
+                    el._flatpickr.clear();
+                    $(el).val('');
+                }
+            });
         } finally {
             setTimeout(function () { window.bankReconSkipFpChange = false; }, 0);
         }
@@ -2769,6 +2789,71 @@ $(document).ready(function() {
     }
 
     // ============================================
+    // INCOME TAG → Income reconciliation overview (deep link)
+    // ============================================
+    function buildIncomeReconOverviewUrl(stmt) {
+        var base = routes.incomeReconciliationOverviewNew || '';
+        if (!base) {
+            return '';
+        }
+        var branch = (stmt.income_matched_branch || '').trim();
+        var split = parseIncomeMatchSplitJson(stmt);
+        var ymds = [];
+        if (split && Array.isArray(split.dates_ymd) && split.dates_ymd.length) {
+            ymds = split.dates_ymd.slice().sort();
+        } else if (stmt.income_matched_date) {
+            var m = moment(stmt.income_matched_date, ['DD/MM/YYYY', 'D/M/YYYY'], true);
+            if (m.isValid()) {
+                ymds = [m.format('YYYY-MM-DD')];
+            }
+        }
+        var zone = split && split.zone_name ? String(split.zone_name).trim() : '';
+        var params = [];
+        if (branch) {
+            params.push('br_branch=' + encodeURIComponent(branch));
+        }
+        if (zone) {
+            params.push('br_zone=' + encodeURIComponent(zone));
+        }
+        if (ymds.length) {
+            params.push('br_date_from=' + encodeURIComponent(ymds[0]));
+            params.push('br_date_to=' + encodeURIComponent(ymds[ymds.length - 1]));
+        }
+        return base + (params.length ? '?' + params.join('&') : '');
+    }
+
+    function buildIncomeTagRemarksLinesHtml(stmt) {
+        var agg = stmt.income_tag_remarks_aggregate;
+        if (agg && agg.length) {
+            var html = '<div class="br-income-tag-remarks mt-1">';
+            agg.forEach(function (r) {
+                html +=
+                    '<div class="br-income-tag-remark-line small border-start border-3 border-secondary ps-2 mb-1">' +
+                    '<span class="text-muted d-block" style="font-size:0.68rem;">' +
+                    escapeAttr(r.label || '') +
+                    '</span>' +
+                    '<span>' +
+                    escapeAttr(r.remark || '') +
+                    '</span>' +
+                    '</div>';
+            });
+            html += '</div>';
+            return html;
+        }
+        var single = (stmt.income_tag_mismatch_remark || '').toString().trim();
+        if (!single) {
+            return '';
+        }
+        return (
+            '<div class="br-income-tag-remarks mt-1">' +
+            '<div class="br-income-tag-remark-line small border-start border-3 border-info ps-2">' +
+            escapeAttr(single) +
+            '</div>' +
+            '</div>'
+        );
+    }
+
+    // ============================================
     // RENDER STATEMENTS TABLE
     // ============================================
     function buildStatementRowHtml(stmt) {
@@ -3010,13 +3095,37 @@ $(document).ready(function() {
             if (incomeTagged) {
                 window.bankReconIncomeDetailCache[stmt.id] = {
                     remark: (stmt.income_tag_mismatch_remark || '').toString(),
+                    remarksAggregate: stmt.income_tag_remarks_aggregate || [],
                     branch: (stmt.income_matched_branch || '').toString(),
                     matchedDate: (stmt.income_matched_date || '').toString(),
                     matchedAt: (stmt.income_matched_at || '').toString(),
                     byName: (stmt.income_matched_by_name || '').toString(),
                     byUser: (stmt.income_matched_by_username || '').toString(),
                 };
-                var hasMismatchRemark = !!(stmt.income_tag_mismatch_remark && String(stmt.income_tag_mismatch_remark).trim());
+                var aggRm = stmt.income_tag_remarks_aggregate;
+                var hasMismatchRemark =
+                    (aggRm && aggRm.length > 0) ||
+                    !!(stmt.income_tag_mismatch_remark && String(stmt.income_tag_mismatch_remark).trim());
+                var overviewUrl = buildIncomeReconOverviewUrl(stmt);
+                var cardInner =
+                    '<div class="br-income-tag-card">' +
+                        '<div class="br-income-tag-badge">' +
+                            '<i class="bi bi-arrow-left-right"></i> Income Tagged' +
+                        '</div>' +
+                        '<div class="br-income-tag-branch">' +
+                            '<i class="bi bi-geo-alt-fill br-income-tag-branch-icon"></i>' +
+                            escapeAttr(stmt.income_matched_branch || '') +
+                        '</div>' +
+                        '<div class="br-income-tag-doc-rows">' +
+                            buildIncomeTaggedDateAmountRowsHtml(stmt) +
+                            buildIncomeTagModesLineHtml(stmt) +
+                            // buildIncomeTagRemarksLinesHtml(stmt) +
+                        '</div>' +
+                        '<div class="br-income-tag-by">' +
+                            '<i class="bi bi-person-fill"></i> ' +
+                            escapeAttr(stmt.income_matched_by_name || '') +
+                        '</div>' +
+                    '</div>';
                 incomeTagCell =
                     '<div class="br-income-tag-card-wrap">' +
                     '<div class="br-income-tag-card-actions">' +
@@ -3034,23 +3143,14 @@ $(document).ready(function() {
                         (hasMismatchRemark ? '<span class="br-income-tag-detail-dot" aria-hidden="true"></span>' : '') +
                     '</button>' +
                     '</div>' +
-                    '<div class="br-income-tag-card">' +
-                        '<div class="br-income-tag-badge">' +
-                            '<i class="bi bi-arrow-left-right"></i> Income Tagged' +
-                        '</div>' +
-                        '<div class="br-income-tag-branch">' +
-                            '<i class="bi bi-geo-alt-fill br-income-tag-branch-icon"></i>' +
-                            escapeAttr(stmt.income_matched_branch || '') +
-                        '</div>' +
-                        '<div class="br-income-tag-doc-rows">' +
-                            buildIncomeTaggedDateAmountRowsHtml(stmt) +
-                            buildIncomeTagModesLineHtml(stmt) +
-                        '</div>' +
-                        '<div class="br-income-tag-by">' +
-                            '<i class="bi bi-person-fill"></i> ' +
-                            escapeAttr(stmt.income_matched_by_name || '') +
-                        '</div>' +
-                    '</div></div>';
+                    (overviewUrl
+                        ? '<a href="' +
+                          escapeAttr(overviewUrl) +
+                          '" target="_blank" rel="noopener" class="br-income-tag-card-link text-decoration-none text-reset d-block" title="Open income reconciliation (branch &amp; collection dates)">' +
+                          cardInner +
+                          '</a>'
+                        : cardInner) +
+                    '</div>';
             }
 
             let radiantTagCell = '<span class="text-muted small"><i class="bi bi-dash"></i> Not linked</span>';
@@ -3101,6 +3201,15 @@ $(document).ready(function() {
                         : '') +
                     (salUtr
                         ? '<div class="br-salary-line text-break small"><span class="text-muted">UTR</span> ' + escapeAttr(salUtr) + '</div>'
+                        : '') +
+                    (stmt.salary_narration
+                        ? '<div class="br-salary-line text-break small" title="Narration"><span class="text-muted">Narr.</span> ' +
+                          escapeAttr(
+                              String(stmt.salary_narration).length > 48
+                                  ? String(stmt.salary_narration).slice(0, 46) + '…'
+                                  : String(stmt.salary_narration)
+                          ) +
+                          '</div>'
                         : '') +
                     '<div class="br-salary-line">Net <strong class="text-success">₹' + salNet + '</strong></div>' +
                     (stmt.salary_stmt_matched_by_name || stmt.salary_uploaded_by_name
@@ -3580,8 +3689,37 @@ $(document).ready(function() {
             byLine = byLine ? byLine + ' (' + c.byUser + ')' : c.byUser;
         }
         $('#brIncomeDetailBy').text(byLine || '—');
-        $('#brIncomeDetailRemark').text((c.remark || '').trim() || '—');
+        var agg = c.remarksAggregate && c.remarksAggregate.length ? c.remarksAggregate : null;
+        var $rw = $('#brIncomeDetailRemarkWrap');
+        if ($rw.length) {
+            if (agg) {
+                var rhtml = '';
+                agg.forEach(function (item) {
+                    rhtml +=
+                        '<div class="border rounded p-2 bg-light mb-2 small">' +
+                        '<div class="text-muted" style="font-size:0.75rem;">' +
+                        escapeAttr(item.label || '') +
+                        '</div>' +
+                        '<div>' +
+                        escapeAttr(item.remark || '') +
+                        '</div></div>';
+                });
+                $rw.html(rhtml);
+            } else {
+                $rw.html(
+                    '<div class="br-income-detail-remark border rounded p-2 bg-light">' +
+                        escapeAttr((c.remark || '').trim() || '—') +
+                        '</div>'
+                );
+            }
+        } else {
+            $('#brIncomeDetailRemark').text((c.remark || '').trim() || '—');
+        }
         bankReconShowModal(document.getElementById('bankReconIncomeTagDetailModal'));
+    });
+
+    $(document).on('click', '.br-income-tag-card-link', function (e) {
+        e.stopPropagation();
     });
 
     function brOpenIncomeBillingListModal(sid) {
@@ -4984,28 +5122,26 @@ $(document).ready(function() {
         var amts = split && split.amounts_ymd ? split.amounts_ymd : null;
 
         if (ymds.length > 1 && amts) {
-            var html = '';
-            ymds.forEach(function (ymd, idx) {
-                var m = moment(ymd, 'YYYY-MM-DD', true);
-                var dmy = m.isValid() ? m.format('DD/MM/YYYY') : String(ymd);
-                var part = parseFloat(amts[ymd]);
-                if (!isFinite(part)) {
-                    part = 0;
-                }
-                var isLast = idx === ymds.length - 1;
-                var tagSuffix = (isLast && tagLine)
-                    ? '<span class="br-income-doc-tag-time">' + escapeAttr(tagLine) + '</span>'
-                    : '';
-                html +=
-                    '<div class="br-income-doc-row">' +
-                        '<span class="br-income-doc-label">MDOC</span>' +
-                        '<span class="br-income-doc-date">' + escapeAttr(dmy) + '</span>' +
-                        '<span class="br-income-doc-sep">—</span>' +
-                        '<span class="br-income-doc-amt">₹' + formatNumber(part) + '</span>' +
-                    '</div>' +
-                    (tagSuffix ? '<div class="br-income-doc-tag-row">' + tagSuffix + '</div>' : '');
+            var dateLabels = ymds.map(function (ymd) {
+                var mx = moment(ymd, 'YYYY-MM-DD', true);
+                return mx.isValid() ? mx.format('DD/MM/YYYY') : String(ymd);
             });
-            return html;
+            var totalPart = ymds.reduce(function (sum, ymd) {
+                var part = parseFloat(amts[ymd]);
+                return sum + (isFinite(part) ? part : 0);
+            }, 0);
+            var tagSuffix = tagLine
+                ? '<div class="br-income-doc-tag-row"><span class="br-income-doc-tag-time">' + escapeAttr(tagLine) + '</span></div>'
+                : '';
+            return (
+                '<div class="br-income-doc-row">' +
+                    '<span class="br-income-doc-label">MDOC</span>' +
+                    '<span class="br-income-doc-date">' + escapeAttr(dateLabels.join(', ')) + '</span>' +
+                    '<span class="br-income-doc-sep">—</span>' +
+                    '<span class="br-income-doc-amt">₹' + formatNumber(totalPart) + '</span>' +
+                '</div>' +
+                tagSuffix
+            );
         }
 
         var coll = (stmt.income_matched_date || '').toString().trim() || '—';
@@ -5266,6 +5402,7 @@ $(document).ready(function() {
             amountType: amountType,
             netPaid: stmt.salary_net_paid,
             utr: (stmt.salary_utr || '').toString(),
+            narration: (stmt.salary_narration || '').toString(),
             ecId: (stmt.salary_ec_id || '').toString(),
             employeeName: (stmt.salary_employee_name || '').toString(),
             designation: (stmt.salary_designation || '').toString(),
@@ -5320,6 +5457,9 @@ $(document).ready(function() {
         }
         if (p.utr) {
             html += '<div class="br-salary-ro-kv br-salary-ro-kv--wide"><div class="br-salary-ro-k">UTR</div><div class="br-salary-ro-v"><code class="br-utr-code">' + escapeAttr(p.utr) + '</code></div></div>';
+        }
+        if (p.narration && p.narration.toString().trim() !== '') {
+            html += '<div class="br-salary-ro-kv br-salary-ro-kv--wide mt-1"><div class="br-salary-ro-k">Narration</div><div class="br-salary-ro-v small text-break text-muted" style="white-space:pre-wrap;">' + escapeAttr(p.narration) + '</div></div>';
         }
         html += '</div>';
 
@@ -6860,7 +7000,7 @@ $(document).ready(function() {
                 var list = res.rows || [];
                 var h = '';
                 if (!list.length) {
-                    h = '<tr><td colspan="6" class="text-center text-muted">No rows</td></tr>';
+                    h = '<tr><td colspan="7" class="text-center text-muted">No rows</td></tr>';
                 } else {
                     list.forEach(function (r) {
                         var st = (r.match_status || '').toString();
@@ -6871,6 +7011,10 @@ $(document).ready(function() {
                         if (sdesc.length > 60) {
                             sdesc = sdesc.slice(0, 60) + '…';
                         }
+                        var narr = (r.narration || '—').toString();
+                        if (narr.length > 80) {
+                            narr = narr.slice(0, 78) + '…';
+                        }
                         h +=
                             '<tr><td class="text-break small">' +
                             escapeAttr((r.utr || '—').toString()) +
@@ -6878,6 +7022,8 @@ $(document).ready(function() {
                             escapeAttr((r.employee_name || '—').toString()) +
                             '</td><td class="small">' +
                             escapeAttr((r.branch || '—').toString()) +
+                            '</td><td class="small text-break" title="' + escapeAttr((r.narration || '').toString()) + '">' +
+                            escapeAttr(narr) +
                             '</td><td>₹' +
                             (r.net_paid != null ? formatNumber(r.net_paid) : '—') +
                             '</td><td class="small ' +

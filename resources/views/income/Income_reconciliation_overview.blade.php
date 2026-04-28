@@ -1599,6 +1599,15 @@
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <!-- income related script start -->
 
+<script type="text/javascript">
+    window.__bankReconDeepLink = {
+        branch: @json(request()->query('br_branch')),
+        zone: @json(request()->query('br_zone')),
+        dateFrom: @json(request()->query('br_date_from')),
+        dateTo: @json(request()->query('br_date_to')),
+    };
+    window.__bankReconDeepBranchPending = @json(request()->query('br_branch'));
+</script>
  <script src="{{ asset('/assets/income_new/Income_reconciliation_overview.js') }}"></script>
 
 <script type="text/javascript">

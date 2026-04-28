@@ -443,7 +443,12 @@
                         <div class="spinner"></div>
                     </div>
                     <div id="tableContainer">
-                        @include('branch.partials.reports-table', ['reports' => $reports, 'summary' => $summary, 'admin' => $admin])
+                        @include('branch.partials.reports-table', [
+                            'reports' => $reports,
+                            'summary' => $summary,
+                            'admin' => $admin,
+                            'allowedBranchIdsForZonalApprove' => $allowedBranchIdsForZonalApprove,
+                        ])
                     </div>
                 </div>
 
@@ -504,12 +509,12 @@
                 </div>
             </div>
 
-            <!-- ===================== AUDITOR REJECT MODAL ===================== -->
+            <!-- ===================== ZONAL HEAD REJECT MODAL (first-level; route: reject.auditor) ===================== -->
             <div class="modal fade" id="auditorRejectModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-danger text-white">
-                            <h5 class="modal-title"><i class="fas fa-times-circle me-2"></i>Auditor Rejection</h5>
+                            <h5 class="modal-title"><i class="fas fa-times-circle me-2"></i>Zonal Head Rejection</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
@@ -1005,7 +1010,7 @@
         <div class="row">
             <div class="col-md-12">
                 <h6 class="text-warning mb-3"><i class="fas fa-check-circle me-2"></i>Approval Status</h6>
-                <div class="info-row"><div class="info-label">Auditor Status:</div><div class="info-value">`;
+                <div class="info-row"><div class="info-label">Zonal Head Status:</div><div class="info-value">`;
 
         if (report.auditor_approval_status == 0)      html += '<span class="approval-badge approval-pending"><i class="fas fa-clock me-1"></i>Pending</span>';
         else if (report.auditor_approval_status == 1)  html += '<span class="approval-badge approval-approved"><i class="fas fa-check-circle me-1"></i>Approved</span>';
@@ -1014,14 +1019,14 @@
         html += `</div></div>`;
 
         if (report.auditor_approval_status != 0 && report.auditor_approved_by) {
-            html += `<div class="info-row"><div class="info-label">Auditor Reviewed By:</div><div class="info-value">${report.auditor_approved_by.user_fullname||'N/A'}</div></div>`;
-            html += `<div class="info-row"><div class="info-label">Auditor Review Date:</div><div class="info-value">${report.auditor_approved_at ? moment(report.auditor_approved_at).format('DD MMM YYYY hh:mm A') : 'N/A'}</div></div>`;
-            if (report.auditor_approval_remarks) html += `<div class="info-row"><div class="info-label">Auditor Remarks:</div><div class="info-value">${report.auditor_approval_remarks}</div></div>`;
+            html += `<div class="info-row"><div class="info-label">Zonal Head Reviewed By:</div><div class="info-value">${report.auditor_approved_by.user_fullname||'N/A'}</div></div>`;
+            html += `<div class="info-row"><div class="info-label">Zonal Head Review Date:</div><div class="info-value">${report.auditor_approved_at ? moment(report.auditor_approved_at).format('DD MMM YYYY hh:mm A') : 'N/A'}</div></div>`;
+            if (report.auditor_approval_remarks) html += `<div class="info-row"><div class="info-label">Zonal Head Remarks:</div><div class="info-value">${report.auditor_approval_remarks}</div></div>`;
         }
 
         html += `<div class="info-row mt-3"><div class="info-label">Management Status:</div><div class="info-value">`;
 
-        if (report.auditor_approval_status != 1)       html += '<span class="text-muted"><i class="fas fa-minus-circle me-1"></i>Awaiting Auditor Approval</span>';
+        if (report.auditor_approval_status != 1)       html += '<span class="text-muted"><i class="fas fa-minus-circle me-1"></i>Awaiting Zonal Head Approval</span>';
         else if (report.management_approval_status == 0) html += '<span class="approval-badge approval-pending"><i class="fas fa-clock me-1"></i>Pending</span>';
         else if (report.management_approval_status == 1) html += '<span class="approval-badge approval-approved"><i class="fas fa-check-circle me-1"></i>Approved</span>';
         else if (report.management_approval_status == 2) html += '<span class="approval-badge approval-rejected"><i class="fas fa-times-circle me-1"></i>Rejected</span>';
@@ -1037,8 +1042,8 @@
         html += `</div></div>`;
         html += '<div class="approval-actions">';
         if (canApproveAuditor) {
-            html += `<button class="btn btn-success" onclick="approveReportAuditor(${report.id})"><i class="fas fa-check-circle me-2"></i>Auditor Approve</button>`;
-            html += `<button class="btn btn-danger" onclick="openRejectModalAuditor(${report.id})"><i class="fas fa-times-circle me-2"></i>Auditor Reject</button>`;
+            html += `<button class="btn btn-success" onclick="approveReportAuditor(${report.id})"><i class="fas fa-check-circle me-2"></i>Zonal Head Approve</button>`;
+            html += `<button class="btn btn-danger" onclick="openRejectModalAuditor(${report.id})"><i class="fas fa-times-circle me-2"></i>Zonal Head Reject</button>`;
         }
         if (canApproveManagement) {
             html += `<button class="btn btn-primary" onclick="approveReportManagement(${report.id})"><i class="fas fa-check-double me-2"></i>Management Approve</button>`;
@@ -1213,7 +1218,7 @@
     function approveReportAuditor(reportId) {
         Swal.fire({
             title: 'Approve Report?',
-            text: 'Are you sure you want to approve this report as Auditor?',
+            text: 'Are you sure you want to approve this report as Zonal Head?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Yes, Approve',

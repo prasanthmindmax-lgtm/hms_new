@@ -740,6 +740,7 @@
                                     <th>Employee</th>
                                     <th>Designation</th>
                                     <th>Branch</th>
+                                    <th>Narration</th>
                                     <th class="text-end">Net paid</th>
                                     <th>Status</th>
                                     <th>Stmt ID</th>
@@ -748,7 +749,7 @@
                             </thead>
                             <tbody id="smTbody">
                                 <tr>
-                                    <td colspan="13" class="text-center text-muted py-5" style="font-size:.9rem;">
+                                    <td colspan="14" class="text-center text-muted py-5" style="font-size:.9rem;">
                                         <i class="bi bi-arrow-up-circle me-2 text-success"></i>
                                         Click <strong>Apply filters</strong> to load data.
                                     </td>

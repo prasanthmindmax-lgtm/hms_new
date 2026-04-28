@@ -255,6 +255,69 @@
             z-index: 2005;
         }
         .batch-toolbar .form-control, .batch-toolbar .form-select { min-width: 140px; }
+        /* Quick filter: compact financial year + transaction date field */
+        .bank-recon-qf-col--fy .bank-recon-qf-btn {
+            font-size: 0.78rem;
+            line-height: 1.2;
+            padding: 0.28rem 0.4rem;
+            min-height: 2.05rem;
+        }
+        .bank-recon-qf-col--fy .bank-recon-qf-field-label {
+            font-size: 0.7rem;
+            margin-bottom: 0.15rem;
+        }
+        .bank-recon-qf-txn-dates {
+            font-size: 0.8rem;
+        }
+        /* Transaction date in first row: same visual height as compact FY / qf buttons */
+        .bank-recon-qf-col--txn .bank-recon-qf-field-label {
+            font-size: 0.7rem;
+            margin-bottom: 0.15rem;
+        }
+        .bank-recon-qf-col--txn .form-control.bank-recon-qf-txn-dates {
+            min-height: 2.05rem;
+            padding: 0.28rem 0.4rem;
+        }
+        .bank-recon-qf-col--nature .bank-recon-qf-menu {
+            min-width: 100% !important;
+            max-width: 100% !important;
+        }
+        /* Quick filter rows: 5 equal columns (xl+); 4 in a row; single ≈ 20% width in last row */
+        @media (min-width: 1200px) {
+            .bank-recon-qf-row--5 {
+                flex-wrap: nowrap;
+            }
+            .bank-recon-qf-row--5 > .bank-recon-qf5-c {
+                flex: 1 1 0% !important;
+                max-width: none !important;
+            }
+            .bank-recon-qf-row--5 > .bank-recon-qf5-c--1 {
+                flex: 0 0 20% !important;
+                max-width: 20% !important;
+            }
+        }
+        .bank-recon-qf-row--5 .dropdown,
+        .bank-recon-qf-row--5 .bank-recon-qf-btn,
+        .bank-recon-qf-row--5 .form-control { width: 100%; }
+        .bank-recon-qf-row--5 .bank-recon-qf-menu { min-width: 100% !important; max-width: 100% !important; }
+        @media (min-width: 1200px) {
+            .bank-recon-qf-row--5 .bank-recon-qf-col--fy .bank-recon-qf-field-label,
+            .bank-recon-qf-row--5 .bank-recon-qf-col--txn .bank-recon-qf-field-label { font-size: 0.79rem; }
+        }
+        /* Row with 6 filters (Bill match … Vendor): one line at xl+ like the 5-column rows */
+        @media (min-width: 1200px) {
+            .bank-recon-qf-row--6 {
+                flex-wrap: nowrap;
+            }
+            .bank-recon-qf-row--6 > .bank-recon-qf6-c {
+                flex: 1 1 0% !important;
+                max-width: none !important;
+            }
+        }
+        .bank-recon-qf-row--6 .dropdown,
+        .bank-recon-qf-row--6 .bank-recon-qf-btn,
+        .bank-recon-qf-row--6 .form-control { width: 100%; }
+        .bank-recon-qf-row--6 .bank-recon-qf-menu { min-width: 100% !important; max-width: 100% !important; }
         /* SweetAlert2 above Match Transaction drawer (JS also lowers modal z-index while Swal is open) */
         .swal2-container { z-index: 2147483647 !important; }
     </style>
@@ -496,15 +559,11 @@
                             </div>
                         </div>
 
-                        {{-- Row 1 --}}
-                        <div class="row g-2 mb-2">
-
-                            @php
-                                /* helper macro: each field is (label-text, icon, btn-id, menu-id, select-id) */
-                            @endphp
+                        {{-- Quick filters: 5 per row (16 with bank / 14 without). Row1: FY, Txn, Mocdoc, +2 --}}
+                        <div class="row g-2 mb-2 align-items-end bank-recon-qf-row--5">
 
                             {{-- Financial Year --}}
-                            <div class="col-6 col-md-4 col-xl">
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c bank-recon-qf-col--fy">
                                 <div class="bank-recon-qf-field-label"><i class="bi bi-calendar3"></i> Financial Year</div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-financialYear"
@@ -536,8 +595,20 @@
                                 </select>
                             </div>
 
-                            {{-- Income / Mocdoc collection dates (multi) — filters income-tagged rows; independent of Financial Year txn window --}}
-                            <div class="col-6 col-md-4 col-xl">
+                            {{-- Bank transaction date range (same as modal) — right after Financial Year --}}
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c bank-recon-qf-col--txn">
+                                <div class="bank-recon-qf-field-label"><i class="bi bi-calendar-range"></i> Transaction date</div>
+                                <input type="text"
+                                       id="qfTransactionDateRange"
+                                       class="form-control form-control-sm bank-recon-qf-txn-dates"
+                                       readonly
+                                       autocomplete="off"
+                                       placeholder="dd/mm/yyyy to dd/mm/yyyy"
+                                       aria-label="Filter by bank transaction date range">
+                            </div>
+
+                            {{-- Income / Mocdoc collection dates (multi) — independent of Financial Year txn window --}}
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
                                 <div class="bank-recon-qf-field-label"><i class="bi bi-calendar2-check"></i> Mocdoc collection dates</div>
                                 <input type="text"
                                        id="qfIncomeCollectionDates"
@@ -548,9 +619,8 @@
                                        aria-label="Filter by Mocdoc or income tag collection dates">
                             </div>
 
-                            {{-- Company → Account Number (conditional) --}}
                             @if(!empty($bankAccountsEnabled))
-                            <div class="col-6 col-md-4 col-xl">
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
                                 <div class="bank-recon-qf-field-label"><i class="bi bi-building"></i> Company</div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-bankCompany"
@@ -571,9 +641,7 @@
                                 </div>
                                 <select id="qfBankCompany" multiple class="d-none"></select>
                             </div>
-                            @endif
-                            @if(!empty($bankAccountsEnabled))
-                            <div class="col-6 col-md-4 col-xl">
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
                                 <div class="bank-recon-qf-field-label"><i class="bi bi-credit-card-2-front"></i> Account Number</div>
                                 <div class="dropdown">
                                     <button class="bank-recon-qf-btn" type="button" id="qfBtn-bankAccount"
@@ -594,10 +662,8 @@
                                 </div>
                                 <select id="qfBankAccount" multiple class="d-none"></select>
                             </div>
-                            @endif
-
-                            {{-- Zone (bills + income narrative + salary UTR branch) --}}
-                            <div class="col-6 col-md-4 col-xl">
+                            @else
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
                                 <div class="bank-recon-qf-field-label" title="Filters vendor bill zone, income-tag branch / description, and salary sheet branch (UTR upload).">
                                     <i class="bi bi-map"></i> Zone
                                 </div>
@@ -620,9 +686,7 @@
                                 </div>
                                 <select id="qfZone" multiple class="d-none"></select>
                             </div>
-
-                            {{-- Branch (bills + income + salary UTR) --}}
-                            <div class="col-6 col-md-4 col-xl">
+                            <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
                                 <div class="bank-recon-qf-field-label" title="Filters vendor bill branch, income-tag branch / description, and salary Excel branch column.">
                                     <i class="bi bi-building"></i> Branch
                                 </div>
@@ -645,264 +709,11 @@
                                 </div>
                                 <select id="qfBranch" multiple class="d-none"></select>
                             </div>
+                            @endif
 
-                        </div>{{-- /row 1 --}}
+                        </div>
 
-                        {{-- Row 2 — Category + PAY IN/OUT + match filters --}}
-                        <div class="row g-2 mb-2">
-
-                            {{-- Category (categorized vs uncategorized) --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-tag"></i> Category</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-category"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-category">
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfCategory_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfCategory_all">All</label>
-                                        </div>
-                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
-                                    </div>
-                                </div>
-                                <select id="qfCategory" multiple class="d-none">
-                                    <option value="categorized">Categorized</option>
-                                    <option value="uncategorized">Uncategorized</option>
-                                </select>
-                            </div>
-
-                            {{-- PAY IN / PAY OUT --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-arrow-down-up"></i> PAY IN / PAY OUT</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-txnType"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All types</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-txnType">
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfTxnType_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfTxnType_all">All types</label>
-                                        </div>
-                                        <div class="qf-menu-list">
-                                            <div class="qf-options-inner">
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfTxnType_deposit" value="deposit">
-                                                    <label class="qf-menu-item-text" for="brqf_qfTxnType_deposit">PAY IN</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfTxnType_withdrawal" value="withdrawal">
-                                                    <label class="qf-menu-item-text" for="brqf_qfTxnType_withdrawal">PAY OUT</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <select id="qfTxnType" multiple class="d-none">
-                                    <option value="deposit">PAY IN</option>
-                                    <option value="withdrawal">PAY OUT</option>
-                                </select>
-                            </div>
-
-                            {{-- Bill Match --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-check-circle"></i> Bill Match</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-expenseMatch"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All statuses</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-expenseMatch">
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfExpenseMatch_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_all">All statuses</label>
-                                        </div>
-                                        <div class="qf-menu-list">
-                                            <div class="qf-options-inner">
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfExpenseMatch_unmatched" value="unmatched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_unmatched">Unmatched</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfExpenseMatch_matched" value="matched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_matched">Matched</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfExpenseMatch_partially_matched" value="partially_matched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfExpenseMatch_partially_matched">Partially matched</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <select id="qfExpenseMatch" multiple class="d-none">
-                                    <option value="unmatched">Unmatched</option>
-                                    <option value="matched">Matched</option>
-                                    <option value="partially_matched">Partially matched</option>
-                                </select>
-                            </div>
-
-                            {{-- Radiant --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-brightness-high"></i> Radiant</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-radiantMatch"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-radiantMatch">
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfRadiantMatch_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_all">All</label>
-                                        </div>
-                                        <div class="qf-menu-list">
-                                            <div class="qf-options-inner">
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfRadiantMatch_radiant_matched" value="radiant_matched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_radiant_matched">Radiant linked</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfRadiantMatch_radiant_keyword_only" value="radiant_keyword_only">
-                                                    <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_radiant_keyword_only">Keyword only</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfRadiantMatch_radiant_unmatched" value="radiant_unmatched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfRadiantMatch_radiant_unmatched">Not linked</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <select id="qfRadiantMatch" multiple class="d-none">
-                                    <option value="radiant_matched">Radiant linked</option>
-                                    <option value="radiant_keyword_only">Keyword only</option>
-                                    <option value="radiant_unmatched">Not linked</option>
-                                </select>
-                            </div>
-
-                            {{-- Income Tag --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-bookmark"></i> Income Tag</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-incomeMatch"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-incomeMatch">
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfIncomeMatch_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfIncomeMatch_all">All</label>
-                                        </div>
-                                        <div class="qf-menu-list">
-                                            <div class="qf-options-inner">
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfIncomeMatch_income_matched" value="income_matched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfIncomeMatch_income_matched">Income matched</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfIncomeMatch_income_unmatched" value="income_unmatched">
-                                                    <label class="qf-menu-item-text" for="brqf_qfIncomeMatch_income_unmatched">Income unmatched</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <select id="qfIncomeMatch" multiple class="d-none">
-                                    <option value="income_matched">Income matched</option>
-                                    <option value="income_unmatched">Income unmatched</option>
-                                </select>
-                            </div>
-
-                            {{-- Salary UTR (sheet match to bank line) --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label" title="Filter lines by salary UTR tagging from the salary Excel upload.">
-                                    <i class="bi bi-cash-coin"></i> Salary UTR
-                                </div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-salaryTag"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-salaryTag">
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfSalaryTag_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfSalaryTag_all">All</label>
-                                        </div>
-                                        <div class="qf-menu-list">
-                                            <div class="qf-options-inner">
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfSalaryTag_tagged" value="tagged">
-                                                    <label class="qf-menu-item-text" for="brqf_qfSalaryTag_tagged">Salary UTR matched</label>
-                                                </div>
-                                                <div class="qf-menu-item">
-                                                    <input type="checkbox" id="brqf_qfSalaryTag_not" value="not_tagged">
-                                                    <label class="qf-menu-item-text" for="brqf_qfSalaryTag_not">No salary UTR</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <select id="qfSalaryTag" multiple class="d-none">
-                                    <option value="tagged">Salary UTR matched</option>
-                                    <option value="not_tagged">No salary UTR</option>
-                                </select>
-                            </div>
-
-                            {{-- Matched By --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-person"></i> Matched By</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-matchedBy"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">Anyone</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-matchedBy">
-                                        <div class="qf-menu-search-wrap">
-                                            <input type="text" class="qf-search-input" placeholder="Search users…">
-                                        </div>
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfMatchedBy_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfMatchedBy_all">Anyone</label>
-                                        </div>
-                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
-                                    </div>
-                                </div>
-                                <select id="qfMatchedBy" multiple class="d-none"></select>
-                            </div>
-
-                            {{-- Vendor Name --}}
-                            <div class="col-6 col-md-4 col-xl">
-                                <div class="bank-recon-qf-field-label"><i class="bi bi-person-badge"></i> Vendor Name</div>
-                                <div class="dropdown">
-                                    <button class="bank-recon-qf-btn" type="button" id="qfBtn-vendor"
-                                            data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
-                                        <span class="qf-btn-text">All vendors</span>
-                                        <i class="bi bi-chevron-down qf-btn-arrow"></i>
-                                    </button>
-                                    <div class="dropdown-menu bank-recon-qf-menu" id="qfMenu-vendor">
-                                        <div class="qf-menu-search-wrap">
-                                            <input type="text" class="qf-search-input" placeholder="Search vendors…">
-                                        </div>
-                                        <div class="qf-menu-item qf-menu-item-all">
-                                            <input type="checkbox" class="qf-all-chk" id="brqf_qfVendor_all" checked>
-                                            <label class="qf-menu-item-text" for="brqf_qfVendor_all">All vendors</label>
-                                        </div>
-                                        <div class="qf-menu-list"><div class="qf-options-inner"></div></div>
-                                    </div>
-                                </div>
-                                <select id="qfVendor" multiple class="d-none"></select>
-                            </div>
-
-                        </div>{{-- /row 2 --}}
+                        @include('bank-reconciliation.partials.bank_recon_qf_rows_2_4')
 
                     </div>{{-- /bank-recon-qf-panel --}}
 
@@ -1699,6 +1510,7 @@
                                     <th>UTR</th>
                                     <th>Name</th>
                                     <th>Branch</th>
+                                    <th>Narration</th>
                                     <th>Net</th>
                                     <th>Status</th>
                                     <th>Stmt line</th>
@@ -2389,6 +2201,7 @@
             billPrint: "{{ route('superadmin.getbillprint') }}",
             billDashboard: "{{ route('superadmin.getbill') }}",
             vendorDashboard: "{{ route('superadmin.getvendor') }}",
+            incomeReconciliationOverviewNew: "{{ route('superadmin.overviewindexnew') }}",
         };
         var routes = window.bankReconRoutes;
         window.bankReconSuperAdmin = @json(!empty($bankReconSuperAdmin));
@@ -2424,6 +2237,9 @@
                     if (typeof window.syncBankReconFinancialYearSelect === 'function') {
                         window.syncBankReconFinancialYearSelect();
                     }
+                    if (typeof window.syncBankReconTransactionDatePickers === 'function') {
+                        window.syncBankReconTransactionDatePickers();
+                    }
                 },
                 onClose: function(selectedDates) {
                     if (window.bankReconSkipFpChange) return;
@@ -2456,10 +2272,16 @@
         }
 
         var filterDateEl = document.getElementById('filterDateRange');
-        if (filterDateEl) {
+        var qfTxnDateEl = document.getElementById('qfTransactionDateRange');
+        if (filterDateEl || qfTxnDateEl) {
             window.bankReconDateFrom = @json($bankReconFyStart->format('Y-m-d'));
             window.bankReconDateTo = @json($bankReconFyEnd->format('Y-m-d'));
-            bankReconWireTxnRangeFlatpickr(filterDateEl);
+            if (filterDateEl) {
+                bankReconWireTxnRangeFlatpickr(filterDateEl);
+            }
+            if (qfTxnDateEl) {
+                bankReconWireTxnRangeFlatpickr(qfTxnDateEl);
+            }
             if (typeof window.syncBankReconTransactionDatePickers === 'function') {
                 window.syncBankReconTransactionDatePickers();
             }

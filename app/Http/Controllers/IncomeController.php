@@ -696,17 +696,38 @@ public function storeRadiant(Request $request)
     // }
   public function fetchRadiant(Request $request)
     {
-        // $zone      = $request->zone_name;
-        $location  = $request->location_name;
-        $date      = $request->date_range;
+        $location = $request->location_name;
+        $date = $request->date_range;
+        $zone = trim((string) $request->input('zone_name', ''));
 
         if (!$location || !$date) {
             return response()->json(['status' => 400, 'data' => null]);
         }
-        $data = DB::table('income_reconciliation_table')
+
+        $q = DB::table('income_reconciliation_table')
             ->where('location_name', $location)
-            ->where('date_range', $date)
-            ->first();
+            ->where('date_range', $date);
+
+        if ($zone !== '') {
+            $q->where('zone_name', $zone);
+        }
+
+        $data = $q->first();
+
+        if ($data) {
+            /** @var \App\Http\Controllers\IncomeReconciliationController $reconCtl */
+            $reconCtl = app(IncomeReconciliationController::class);
+            $reconCtl->appendIncomeReconciliationBankTagRemarksForOverview($data);
+
+            $bankMismatchAgg = trim((string) ($data->display_bank_income_remarks ?? ''));
+            $legacyRemark = isset($data->remark) ? trim((string) $data->remark) : '';
+
+            // Remark column: all MOC mismatch remarks from every income-tagged bank line (+ row-level), then any legacy row remark.
+            $data->remark = $bankMismatchAgg !== ''
+                ? ($legacyRemark !== '' ? $bankMismatchAgg . "\n\n" . $legacyRemark : $bankMismatchAgg)
+                : $legacyRemark;
+        }
+
         return response()->json(['status' => 200, 'data' => $data]);
     }
 
