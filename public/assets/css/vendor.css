@@ -1743,6 +1743,128 @@ input:focus {
   width: 300px;
 }
 
+.notes-upload-wrapper.grn-create-uploads-3col {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 3fr) minmax(0, 3fr);
+  column-gap: 1.5rem;
+  align-items: start;
+  box-sizing: border-box;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .notes-section {
+  min-width: 0;
+}
+@media (max-width: 1199.98px) {
+  .notes-upload-wrapper.grn-create-uploads-3col {
+    grid-template-columns: 1fr;
+  }
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-section {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.notes-upload-wrapper.grn-create-uploads-3col,
+.notes-upload-wrapper.grn-create-uploads-3col .upload-section {
+  text-align: left;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-title,
+.notes-upload-wrapper.grn-create-uploads-3col .upload-hint {
+  display: block;
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-hint {
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-box {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  padding-left: 0;
+  box-sizing: border-box;
+  gap: 5px;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList {
+  list-style: none;
+  list-style-type: none;
+  padding: 0 !important;
+  padding-left: 0 !important;
+  padding-inline-start: 0 !important;
+  margin: 8px 0 0 0 !important;
+  margin-left: 0 !important;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  margin-left: 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  gap: 8px;
+  line-height: 1.35;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li::before,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li::before {
+  flex-shrink: 0;
+  align-self: center;
+  line-height: 1;
+  font-size: 1.1rem;
+}
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li::before {
+  content: '🎬';
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .file-name,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .grn-file-link-text,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li > span:not(.remove-file):not(.remove-file1),
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .grn-video-preview-name,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .grn-video-new-name,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .grn-file-link-text,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li > span:not(.remove-file):not(.remove-file1):not(.remove-grn-video) {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  align-self: center;
+  line-height: 1.35;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .remove-file,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .remove-file1,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .remove-grn-video,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .remove-file1 {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+}
+
 .upload-title {
   display: block;
   font-weight: 600;
@@ -2413,6 +2535,133 @@ hr {
   width: 300px;
 }
 
+/* GRN create: 3 columns in one row — Notes | Files | Video */
+.notes-upload-wrapper.grn-create-uploads-3col {
+  display: grid;
+  /* 6 : 3 : 3 (Bootstrap 12-col equivalent: col-6 | col-3 | col-3) */
+  grid-template-columns: minmax(0, 6fr) minmax(0, 3fr) minmax(0, 3fr);
+  column-gap: 1.5rem;
+  align-items: start;
+  box-sizing: border-box;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .notes-section {
+  min-width: 0;
+}
+@media (max-width: 1199.98px) {
+  .notes-upload-wrapper.grn-create-uploads-3col {
+    grid-template-columns: 1fr;
+  }
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-section {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* One flush left edge: title, button row, hint, file rows (override Bootstrap ul padding) */
+.notes-upload-wrapper.grn-create-uploads-3col,
+.notes-upload-wrapper.grn-create-uploads-3col .upload-section {
+  text-align: left;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-title,
+.notes-upload-wrapper.grn-create-uploads-3col .upload-hint {
+  display: block;
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-hint {
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .upload-box {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  padding-left: 0;
+  box-sizing: border-box;
+  gap: 5px;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList {
+  list-style: none;
+  list-style-type: none;
+  padding: 0 !important;
+  padding-left: 0 !important;
+  padding-inline-start: 0 !important;
+  margin: 8px 0 0 0 !important;
+  margin-left: 0 !important;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  margin-left: 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  gap: 8px;
+  line-height: 1.35;
+}
+/* Icon (emoji) + text baseline: keep icon vertically centered with wrapped text */
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li::before,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li::before {
+  flex-shrink: 0;
+  align-self: center;
+  line-height: 1;
+  font-size: 1.1rem;
+}
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li::before {
+  content: '🎬';
+}
+/* Filename is the flex item that may wrap; min-width:0 allows flex shrink + no clipping */
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .file-name,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .grn-file-link-text,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li > span:not(.remove-file):not(.remove-file1),
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .grn-video-preview-name,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .grn-video-new-name,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .grn-file-link-text,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li > span:not(.remove-file):not(.remove-file1):not(.remove-grn-video) {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  align-self: center;
+  line-height: 1.35;
+}
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .remove-file,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .remove-file1,
+.notes-upload-wrapper.grn-create-uploads-3col .file-list li .remove-grn-video,
+.notes-upload-wrapper.grn-create-uploads-3col #grnVideoList li .remove-file1 {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+}
+
 .upload-title {
   display: block;
   font-weight: 600;
@@ -2637,23 +2886,57 @@ hr {
 #documentModal1{
   z-index: 999999;
 }
+#documentModal1 #image_pdfs .btn.pdf-btn,
+#documentModal1 #image_pdfs .btn {
+  white-space: normal;
+  text-align: left;
+  line-height: 1.3;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+  font-size: 11px;
+  max-width: 100%;
+}
 .preview-card {
   background-color: #f8f9fa;
   border: 1px solid #ddd;
   border-radius: 10px;
-  padding: 12px;
-  margin: 10px;
+  padding: 10px 8px 12px;
+  margin: 6px;
   width: 150px;
-  text-align: center;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   font-size: 12px;
-  overflow-wrap: break-word;
   cursor: pointer;
+}
+/* Filename under icon: same width as card, left-aligned — avoids ragged “centered” line wrapping */
+.preview-card > img + div,
+.preview-card .grn-doc-filename {
+  display: block;
+  width: 100%;
+  align-self: stretch;
+  text-align: left;
+  line-height: 1.35;
+  font-size: 11px;
+  color: #334155;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: 0;
+  max-height: 6.5em;
+  overflow-y: auto;
 }
 .preview-card img {
   max-width: 100%;
   max-height: 100px;
   object-fit: cover;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
 }
 .preview-card a {
   text-decoration: none;
@@ -2917,4 +3200,38 @@ thead > tr{
 .sortable.active .fa-sort-up,
 .sortable.active .fa-sort-down {
     color: #2a6fdb;
+}
+
+/* Vendor list */
+.vendor-files-cell {
+  white-space: nowrap;
+  min-width: 90px;
+  vertical-align: middle !important;
+}
+.vendor-files-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4c1d95;
+  background: linear-gradient(180deg, #f5f3ff, #ede9fe);
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.vendor-files-chip:hover,
+.vendor-files-chip:focus {
+  background: #ede9fe;
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.12);
+  outline: none;
+}
+.vendor-files-chip i {
+  font-size: 13px;
+  opacity: 0.9;
 }

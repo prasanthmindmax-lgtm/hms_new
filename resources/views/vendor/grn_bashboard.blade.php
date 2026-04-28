@@ -9,15 +9,10 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" />
 <style>
-.preview-card {
-  background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 10px;
-  padding: 12px; margin: 10px; width: 150px; text-align: center;
-  font-size: 12px; overflow-wrap: break-word; cursor: pointer;
-}
-.preview-card img { max-width:100%; max-height:100px; object-fit:cover; margin-bottom:8px; }
-#documentModal1{
-  z-index: 999999;
-}
+/* GRN panel: cards use global .preview-card in vendor.css (left-aligned file names) */
+#documentModal1{ z-index: 999999; }
+.document-preview-bill .preview-card { margin: 0; }
+.document-preview-bill { align-items: flex-start; }
 /* GRN detail side panel */
 .grn-panel-backdrop {
   position:fixed; inset:0; background:rgba(15,23,42,.45);
@@ -803,16 +798,18 @@ $(document).ready(function () {
       : (ext === 'pdf'
         ? 'https://cdn-icons-png.flaticon.com/512/337/337946.png'
         : 'https://cdn-icons-png.flaticon.com/512/564/564619.png');
-    const $row = $('<div></div>');
-    if (title) {
-      $row.append($('<h6></h6>').text(title));
-    }
     const $card = $('<div class="preview-card documentclk" role="button" tabindex="0"></div>');
     $card.data('grnDocUrls', [fileUrl]);
-    $card.append($('<img alt="">').attr('src', iconUrl).css({ height: '60px', objectFit: 'cover' }));
-    $card.append($('<div></div>').text(filename));
-    $row.append($card);
-    $(containerSelector).append($row);
+    $card.append($('<img alt="">').attr('src', iconUrl).css({ height: '60px', objectFit: 'contain' }));
+    $card.append($('<div class="grn-doc-filename"></div>').text(filename));
+    if (title) {
+      const $row = $('<div class="mb-1"></div>');
+      $row.append($('<h6 class="w-100 small text-muted"></h6>').text(title));
+      $row.append($card);
+      $(containerSelector).append($row);
+    } else {
+      $(containerSelector).append($card);
+    }
   }
 
   // Edit & PDF from panel
@@ -856,7 +853,7 @@ $(document).ready(function () {
         fileName = decodeURIComponent(fileName);
       } catch (err) { /* keep segment as-is */ }
       fileName = $('<div>').text(fileName).html();
-      views += '<button style="font-size: 11px;" type="button" class="btn btn-primary pdf-btn" data-filepath="' + file + '">' + fileName + '</button>';
+      views += '<button type="button" class="btn btn-primary pdf-btn" data-filepath="' + file + '">' + fileName + '</button>';
     });
     $('#image_pdfs').html(views);
   });

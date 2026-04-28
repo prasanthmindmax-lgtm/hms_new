@@ -13,11 +13,40 @@
               <th>REFERENCE</th>
               <th>RECEIVABLES (BCY)</th>
               <th>UNUSED CREDITS (BCY)</th>
+              <th>FILES</th>
               <th>STATUS</th>
           </tr>
       </thead>
       <tbody>
           @forelse ($vendor as $v)
+              @php
+                $fileUrls = [];
+                $addFiles = function ($raw) use (&$fileUrls) {
+                    if (empty($raw) || $raw === 'null') {
+                        return;
+                    }
+                    $arr = is_string($raw) ? json_decode($raw, true) : $raw;
+                    if (!is_array($arr)) {
+                        return;
+                    }
+                    $base = rtrim(asset('public/uploads/customers'), '/');
+                    foreach ($arr as $f) {
+                        if ($f === null || $f === '') {
+                            continue;
+                        }
+                        $f = ltrim((string) $f, '/');
+                        $fileUrls[] = $base . '/' . $f;
+                    }
+                };
+                $addFiles($v->pan_upload ?? null);
+                $addFiles($v->documents ?? null);
+                if (!empty($v->bankdetails) && (is_countable($v->bankdetails) ? count($v->bankdetails) : 0)) {
+                    foreach ($v->bankdetails as $b) {
+                        $addFiles($b->bank_uploads ?? null);
+                    }
+                }
+                $fileUrls = array_values(array_unique($fileUrls));
+              @endphp
               <tr class="customer-row"
                   data-id="{{ $v->id }}"
                   data-name="{{ $v->display_name }}"
@@ -63,6 +92,21 @@
                   <td>{{ $v->reference ?? '-' }}</td>
                   <td>₹{{ number_format($v->opening_balance ?? 0, 2) }}</td>
                   <td>₹0.00</td>
+                  <td class="vendor-files-cell text-center align-middle" onclick="event.stopPropagation()">
+                    @if(count($fileUrls) > 0)
+                        <span class="doc-row vendor-files-chip"
+                            role="button" tabindex="0"
+                            data-filetype="documents"
+                            data-b64-files='@json($fileUrls)'
+                            data-files='@json($fileUrls)'
+                            onclick="event.stopPropagation(); if(typeof Documentview==='function'){ Documentview(this); } return false;">
+                            <i class="bi bi-paperclip" aria-hidden="true"></i>
+                            {{ count($fileUrls) }} <span class="d-none d-md-inline">file</span>
+                        </span>
+                    @else
+                        <span class="text-muted" style="font-size: 12px;">—</span>
+                    @endif
+                  </td>
                   <td>
                       <div class="form-check form-switch d-flex align-items-center gap-2" style="padding-left:0;">
                           <input class="form-check-input vendor-status-toggle" type="checkbox"
@@ -78,7 +122,7 @@
               </tr>
           @empty
               <tr>
-                  <td colspan="12" class="text-center py-5 text-muted">
+                  <td colspan="13" class="text-center py-5 text-muted">
                       <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
                       No vendors found
                   </td>

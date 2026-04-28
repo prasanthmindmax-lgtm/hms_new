@@ -88,6 +88,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -5205,38 +5206,78 @@ public function getgrnconvert(Request $request)
     $limit_access = $admin->access_limits;
     $locations = TblLocationModel::all();
 
-    $perPage = $request->get('per_page', 10);
-    $activeTable = $request->get('table', 'po'); // Get which table is active
+    $perPage = (int) $request->get('per_page', 10);
+    $perPage = in_array($perPage, [10, 25, 50, 100, 250, 500], true) ? $perPage : 10;
+    $activeTable = $request->get('table', 'bill');
+    $q = trim((string) $request->get('q', ''));
 
-    // Load PO data
-    $purchaselist = TblPurchaseorder::with(['BillLines','Tblvendor','TblBilling'])
+    $poQuery = TblPurchaseorder::with(['BillLines', 'Tblvendor', 'TblBilling'])
         ->orderBy('id', 'desc')
         ->where('grn_status', 0)
-        ->where('delete_status',0)
-        ->paginate($perPage, ['*'], 'po_page')
-        ->appends([
-            'per_page' => $perPage,
-            'table' => $activeTable
-        ]);
+        ->where('delete_status', 0);
 
-    // Load Bill data
-    $billlist = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails'])
+    if ($q !== '') {
+        $poQuery->where(function ($w) use ($q) {
+            $w->where('purchase_order_number', 'like', "%{$q}%")
+                ->orWhere('order_number', 'like', "%{$q}%")
+                ->orWhere('vendor_name', 'like', "%{$q}%");
+        });
+    }
+
+    $purchaselist = $poQuery->paginate($perPage, ['*'], 'po_page');
+    $poAppends = ['per_page' => $perPage, 'table' => 'po'];
+    if ($q !== '') {
+        $poAppends['q'] = $q;
+    }
+    $purchaselist->appends($poAppends);
+
+    $billQuery = Tblbill::with(['BillLines', 'Tblvendor', 'TblBilling', 'Tblbankdetails'])
         ->orderBy('id', 'desc')
         ->where('grn_status', 0)
-        ->where('delete_status',0)
-        ->paginate($perPage, ['*'], 'bill_page')
-        ->appends([
-            'per_page' => $perPage,
-            'table' => $activeTable
-        ]);
+        ->where('delete_status', 0);
+
+    if ($q !== '') {
+        $billQuery->where(function ($w) use ($q) {
+            $w->where('bill_number', 'like', "%{$q}%")
+                ->orWhere('order_number', 'like', "%{$q}%")
+                ->orWhere('vendor_name', 'like', "%{$q}%")
+                ->orWhere('company_name', 'like', "%{$q}%")
+                ->orWhereHas('Tblvendor', function ($v) use ($q) {
+                    $v->where('pan_number', 'like', "%{$q}%")
+                        ->orWhere('gst_number', 'like', "%{$q}%");
+                });
+        });
+    }
+
+    $billlist = $billQuery->paginate($perPage, ['*'], 'bill_page');
+    $billAppends = ['per_page' => $perPage, 'table' => 'bill'];
+    if ($q !== '') {
+        $billAppends['q'] = $q;
+    }
+    $billlist->appends($billAppends);
+
+    if ($request->boolean('grn_async') || (string) $request->get('grn_async') === '1') {
+        $html = view('vendor.grn_convert', [
+            'admin'         => $admin,
+            'locations'     => $locations,
+            'purchaselist'  => $purchaselist,
+            'billlist'      => $billlist,
+            'perPage'       => $perPage,
+            'activeTable'   => 'bill',
+            'q'             => $q,
+        ])->fragment('grn-bill-table-ajax');
+
+        return response()->json(['html' => $html, 'table' => 'bill', 'q' => $q]);
+    }
 
     return view('vendor.grn_convert', [
-        'admin' => $admin,
-        'locations' => $locations,
-        'purchaselist' => $purchaselist,
-        'billlist' => $billlist,
-        'perPage' => $perPage,
-        'activeTable' => $activeTable
+        'admin'         => $admin,
+        'locations'     => $locations,
+        'purchaselist'  => $purchaselist,
+        'billlist'      => $billlist,
+        'perPage'       => $perPage,
+        'activeTable'   => $activeTable,
+        'q'             => $q,
     ]);
 }
 public function getgrncreate()
@@ -5318,6 +5359,23 @@ public function savegrn(Request $request)
         $request->validate([
             'department_id'   => 'required|integer|exists:departments,id',
         ]);
+        if ($request->hasFile('video_uploads')) {
+            $request->validate([
+                'video_uploads' => 'array|max:3',
+                'video_uploads.*' => 'file|max:10240',
+            ], [
+                'video_uploads.*.max' => 'Each video may not be greater than 10MB.',
+            ]);
+        }
+        if ($request->input('qc_ststus') === 'Checked') {
+            $request->validate([
+                'qc_checked_by' => 'required|integer|exists:users,id',
+            ], [
+                'qc_checked_by.required' => 'QC Checked By is required when QC Status is Checked.',
+            ]);
+        }
+
+        $qcCheckedBy = $request->input('qc_ststus') === 'Checked' ? $request->input('qc_checked_by') : null;
 
         $data = [
             'user_id' => $user_id,
@@ -5341,7 +5399,7 @@ public function savegrn(Request $request)
             'save_status' => $request->save_status,
             'note' => $request->note,
             'qc_ststus' => $request->qc_ststus,
-            'qc_checked_by' => $request->qc_checked_by,
+            'qc_checked_by' => $qcCheckedBy,
             'created_at' => $now,
         ];
         if (!$isUpdate) {
@@ -5358,22 +5416,26 @@ public function savegrn(Request $request)
         }
 
        $fileNames = [];
-
-        // 1. Handle new file uploads
-        if ($request->hasFile('uploads')) {
-            $uploadPath = public_path('uploads/vendor/grn');
-
-            if (!File::exists($uploadPath)) {
-                File::makeDirectory($uploadPath, 0755, true);
+        $uploadPath = public_path('uploads/vendor/grn');
+        if (!File::exists($uploadPath)) {
+            File::makeDirectory($uploadPath, 0755, true);
+        }
+        $appendGrnFiles = function ($fileBag) use ($uploadPath, &$fileNames) {
+            if (!$fileBag) {
+                return;
             }
-
-            foreach ($request->file('uploads') as $file) {
+            foreach (array_filter(Arr::wrap($fileBag)) as $file) {
+                if (!$file->isValid()) {
+                    continue;
+                }
                 $originalName = $file->getClientOriginalName();
-                $uniqueFileName = time() . '_' . $originalName;
+                $uniqueFileName = time() . '_' . uniqid('grn_', true) . '_' . preg_replace('/\s+/', '_', $originalName);
                 $file->move($uploadPath, $uniqueFileName);
                 $fileNames[] = $uniqueFileName;
             }
-        }
+        };
+        $appendGrnFiles($request->file('uploads'));
+        $appendGrnFiles($request->file('video_uploads'));
 
         // 2. Get existing files from hidden input (if any)
         $existingFiles = $request->existing_files ?? []; // from hidden input

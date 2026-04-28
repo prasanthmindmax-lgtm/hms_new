@@ -45,7 +45,7 @@
         <div class="container">
           <h1>New GRN</h1>
 
-          <form id="billForm" method="POST" action="">
+          <form id="billForm" method="POST" action="" enctype="multipart/form-data">
               @csrf
 
             <div class="container mt-4">
@@ -203,7 +203,7 @@
                         <input type="text" class="form-control datepicker" id="due_date" autocomplete="off" autocorrect="off" name="due_date" >
                     </div>
 
-                    <label for="payment_terms" class="col-md-2 ">Payment Terms</label>
+                    {{--  <label for="payment_terms" class="col-md-2 ">Payment Terms</label>
                     <div class="col-md-4">
                         <select class="form-select" id="payment_terms" autocomplete="off" autocorrect="off" name="payment_terms">
                             <option value="Due on Receipt" selected>Due on Receipt</option>
@@ -211,7 +211,7 @@
                             <option value="Net 30">Net 30</option>
                             <option value="Net 60">Net 60</option>
                         </select>
-                    </div>
+                    </div>  --}}
                 </div>
 
                 <div class="row mb-3">
@@ -222,16 +222,32 @@
                             <option value="Un Checked">Un Checked</option>
                         </select>
                     </div>
-                <label for="qc_checked_by" class="col-md-2 ">QC Checked By</label>
+                <label for="qc_checked_by_display" class="col-md-2 ">QC Checked By <span class="text-danger" id="qc_checked_by_required_mark" title="Required when QC Status is Checked">*</span></label>
                 <div class="col-md-4">
-                    <select class="form-select" id="qc_checked_by" name="qc_checked_by" autocomplete="off" autocorrect="off">
-                        <option value="">Select User</option>
-                        @foreach($users as $user)
-                            <option value="{{ $user->id }}">
-                                {{ $user->user_fullname }}
-                            </option>
-                        @endforeach
-                    </select>
+                    @php
+                        $grnQcUserLabel = function ($u) {
+                            $n = trim((string) (data_get($u, 'user_fullname', '') ?? '')) ?: 'User';
+                            $e = data_get($u, 'username');
+                            $eid = ($e !== null && (string) $e !== '') ? (string) $e : (string) (data_get($u, 'id', '') ?? '');
+
+                            return $n . ' - ' . $eid;
+                        };
+                    @endphp
+                      <div class="tax-dropdown-wrapper user-section" style="width:343px">
+                          <input type="text" class="form-control user-search-input" name="qc_user" id="qc_checked_by_display" autocomplete="off" autocorrect="off" placeholder="Select a user" readonly>
+                          <input type="hidden" name="qc_checked_by" class="qc_checked_by" id="qc_checked_by" value="">
+                          <div class="dropdown-menu tax-dropdown grn-qc-dropdown">
+                            <div class="inner-search-container">
+                              <input type="text" class="user-inner-search" placeholder="Search...">
+                            </div>
+                            <div class="user-list">
+                                @foreach($users as $user)
+                                    <div data-id="{{ (int) $user->id }}">{{ $grnQcUserLabel($user) }}</div>
+                                @endforeach
+                            </div>
+                          </div>
+                          <span class="error_qc" style="color:red"></span>
+                        </div>
                 </div>
             </div>
 
@@ -302,32 +318,41 @@
                 </div>
             </div>
 
-              <div class="notes-upload-wrapper">
+              <div class="notes-upload-wrapper grn-create-uploads-3col">
                 <!-- Notes Section -->
                 <div class="notes-section">
                   <label for="notes">Notes</label>
                   <textarea id="notes" class="notes-textarea" name="note" placeholder="Enter your note..."></textarea>
                   <p class="note-hint">It will not be shown in PDF</p>
                 </div>
-
-                <!-- Upload Section -->
-                <div class="upload-section">
+                <div class="upload-section grn-attach-files-col">
                   <label class="upload-title">Attach File(s) to GRN</label>
 
-                  <!-- Hidden file input -->
                   <input type="file" id="fileInput" name="uploads[]" multiple style="display: none;" />
                   <input type="hidden" name="existing_files" id="existingFilesInput">
-                  <!-- Upload buttons -->
                   <div class="upload-box">
                     <button type="button" class="upload-btn" id="uploadTrigger">📤 Upload File</button>
                     <button type="button" class="upload-dropdown">▼</button>
                   </div>
 
-                  <!-- Upload hint -->
                   <p class="upload-hint">You can upload a maximum of 5 files, 10MB each</p>
 
-                  <!-- Display uploaded file names -->
                   <ul class="file-list" id="fileList"></ul>
+                </div>
+
+                <div class="upload-section grn-video-upload grn-video-col">
+                  <label class="upload-title">Video (GRN)</label>
+                  <input type="file" id="grnVideoInput" name="video_uploads[]" accept="video/*" style="display: none;" />
+                  <div class="upload-box">
+                    <button type="button" class="upload-btn" id="grnVideoUploadTrigger">🎬 Upload video</button>
+                  </div>
+                  <p class="upload-hint">MP4, WebM, MOV, etc. &mdash; max 1 file, 10MB </p>
+                  <ul class="file-list" id="grnVideoList"></ul>
+                  <div id="grnVideoPlayerWrap" class="mt-2" style="display: none; width: 100%; max-width: 100%;">
+                    <video id="grnVideoInline" class="w-100 rounded border" style="max-height: 360px; background: #0f172a;" controls playsinline>
+                      <source id="grnVideoInlineSource" type="video/mp4" />
+                    </video>
+                  </div>
                 </div>
               </div>
               <div
@@ -348,9 +373,9 @@
                               <div class="btn-group-vertical w-100" id="image_pdfs" style="margin-left: 11px;">
                               </div>
                               </div>
-                                  <div class="col-sm-9">
-                                  <embed id="pdfmain" src="" width="100%" height="600px" />
-                              </div>
+                                  <div class="col-sm-9" id="grn-modal-primary-preview" style="min-height: 320px;">
+                                    <div id="grn-doc-preview-inner" class="w-100" style="min-height: 320px;"></div>
+                                </div>
                       </div>
                   </div>
               </div>
@@ -368,7 +393,7 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-  window.GRN_UPLOADS_BASE = @json(rtrim(asset('public/uploads/vendor/grn'), '/'));
+  window.GRN_UPLOADS_BASE = @json(rtrim(asset('uploads/vendor/grn'), '/'));
 </script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 <script src="{{ asset('/assets/js/plugins/dropzone-amd-module.min.js') }}"></script>
@@ -377,6 +402,44 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
  <script>
+  function grnIsVideoFilename (name) {
+    var n = String(name == null ? '' : name).split('?')[0].split('/').pop();
+    return /\.(mp4|webm|ogg|mov|mkv|m4v|avi|wmv|flv)$/i.test(n);
+  }
+  function grnSetDocPreviewFromUrl (u, nameHint) {
+    var $inner = $('#grn-doc-preview-inner');
+    if (!$inner.length) {
+      return;
+    }
+    $inner.empty();
+    u = String(u == null ? '' : u);
+    if (!u) {
+      $inner.append($('<p class="text-muted p-2">No preview</p>'));
+      return;
+    }
+    var hint = String(nameHint == null ? u : nameHint);
+    if (grnIsVideoFilename(hint)) {
+      $inner.append(
+        $('<video class="w-100 rounded" style="max-height:600px;background:#0b1220" controls playsinline></video>').append(
+          $('<source>').attr('src', u)
+        )
+      );
+      return;
+    }
+    if (hint.toLowerCase().endsWith('.pdf') || u.toLowerCase().indexOf('.pdf?') > -1) {
+      $inner.append(
+        $('<embed class="w-100" type="application/pdf" width="100%" height="600px" />').attr('src', u)
+      );
+      return;
+    }
+    if (/\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(hint) || (u.indexOf('data:') === 0 && u.indexOf('image/') > 0)) {
+      $inner.append($('<img class="img-fluid rounded" style="max-height:600px" alt="" />').attr('src', u));
+      return;
+    }
+    $inner.append($('<p class="text-muted p-3">Preview is not available for this type.</p>')).append(
+      $('<a class="d-inline-block" target="_blank" rel="noopener">Open in new tab</a>').attr('href', u)
+    );
+  }
     toastr.options = {
                 "closeButton": true,
                 "progressBar": true,
@@ -910,6 +973,76 @@
                     });
                   });
 
+                  // QC checked by
+                  $(document).on('click', '.user-section .user-search-input', function (e) {
+                      e.stopPropagation();
+                      $(this).val('');
+                      $('.dropdown-menu.tax-dropdown').hide();
+
+                      const $input = $(this);
+                      let $dropdown = $input.data('dropdown');
+
+                      if (!$dropdown) {
+                          $dropdown = $input.siblings('.grn-qc-dropdown').clone(true);
+                          $('body').append($dropdown);
+                          $input.data('dropdown', $dropdown);
+                      }
+
+                      $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper.user-section'));
+                      $dropdown.data('row', $input.closest('tr'));
+
+                      const offset = $input.offset();
+                      $dropdown.css({
+                          position: 'absolute',
+                          top: offset.top + $input.outerHeight(),
+                          left: offset.left,
+                          width: $input.outerWidth(),
+                          zIndex: 999
+                      }).show();
+                      $(this).removeAttr('readonly');
+                  });
+                  $(document).on('click', '.grn-qc-dropdown .user-list div', function () {
+                      const selectedText = $(this).text().trim();
+                      const selectedid = $(this).data('id');
+                      const idStr = (selectedid === undefined || selectedid === null) ? '' : String(selectedid);
+
+                      const $dropdown = $(this).closest('.grn-qc-dropdown');
+                      const wrapper = $dropdown.data('wrapper');
+                      const row = $dropdown.data('row');
+
+                      if (!wrapper || !row) {
+                          console.warn("Wrapper or row not found — GST selection failed.");
+                          $dropdown.hide();
+                          return;
+                      }
+                      wrapper.find('.user-search-input').val(idStr === '' ? '' : selectedText);
+                      wrapper.find('.qc_checked_by').val(idStr);
+                      wrapper.find('.error_qc').text('');
+                      $dropdown.hide();
+                  });
+                  $('.user-section .user-search-input').on('keyup', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const $dropdown = $(this).data('dropdown');
+
+                    if ($dropdown) {
+                      const list = $dropdown.find('.user-list div');
+                      list.each(function () {
+                        const itemText = $(this).text().toLowerCase();
+                        const idPart = String($(this).data('id') == null || $(this).data('id') === undefined ? '' : $(this).data('id')).toLowerCase();
+                        $(this).toggle(itemText.includes(searchText) || idPart.includes(searchText));
+                      });
+                    }
+                  });
+                  $(document).on('keyup', '.grn-qc-dropdown .user-inner-search', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const list = $(this).closest('.grn-qc-dropdown').find('.user-list div');
+                    list.each(function () {
+                      const itemText = $(this).text().toLowerCase();
+                      const idPart = String($(this).data('id') == null || $(this).data('id') === undefined ? '' : $(this).data('id')).toLowerCase();
+                      $(this).toggle(itemText.includes(searchText) || idPart.includes(searchText));
+                    });
+                  });
+
                 $(document).on('click', function (e) {
                     if (!$(e.target).closest('.tax-dropdown-wrapper').length) {
                       $('.dropdown-menu.tax-dropdown').hide();
@@ -968,9 +1101,69 @@
               //     $('#fileList').append(li);
               //   });
               // });
+              function grnRevokeVideoObjectUrl() {
+                if (window._grnVideoObjectUrl) {
+                  try { URL.revokeObjectURL(window._grnVideoObjectUrl); } catch (x) { /* */ }
+                  window._grnVideoObjectUrl = null;
+                }
+              }
+              window.grnRevokeVideoObjectUrl = grnRevokeVideoObjectUrl;
+              window.selectedVideoFiles = window.selectedVideoFiles || [];
+
               $('#uploadTrigger').on('click', function () {
                   $('#fileInput').click();
                 });
+              $('#grnVideoUploadTrigger').on('click', function () {
+                $('#grnVideoInput').click();
+              });
+              $('#grnVideoInput').on('change', function () {
+                grnRevokeVideoObjectUrl();
+                const files = Array.from(this.files || []);
+                const maxBytes = 10 * 1024 * 1024;
+                if (files.length && files[0].size > maxBytes) {
+                  toastr.error('Video must be 10MB or smaller.');
+                  $(this).val('');
+                  window.selectedVideoFiles = [];
+                  $('#grnVideoList').empty();
+                  $('#grnVideoPlayerWrap').hide();
+                  return;
+                }
+                window.selectedVideoFiles = files;
+                const $vlist = $('#grnVideoList');
+                $vlist.empty();
+                if (!files.length) {
+                  $('#grnVideoPlayerWrap').hide();
+                  return;
+                }
+                const f = files[0];
+                const u = URL.createObjectURL(f);
+                window._grnVideoObjectUrl = u;
+                $vlist.append(
+                  '<li><span class="grn-video-preview-name" style="cursor:pointer;color:blue;">' + $('<div>').text(f.name).html() +
+                  '</span> <span class="remove-grn-video" style="cursor:pointer;color:red">❌</span></li>'
+                );
+                $('#grnVideoInline source').attr('src', u).attr('type', f.type || 'video/mp4');
+                $('#grnVideoInline')[0].load();
+                $('#grnVideoPlayerWrap').show();
+              });
+              $(document).on('click', '.remove-grn-video', function (e) {
+                e.stopPropagation();
+                grnRevokeVideoObjectUrl();
+                window.selectedVideoFiles = [];
+                $('#grnVideoInput').val('');
+                $('#grnVideoList').empty();
+                $('#grnVideoPlayerWrap').hide();
+              });
+              $(document).on('click', '.grn-video-preview-name, .grn-video-new-name', function () {
+                if (!window.selectedVideoFiles || !window.selectedVideoFiles[0]) {
+                  return;
+                }
+                const file = window.selectedVideoFiles[0];
+                const fileURL = URL.createObjectURL(file);
+                grnSetDocPreviewFromUrl(fileURL, file.name);
+                new bootstrap.Modal(document.getElementById('documentModal1')).show();
+                setTimeout(function () { try { URL.revokeObjectURL(fileURL); } catch (e) {} }, 6e4);
+              });
 
                 // On file input change
                 $('#fileInput').on('change', function () {
@@ -1021,36 +1214,27 @@
                 $('#fileList').on('click', '.file-name', function () {
                   const index = $(this).data('index');
                   const file = window.selectedFiles[index];
-                  if (!file) return;
-
+                  if (!file) { return; }
+                  if (file.type && String(file.type).indexOf('video/') === 0) {
+                    const u = URL.createObjectURL(file);
+                    grnSetDocPreviewFromUrl(u, file.name);
+                    new bootstrap.Modal(document.getElementById('documentModal1')).show();
+                    setTimeout(function () { try { URL.revokeObjectURL(u); } catch (e) {} }, 12e4);
+                    return;
+                  }
                   const reader = new FileReader();
-
                   reader.onload = function (e) {
                     const fileURL = e.target.result;
-                    let previewHTML = '';
-
-                    if (file.type.startsWith("image/")) {
-                      // Show image in right panel
-                      previewHTML = `<img src="${fileURL}" class="img-fluid rounded" style="max-height:600px;">`;
-                      $('#pdfmain').replaceWith(`<div id="pdfmain" class="text-center">${previewHTML}</div>`);
-                    } else if (file.type === "application/pdf") {
-                      // Show PDF inside embed
-                      $('#pdfmain').replaceWith(`<embed id="pdfmain" src="${fileURL}" width="100%" height="600px" />`);
-                    } else if (file.type.startsWith("text/")) {
-                      // Show text inside <pre>
-                      previewHTML = `<pre style="max-height:600px; overflow:auto; text-align:left;">${e.target.result}</pre>`;
-                      $('#pdfmain').replaceWith(`<div id="pdfmain">${previewHTML}</div>`);
+                    if (file.type && file.type.startsWith('text/')) {
+                      $('#grn-doc-preview-inner').html(
+                        '<pre style="max-height:600px;overflow:auto;text-align:left;white-space:pre-wrap;">' + $('<div>').text(e.target.result).html() + '</pre>'
+                      );
                     } else {
-                      $('#pdfmain').replaceWith(`<div id="pdfmain"><p class="text-muted">Preview not supported for this file type.</p></div>`);
+                      grnSetDocPreviewFromUrl(fileURL, file.name);
                     }
-
-                    // Show modal
-                    const modal = new bootstrap.Modal(document.getElementById('documentModal1'));
-                    modal.show();
+                    new bootstrap.Modal(document.getElementById('documentModal1')).show();
                   };
-
-                  // Use correct read mode
-                  if (file.type.startsWith("text/")) {
+                  if (file.type && file.type.startsWith('text/')) {
                     reader.readAsText(file);
                   } else {
                     reader.readAsDataURL(file);
@@ -1061,6 +1245,21 @@
 
 
               $(document).ready(function () {
+              function syncQcCheckedByRequiredUi() {
+                var need = $('#qc_ststus').val() === 'Checked';
+                $('#qc_checked_by_required_mark').toggle(need);
+              }
+              $('#qc_ststus').on('change', function () {
+                if ($(this).val() !== 'Checked') {
+                  $('#qc_checked_by').val('');
+                  $('#qc_checked_by_display').val('');
+                  $('.user-section .error_qc').text('');
+                }
+                syncQcCheckedByRequiredUi();
+              });
+              syncQcCheckedByRequiredUi();
+              window.GRN = window.GRN || {};
+              window.GRN.syncQcCheckedByRequiredUi = syncQcCheckedByRequiredUi;
 
               function submitBillForm(saveStatus, $btn) {
                     let originalText = $btn.html();
@@ -1069,6 +1268,15 @@
                         toastr.error('Please select a department.');
                         return;
                     }
+                    if ($('#qc_ststus').val() === 'Checked') {
+                        var qcb = $('#qc_checked_by').val();
+                        if (qcb == null || String(qcb).trim() === '') {
+                            toastr.error('Please select QC Checked By when QC Status is Checked.');
+                            $('.error_qc').text('Please select a user.');
+                            return;
+                        }
+                    }
+                    $('.error_qc').text('');
                 $btn.prop('disabled', true);
                     // Show loader on button
                     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
@@ -1154,8 +1362,9 @@ $(function () {
     function makeUrl (name) {
       return base + encodeURIComponent(String(name).replace(/^\/+/, ''));
     }
-    $('#documentModal1').modal('show');
-    $('#pdfmain').attr('src', makeUrl(fileArray[0]));
+    var firstU = makeUrl(fileArray[0]);
+    var firstN = fileArray[0];
+    grnSetDocPreviewFromUrl(firstU, firstN);
     var $list = $('#image_pdfs').empty();
     fileArray.forEach(function (name) {
       var u = makeUrl(name);
@@ -1165,16 +1374,20 @@ $(function () {
       } catch (x) { /* keep */ }
       var $b = $('<button type="button" class="btn btn-primary pdf-btn" style="font-size: 11px;"></button>');
       $b.attr('data-filepath', u);
+      $b.attr('data-fname', fn);
       $b.text(fn);
       $list.append($b);
     });
+    const modal = bootstrap.Modal.getOrCreateInstance ? bootstrap.Modal.getOrCreateInstance(document.getElementById('documentModal1')) : new bootstrap.Modal(document.getElementById('documentModal1'));
+    modal.show();
   });
   $(document).on('click', '.pdf-btn', function () {
     $('.pdf-btn').removeClass('active');
     $(this).addClass('active');
     var fp = $(this).attr('data-filepath');
+    var fn = $(this).attr('data-fname') || '';
     if (fp) {
-      $('#pdfmain').attr('src', fp);
+      grnSetDocPreviewFromUrl(fp, fn);
     }
   });
 });
@@ -1267,15 +1480,38 @@ $(document).ready(function () {
                       $('#payment_terms').val(h.payment_terms);
                       (function setQcCheckedBy() {
                         var qc = h.qc_checked_by;
+                        var id = '';
                         if (qc != null && qc !== '' && typeof qc === 'object' && qc.id != null) {
-                          $('#qc_checked_by').val(qc.id);
-                        } else if (qc != null && qc !== '') {
-                          $('#qc_checked_by').val(qc);
+                          id = String(qc.id);
+                        } else if (qc != null && qc !== '' && (typeof qc === 'number' || typeof qc === 'string')) {
+                          id = String(qc);
+                        }
+                        $('#qc_checked_by').val(id);
+                        var $row = id
+                          ? $('#qc_checked_by').closest('.tax-dropdown-wrapper').find('.user-list [data-id="' + id + '"]')
+                          : $();
+                        if ($row.length) {
+                          $('.user-search-input#qc_checked_by_display').val($row.text().trim());
+                          return;
+                        }
+                        var rel = h.q_c_checked_by || h.qcCheckedBy || h.QcCheckedBy;
+                        if (rel && typeof rel === 'object' && (rel.user_fullname != null || rel.id != null)) {
+                          var n = String((rel.user_fullname || '').trim() || 'User');
+                          var e = rel.employee_id;
+                          var eid = (e != null && String(e) !== '') ? String(e) : String(rel.id != null ? rel.id : id);
+                          $('#qc_checked_by_display').val(n + ' - ' + eid);
+                          return;
+                        }
+                        if (id) {
+                          $('#qc_checked_by_display').val('User #' + id);
                         } else {
-                          $('#qc_checked_by').val('');
+                          $('#qc_checked_by_display').val('');
                         }
                       })();
                       $('#qc_ststus').val(h.qc_ststus);
+                      if (window.GRN && typeof window.GRN.syncQcCheckedByRequiredUi === 'function') {
+                        window.GRN.syncQcCheckedByRequiredUi();
+                      }
                       $('#subject').val(h.subject);
                       $('#bill_id').val(h.bill_id);
                       $('#purchase_id').val(h.purchase_id);
@@ -1329,18 +1565,42 @@ $(document).ready(function () {
                       })();
                       // console.log("window.existingFiles",window.existingFiles);
 
-                      window.selectedFiles = []; // New files chosen
+                      window.selectedFiles = [];
+                      window.selectedVideoFiles = [];
                       $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
+                      function grnUpdateEditVideoPreview() {
+                        if (window.grnRevokeVideoObjectUrl) {
+                          window.grnRevokeVideoObjectUrl();
+                        }
+                        if (window.selectedVideoFiles && window.selectedVideoFiles[0]) {
+                          var f = window.selectedVideoFiles[0];
+                          var u = URL.createObjectURL(f);
+                          window._grnVideoObjectUrl = u;
+                          $('#grnVideoInline source').attr('src', u).attr('type', f.type || 'video/mp4');
+                          if ($('#grnVideoInline')[0]) {
+                            $('#grnVideoInline')[0].load();
+                          }
+                          $('#grnVideoPlayerWrap').show();
+                        } else {
+                          $('#grnVideoPlayerWrap').hide();
+                        }
+                      }
                       function renderExistingFiles() {
                         $('#fileList').empty();
+                        $('#grnVideoList').empty();
                         $.each(window.existingFiles, function (index, name) {
                           var files = Array.isArray(name) ? name : [name];
-                          $('#fileList').append(
-                            '<li class="documentclk" data-filetype="document" data-files="' +
-                              JSON.stringify(files).replace(/"/g, '&quot;') + '">' + $('<div>').text(name).html() + ' ' +
-                              '<span class="remove-file1" data-type="existing" data-index="' + index +
-                              '" style="cursor:pointer; color:red;">❌</span></li>'
-                          );
+                          var n = name;
+                          var isVid = (typeof grnIsVideoFilename === 'function' && grnIsVideoFilename(n));
+                          var li = '<li class="documentclk" data-filetype="document" data-files="' +
+                            JSON.stringify(files).replace(/"/g, '&quot;') + '"><span class="grn-file-link-text">' + $('<div>').text(n).html() + '</span> ' +
+                            '<span class="remove-file1" data-type="existing" data-index="' + index +
+                            '" style="cursor:pointer; color:red;">❌</span></li>';
+                          if (isVid) {
+                            $('#grnVideoList').append(li);
+                          } else {
+                            $('#fileList').append(li);
+                          }
                         });
                         $.each(window.selectedFiles, function (index, file) {
                           $('#fileList').append(
@@ -1351,28 +1611,52 @@ $(document).ready(function () {
                             '" style="cursor:pointer; color:red;">❌</span></li>'
                           );
                         });
+                        if (window.selectedVideoFiles && window.selectedVideoFiles[0]) {
+                          var vf = window.selectedVideoFiles[0];
+                          $('#grnVideoList').append(
+                            '<li><span class="grn-video-new-name" style="cursor:pointer;color:blue;text-decoration:underline;">' + $('<div>').text(vf.name).html() +
+                            '</span> <span class="remove-file1" data-type="newvideo" data-index="0" style="cursor:pointer;color:red">❌</span></li>'
+                          );
+                        }
+                        grnUpdateEditVideoPreview();
                         $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                       }
 
                       renderExistingFiles();
 
                       $('#fileInput').off('change').on('change', function (e) {
-                        window.selectedFiles = Array.from(e.target.files); // overwrite
+                        window.selectedFiles = Array.from(e.target.files || []);
+                        renderExistingFiles();
+                      });
+                      $('#grnVideoInput').off('change').on('change', function (e) {
+                        var list = Array.from(e.target.files || []);
+                        var maxBytes = 10 * 1024 * 1024;
+                        if (list.length && list[0].size > maxBytes) {
+                          toastr.error('Video must be 10MB or smaller.');
+                          $(e.target).val('');
+                          window.selectedVideoFiles = [];
+                          renderExistingFiles();
+                          return;
+                        }
+                        window.selectedVideoFiles = list;
                         renderExistingFiles();
                       });
 
-                      // Remove handler
-                      $('#fileList').on('click', '.remove-file1', function () {
+                      $('#fileList, #grnVideoList').off('click', '.remove-file1').on('click', '.remove-file1', function () {
                         const index = $(this).data('index');
                         const type = $(this).data('type');
-
                         if (type === 'existing') {
                           window.existingFiles.splice(index, 1);
-                        } else {
+                        } else if (type === 'new') {
                           window.selectedFiles.splice(index, 1);
-                          $('#fileInput').val(''); // Clear file input
+                          $('#fileInput').val('');
+                        } else if (type === 'newvideo') {
+                          window.selectedVideoFiles = [];
+                          if (window.grnRevokeVideoObjectUrl) {
+                            window.grnRevokeVideoObjectUrl();
+                          }
+                          $('#grnVideoInput').val('');
                         }
-
                         renderExistingFiles();
                       });
 

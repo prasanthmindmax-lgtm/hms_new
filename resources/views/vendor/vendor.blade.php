@@ -754,7 +754,7 @@
             if ($(e.target).is('input[type="checkbox"]') || $(e.target).closest('.form-check').length) {
                 return;
             }
-            if ($(e.target).closest('.uploadClick').length) {
+            if ($(e.target).closest('.uploadClick, .doc-row, .vendor-files-cell, .vendor-files-chip').length) {
                 return;
             }
             $('.customer-row').removeClass('selected');
@@ -868,14 +868,18 @@
             $('body').css('overflow', 'hidden');
 
             // Function to generate preview HTML for a file
-          function generatePreviewHtml(filename, basePath, containerId,title) {
-            const extension = filename.split('.').pop().toLowerCase();
+          function generatePreviewHtml(filename, containerId, title) {
+            const basePath = @json(rtrim(asset('public/uploads/customers'), '/') . '/');
+            const safeName = String(filename).replace(/^\//, '');
+            const fileUrl = basePath + safeName;
+            const extension = safeName.split('.').pop().toLowerCase();
             const fileType = 'documents';
-            const fileArray = JSON.stringify([basePath + filename]);
+            const fileArray = JSON.stringify([fileUrl]);
+            const fileAttr = String(fileArray).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
             let iconUrl;
             if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
-              iconUrl = `${basePath}${filename}`;
+              iconUrl = fileUrl;
             } else if (extension === 'pdf') {
               iconUrl = 'https://cdn-icons-png.flaticon.com/512/337/337946.png';
             } else {
@@ -885,16 +889,16 @@
             const previewHtml = `
                         <div>
                             <h5>${title}</h5>
-                            <div class="preview-card col-sm-3 uploadClick"
+                            <div class="preview-card col-sm-3 uploadClick doc-row"
                                 data-filetype="${fileType}"
-                                data-files='${fileArray}'
+                                data-b64-files="${fileAttr}"
+                                data-files="${fileAttr}"
                                 onclick="Documentview(this)">
                                 <img src="${iconUrl}" alt="${extension === 'pdf' ? 'PDF' : 'File'}" style="height:60px;">
-                                <div class="file_name">${filename}</div>
+                                <div class="file_name">${safeName}</div>
                             </div>
                         </div>
                         `;
-
 
             $(containerId).append(previewHtml);
           }
@@ -904,22 +908,22 @@
             if (pan_upload && pan_upload.trim() !== "" && pan_upload !== null ) {
                 pan_upload = JSON.parse(pan_upload);
                 pan_upload.forEach(filename =>
-                    generatePreviewHtml(filename, '../public/uploads/customers/', '#upload_document','Pan Upload')
+                    generatePreviewHtml(filename, '#upload_document','Pan Upload')
                 );
             }
           let documents = all_data.documents;
             if (documents && documents.trim() !== "" && documents !== null ) {
                 documents = JSON.parse(documents);
                 documents.forEach(filename =>
-                    generatePreviewHtml(filename, '../public/uploads/customers/', '#upload_document','Document Upload')
+                    generatePreviewHtml(filename, '#upload_document','Document Upload')
                 );
             }
 
            bankdetails.forEach((element,index) => {
                 if (element.bank_uploads !== "" && element.bank_uploads !== null) {
-                    let bank_upload = JSON.parse(element.bank_uploads); // ✅ fixed
+                    let bank_upload = JSON.parse(element.bank_uploads);
                     bank_upload.forEach(filename =>
-                        generatePreviewHtml(filename, '../public/uploads/customers/', '#upload_document','Bank Upload')
+                        generatePreviewHtml(filename, '#upload_document','Bank Upload')
                     );
                 }
                 });
@@ -1221,16 +1225,19 @@
             myModal.show();
 
             const fileType = $(el).data('filetype');
-            const filesData = $(el).attr('data-files');
+            const filesRaw = $(el).attr('data-b64-files') || $(el).attr('data-files');
             let fileArray = [];
 
             try {
-                fileArray = JSON.parse(filesData);
+                if (!filesRaw) {
+                    throw new Error('empty file');
+                }
+                fileArray = JSON.parse(filesRaw);
                 if (typeof fileArray === 'string') {
                     fileArray = JSON.parse(fileArray);
                 }
             } catch (e) {
-                console.error('Invalid JSON in data-files:', filesData);
+                console.error('Invalid file JSON:', filesRaw, e);
                 $('#image_pdfs').html('<p>Invalid file data</p>');
                 return;
             }
@@ -1662,7 +1669,7 @@
             status_name: '',
             universal_search: '',
         };
-        
+
         if (savedFilters) {
             filters = savedFilters;
         }
@@ -1728,7 +1735,7 @@
 
         filters = savedFilters;
         console.log("savedFilterslower",savedFilters);
-        
+
         $('.vendor-search-input').val(filters.vendor_name);
         $('.universal_search').val(filters.universal_search || '');
         $('.status-search-input').val(filters.status_name || '');
