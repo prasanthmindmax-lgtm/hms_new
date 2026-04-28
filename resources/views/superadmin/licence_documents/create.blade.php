@@ -105,7 +105,7 @@
                                             </td>
                                             <td class="ld-col-file">
                                                 @if (!empty($row['file_path']))
-                                                    @php $fileUrl = asset($row['file_path']); @endphp
+                                                    @php $fileUrl = \App\Models\BranchLicenceDocument::publicFileUrl($row['file_path']); @endphp
                                                     <div class="ld-file-tile">
                                                         <span class="ld-file-tile-icon" aria-hidden="true"><i
                                                                 class="bi bi-file-earmark-check"></i></span>

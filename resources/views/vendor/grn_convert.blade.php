@@ -16,6 +16,20 @@
     gap: 20px;
     /* cursor: pointer; */
   }
+  .grn-bill-convert-only #po-table { display: none !important; }
+  .grn-bill-convert-only #bill-table { display: block !important; }
+  .grn-bill-convert-only .converter { flex: 1; min-width: 0; max-width: 480px; margin-right: 12px; }
+  .grn-convert-search-pill { position: relative; width: 100%; max-width: 100%; }
+  .grn-convert-search-pill i.bi-search {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: #94a3b8; font-size: 15px; pointer-events: none; z-index: 1;
+  }
+  .grn-convert-search-pill .form-control {
+    border-radius: 8px; border: 1px solid #c7d2e0; background: #fff;
+    padding: 0.4rem 0.85rem 0.4rem 2.35rem; font-size: 14px; color: #1e293b;
+  }
+  .grn-convert-search-pill .form-control::placeholder { color: #94a3b8; }
+  .grn-convert-search-pill .form-control:focus { border-color: #94a3b8; box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2); }
 </style>
 <body style="overflow-x: hidden;">
 
@@ -31,11 +45,16 @@
     <div class="pc-container">
         <div class="pc-content">
 
-            <div class="container-box">
+            <div class="container-box grn-bill-convert-only">
                 <div class="header-bar d-flex justify-content-between align-items-center">
                   <div class="converter">
-                    {{-- <button id="po-convert" class="btn btn-outline-primary btn-sm me-2">PO Convert</button> --}}
-                    <button id="bill-convert" class="btn btn-outline-secondary btn-sm">Bill Convert</button>
+                    <div class="grn-convert-search-pill">
+                      <i class="bi bi-search" aria-hidden="true"></i>
+                      <input type="search" class="form-control" id="grn-convert-search" name="q"
+                        placeholder="Search Bill No, Vendor Name, Reference Number…"
+                        value="{{ e($q ?? request('q', '')) }}"
+                        autocomplete="off">
+                    </div>
                   </div>
 
                   <div>
@@ -121,6 +140,16 @@
                 </div>
 
                 <div style="overflow-x: auto;display:none;" id="bill-table" >
+                <div id="grn-ajax-bill">
+                @fragment('grn-bill-table-ajax')
+                    @php
+                    $q = $q ?? request('q', '');
+                    $perPage = $perPage ?? 10;
+                    $__billAppend = array_merge(
+                        ['table' => 'bill', 'per_page' => $perPage],
+                        (string) $q !== '' ? ['q' => $q] : []
+                    );
+                    @endphp
                   <table class="table table-hover mb-0">
                       <thead>
                       <tr>
@@ -164,16 +193,15 @@
                           @endforeach
                       </tbody>
                   </table>
-                  <!-- ✅ Pagination Controls -->
                    @if($billlist->total() > 10)
                     <div class="d-flex justify-content-between">
                         <div class="mt-3">
-                            {{ $billlist->appends(['table' => 'bill', 'per_page' => $perPage])->links('pagination::bootstrap-4') }}
+                            {{ $billlist->appends($__billAppend)->links('pagination::bootstrap-4') }}
                         </div>
                         <div>
-                            <form method="GET" id="perPageForm">
-                                <input type="hidden" name="table" value="{{ $activeTable ?? 'po' }}">
-                                <select name="per_page" id="per_page" class="form-control form-control-sm" style="width: 70px; display: inline-block;">
+                            <form method="GET" id="perPageFormGrnBill" onsubmit="return false;">
+                                <input type="hidden" name="table" value="{{ $activeTable ?? 'bill' }}">
+                                <select name="per_page" class="form-control form-control-sm" style="width: 70px; display: inline-block;">
                                     @foreach([10, 25, 50, 100,250,500] as $size)
                                         <option value="{{ $size }}" {{ $perPage == $size ? 'selected' : '' }}>{{ $size }}</option>
                                     @endforeach
@@ -183,6 +211,8 @@
                         </div>
                     </div>
                     @endif
+                @endfragment
+                </div>
                 </div>
             </div>
 
@@ -209,43 +239,85 @@
 
 <script>
   $(document).ready(function() {
-    // Handle PO/Bill convert button clicks
-    $('#po-convert').click(function() {
-        $('#bill-table').hide();
-        $('#po-table').show();
-        // Update URL parameter to remember which table is active
-        updateUrlParam('table', 'po');
-    });
+    // Bill data only: keep bill table visible, PO table hidden
+    $('#po-table').hide();
+    $('#bill-table').show();
 
-    $('#bill-convert').click(function() {
-        $('#po-table').hide();
-        $('#bill-table').show();
-        // Update URL parameter to remember which table is active
-        updateUrlParam('table', 'bill');
-    });
-
-    // Check URL parameter on page load to show the correct table
-    const urlParams = new URLSearchParams(window.location.search);
-    const activeTable = urlParams.get('table');
-    if (activeTable === 'bill') {
-        $('#po-table').hide();
-        $('#bill-table').show();
-    } else {
-        $('#bill-table').hide();
-        $('#po-table').show();
+    var grnFetchController = null;
+    var grnRequestId = 0;
+    function grnAsyncReplace(url) {
+      if (!document.getElementById('grn-ajax-bill')) return;
+      if (grnFetchController) {
+        grnFetchController.abort();
+      }
+      grnRequestId += 1;
+      var thisReq = grnRequestId;
+      grnFetchController = new AbortController();
+      var c = grnFetchController;
+      return fetch(String(url), {
+        signal: c.signal,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      })
+        .then(function (r) {
+          if (thisReq !== grnRequestId) return;
+          if (!r.ok) {
+            throw new Error('Network response was not ok');
+          }
+          if ((r.headers.get('content-type') || '').indexOf('application/json') === -1) {
+            throw new Error('Expected JSON from server');
+          }
+          return r.json();
+        })
+        .then(function (d) {
+          if (thisReq !== grnRequestId) { return; }
+          if (d == null) { return; }
+          if (d.html) {
+            document.getElementById('grn-ajax-bill').innerHTML = d.html;
+          }
+          var u2 = new URL(String(url), window.location.origin);
+          u2.searchParams.delete('grn_async');
+          window.history.replaceState(null, '', u2);
+        })
+        .catch(function (err) {
+          if (err && err.name === 'AbortError') { return; }
+          if (typeof console !== 'undefined' && console.error) {
+            console.error('grn async:', err);
+          }
+        });
     }
-
-    // Handle per page changes
-    $('#per_page').change(function() {
-        $('#perPageForm').submit();
+    var grnSearchT = null;
+    $(document).on('input', '#grn-convert-search', function () {
+      clearTimeout(grnSearchT);
+      var $in = $(this);
+      grnSearchT = setTimeout(function () {
+        var t = $in.val() != null ? String($in.val()).trim() : '';
+        var u = new URL(window.location.href);
+        u.searchParams.set('table', 'bill');
+        if (t.length) { u.searchParams.set('q', t); } else { u.searchParams.delete('q'); }
+        u.searchParams.delete('bill_page');
+        u.searchParams.set('grn_async', '1');
+        u.searchParams.delete('po_page');
+        grnAsyncReplace(u.toString());
+      }, 300);
     });
-
-    // Function to update URL parameter without reloading
-    function updateUrlParam(key, value) {
-        const url = new URL(window.location);
-        url.searchParams.set(key, value);
-        window.history.pushState({}, '', url);
-    }
+    $(document).on('click', '#grn-ajax-bill .pagination a', function (e) {
+      e.preventDefault();
+      if (!this.getAttribute('href')) return;
+      var u = new URL(this.getAttribute('href'), window.location.origin);
+      u.searchParams.set('grn_async', '1');
+      u.searchParams.set('table', 'bill');
+      grnAsyncReplace(u.toString());
+    });
+    $(document).on('change', '#grn-ajax-bill select[name=per_page]', function () {
+      var u = new URL(window.location.href);
+      u.searchParams.set('per_page', $(this).val());
+      u.searchParams.set('table', 'bill');
+      u.searchParams.delete('bill_page');
+      u.searchParams.set('grn_async', '1');
+      grnAsyncReplace(u.toString());
+    });
 });
 $(document).ready(function () {
     // $('#po-convert').on('click', function () {
