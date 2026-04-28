@@ -54,4 +54,19 @@ class BranchLicenceDocument extends Model
     {
         return LicenceDocumentCatalog::requiredCountForLevel($level);
     }
+
+    public static function publicFileUrl(?string $filePath): string
+    {
+        if ($filePath === null || $filePath === '') {
+            return '';
+        }
+
+        $p = str_replace('\\', '/', (string) $filePath);
+        $p = trim($p, '/');
+        if (str_starts_with($p, 'public/')) {
+            return asset($p);
+        }
+
+        return asset('public/'.$p);
+    }
 }
