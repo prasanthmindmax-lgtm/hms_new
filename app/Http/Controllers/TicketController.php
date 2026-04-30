@@ -949,8 +949,17 @@ class TicketController extends Controller
         }
 
         $paths = $this->uploadAttachments($request->file('attachments'));
+        $lastTicket = Ticket::orderBy('id', 'desc')->value('ticket_no');
+
+        if ($lastTicket && preg_match('/TKT-(\d+)/', $lastTicket, $matches)) {
+            $nextNumber = (int) $matches[1] + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        $ticketNo = 'TKT-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
         $ticket = Ticket::create([
-            'ticket_no' => 'TKT-TMP-' . uniqid('', true),
+            'ticket_no' => $ticketNo,
             'location_id' => $validated['location_id'],
             'from_department_id' => $validated['from_department_id'],
             'to_department_id' => $validated['to_department_id'],
@@ -962,7 +971,6 @@ class TicketController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        $ticket->ticket_no = 'TKT-' . str_pad((string) $ticket->id, 5, '0', STR_PAD_LEFT);
         $uid = (int) auth()->id();
         $creatorName = (string) (usermanagementdetails::query()->where('id', $uid)->value('user_fullname') ?? '—');
         $ticket->solution = [
@@ -993,7 +1001,6 @@ class TicketController extends Controller
             'to_department_id' => 'required|integer|exists:departments,id',
             'issue_category_id' => 'required|integer|exists:issue_categories,id',
             'priority' => 'required|string|in:' . implode(',', Ticket::PRIORITIES),
-            'subject' => 'required|string|max:500',
             'description' => 'required|string|max:10000',
             'attachments.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,pdf,doc,docx,xls,xlsx|max:10240',
         ]);
@@ -1072,7 +1079,6 @@ class TicketController extends Controller
         $ticket->to_department_id = $validated['to_department_id'];
         $ticket->issue_category_id = $validated['issue_category_id'];
         $ticket->priority = $validated['priority'];
-        $ticket->subject = $validated['subject'];
         $ticket->description = $validated['description'];
         $ticket->attachments = array_values($merged);
         $ticket->save();

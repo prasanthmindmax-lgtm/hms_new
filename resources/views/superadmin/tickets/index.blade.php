@@ -23,7 +23,7 @@
 
   <div class="pc-container">
     <div class="pc-content">
-      <div class="qd-card tk-tickets-page">
+  <div class="qd-card tk-tickets-page">
 
         <div class="tk-hero">
           <div class="tk-hero-inner">
@@ -194,15 +194,15 @@
                   <tr>
                     <th>TICKET NO</th>
                     <th>DATE</th>
-                    <th>LOCATION</th>
+                    <th class="text-nowrap">LOCATION</th>
                     <th>FROM DEPARTMENT</th>
                     <th>TO DEPARTMENT</th>
                     <th>TICKET CATEGORY</th>
                     <th>ISSUE CATEGORY</th>
                     <th>PRIORITY</th>
                     <th>STATUS</th>
-                    <th>RAISED BY</th>
-                    <th>CLOSED BY</th>
+                    <th class="text-nowrap">RAISED BY</th>
+                    <th class="text-nowrap">CLOSED BY</th>
                     <th>CLOSED AT</th>
                     <th>TAT</th>
                     <th title="Compares category SLA (HH:MM allowance from raised to closed) with actual time to close">SLA VS ACTUAL</th>
@@ -247,8 +247,9 @@
         </div>
 
       </div>
-    </div>
+
   </div>
+</div>
 
   <div class="sm-modal-overlay" id="modalOverlay"></div>
 
@@ -515,18 +516,60 @@
     </div>
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+  {{-- Attachment preview --}}
+  <div class="sm-modal tk-att-preview-modal" id="tkAttachmentPreviewModal" role="dialog" aria-modal="true" aria-labelledby="tkAttPreviewTitle">
+    <div class="sm-modal-box wide tk-modal-font tk-att-preview-box">
+      <div class="tk-att-preview-top">
+        <div>
+          <h2 class="tk-att-preview-title" id="tkAttPreviewTitle">Attachment preview</h2>
+          <p class="tk-att-preview-fname text-muted small mb-0" id="tkAttPreviewFname"></p>
+        </div>
+        <button type="button" class="sm-modal-close tk-att-preview-x" id="btnTkAttPreviewClose" aria-label="Close preview">&times;</button>
+      </div>
+      <div class="tk-att-preview-canvas">
+        <div id="tkAttPreviewImageWrap" class="d-none tk-att-prev-panel">
+          <img id="tkAttPreviewImg" src="" alt="Attachment preview" class="tk-att-preview-img-el">
+        </div>
+        <div id="tkAttPreviewIframeWrap" class="d-none tk-att-prev-panel tk-att-iframe-h">
+          <iframe id="tkAttPreviewIframe" title="Document preview" src="about:blank" class="tk-att-preview-iframe-el"></iframe>
+        </div>
+        <div id="tkAttPreviewOfficeWrap" class="d-none tk-att-prev-panel tk-att-office-msg">
+          <i class="bi bi-file-earmark-text tk-att-office-ico" aria-hidden="true"></i>
+          <p class="mb-2">In-browser preview is not available for this file type.</p>
+          <a href="#" class="sm-btn-primary tk-att-open-new" id="tkAttPreviewOfficeLink" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+        </div>
+      </div>
+      <div class="tk-att-preview-tools">
+        <a href="#" class="tk-att-open-duplicate text-decoration-none" id="tkAttPreviewOpenDup" target="_blank" rel="noopener noreferrer" style="display:none;">
+          <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open in new tab
+        </a>
+        <button type="button" class="sm-btn-primary" id="btnTkAttPreviewCloseFoot">Close</button>
+      </div>
+    </div>
+  </div>
+
+@include('superadmin.superadminfooter')
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script>
+(function() {
+  if (typeof toastr === 'undefined') return;
+  toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3500 };
+  @if(session('success')) toastr.success(@json(session('success'))); @endif
+  @if(session('error')) toastr.error(@json(session('error'))); @endif
+})();
+</script>
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
   <script>
+    window.TICKET_ATTACHMENTS_BASE = @json(rtrim(asset('/public/ticket_attachments'), '/') . '/');
     (function() {
       const routes = {
         data: @json(route('superadmin.tickets.data')),
         store: @json(route('superadmin.tickets.store')),
         update: @json(route('superadmin.tickets.update')),
         categories: @json(route('superadmin.tickets.categories')),
-        /** GET …/get-ticket-categories/{department_id} — global + department-specific ticket categories */
         ticketByDept: @json(rtrim(url('/get-ticket-categories/'), '/')),
         ticketCategoryList: @json(route('superadmin.tickets.ticket-category-list')),
         status: @json(route('superadmin.tickets.status')),
@@ -865,10 +908,60 @@
         raiseExistingAttachments = [];
       }
 
+      function closeAttachmentPreviewModal() {
+        $('#tkAttPreviewImg').attr('src', '');
+        $('#tkAttPreviewIframe').attr('src', 'about:blank');
+        $('#tkAttPreviewOpenDup').hide().attr('href', '#');
+        $('#tkAttPreviewOfficeLink').attr('href', '#');
+        $('#tkAttachmentPreviewModal').removeClass('show');
+        $('#modalOverlay').removeClass('tk-overlay-boost');
+        $('#tkAttPreviewImageWrap, #tkAttPreviewIframeWrap, #tkAttPreviewOfficeWrap').addClass('d-none');
+      }
+
+      function openAttachmentPreviewFromName(name) {
+        const n = String(name || '').trim();
+        if (!n) {
+          return;
+        }
+        const url = window.TICKET_ATTACHMENTS_BASE + encodeURIComponent(n);
+        const ext = (n.split('.').pop() || '').toLowerCase();
+        const isImg = ['png', 'jpg', 'jpeg', 'gif', 'webp'].indexOf(ext) >= 0;
+        const isPdf = ext === 'pdf';
+        const isOffice = ticketAttachmentIsOfficeDoc(n);
+
+        closeAttachmentPreviewModal();
+        $('#tkAttPreviewFname').text(n);
+        $('#tkAttPreviewTitle').text(
+          isImg ? 'Image preview' : isPdf ? 'PDF preview' : isOffice ? 'Document' : 'Attachment'
+        );
+
+        if (isImg) {
+          $('#tkAttPreviewImageWrap').removeClass('d-none');
+          $('#tkAttPreviewImg').attr('src', url).attr('alt', n);
+          $('#tkAttPreviewOpenDup').attr('href', url).show();
+        } else if (isPdf) {
+          $('#tkAttPreviewIframeWrap').removeClass('d-none');
+          $('#tkAttPreviewIframe').attr('src', url);
+          $('#tkAttPreviewOpenDup').attr('href', url).show();
+        } else if (isOffice) {
+          $('#tkAttPreviewOfficeWrap').removeClass('d-none');
+          $('#tkAttPreviewOfficeLink').attr('href', url);
+          $('#tkAttPreviewOpenDup').hide();
+        } else {
+          $('#tkAttPreviewOfficeWrap').removeClass('d-none');
+          $('#tkAttPreviewOfficeLink').attr('href', url);
+          $('#tkAttPreviewOpenDup').attr('href', url).show();
+        }
+        $('#modalOverlay').addClass('tk-overlay-boost');
+        $('#tkAttachmentPreviewModal').addClass('show');
+      }
+
       function closeModal() {
+        closeAttachmentPreviewModal();
         var wasRaise = $('#raiseModal').hasClass('show');
         $('.sm-modal').removeClass('show');
         $('#modalOverlay').removeClass('show');
+        $('#modalOverlay').removeClass('tk-overlay-boost');
         $('body').css('overflow', 'auto');
         if (wasRaise) {
           resetRaiseModalChrome();
@@ -1283,12 +1376,6 @@
         });
       }
 
-      /**
-       * Load ticket category options for the selected *to* department (global + dept-specific).
-       * @param {string} toDeptId
-       * @param {string|null|undefined} selectTicketIdAfter — for edit, preselect this id
-       * @param {function} [done]
-       */
       function loadTicketCategoriesByToDepartment(toDeptId, selectTicketIdAfter, done) {
         var $tc = $('#raise_ticket_cat_id');
         if (!toDeptId) {
@@ -1417,11 +1504,14 @@
             t.id +
             '" title="Edit ticket (open only)"><i class="bi bi-pencil" aria-hidden="true"></i> Edit</button>' :
             '';
-          const raisedCell = '<div class="tk-tk-stack-primary">' + $('<div>').text(t.created_by_name || '').html() + '</div>';
+          const raisedCell =
+            '<div class="tk-tk-stack-primary text-nowrap"><div class="text-nowrap">' +
+            $('<div>').text(t.created_by_name || '').html() +
+            '</div></div>';
           const isClosed = String(t.status || '') === 'closed';
           const statusByCell = isClosed ?
-            '<div class="tk-tk-stack-primary">' + $('<div>').text(t.status_updated_by_name || '—').html() + '</div>' :
-            '<div class="tk-tk-stack-primary"><span class="tk-tk-muted">—</span></div>';
+            '<div class="tk-tk-stack-primary text-nowrap"><div class="text-nowrap">' + $('<div>').text(t.status_updated_by_name || '—').html() + '</div></div>' :
+            '<div class="tk-tk-stack-primary text-nowrap"><span class="tk-tk-muted">—</span></div>';
           const statusAtCell = isClosed ?
             '<div class="tk-tk-stack-primary">' + $('<div>').text(t.status_updated_at || '—').html() + '</div>' :
             '<div class="tk-tk-stack-primary"><span class="tk-tk-muted">—</span></div>';
@@ -1438,15 +1528,15 @@
             '<tr class="qdt-row">' +
             '<td><span class="tk-tk-ref">' + $('<div>').text(t.ticket_no).html() + '</span></td>' +
             '<td class="tk-td-datetime">' + $('<div>').text(t.created_at).html() + '</td>' +
-            '<td>' + $('<div>').text(t.location_name).html() + '</td>' +
+            '<td class="text-nowrap"><span class="text-nowrap">' + $('<div>').text(t.location_name || '').html() + '</span></td>' +
             '<td><span class="tk-tk-route">' + $('<div>').text(t.from_department_name || '').html() + '</span></td>' +
             '<td><span class="tk-tk-route">' + $('<div>').text(t.to_department_name || '').html() + '</span></td>' +
             '<td>' + $('<div>').text(t.ticket_category_name || '').html() + '</td>' +
             '<td>' + $('<div>').text(t.category_name).html() + '</td>' +
             '<td>' + pr + '</td>' +
             '<td>' + st + '</td>' +
-            '<td>' + raisedCell + '</td>' +
-            '<td>' + statusByCell + '</td>' +
+            '<td class="text-nowrap">' + raisedCell + '</td>' +
+            '<td class="text-nowrap">' + statusByCell + '</td>' +
             '<td>' + statusAtCell + '</td>' +
             '<td>' + ttcCell + '</td>' +
             '<td>' + slaCell + '</td>' +
@@ -2325,23 +2415,15 @@
           filesHtml = t.attachments
             .map(function(p) {
               const name = (p.split('/').pop() || 'file').trim();
-              const directUrl = routes.attachmentView + '?f=' + encodeURIComponent(name);
               const spec = fileIconSpec(name);
               const mod = spec.mod ? ' ' + spec.mod : '';
-              const isOffice = ticketAttachmentIsOfficeDoc(name);
-              const href = isOffice ? '#' : directUrl;
-              const officeClass = isOffice ? ' tk-attachment-office' : '';
-              const dataEnc = isOffice ? ' data-fenc="' + encodeURIComponent(name) + '"' : '';
+              const dataEnc = encodeURIComponent(name);
               return (
-                '<a href="' +
-                href +
-                '"' +
+                '<a href="javascript:void(0)"' +
+                ' class="detail-file-link tk-detail-attachment"' +
+                ' data-tk-enc="' +
                 dataEnc +
-                ' class="detail-file-link' +
-                officeClass +
-                '"' +
-                (isOffice ? '' : ' target="_blank" rel="noopener noreferrer"') +
-                ' title="Open in new tab">' +
+                '" role="button" title="View attachment">' +
                 '<span class="tk-file-item-ic' +
                 mod +
                 '"><i class="bi ' +
@@ -2359,27 +2441,15 @@
         openModal('#detailModal');
       });
 
-      $(document).on('click', '.detail-file-link.tk-attachment-office', function(e) {
+      $(document).on('click', 'a.tk-detail-attachment', function(e) {
         e.preventDefault();
-        var enc = $(this).attr('data-fenc');
+        e.stopPropagation();
+        const enc = $(this).attr('data-tk-enc');
         if (!enc) {
           return;
         }
-        var name = decodeURIComponent(enc);
-        $.get(routes.attachmentView, {
-            office: 1,
-            f: name
-          })
-          .done(function(res) {
-            if (res && res.viewer_url) {
-              window.open(res.viewer_url, '_blank', 'noopener,noreferrer');
-            } else {
-              window.open(routes.attachmentView + '?f=' + encodeURIComponent(name), '_blank', 'noopener,noreferrer');
-            }
-          })
-          .fail(function() {
-            window.open(routes.attachmentView + '?f=' + encodeURIComponent(name), '_blank', 'noopener,noreferrer');
-          });
+        const name = decodeURIComponent(enc);
+        openAttachmentPreviewFromName(name);
       });
 
       $(document).on('click', '.btn-quick-status', function() {
@@ -2418,7 +2488,30 @@
         closeQuickStatusModalOnly();
       });
 
-      $(document).on('click', '.close-modal, #modalOverlay', closeModal);
+      $(document).on('click', '#modalOverlay', function() {
+        if ($('#tkAttachmentPreviewModal').hasClass('show')) {
+          closeAttachmentPreviewModal();
+          return;
+        }
+        closeModal();
+      });
+      $(document).on('click', '#tkAttachmentPreviewModal', function(e) {
+        if (e.target === this) {
+          closeAttachmentPreviewModal();
+        }
+      });
+      $(document).on('click', '#btnTkAttPreviewClose, #btnTkAttPreviewCloseFoot', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAttachmentPreviewModal();
+      });
+      $(document).on('click', '.close-modal', function() {
+        if ($('#tkAttachmentPreviewModal').hasClass('show')) {
+          closeAttachmentPreviewModal();
+          return;
+        }
+        closeModal();
+      });
 
       initTicketDateRangePicker();
       renderTicketFilterChips();
@@ -2430,7 +2523,5 @@
     })();
   </script>
 
-  @include('superadmin.superadminfooter')
 </body>
-
 </html>
