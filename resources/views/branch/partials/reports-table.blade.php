@@ -39,7 +39,7 @@
                         <th class="col-amount">Cash In</br> Hand</th>
                         <th>Created By</th>
                         <th class="text-center">Amount Handled </br> By</th>
-                        <th class="text-center">Auditor Approval</th>
+                        <th class="text-center">Zonal Head Approval</th>
                         <th class="text-center">Management Approval</th>
                         <th class="text-center">Files</th>
                         <th class="text-center">Actions</th>
@@ -152,7 +152,7 @@
                             @endif
                         </td>
 
-                        <!-- Auditor Approval Status -->
+                        <!-- Zonal head (first-level) approval — DB column: auditor_approval_status -->
                         <td class="text-center auditor-approval-cell">
                             @if($report->auditor_approval_status == 0)
                                 <span class="approval-badge approval-pending">
@@ -197,7 +197,7 @@
                         <td class="text-center management-approval-cell">
                             @if($report->auditor_approval_status != 1)
                                 <span class="text-muted">
-                                    <i class="fas fa-minus-circle me-1"></i>Awaiting Auditor
+                                    <i class="fas fa-minus-circle me-1"></i>Awaiting Zonal Head
                                 </span>
                             @elseif($report->management_approval_status == 0)
                                 <span class="approval-badge approval-pending">
@@ -296,11 +296,14 @@
                                 <button type="button" class="btn btn-sm btn-info" onclick="viewReport({{ $report->id }})" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                                @if($admin->access_limits == 4 && $report->auditor_approval_status == 0)
-                                    <button type="button" class="btn btn-sm btn-success" onclick="approveReportAuditor({{ $report->id }})" title="Auditor Approve">
+                                @php
+                                    $zonalBranchIds = $allowedBranchIdsForZonalApprove ?? [];
+                                @endphp
+                                @if($admin->access_limits == 2 && $report->auditor_approval_status == 0 && in_array((int) $report->branch_id, $zonalBranchIds, true))
+                                    <button type="button" class="btn btn-sm btn-success" onclick="approveReportAuditor({{ $report->id }})" title="Zonal Head Approve">
                                         <i class="fas fa-check"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModalAuditor({{ $report->id }})" title="Auditor Reject">
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModalAuditor({{ $report->id }})" title="Zonal Head Reject">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 @endif

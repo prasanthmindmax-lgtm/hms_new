@@ -1,1100 +1,679 @@
-let employeeDataSource = [];
-let currentPage = 1;
-let currentPageSize = 10;
-const employeeDataUrl = 'employee-data';
+/* ════════════════════════════════════════
+   Access Master — JS
+   New UI: menu filter, export CSV/XLSX,
+   custom am-dd dropdowns, stats, chips
+════════════════════════════════════════ */
+
+'use strict';
+
+// ── State ──────────────────────────────
+let employeeDataSource  = [];   // raw from server
+let currentFilteredData = [];   // after filters
+let currentPage         = 1;
+let currentPageSize     = 10;
 
 let currentFilters = {
-    role: '',
-    zone: '',
+    role:   '',
+    zone:   '',
     branch: '',
-    name: '',
-    empnum: ''
+    name:   '',
+    empnum: '',
+    menu:   '',     // menu_id display label
+    status: '',     // active | inactive | not_used
 };
+let currentMenuId   = '';  // numeric menu id for export
 
-$(document).ready(function() {
-    document.addEventListener("DOMContentLoaded", function() {
-        let el = document.getElementById('name-views');
-        if (el) el.value = '';
+// ── Helpers ────────────────────────────
+function debounce(fn, wait) {
+    let t;
+    return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); };
+}
+
+// ── Custom am-dd dropdown component ───
+function initAmDropdown(wrapperId, onSelect) {
+    const $w  = $('#' + wrapperId);
+    const $in = $w.find('.am-dd-input');
+    const $s  = $w.find('.am-dd-search');
+
+    // Toggle open/close
+    $in.on('click', function (e) {
+        e.stopPropagation();
+        const wasOpen = $w.hasClass('open');
+        closeAllDropdowns();
+        if (!wasOpen) { $w.addClass('open'); $s.val('').trigger('input').focus(); }
     });
+
+    // Live search
+    $s.on('input', function () {
+        const q = $(this).val().toLowerCase();
+        $w.find('.am-dd-opt').each(function () {
+            $(this).toggle($(this).text().toLowerCase().includes(q));
+        });
+    }).on('click', function (e) { e.stopPropagation(); });
+
+    // Option click
+    $(document).on('click', '#' + wrapperId + ' .am-dd-opt', function (e) {
+        e.stopPropagation();
+        const val  = $(this).attr('data-value');
+        const text = $(this).text();
+        $in.val(text);
+        $w.find('.am-dd-opt').removeClass('selected');
+        $(this).addClass('selected');
+        $w.removeClass('open');
+        onSelect(val, text);
+    });
+}
+
+function closeAllDropdowns() {
+    $('.am-dd').removeClass('open');
+}
+
+$(document).on('click', function (e) {
+    if (!$(e.target).closest('.am-dd').length) closeAllDropdowns();
 });
 
-$(document).ready(function() {
-    document.addEventListener("DOMContentLoaded", function() {
-        let el = document.getElementById('name-views');
-        if (el) el.value = '';
-    });
+// ── Populate am-dd options ─────────────
+function setDdOptions(containerId, items) {
+    // items: [{value, label}]
+    const html = items.map(i =>
+        `<div class="am-dd-opt" data-value="${escHtml(String(i.value))}">${escHtml(i.label)}</div>`
+    ).join('');
+    $('#' + containerId).html(html || '<div class="am-dd-opt text-muted">No options</div>');
+}
 
-    $('.access-values-search').val('');
-    $('#name-views').val('');
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Chips ──────────────────────────────
+function renderChips() {
+    const labels = {
+        role: 'Designation', zone: 'Zone', branch: 'Branch',
+        name: 'Employee', empnum: 'Search', menu: 'Menu', status: 'Status'
+    };
+    const area = $('#amChipsArea');
+    area.find('.am-chip').remove();
+
+    let hasAny = false;
+    Object.entries(currentFilters).forEach(([k, v]) => {
+        if (!v) return;
+        hasAny = true;
+        const displayVal = k === 'menu'
+            ? ($('#menu-views').val() || v)
+            : v;
+        const chip = $(`
+            <span class="am-chip" data-filter="${k}">
+                <i class="bi bi-tag-fill" style="font-size:.65rem;"></i>
+                <span>${labels[k]}: ${escHtml(displayVal)}</span>
+                <span class="am-chip-x" data-filter="${k}">&times;</span>
+            </span>`);
+        area.prepend(chip);
+    });
+    $('#amClearAll').toggle(hasAny);
+}
+
+$(document).on('click', '.am-chip-x', function (e) {
+    e.stopPropagation();
+    const key = $(this).attr('data-filter');
+    clearFilter(key);
+});
+
+$('#amClearAll').on('click', function () {
+    Object.keys(currentFilters).forEach(k => { currentFilters[k] = ''; });
+    currentMenuId = '';
+    $('#role-views,#zone-views,#branch-views,#name-views,#menu-views').val('');
     $('#employee_num').val('');
-
-    // Initialize only if the required elements exist
-    if ($('#employee_details').length && $('#access-items-per-page').length) {
-        fetchEmployeeData();
-
-        // Pagination dropdown change handler
-        $('#access-items-per-page').change(function() {
-            currentPageSize = parseInt($(this).val());
-            currentPage = 1;
-            renderEmployeeTable();
-            renderPagination();
-        });
-
-        // Initialize all filters
-        initializeFilters();
-
-        // View employee details handler
-        $(document).on('click', '.view-employee', function(e) {
-            e.stopPropagation();
-            const employeeId = $(this).data('id');
-            viewEmployeeDetails(employeeId);
-        });
-
-        // Edit permissions handler
-        $(document).on('click', '.edit-permission', function(e) {
-            e.stopPropagation();
-            const employeeId = $(this).data('id');
-            openPermissionModal(employeeId);
-        });
-
-        // Name search with debounce
-        if ($('#name-search').length) {
-            $('#name-search').on('input', debounce(function() {
-                currentFilters.name = $(this).val().trim();
-                currentPage = 1;
-                applyFilters();
-            }, 300));
-        }
-
-        // Employee number search with debounce
-        if ($('#employee_num').length) {
-            $('#employee_num').on('input', debounce(function() {
-                currentFilters.empnum = $(this).val().trim();
-                currentPage = 1;
-                applyFilters();
-
-            }, 300));
-        }
-    }
+    $('.am-dd-opt').removeClass('selected');
+    $('.am-stat').removeClass('am-stat-active-filter');
+    renderChips();
+    currentPage = 1;
+    applyFilters();
 });
 
-// Fetch employee data from server with enhanced error handling
-function fetchEmployeeData() {
-    if (!$('#employee_details1').length || !$('#employee_details').length) return;
+function clearFilter(key) {
+    currentFilters[key] = '';
+    if (key === 'menu') { currentMenuId = ''; $('#menu-views').val(''); }
+    else if (key === 'status') { $('.am-stat').removeClass('am-stat-active-filter'); }
+    else { $(`#${key}-views`).val(''); }
+    if (key === 'zone') {
+        currentFilters.branch = '';
+        $('#branch-views').val('');
+        populateBranchFilter(employeeDataSource);
+    }
+    if (key === 'empnum') { $('#employee_num').val(''); }
+    $('.am-dd-opt').removeClass('selected');
+    renderChips();
+    currentPage = 1;
+    applyFilters();
+}
 
+// ── Per-page ───────────────────────────
+$('#access-items-per-page').on('change', function () {
+    currentPageSize = parseInt($(this).val());
+    currentPage = 1;
+    renderEmployeeTable();
+    renderPagination();
+});
+
+// ── Fetch employee data ────────────────
+function fetchEmployeeData() {
     $('#employee_details1').show();
     $('#employee_details').hide();
 
     $.ajax({
-        url: employeeDataUrl,
-        type: "GET",
-        success: function(response) {
+        url: amEmployeeUrl,
+        type: 'GET',
+        success: function (response) {
             $('#employee_details1').hide();
             $('#employee_details').show();
 
             employeeDataSource = response.data || [];
+            const notUsed = employeeDataSource.filter(e => e.active_status === null).length;
             $('#total_access_count').text(response.total || 0);
             $('#total_active_count').text(response.activeCount || 0);
             $('#total_inactive_count').text(response.inactiveCount || 0);
-            $('#access-count').text(response.total || 0);
+            $('#total_notused_count').text(notUsed);
 
-            populateFilters(response.data);
-            applyFilters();
-        },
-        error: function(xhr, status, error) {
-            $('#employee_details1').hide();
-            console.error("Error fetching employee data:", error);
-            if ($('#employee_details').length) {
-                $('#employee_details').html(
-                    '<tr><td colspan="7" class="text-center text-danger">Error loading data. Please try again.</td></tr>'
+            if (response.autoInactivated > 0) {
+                toastr.info(
+                    `${response.autoInactivated} user(s) not found in HRM — automatically marked Inactive.`,
+                    'Auto-Inactive Update',
+                    { timeOut: 6000 }
                 );
             }
+
+            buildFilterOptions(employeeDataSource);
+            buildMenuOptions();
+            applyFilters();
+        },
+        error: function () {
+            $('#employee_details1').hide();
+            $('#employee_details').show().html(
+                '<tr><td colspan="11" class="text-center text-danger py-4">Error loading data. Please refresh.</td></tr>'
+            );
         }
     });
 }
 
-// Initialize filters with search functionality and element checks
-function initializeFilters() {
-    $('.access-values-search').val('');
-    $('#name-views').val('');
-    $('#employee_num').val('');
+// ── Build filter options ───────────────
+function buildFilterOptions(data) {
+    // Designation
+    const roles = [...new Set(data.map(e => e.role?.name))].filter(Boolean).sort();
+    setDdOptions('roles-options', roles.map(r => ({ value: r, label: r })));
 
-    if (!$('.access-values-search').length) return;
+    // Zones
+    const zones = [...new Set(data.map(e => e.zone_name))].filter(Boolean).sort();
+    setDdOptions('zones-options', zones.map(z => ({ value: z, label: z })));
 
-    // Show dropdown when input is focused - with better targeting
-    $('.access-values-search').on('click', function(e) {
-        e.stopPropagation(); // Prevent event from bubbling up
-        $('.dropdown').removeClass('active'); // Close all other dropdowns first
-        $(this).closest('.dropdown').addClass('active');
-        const dropdownSearch = $(this).closest('.dropdown').find('.dropdown-search');
-        if (dropdownSearch.length) {
-            dropdownSearch.focus();
+    // Branches (all)
+    populateBranchFilter(data);
+
+    // Names (all)
+    populateNameFilter(data);
+}
+
+function populateBranchFilter(data) {
+    const branches = [...new Set(data.map(e => e.branch_name))].filter(Boolean).sort();
+    setDdOptions('branches-options', branches.map(b => ({ value: b, label: b })));
+}
+
+function populateNameFilter(data) {
+    const names = [...new Set(data.map(e => e.user?.name))].filter(Boolean).sort();
+    setDdOptions('names-options', names.map(n => ({ value: n, label: n })));
+}
+
+function buildMenuOptions() {
+    if (typeof amMenus === 'undefined' || !amMenus || !amMenus.length) return;
+    // DB column is 'menu_name'
+    const opts = amMenus.map(m => ({ value: m.id, label: m.menu_name || m.name || String(m.id) }));
+    setDdOptions('menus-options', opts);
+}
+
+// ── Init custom dropdowns ──────────────
+$(document).ready(function () {
+    initAmDropdown('ddRole', function (val) {
+        currentFilters.role = val;
+        renderChips(); currentPage = 1; applyFilters();
+    });
+    initAmDropdown('ddZone', function (val) {
+        currentFilters.zone = val;
+        // narrow branch options
+        const filtered = val ? employeeDataSource.filter(e => e.zone_name === val) : employeeDataSource;
+        populateBranchFilter(filtered);
+        if (!filtered.some(e => e.branch_name === currentFilters.branch)) {
+            currentFilters.branch = ''; $('#branch-views').val('');
         }
+        renderChips(); currentPage = 1; applyFilters();
+    });
+    initAmDropdown('ddBranch', function (val) {
+        currentFilters.branch = val;
+        const filtered = val ? employeeDataSource.filter(e => e.branch_name === val) : employeeDataSource;
+        populateNameFilter(filtered);
+        if (!filtered.some(e => e.user?.name === currentFilters.name)) {
+            currentFilters.name = ''; $('#name-views').val('');
+        }
+        renderChips(); currentPage = 1; applyFilters();
+    });
+    initAmDropdown('ddName', function (val) {
+        currentFilters.name = val;
+        renderChips(); currentPage = 1; applyFilters();
+    });
+    initAmDropdown('ddMenu', function (val, text) {
+        currentFilters.menu = text;
+        currentMenuId = val;
+        renderChips(); currentPage = 1; applyFilters();
     });
 
-    // Hide dropdown when clicking outside - improved version
-    $(document).on('click', function(e) {
-        // Check if click is outside any dropdown or its children
-        if (!$(e.target).closest('.dropdown').length) {
-            $('.dropdown').removeClass('active');
+    // Quick search
+    $('#employee_num').on('input', debounce(function () {
+        currentFilters.empnum = $(this).val().trim();
+        renderChips(); currentPage = 1; applyFilters();
+    }, 280));
+
+    // Stat card click → filter by status
+    $(document).on('click', '.am-stat[data-status]', function () {
+        const st = $(this).attr('data-status');
+        if (currentFilters.status === st) {
+            // toggle off
+            currentFilters.status = '';
+            $(this).removeClass('am-stat-active-filter');
+        } else {
+            currentFilters.status = st;
+            $('.am-stat').removeClass('am-stat-active-filter');
+            $(this).addClass('am-stat-active-filter');
         }
+        renderChips();
+        currentPage = 1;
+        applyFilters();
     });
 
-    // Search within dropdown options - prevent propagation
-    $(document).on('input', '.dropdown-search', function(e) {
-        e.stopPropagation();
-        const target = $(this).data('target');
-        const searchTerm = $(this).val().toLowerCase();
-        $(`#${target}-options div`).each(function() {
-            const text = $(this).text().toLowerCase();
-            $(this).toggle(text.includes(searchTerm));
-        });
+    // Kick off
+    fetchEmployeeData();
+});
+
+// ── Apply filters ──────────────────────
+function applyFilters() {
+    const q = (currentFilters.empnum || '').toLowerCase();
+    const menuIdNum = currentMenuId ? parseInt(currentMenuId) : null;
+
+    currentFilteredData = employeeDataSource.filter(emp => {
+        if (currentFilters.role   && emp.role?.name   !== currentFilters.role)   return false;
+        if (currentFilters.zone   && emp.zone_name    !== currentFilters.zone)   return false;
+        if (currentFilters.branch && emp.branch_name  !== currentFilters.branch) return false;
+        if (currentFilters.name   && emp.user?.name   !== currentFilters.name)   return false;
+        if (currentFilters.status === 'active'   && emp.active_status != 0) return false;
+        if (currentFilters.status === 'inactive' && emp.active_status != 1) return false;
+        if (currentFilters.status === 'not_used' && emp.active_status !== null) return false;
+        if (menuIdNum !== null) {
+            const allowed = emp.allowed_menu_ids || [];
+            if (!allowed.map(Number).includes(menuIdNum)) return false;
+        }
+        if (q) {
+            const hay = [
+                emp.id, emp.user?.name, emp.role?.name,
+                emp.branch_name, emp.zone_name, emp.user_fullname,
+                emp.username, emp.status_modified_name,
+                emp.active_status === null ? 'not used' : emp.active_status == 0 ? 'active' : 'inactive'
+            ].join(' ').toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
     });
 
-    // Clear all filters handler - with propagation prevention
-    $(document).on('click', '.clear-all-access-views', function(e) {
-        e.stopPropagation();
-        // Clear all filters
-        $('.access-values-search').val('');
-        $('#employee_num').val('');
-        currentFilters = { role: '', zone: '', branch: '', name: '', empnum: '' };
+    renderEmployeeTable();
+    renderPagination();
+}
 
-        // Reset dropdowns to show all options
-        if (window.employeeFullData) {
-            populateBranchFilter(window.employeeFullData);
-            populateNameFilter(window.employeeFullData);
-        }
+// ── Render table ───────────────────────
+function renderEmployeeTable() {
+    if (!$('#employee_details').length) return;
 
-        // Close all dropdowns
-        $('.dropdown').removeClass('active');
+    const data = currentFilteredData;
+    const start = (currentPage - 1) * currentPageSize;
+    const page  = data.slice(start, start + currentPageSize);
+    const total = data.length;
 
-        // Update UI and data
-        $('.filter-values-container').empty();
-        $(this).hide();
+    $('#access-count').text(total);
+    const from = total ? start + 1 : 0;
+    const to   = Math.min(start + currentPageSize, total);
+    $('#amPageInfo').text(`Showing ${from}–${to} of ${total} records`);
+
+    if (!page.length) {
+        $('#employee_details').html('<tr><td colspan="11" class="text-center py-5 text-muted">No records found</td></tr>');
+        return;
+    }
+
+    let html = '';
+    page.forEach((emp, idx) => {
+        const statusBadge = emp.active_status === null
+            ? `<span class="am-badge badge-notused">Not Used</span>`
+            : emp.active_status == 0
+                ? `<span class="am-badge badge-active status-badge" data-id="${emp.user_id}" data-status="0" title="Click to change">Active</span>`
+                : `<span class="am-badge badge-inactive status-badge" data-id="${emp.user_id}" data-status="1" title="Click to change">Inactive</span>`;
+
+        const menuCount = (emp.allowed_menu_ids || []).length;
+        const menuBadge = `<span class="badge" style="background:#ece9ff;color:#4f52c9;font-size:.72rem;">${menuCount} menus</span>`;
+
+        html += `
+        <tr>
+            <td class="text-muted" style="font-size:.75rem;">${start + idx + 1}</td>
+            <td><strong>#${escHtml(emp.id || '')}</strong></td>
+            <td>${escHtml(emp.user?.name || 'N/A')}</td>
+            <td><span style="font-size:.78rem;color:#6b7280;">${escHtml(emp.role?.name || '—')}</span></td>
+            <td>${escHtml(emp.branch_name || '—')}</td>
+            <td>${escHtml(emp.zone_name || '—')}</td>
+            <td>${statusBadge}</td>
+            <td style="font-size:.76rem;">
+                ${emp.status_modified_name ? escHtml(emp.status_modified_name) : '—'}<br>
+                <span class="text-muted">${emp.status_changed_on ? escHtml(emp.status_changed_on) : ''}</span>
+            </td>
+            <td>${menuBadge}</td>
+            <td>
+                <i class="bi bi-key-fill edit-permission"
+                   style="cursor:pointer;color:#6a6ee4;font-size:1rem;"
+                   data-id="${escHtml(emp.id)}" title="Edit Permissions"></i>
+            </td>
+            <td>
+                <i class="bi bi-eye-fill view-employee"
+                   style="cursor:pointer;color:#6a6ee4;font-size:1rem;"
+                   data-id="${escHtml(emp.id)}" title="View Details"></i>
+            </td>
+        </tr>`;
+    });
+
+    $('#employee_details').html(html);
+}
+
+// ── Render pagination ──────────────────
+function renderPagination() {
+    const total = currentFilteredData.length;
+    const totalPages = Math.ceil(total / currentPageSize);
+    let html = '';
+
+    html += `<button class="page-btn" data-page="prev" ${currentPage <= 1 ? 'disabled' : ''}>&laquo;</button>`;
+    const max = 5;
+    let sp = Math.max(1, currentPage - Math.floor(max / 2));
+    let ep = Math.min(totalPages, sp + max - 1);
+    if (ep - sp + 1 < max) sp = Math.max(1, ep - max + 1);
+
+    if (sp > 1) { html += `<button class="page-btn" data-page="1">1</button>`; if (sp > 2) html += `<span class="dots">…</span>`; }
+    for (let i = sp; i <= ep; i++) {
+        html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+    }
+    if (ep < totalPages) { if (ep < totalPages - 1) html += `<span class="dots">…</span>`; html += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`; }
+    html += `<button class="page-btn" data-page="next" ${currentPage >= totalPages ? 'disabled' : ''}>&raquo;</button>`;
+
+    const $pager = $('#access-pagination');
+    $pager.html(html);
+
+    $pager.find('.page-btn').off('click').on('click', function () {
+        const p = $(this).attr('data-page');
+        const tp = Math.ceil(currentFilteredData.length / currentPageSize);
+        if (p === 'prev' && currentPage > 1) currentPage--;
+        else if (p === 'next' && currentPage < tp) currentPage++;
+        else if (!isNaN(p)) currentPage = parseInt(p);
         renderEmployeeTable();
         renderPagination();
     });
 }
 
-function populateFilters(data) {
-    if (!data) return;
-
-    // Store the complete data for filtering
-    window.employeeFullData = data;
-
-    // Clear current filters (but keep UI selections)
-    const uiState = {
-        role: $('#role-views').val(),
-        zone: $('#zone-views').val(),
-        branch: $('#branch-views').val(),
-        name: $('#name-views').val(),
-        empnum: $('#employee_num').val(),
+// ── Export ─────────────────────────────
+function buildExportUrl(format) {
+    const params = {
+        format: format,
+        role:   currentFilters.role,
+        zone:   currentFilters.zone,
+        branch: currentFilters.branch,
+        name:   currentFilters.name,
+        empnum: currentFilters.empnum,
+        status: currentFilters.status,
     };
-
-
-    // Repopulate all filters
-    populateRoleFilter(data);
-    populateZoneFilter(data);
-
-    // Only populate branch filter if zone is selected
-    if (uiState.zone) {
-        const filteredBranches = data.filter(employee =>
-            employee.zone_name === uiState.zone
-        );
-        populateBranchFilter(filteredBranches);
-    } else {
-        populateBranchFilter(data);
-    }
-
-    // Only populate name filter if branch is selected
-    if (uiState.branch) {
-        const filteredNames = data.filter(employee =>
-            employee.branch_name === uiState.branch
-        );
-        populateNameFilter(filteredNames);
-    } else {
-        populateNameFilter(data);
-    }
-
-    // Restore UI state
-    if (uiState.role) currentFilters.role = uiState.role;
-    if (uiState.zone) currentFilters.zone = uiState.zone;
-    if (uiState.branch) currentFilters.branch = uiState.branch;
-    if (uiState.name) currentFilters.name = uiState.name;
-    if (uiState.empnum) currentFilters.empnum = uiState.empnum;
-
-    showActiveFilters();
+    if (currentMenuId) params.menu_id = currentMenuId;
+    const qs = Object.entries(params)
+        .filter(([, v]) => v)
+        .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+        .join('&');
+    return amExportUrl + (qs ? '?' + qs : '');
 }
 
-function populateZoneFilter(data) {
-    if (!$('#zones-options').length) return;
-
-    const zones = [...new Set(data.map(employee => employee.zone_name))].filter(Boolean);
-    let zoneOptions = zones.map(zone => `<div data-value="${zone}">${zone}</div>`).join('');
-    $('#zones-options').html(zoneOptions || '<div>No zones available</div>');
-    setupFilterHandler('#zones-options div', 'zone', onZoneSelected);
-}
-
-function populateRoleFilter(data) {
-    if (!$('#roles-options').length) return;
-
-    const roles = [...new Set(data.map(employee => employee.role?.name))].filter(Boolean);
-    let roleOptions = roles.map(role => `<div data-value="${role}">${role}</div>`).join('');
-    $('#roles-options').html(roleOptions || '<div>No roles available</div>');
-    setupFilterHandler('#roles-options div', 'role', applyFilters);
-}
-
-function populateBranchFilter(data) {
-    if (!$('#branches-options').length) return;
-
-    const branches = [...new Set(data.map(employee => employee.branch_name))].filter(Boolean);
-    let branchOptions = branches.map(branch => `<div data-value="${branch}">${branch}</div>`).join('');
-    $('#branches-options').html(branchOptions || '<div>No branches available</div>');
-    setupFilterHandler('#branches-options div', 'branch', onBranchSelected);
-}
-
-function populateNameFilter(data) {
-    if (!$('#names-options').length) return;
-
-    const names = [...new Set(data.map(employee => employee.user?.name))].filter(Boolean);
-    let nameOptions = names.map(name => `<div data-value="${name}">${name}</div>`).join('');
-    $('#names-options').html(nameOptions || '<div>No employees available</div>');
-    setupFilterHandler('#names-options div', 'name', applyFilters);
-}
-
-function onZoneSelected() {
-    // Only reset branch if zone actually changed
-    if (currentFilters.zone && window.employeeFullData) {
-        const filteredBranches = window.employeeFullData.filter(employee =>
-            employee.zone_name === currentFilters.zone
-        );
-
-        populateBranchFilter(filteredBranches);
-
-        // Reset branch filter only if the new zone doesn't contain the current branch
-        const branchExists = filteredBranches.some(emp =>
-            emp.branch_name === currentFilters.branch
-        );
-
-        if (!branchExists) {
-            currentFilters.branch = '';
-            $('#branch-views').val('');
-        }
-    } else if (window.employeeFullData) {
-        populateBranchFilter(window.employeeFullData);
-    }
-
-    showActiveFilters();
-    debounce(applyFilters, 100)();
-}
-
-function onBranchSelected() {
-    if (currentFilters.branch && window.employeeFullData) {
-        const filteredUsers = window.employeeFullData.filter(employee =>
-            employee.branch_name === currentFilters.branch
-        );
-
-        populateNameFilter(filteredUsers);
-
-        // Reset name filter only if the new branch doesn't contain the current name
-        const nameExists = filteredUsers.some(emp =>
-            emp.user?.name === currentFilters.name
-        );
-
-        if (!nameExists) {
-            currentFilters.name = '';
-            $('#name-views').val('');
-        }
-    } else if (window.employeeFullData) {
-        populateNameFilter(window.employeeFullData);
-    }
-
-    showActiveFilters();
-    debounce(applyFilters, 100)();
-}
-
-function setupFilterHandler(selector, filterType, callback = null) {
-    $(document).on('click', selector, function() {
-        const filterValue = $(this).text();
-
-        // Only proceed if the filter value actually changed
-        if (currentFilters[filterType] !== filterValue) {
-            currentFilters[filterType] = filterValue;
-            $(`#${filterType}-views`).val(filterValue);
-            $(this).closest('.dropdown').removeClass('active');
-
-            showActiveFilters();
-            $('.clear-all-access-views').show();
-
-            if (callback) {
-                callback();
-            } else {
-                // Debounce the filter application
-                debounce(applyFilters, 100)();
-            }
-        }
-    });
-}
-
-function showActiveFilters() {
-    const container = $('.filter-values-container');
-    if (!container.length) return;
-
-    container.empty();
-
-    Object.entries(currentFilters).forEach(([key, value]) => {
-        if (value) {
-            const filterName = getFilterDisplayName(key);
-            container.append(`
-                <span class="badge bg-primary me-1 mb-1 filter-badge" data-filter="${key}" style="cursor: pointer;">
-                    ${filterName}: ${value}
-                    <i class="fas fa-times ms-1" data-filter="${key}"></i>
-                </span>
-            `);
-        }
-    });
-
-    $('.clear-all-access-views').toggle(Object.values(currentFilters).some(v => v));
-}
-
-function getFilterDisplayName(filterKey) {
-    const names = {
-        'role': 'Designation',
-        'zone': 'Zone',
-        'branch': 'Branch',
-        'name': 'Employee',
-        'empnum': 'Employee Number'
-    };
-    return names[filterKey] || filterKey;
-}
-
-// Update the remove filter handler to work on the entire badge
-$(document).on('click', '.filter-badge', function(e) {
-    e.stopPropagation();
-    const filterKey = $(this).data('filter');
-
-    // Don't remove if clicking specifically on something else inside the badge
-    if ($(e.target).hasClass('fa-times') || $(e.target).parent().hasClass('filter-badge')) {
-        currentFilters[filterKey] = '';
-        $(`#${filterKey}-views`).val('');
-
-        if (filterKey === 'empnum') {
-            $('#employee_num').val('');
-        }
-
-        if (filterKey === 'zone') {
-            currentFilters.branch = '';
-            $('#branch-views').val('');
-        }
-
-        showActiveFilters();
-        applyFilters();
-    }
+$('#btnExportCsv').on('click', function () {
+    window.location.href = buildExportUrl('csv');
+});
+$('#btnExportXlsx').on('click', function () {
+    window.location.href = buildExportUrl('xlsx');
 });
 
-$(document).on('click', '.remove-filter', function(e) {
+// ── View details ───────────────────────
+$(document).on('click', '.view-employee', function (e) {
     e.stopPropagation();
-    const filterKey = $(this).data('filter');
-
-    currentFilters[filterKey] = '';
-    $(`#${filterKey}-views`).val('');
-
-    if (filterKey === 'empnum') {
-        $('#employee_num').val('');
-    }
-
-    if (filterKey === 'zone') {
-        currentFilters.branch = '';
-        $('#branch-views').val('');
-    }
-
-    showActiveFilters();
-    applyFilters();
+    viewEmployeeDetails($(this).attr('data-id'));
 });
-
-function applyFilters() {
-    if (!window.employeeFullData) return;
-
-    const searchText = (currentFilters.empnum || '').toLowerCase().trim();
-
-    currentFilteredData = window.employeeFullData.filter(employee => {
-        let statusText = 'not used';
-        if (employee.active_status == 0) statusText = 'active';
-        else if (employee.active_status == 1) statusText = 'inactive';
-        else if (employee.active_status == null) statusText = 'not used';
-
-        const searchTarget = `
-            ${employee.id || ''}
-            ${employee.user?.name || ''}
-            ${employee.role?.name || ''}
-            ${employee.branch_name || ''}
-            ${employee.zone_name || ''}
-            ${employee.user_fullname || ''}
-            ${employee.username || ''}
-            ${employee.status_modified_name || ''}
-            ${statusText}
-        `.toLowerCase();
-
-        const roleMatch = !currentFilters.role || (employee.role?.name === currentFilters.role);
-        const zoneMatch = !currentFilters.zone || (employee.zone_name === currentFilters.zone);
-        const branchMatch = !currentFilters.branch || (employee.branch_name === currentFilters.branch);
-        const nameMatch = !currentFilters.name || (employee.user?.name === currentFilters.name);
-        const textMatch = !searchText || searchTarget.includes(searchText);
-
-        return roleMatch && zoneMatch && branchMatch && nameMatch && textMatch;
-    });
-
-    currentPage = 1; // reset to first page when filters change
-
-    renderEmployeeTable(currentFilteredData);
-    renderPagination(currentFilteredData);
-}
-
-
-function renderEmployeeTable(data = null) {
-    if (!$('#employee_details').length) return;
-
-    // const displayData = data || employeeDataSource;
-    const displayData = data || currentFilteredData.length ? currentFilteredData : employeeDataSource;
-
-    const startIdx = (currentPage - 1) * currentPageSize;
-    const endIdx = currentPage * currentPageSize;
-    const pageData = displayData.slice(startIdx, endIdx);
-
-    let tableHtml = '';
-
-    if (pageData.length === 0) {
-        tableHtml = '<tr><td colspan="7" class="text-center">No employee records found</td></tr>';
-    } else {
-        pageData.forEach(employee => {
-            tableHtml += `
-                <tr onclick="rowClick(event)">
-                    <td class="tdview">
-                        <strong>#${employee.id}</strong>
-                    </td>
-                    <td class="tdview">
-                        ${employee.user?.name || 'N/A'}
-                    </td>
-                    <td class="tdview">
-                        ${employee.role?.name || 'Not specified'}
-                    </td>
-                    <td class="tdview">
-                        ${employee.branch_name || 'Unknown Branch'}
-                    </td>
-                    <td class="tdview">
-                        ${employee.zone_name || 'Unknown Zone'}
-                    </td>
-
-                    <td class="tdview" style="cursor:pointer">
-                        ${
-                            employee.active_status === null
-                                ? '<span class="badge bg-secondary">Not Used</span>'
-                                : employee.active_status === 0
-                                    ? `<span class="badge bg-success status-badge" data-id="${employee.user_id}" data-status="0">Active</span>`
-                                    : `<span class="badge bg-danger status-badge" data-id="${employee.user_id}" data-status="1">Inactive</span>`
-                        }
-                    </td>
-                     <td class="tdview">
-                        ${employee.status_modified_name !==null && employee.status_modified_name !=='undefined'?employee.status_modified_name : '-'}</br>
-                        ${employee.status_changed_on !==null ?employee.status_changed_on : '-'}</br>
-                    </td>
-                    <td class="tdview">
-                        <i class="fas fa-key edit-permission"
-                        style="cursor:pointer;color:#6777ef;"
-                        data-id="${employee.id}"
-                        title="Edit Permissions"></i>
-                    </td>
-                    <td class="tdview">
-                        <i class="fas fa-eye view-employee"
-                           style="cursor:pointer;color:#6777ef;"
-                           data-id="${employee.id}"
-                           title="View Details"></i>
-                    </td>
-                </tr>
-            `;
-        });
-    }
-
-    $('#employee_details').html(tableHtml);
-    if ($('#access-count').length) {
-        $('#access-count').text(displayData.length);
-    }
-}
-
-function renderPagination(data = null) {
-    if (!$('#access-pagination').length) return;
-
-    const displayData = data || employeeDataSource;
-    const totalItems = displayData.length;
-    const totalPages = Math.ceil(totalItems / currentPageSize);
-    let paginationHtml = '';
-
-    paginationHtml += `<button class="page-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''}>&laquo;</button>`;
-
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-        startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    if (startPage > 1) {
-        paginationHtml += `<button class="page-btn" data-page="1">1</button>`;
-        if (startPage > 2) {
-            paginationHtml += `<span class="page-dots">...</span>`;
-        }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-        paginationHtml += `<button class="page-btn ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
-    }
-
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-            paginationHtml += `<span class="page-dots">...</span>`;
-        }
-        paginationHtml += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`;
-    }
-
-    paginationHtml += `<button class="page-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''}>&raquo;</button>`;
-
-    $('#access-pagination').html(paginationHtml);
-
-    // $('.page-btn').off('click').on('click', function() {
-    //     const pageAction = $(this).data('page');
-
-    //     if (pageAction === 'prev' && currentPage > 1) {
-    //         currentPage--;
-    //     } else if (pageAction === 'next' && currentPage < totalPages) {
-    //         currentPage++;
-    //     } else if (!isNaN(pageAction)) {
-    //         currentPage = parseInt(pageAction);
-    //     }
-
-    //     renderEmployeeTable();
-    //     renderPagination();
-    // });
-    $('.page-btn').off('click').on('click', function() {
-        const pageAction = $(this).data('page');
-
-        if (pageAction === 'prev' && currentPage > 1) {
-            currentPage--;
-        } else if (pageAction === 'next' && currentPage < totalPages) {
-            currentPage++;
-        } else if (!isNaN(pageAction)) {
-            currentPage = parseInt(pageAction);
-        }
-
-        renderEmployeeTable(currentFilteredData.length ? currentFilteredData : employeeDataSource);
-        renderPagination(currentFilteredData.length ? currentFilteredData : employeeDataSource);
-    });
-
-}
 
 function viewEmployeeDetails(employeeId) {
-    const employee = employeeDataSource.find(item => item.id == employeeId);
+    const emp = employeeDataSource.find(e => e.id == employeeId);
+    if (!emp) { alert('Employee not found. Please refresh.'); return; }
 
-    if (employee) {
-        // Set basic information
-        $('#view-access-id').text(employee.id);
-        $('#view-employee-id').text(employee.id);
-        $('#view-employee-name').text(employee.user?.name || 'N/A');
-        $('#view-role').text(employee.role?.name || 'Not specified');
-        $('#view-branch').text(employee.branch_name || 'Unknown Branch');
-        $('#view-zone').text(employee.zone_name || 'Unknown Zone');
-        $('#view-employee-created').text(employee.created_by_username || 'Unknown Zone');
-        $('#view-employee-modified-time').text(employee.permission_modified_at || 'Unknown Zone');
+    $('#view-access-id').text(emp.id);
+    $('#view-employee-id').text(emp.id);
+    $('#view-employee-name').text(emp.user?.name || 'N/A');
+    $('#view-role').text(emp.role?.name || '—');
+    $('#view-branch').text(emp.branch_name || '—');
+    $('#view-zone').text(emp.zone_name || '—');
+    $('#view-employee-created').text(emp.created_by_username || '—');
+    $('#view-employee-modified-time').text(emp.permission_modified_at || '—');
 
-        // Fetch additional details including permissions
-        $.ajax({
-            url: 'get-user-details',
-            type: 'GET',
-            data: { employee_id: employeeId },
-            success: function(response) {
-                // Set additional information
-                $('#view-employee-email').text(response.email || 'N/A');
-                $('#view-reporting-manager').text(
-                    response.reporting_manager_name || 'Not assigned'
-                );
-                $('#view-zonal-head').text(
-                    response.zonal_head ? 'Yes' : 'No'
-                );
-
-                // Render permissions table
-                renderViewPermissionsTable(response.menus, response.user_permissions);
-
-                // Show the modal
-                $('#access-view-modal').modal('show');
-            },
-            error: function(xhr) {
-                console.error('Error fetching user details:', xhr.responseText);
-                alert('Error loading employee details. Please try again.');
-            }
-        });
-    } else {
-        alert('Employee details not found. Please refresh the page and try again.');
-    }
+    $.ajax({
+        url: 'get-user-details', type: 'GET', data: { employee_id: employeeId },
+        success: function (r) {
+            $('#view-employee-email').text(r.email || 'N/A');
+            $('#view-reporting-manager').text(r.reporting_manager_name || 'Not assigned');
+            $('#view-zonal-head').text(r.zonal_head ? 'Yes' : 'No');
+            renderViewPermissionsTable(r.menus, r.user_permissions);
+            $('#access-view-modal').modal('show');
+        },
+        error: function () { alert('Error loading employee details.'); }
+    });
 }
 
 function renderViewPermissionsTable(menus, userPermissions) {
-    let html = '';
     const menuMap = {};
+    menus.forEach(m => { if (m.sub_menus === 0) menuMap[m.id] = { menu: m, subs: [] }; });
+    menus.forEach(m => { if (m.sub_menus !== 0 && menuMap[m.sub_menus]) menuMap[m.sub_menus].subs.push(m); });
 
-    // First pass: organize menus and submenus
-    menus.forEach(menu => {
-        if (menu.sub_menus === 0) {
-            menuMap[menu.id] = {
-                menu: menu,
-                submenus: []
-            };
-        }
-    });
-
-    menus.forEach(menu => {
-        if (menu.sub_menus !== 0 && menuMap[menu.sub_menus]) {
-            menuMap[menu.sub_menus].submenus.push(menu);
-        }
-    });
-
-    // Second pass: build the table rows
-    for (const [menuId, menuData] of Object.entries(menuMap)) {
-        const mainMenu = menuData.menu;
-        const submenus = menuData.submenus;
-        const hasPermission = userPermissions.includes(parseInt(mainMenu.id));
-
-        // Main menu row
-        html += `
-            <tr>
-                <td><strong>${mainMenu.menu_name}</strong></td>
-                <td></td>
-                <td>
-                    <span class="badge bg-${hasPermission ? 'success' : 'secondary'}">
-                        ${hasPermission ? 'Enabled' : 'Disabled'}
-                    </span>
-                </td>
-            </tr>
-        `;
-
-        // Submenu rows
-        submenus.forEach(submenu => {
-            const subHasPermission = userPermissions.includes(parseInt(submenu.id));
-
-            html += `
-                <tr>
-                    <td></td>
-                    <td>${submenu.menu_name}</td>
-                    <td>
-                        <span class="badge bg-${subHasPermission ? 'success' : 'secondary'}">
-                            ${subHasPermission ? 'Enabled' : 'Disabled'}
-                        </span>
-                    </td>
-                </tr>
-            `;
+    let html = '';
+    for (const { menu, subs } of Object.values(menuMap)) {
+        const has = userPermissions.includes(parseInt(menu.id));
+        html += `<tr><td><strong>${escHtml(menu.menu_name)}</strong></td><td></td>
+            <td><span class="badge ${has ? 'bg-success' : 'bg-secondary'}">${has ? 'Enabled' : 'Disabled'}</span></td></tr>`;
+        subs.forEach(s => {
+            const sh = userPermissions.includes(parseInt(s.id));
+            html += `<tr><td></td><td>${escHtml(s.menu_name)}</td>
+                <td><span class="badge ${sh ? 'bg-success' : 'bg-secondary'}">${sh ? 'Enabled' : 'Disabled'}</span></td></tr>`;
         });
     }
-
-    $('#view-permissions-table').html(html || `
-        <tr>
-            <td colspan="3" class="text-center">No permissions assigned</td>
-        </tr>
-    `);
+    $('#view-permissions-table').html(html || '<tr><td colspan="3" class="text-center">No permissions assigned</td></tr>');
 }
 
+// ── Edit permissions ───────────────────
+$(document).on('click', '.edit-permission', function (e) {
+    e.stopPropagation();
+    openPermissionModal($(this).attr('data-id'));
+});
+
 function openPermissionModal(employeeId) {
-    if (!$('#permission-modal').length) return;
+    const emp = employeeDataSource.find(e => e.id == employeeId);
+    if (!emp) { alert('Employee not found'); return; }
 
-    const employee = employeeDataSource.find(item => item.id == employeeId);
+    $('#permission-employee-id').text(emp.id);
+    $('#perm-employee-id').val(emp.id);
+    $('#perm-employee-name').val(emp.user?.name || 'N/A');
+    $('#perm-branch').val(emp.branch_name || '—');
+    $('#perm-zone').val(emp.zone_name || '—');
+    $('#perm-branch-id').val(emp.branch_id ?? '');
+    $('#perm-zone-id').val(emp.zone_id ?? '');
+    $('#multi-location').val(emp.multi_location_name ?? '');
+    $('#location_ids').val(emp.multi_location ?? '');
 
-    if (!employee) {
-        alert('Employee not found');
-        return;
-    }
-    console.log("employee",employee);
-
-    $('#permission-employee-id').text(employee.id);
-    $('#perm-employee-id').val(employee.id);
-    $('#perm-employee-name').val(employee.user?.name || 'N/A');
-    $('#perm-branch').val(employee.branch_name || 'Unknown Branch');
-    $('#perm-zone').val(employee.zone_name || 'Unknown Zone');
-    $('#perm-branch-id').val(employee.branch_id ?? '');
-    $('#perm-zone-id').val(employee.zone_id ?? '');
-    $('#multi-location').val(employee.multi_location_name ?? '');
-    $('#location_ids').val(employee.multi_location ?? '');
-
-    fetchUserDetails(employee.id);
+    fetchUserDetails(emp.id);
     $('#permission-modal').modal('show');
 }
 
 function fetchUserDetails(employeeId) {
-    if (!$('#perm-role').length) return;
-
     $.ajax({
-        url: 'get-user-details',
-        type: 'GET',
-        data: { employee_id: employeeId },
-        success: function(response) {
-            $('#perm-role').val(response.role_id || 3);
-            if (response.email && $('#perm-email').length) {
-                $('#perm-email').val(response.email);
-            }
-            if (response.zonal_head !== undefined && $('#perm-zonal-head').length) {
-                $('#perm-zonal-head').val(response.zonal_head ? '1' : '0');
-            }
-
-            populateReportingManagers(response.managers, response.reporting_manager);
+        url: 'get-user-details', type: 'GET', data: { employee_id: employeeId },
+        success: function (r) {
+            $('#perm-role').val(r.role_id || 3);
+            if (r.email) $('#perm-email').val(r.email);
+            $('#perm-zonal-head').val(r.zonal_head ? '1' : '0');
+            populateReportingManagers(r.managers, r.reporting_manager);
             fetchMenuPermissions(employeeId);
         },
-        error: function(xhr) {
-            console.error('Error fetching user details:', xhr.responseText);
-            fetchMenuPermissions(employeeId);
-        }
+        error: function () { fetchMenuPermissions(employeeId); }
     });
 }
 
-function populateReportingManagers(managers, selectedManager) {
-    if (!$('#perm-reporting-manager').length) return;
-
-    const $select = $('#perm-reporting-manager');
-    $select.empty().append('<option value="">Select Reporting Manager</option>');
-
-    if (managers && managers.length > 0) {
-        managers.forEach(manager => {
-            const isSelected = manager.id.toString() === (selectedManager || '').toString();
-            $select.append(`
-                <option value="${manager.id}" ${isSelected ? 'selected' : ''}>
-                    ${manager.user_fullname} (${manager.username})
-                </option>
-            `);
-        });
-    }
+function populateReportingManagers(managers, selected) {
+    const $s = $('#perm-reporting-manager').empty().append('<option value="">Select Reporting Manager</option>');
+    (managers || []).forEach(m => {
+        $s.append(`<option value="${m.id}" ${String(m.id) === String(selected) ? 'selected' : ''}>${escHtml(m.user_fullname)} (${escHtml(m.username)})</option>`);
+    });
 }
 
 function fetchMenuPermissions(employeeId) {
-    if (!$('#permission-table-body').length) return;
-
     $.ajax({
-        url: 'get-menu-permissions',
-        type: 'GET',
-        data: { employee_id: employeeId },
-        success: function(response) {
-            $('#perm-role').val(response.role_id || 3);
-            if (response.menus && response.menus.length > 0) {
-                renderMenuPermissions(response.menus, response.user_permissions);
-            } else {
-                $('#permission-table-body').html(
-                    '<tr><td colspan="3" class="text-center">No menu permissions available</td></tr>'
-                );
-            }
-        },
-        error: function(xhr) {
-            console.error('Error fetching menu permissions:', xhr.responseText);
+        url: 'get-menu-permissions', type: 'GET', data: { employee_id: employeeId },
+        success: function (r) {
+            $('#perm-role').val(r.role_id || 3);
+            renderMenuPermissions(r.menus || [], r.user_permissions || []);
         }
     });
 }
 
-function renderMenuPermissions(menus, userPermissions) {
-    if (!$('#permission-table-body').length) return;
+function renderMenuPermissions(menus, perms) {
+    const menuMap = {};
+    menus.forEach(m => { if (m.sub_menus === 0) menuMap[m.id] = { menu: m, subs: [] }; });
+    menus.forEach(m => { if (m.sub_menus !== 0 && menuMap[m.sub_menus]) menuMap[m.sub_menus].subs.push(m); });
 
     let html = '';
-    const menuMap = {};
-
-    menus.forEach(menu => {
-        if (menu.sub_menus === 0) {
-            menuMap[menu.id] = {
-                menu: menu,
-                submenus: []
-            };
-        }
-    });
-
-    menus.forEach(menu => {
-        if (menu.sub_menus !== 0 && menuMap[menu.sub_menus]) {
-            menuMap[menu.sub_menus].submenus.push(menu);
-        }
-    });
-
-    for (const [menuId, menuData] of Object.entries(menuMap)) {
-        const mainMenu = menuData.menu;
-        const submenus = menuData.submenus;
-
-        html += `
-            <tr>
-                <td>${mainMenu.menu_name}</td>
-                <td></td>
-                <td class="text-center">
-                    <input type="checkbox" class="menu-checkbox"
-                           data-menu-id="${mainMenu.id}"
-                           ${userPermissions.includes(parseInt(mainMenu.id)) ? 'checked' : ''}>
-                </td>
-            </tr>
-        `;
-
-        submenus.forEach(submenu => {
-            html += `
-                <tr>
-                    <td></td>
-                    <td>${submenu.menu_name}</td>
-                    <td class="text-center">
-                        <input type="checkbox" class="menu-checkbox"
-                               data-menu-id="${submenu.id}"
-                               ${userPermissions.includes(parseInt(submenu.id)) ? 'checked' : ''}>
-                    </td>
-                </tr>
-            `;
+    for (const { menu, subs } of Object.values(menuMap)) {
+        const chk = perms.includes(parseInt(menu.id));
+        html += `<tr><td>${escHtml(menu.menu_name)}</td><td></td>
+            <td class="text-center"><input type="checkbox" class="menu-checkbox" data-menu-id="${menu.id}" ${chk ? 'checked' : ''}></td></tr>`;
+        subs.forEach(s => {
+            const sc = perms.includes(parseInt(s.id));
+            html += `<tr><td></td><td>${escHtml(s.menu_name)}</td>
+                <td class="text-center"><input type="checkbox" class="menu-checkbox" data-menu-id="${s.id}" ${sc ? 'checked' : ''}></td></tr>`;
         });
     }
-
-    $('#permission-table-body').html(html);
+    $('#permission-table-body').html(html || '<tr><td colspan="3" class="text-center">No menus available</td></tr>');
 }
 
-$('#save-permissions').click(function() {
-    if (!$('#perm-employee-id').length) return;
-
-    const employeeId = $('#perm-employee-id').val();
-    const employeeName = $('#perm-employee-name').val();
-    const roleId = $('#perm-role').val();
-    const email = $('#perm-email').val();
-    const password = $('#perm-password').val();
-    const reportingManager = $('#perm-reporting-manager').val();
-    const zonalHead = $('#perm-zonal-head').val();
-    const branchId = $('#perm-branch-id').val();
-    const zoneId = $('#perm-zone-id').val();
-    const multiLocId = $('#location_ids').val();
-    const multiLocNames = $('#multi-location').val();
-    const checkedMenus = [];
-
-    $('.menu-checkbox:checked').each(function() {
-        checkedMenus.push($(this).data('menu-id'));
-    });
+$('#save-permissions').on('click', function () {
+    const menus = [];
+    $('.menu-checkbox:checked').each(function () { menus.push($(this).attr('data-menu-id')); });
 
     $.ajax({
-        url: 'save-permissions',
-        type: 'POST',
+        url: 'save-permissions', type: 'POST',
         data: {
-            employee_id: employeeId,
-            employee_name: employeeName,
-            role_id: roleId,
-            email: email,
-            password: password,
-            reporting_manager: reportingManager,
-            zonal_head: zonalHead,
-            branch_id: branchId,
-            zone_id: zoneId,
-            menus: checkedMenus,
-            multiLocId: multiLocId,
-            multiLocNames: multiLocNames,
+            employee_id: $('#perm-employee-id').val(),
+            employee_name: $('#perm-employee-name').val(),
+            role_id: $('#perm-role').val(),
+            email: $('#perm-email').val(),
+            password: $('#perm-password').val(),
+            reporting_manager: $('#perm-reporting-manager').val(),
+            zonal_head: $('#perm-zonal-head').val(),
+            branch_id: $('#perm-branch-id').val(),
+            zone_id: $('#perm-zone-id').val(),
+            menus: menus,
+            multiLocId: $('#location_ids').val(),
+            multiLocNames: $('#multi-location').val(),
             _token: $('meta[name="csrf-token"]').attr('content')
         },
-        success: function(response) {
-            alert('Permissions saved successfully');
-            if ($('#permission-modal').length) {
-                $('#permission-modal').modal('hide');
-            }
+        success: function () {
+            toastr.success('Permissions saved successfully');
+            $('#permission-modal').modal('hide');
             fetchEmployeeData();
         },
-        error: function(xhr) {
-            console.error('Error saving permissions:', xhr.responseText);
-            alert('Error saving permissions. Please check console for details.');
-        }
+        error: function () { toastr.error('Error saving permissions.'); }
     });
 });
 
-function rowClick(event) {
-    const selectedRows = document.querySelectorAll('.selected');
-    selectedRows.forEach(row => row.classList.remove('selected'));
-    event.currentTarget.classList.add('selected');
-}
-
-function debounce(func, wait) {
-    let timeout;
-    return function() {
-        const context = this, args = arguments;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-            func.apply(context, args);
-        }, wait);
-    };
-}
-
-// Initialize any third-party libraries only if their elements exist
-function initializeThirdPartyLibs() {
-    // SimpleBar initialization
-    if (typeof SimpleBar !== 'undefined' && $('.simplebar-container').length) {
-        new SimpleBar(document.querySelector('.simplebar-container'));
-    }
-
-    // DataTables initialization
-    if (typeof exports !== 'undefined' && exports.DataTable && $('#data-table').length) {
-        new exports.DataTable(document.getElementById('data-table'));
-    }
-
-    // ApexCharts initialization
-    // if (typeof ApexCharts !== 'undefined') {
-    //     initializeCharts();
-    // }
-}
-
-$(document).ready(function() {
-    initializeThirdPartyLibs();
-    $('.access-values-search').val('');
-    $('#name-views').val('');
-    $('#employee_num').val('');
+// Select-all menus
+$('#selectAllMenus').on('change', function () {
+    $('.menu-checkbox').prop('checked', $(this).prop('checked'));
+});
+$(document).on('change', '.menu-checkbox', function () {
+    const total = $('.menu-checkbox').length, checked = $('.menu-checkbox:checked').length;
+    $('#selectAllMenus').prop('checked', total === checked);
 });
 
-let selectedUserId = null;
-let currentStatus = null;
+// ── Status badge click ─────────────────
+let selectedUserId = null, currentStatus = null;
 
-// When opening modal, pass current status and user ID
 $(document).on('click', '.status-badge', function () {
-    selectedUserId = $(this).data('id');
-    currentStatus = $(this).data('status');
-
-    // Preselect the radio button based on current status
-    if (currentStatus == 0) {
-        $('#statusActive').prop('checked', true);
-    } else {
-        $('#statusInactive').prop('checked', true);
-    }
-
-    $('#statusDate').val(''); // reset date
+    selectedUserId = $(this).attr('data-id');
+    currentStatus  = $(this).attr('data-status');
+    if (currentStatus == 0) $('#statusActive').prop('checked', true);
+    else $('#statusInactive').prop('checked', true);
+    $('#statusDate').val('');
     $('#statusModal').modal('show');
 });
 
-// Confirm status change
 $('#confirmStatusChange').on('click', function () {
-    const newStatus = $('input[name="active_status"]:checked').val();
-    const statusDate = $('#statusDate').val();
-
-    if (!statusDate) {
-        toastr.warning('Please select an effective date.');
-        return;
-    }
+    const ns   = $('input[name="active_status"]:checked').val();
+    const date = $('#statusDate').val();
+    if (!date) { toastr.warning('Please select an effective date.'); return; }
 
     $.ajax({
-        url: updateStatusUrl, // Laravel route
-        type: 'POST',
-        data: {
-            _token: $('meta[name="csrf-token"]').attr('content'),
-            user_id: selectedUserId,
-            active_status: newStatus,
-            status_date: statusDate
-        },
-        success: function (response) {
+        url: updateStatusUrl, type: 'POST',
+        data: { _token: $('meta[name="csrf-token"]').attr('content'), user_id: selectedUserId, active_status: ns, status_date: date },
+        success: function () {
             $('#statusModal').modal('hide');
-            toastr.success('User status updated successfully.');
-
-            // Update UI badge
-            const badge = $(`.status-badge[data-id="${selectedUserId}"]`);
-            if (newStatus == 0) {
-                badge.removeClass('bg-danger').addClass('bg-success').text('Active').data('status', 0);
-            } else {
-                badge.removeClass('bg-success').addClass('bg-danger').text('Inactive').data('status', 1);
-            }
-
-            fetchEmployeeData(); // optional refresh
+            toastr.success('User status updated.');
+            fetchEmployeeData();
         },
-        error: function () {
-            toastr.error('Failed to update user status.');
-        }
+        error: function () { toastr.error('Failed to update user status.'); }
     });
 });
-$(document).ready(function () {
 
+// ── Multi-location picker ──────────────
+$(document).ready(function () {
     let selectedLocations = new Set();
-    let selectedNames = new Set();
+    let selectedNames     = new Set();
 
     $('#multi-location').on('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const $dropdown = $('#locationDropdown');
-        const isShowing = $dropdown.hasClass('show');
-
+        e.preventDefault(); e.stopPropagation();
+        const $d = $('#locationDropdown');
+        const was = $d.hasClass('show');
         $('.dropdown-menu').removeClass('show');
-
-        if (!isShowing) {
-            $dropdown.addClass('show');
-            $(this).attr('aria-expanded', 'true');
-
-            setTimeout(() => $('#locationSearch').focus(), 10);
-        } else {
-            $dropdown.removeClass('show');
-            $(this).attr('aria-expanded', 'false');
-        }
+        if (!was) { $d.addClass('show'); $('#locationSearch').focus(); }
     });
 
     $(document).on('click', function (e) {
         if (!$(e.target).closest('.dropdown').length) {
             $('#locationDropdown').removeClass('show');
-            $('#multi-location').attr('aria-expanded', 'false');
         }
     });
+    $('#locationDropdown').on('click', function (e) { e.stopPropagation(); });
 
-    $('#locationDropdown').on('click', function (e) {
-        e.stopPropagation();
-    });
-
-   $(document).on('keyup', '#locationSearch', function () {
-        const search = $(this).val().toLowerCase();
-
+    $(document).on('keyup', '#locationSearch', function () {
+        const q = $(this).val().toLowerCase();
         $('.location-item').each(function () {
-            const locationName = $(this)
-                .find('.location-name')
-                .text()
-                .toLowerCase();
-
-            if (locationName.includes(search)) {
-                $(this).removeClass('d-none');
-            } else {
-                $(this).addClass('d-none');
-            }
+            $(this).toggleClass('d-none', !$(this).find('.location-name').text().toLowerCase().includes(q));
         });
     });
 
     window.toggleLocation = function (el) {
-        const $el = $(el);
-        const id = $el.data('id');
-        const name = $el.data('name');
-        const $tick = $el.find('.tick');
-
+        const $el = $(el), id = $el.attr('data-id'), name = $el.attr('data-name');
         if (selectedLocations.has(id)) {
-            selectedLocations.delete(id);
-            selectedNames.delete(name);
-            $tick.hide();
-            $el.removeClass('bg-light');
+            selectedLocations.delete(id); selectedNames.delete(name);
+            $el.find('.tick').hide(); $el.removeClass('bg-light');
         } else {
-            selectedLocations.add(id);
-            selectedNames.add(name);
-            $tick.show();
-            $el.addClass('bg-light');
+            selectedLocations.add(id); selectedNames.add(name);
+            $el.find('.tick').show(); $el.addClass('bg-light');
         }
-
         $('#multi-location').val([...selectedNames].join(', '));
         $('#location_ids').val([...selectedLocations].join(','));
-
         $('#locationDropdown').addClass('show');
-        $('#multi-location').attr('aria-expanded', 'true');
     };
-
-    $(document).on('keydown', function (e) {
-        if (e.key === 'Escape') {
-            $('#locationDropdown').removeClass('show');
-            $('#multi-location').attr('aria-expanded', 'false');
-        }
-    });
- // 🔹 Select All → check/uncheck all
-    $('#selectAllMenus').on('change', function () {
-        const isChecked = $(this).prop('checked');
-        $('.menu-checkbox').prop('checked', isChecked);
-    });
-
-    // 🔹 Individual checkbox change
-    $(document).on('change', '.menu-checkbox', function () {
-        const total = $('.menu-checkbox').length;
-        const checked = $('.menu-checkbox:checked').length;
-
-        // If all checked → select all checked
-        $('#selectAllMenus').prop('checked', total === checked);
-    });
 });

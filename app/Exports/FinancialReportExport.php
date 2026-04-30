@@ -48,7 +48,7 @@ class FinancialReportExport implements FromCollection, WithHeadings, WithMapping
             'Placed By',
             'Locker By',
             'Cash Given By',
-            'Auditor Status',
+            'Zonal Head Status',
             'Management Status',
             'Created By',
             'Created At',
@@ -134,7 +134,7 @@ class FinancialReportExport implements FromCollection, WithHeadings, WithMapping
             'Q' => 20,  // Placed By
             'R' => 20,  // Locker By
             'S' => 20,  // Cash Given By
-            'T' => 16,  // Auditor Status
+            'T' => 16,  // Zonal Head Status
             'U' => 18,  // Management Status
             'V' => 22,  // Created By
             'W' => 20,  // Created At

@@ -9,6 +9,7 @@ $(document).ready(function() {
     let currentEditId = null;
     let fileStorage = {
         radiant_collection: [],
+        radiant_ledger_book: [],
         actual_card: [],
         upi: [],              // NEW
         deposit: [],          // NEW
@@ -16,6 +17,13 @@ $(document).ready(function() {
         cashier_info: [],
         additional_amounts: []
     };
+
+    /** Public URL for files stored as branch_financial_files/... */
+    function publicFileUrl(filePath) {
+        if (!filePath) { return '#'; }
+        const p = String(filePath).replace(/^\/+/, '');
+        return encodeURI('/' + p);
+    }
     
     // ================================================
     // DATE RANGE PICKER FOR RADIANT COLLECTION
@@ -87,6 +95,7 @@ $(document).ready(function() {
             $('#radiant_date_range').prop('disabled', true).css('background-color', '#f0f0f0');
             $('#radiant_collection_amount').prop('disabled', true).css('background-color', '#f0f0f0');
             $('#radiant_collection_files').prop('disabled', true);
+            $('#radiant_ledger_book_files').prop('disabled', true);
         } else {
             // Hide remarks container
             $('#radiantRemarksContainer').slideUp();
@@ -96,6 +105,7 @@ $(document).ready(function() {
             $('#radiant_date_range').prop('disabled', false).css('background-color', '');
             $('#radiant_collection_amount').prop('disabled', false).css('background-color', '');
             $('#radiant_collection_files').prop('disabled', false);
+            $('#radiant_ledger_book_files').prop('disabled', false);
         }
     });
     
@@ -201,6 +211,10 @@ $(document).ready(function() {
         handleFilePreview(this, '#radiant_collection_preview');
     });
     
+    $('#radiant_ledger_book_files').on('change', function() {
+        handleFilePreview(this, '#radiant_ledger_book_preview');
+    });
+    
     $('#actual_card_files').on('change', function() {
         handleFilePreview(this, '#actual_card_preview');
     });
@@ -245,6 +259,54 @@ $(document).ready(function() {
         $(this).closest('.preview-item').remove();
     });
     
+    function parseMoney(el) {
+        const v = parseFloat(String($(el).val() || '0').replace(/,/g, ''));
+        return isFinite(v) ? v : 0;
+    }
+    
+    function hasExistingPreviews(previewSelector) {
+        return $(previewSelector + ' .existing-file').length > 0;
+    }
+    
+    function hasNewFiles(key) {
+        return fileStorage[key] && fileStorage[key].length > 0;
+    }
+    
+    /** Client-side: amounts &gt; 0 require uploads (or existing files in edit mode). */
+    function validateRequiredAttachments() {
+        const notCollected = $('#radiant_not_collected').is(':checked');
+        const rAmt = parseMoney('#radiant_collection_amount');
+        if (!notCollected && rAmt > 0) {
+            if (!hasNewFiles('radiant_collection') && !hasExistingPreviews('#radiant_collection_preview')) {
+                return 'Radiant cash: upload at least one file under Collection proof, or keep existing files.';
+            }
+            if (!hasNewFiles('radiant_ledger_book') && !hasExistingPreviews('#radiant_ledger_book_preview')) {
+                return 'Radiant cash: ledger book copy is required when the collection amount is greater than 0.';
+            }
+        }
+        if (parseMoney('#deposit_amount') > 0) {
+            if (!hasNewFiles('deposit') && !hasExistingPreviews('#deposit_preview')) {
+                return 'Deposit: attachment is required when the amount is greater than 0.';
+            }
+        }
+        if (parseMoney('#actual_card_amount') > 0) {
+            if (!hasNewFiles('actual_card') && !hasExistingPreviews('#actual_card_preview')) {
+                return 'Actual card: attachment is required when the amount is greater than 0.';
+            }
+        }
+        if (parseMoney('#upi_amount') > 0) {
+            if (!hasNewFiles('upi') && !hasExistingPreviews('#upi_preview')) {
+                return 'UPI: attachment is required when the amount is greater than 0.';
+            }
+        }
+        if (parseMoney('#bank_deposit_amount') > 0) {
+            if (!hasNewFiles('bank_deposit') && !hasExistingPreviews('#bank_deposit_preview')) {
+                return 'Direct bank deposit: attachment is required when the amount is greater than 0.';
+            }
+        }
+        return null;
+    }
+    
     // ================================================
     // SUBMIT FORM
     // ================================================
@@ -278,6 +340,12 @@ $(document).ready(function() {
             return;
         }
         
+        const attErr = validateRequiredAttachments();
+        if (attErr) {
+            showAlert('Error', attErr, 'error');
+            return;
+        }
+        
         const formData = new FormData();
         
         // Basic info
@@ -297,6 +365,9 @@ $(document).ready(function() {
         formData.append('radiant_not_collected_remarks', $('#radiant_not_collected_remarks').val() || '');
         fileStorage.radiant_collection.forEach(file => {
             formData.append('radiant_collection_files[]', file);
+        });
+        fileStorage.radiant_ledger_book.forEach(file => {
+            formData.append('radiant_ledger_book_files[]', file);
         });
         
         // Actual card
@@ -469,9 +540,18 @@ $(document).ready(function() {
             $('#radiant_date_range').prop('disabled', true).css('background-color', '#f0f0f0');
             $('#radiant_collection_amount').prop('disabled', true).css('background-color', '#f0f0f0');
             $('#radiant_collection_files').prop('disabled', true);
+            $('#radiant_ledger_book_files').prop('disabled', true);
+        } else {
+            $('#radiant_ledger_book_files').prop('disabled', false);
         }
         
         showExistingFiles(data.radiant_collection_files, '#radiant_collection_preview', 'Radiant Collection');
+        const ledgerJson = data.radiant_ledger_book_files !== undefined ? data.radiant_ledger_book_files : null;
+        if (ledgerJson) {
+            showExistingFiles(ledgerJson, '#radiant_ledger_book_preview', 'Ledger book');
+        } else {
+            $('#radiant_ledger_book_preview').empty();
+        }
         
         // Actual card
         $('#actual_card_amount').val(data.actual_card_amount);
@@ -535,7 +615,7 @@ $(document).ready(function() {
             if (isImage) {
                 previewHtml = `
                     <div class="preview-item existing-file" data-file="${filePath}">
-                        <img src="/${filePath}" alt="File">
+                        <img src="${publicFileUrl(filePath)}" alt="File">
                         <button type="button" class="view-file-btn" style="position:absolute;bottom:5px;right:5px;background:rgba(102,126,234,0.9);border:none;color:white;padding:5px 10px;border-radius:5px;cursor:pointer;">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -562,7 +642,7 @@ $(document).ready(function() {
     $(document).on('click', '.view-file-btn', function(e) {
         e.stopPropagation();
         const filePath = $(this).closest('.existing-file').data('file');
-        window.open('/' + filePath, '_blank');
+        window.open(publicFileUrl(filePath), '_blank');
     });
     
     // ================================================
@@ -641,26 +721,40 @@ $(document).ready(function() {
         openFileViewModal(files, title);
     });
     
+    $(document).on('click', '.file-preview-all-trigger', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        let groups = $(this).data('groups');
+        if (typeof groups === 'string') {
+            try { groups = JSON.parse(groups); } catch (err) { groups = []; }
+        }
+        openGroupedFileViewModal(groups || []);
+    });
+    
     // ================================================
     // OPEN FILE VIEW MODAL
     // ================================================
     function openFileViewModal(files, title) {
         let filesHtml = '';
+        const fileList = Array.isArray(files) ? files : [];
         
-        files.forEach(filePath => {
+        fileList.forEach((filePath) => {
+            const u = publicFileUrl(filePath);
             const ext = filePath.split('.').pop().toLowerCase();
             const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
             const isPdf = ext === 'pdf';
+            const baseName = filePath.split('/').pop() || 'file';
+            const safeName = String(baseName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
             
             if (isImage) {
                 filesHtml += `
                     <div style="margin-bottom:20px;">
-                        <img src="../public/${filePath}" style="max-width:100%;border-radius:10px;">
+                        <img src="${u}" style="max-width:100%;border-radius:10px;" alt="${safeName}">
                         <div style="margin-top:10px;">
-                            <a href="../public/${filePath}" target="_blank" class="btn btn-primary btn-sm">
+                            <a href="${u}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
                                 <i class="fas fa-external-link-alt"></i> Open
                             </a>
-                            <a href="../public/${filePath}" download class="btn btn-success btn-sm">
+                            <a href="${u}" download="${baseName}" class="btn btn-success btn-sm">
                                 <i class="fas fa-download"></i> Download
                             </a>
                         </div>
@@ -669,12 +763,12 @@ $(document).ready(function() {
             } else if (isPdf) {
                 filesHtml += `
                     <div style="margin-bottom:20px;">
-                        <iframe src="../public/${filePath}" style="width:100%;height:500px;border:1px solid #ddd;border-radius:10px;"></iframe>
+                        <iframe src="${u}" style="width:100%;height:500px;border:1px solid #ddd;border-radius:10px;"></iframe>
                         <div style="margin-top:10px;">
-                            <a href="../public/${filePath}" target="_blank" class="btn btn-primary btn-sm">
+                            <a href="${u}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
                                 <i class="fas fa-external-link-alt"></i> Open
                             </a>
-                            <a href="../public/${filePath}" download class="btn btn-success btn-sm">
+                            <a href="${u}" download class="btn btn-success btn-sm">
                                 <i class="fas fa-download"></i> Download
                             </a>
                         </div>
@@ -684,11 +778,11 @@ $(document).ready(function() {
                 filesHtml += `
                     <div style="padding:20px;background:#f7fafc;border-radius:10px;margin-bottom:15px;text-align:center;">
                         <i class="fas fa-file" style="font-size:50px;color:#667eea;"></i>
-                        <p style="margin-top:10px;">${filePath.split('/').pop()}</p>
-                        <a href="../public/${filePath}" target="_blank" class="btn btn-primary btn-sm">
+                        <p style="margin-top:10px;">${safeName}</p>
+                        <a href="${u}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
                             <i class="fas fa-external-link-alt"></i> Open
                         </a>
-                        <a href="../public/${filePath}" download class="btn btn-success btn-sm">
+                        <a href="${u}" download class="btn btn-success btn-sm">
                             <i class="fas fa-download"></i> Download
                         </a>
                     </div>
@@ -705,6 +799,46 @@ $(document).ready(function() {
             customClass: {
                 container: 'swal-on-top'
             }
+        });
+    }
+    
+    /**
+     * Grouped "all attachments" from table (several sections in one modal).
+     */
+    function openGroupedFileViewModal(groups) {
+        if (!Array.isArray(groups) || !groups.length) {
+            showAlert('Info', 'No files attached', 'info');
+            return;
+        }
+        let html = '';
+        groups.forEach((g) => {
+            const paths = g.files && g.files.length ? g.files : [];
+            if (!paths.length) { return; }
+            html += `<h6 style="margin:16px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;color:#2d3748;">${(g.title || 'Files').toString()}</h6>`;
+            html += '<div style="padding-left:8px;">';
+            paths.forEach((filePath) => {
+                const u = publicFileUrl(filePath);
+                const ext = filePath.split('.').pop().toLowerCase();
+                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                const isPdf = ext === 'pdf';
+                const name = filePath.split('/').pop();
+                if (isImage) {
+                    html += `<div style="margin-bottom:12px;"><img src="${u}" style="max-width:100%;max-height:220px;object-fit:contain;border-radius:8px;" alt=""><br><a href="${u}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">${name}</a></div>`;
+                } else if (isPdf) {
+                    html += `<div style="margin-bottom:12px;"><iframe src="${u}" style="width:100%;height:360px;border:1px solid #ddd;border-radius:8px;"></iframe><a href="${u}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">${name}</a></div>`;
+                } else {
+                    html += `<div style="margin:8px 0;"><a href="${u}" target="_blank" class="btn btn-sm btn-primary"><i class="fas fa-file"></i> ${name}</a></div>`;
+                }
+            });
+            html += '</div>';
+        });
+        Swal.fire({
+            title: 'All attachments',
+            html: html || '<p class="text-muted">No files</p>',
+            width: '860px',
+            showCloseButton: true,
+            showConfirmButton: false,
+            customClass: { container: 'swal-on-top' }
         });
     }
     
@@ -776,6 +910,7 @@ $(document).ready(function() {
         // Reset file storage
         fileStorage = {
             radiant_collection: [],
+            radiant_ledger_book: [],
             actual_card: [],
             upi: [],
             deposit: [],
@@ -786,6 +921,7 @@ $(document).ready(function() {
         
         // Reset file inputs
         $('#radiant_collection_files').val('');
+        $('#radiant_ledger_book_files').val('');
         $('#actual_card_files').val('');
         $('#upi_files').val('');
         $('#deposit_files').val('');
@@ -806,6 +942,7 @@ $(document).ready(function() {
         $('#radiant_date_range').prop('disabled', false).css('background-color', '');
         $('#radiant_collection_amount').prop('disabled', false).css('background-color', '');
         $('#radiant_collection_files').prop('disabled', false);
+        $('#radiant_ledger_book_files').prop('disabled', false);
         
         // Reset acknowledgement
         $('#acknowledgement_agreed').prop('checked', false);

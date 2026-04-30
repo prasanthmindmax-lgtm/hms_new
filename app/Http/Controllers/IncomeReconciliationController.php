@@ -9,6 +9,7 @@ use App\Models\TblLocationModel;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\IncomeReconciliationExport;
 use App\Exports\IncomeTemplateExport;
@@ -738,6 +739,98 @@ public function overviewdata(Request $request)
 //     ]);
 // }
 
+/**
+ * Concatenate mismatch remarks from income_reconciliation_table and linked bank_statements (income tag).
+ *
+ * @param  object  $row  income_reconciliation_table row
+ */
+public function appendIncomeReconciliationBankTagRemarksForOverview(object $row): void
+{
+    $row->display_bank_income_remarks = '';
+
+    /** @var array<string, string> Ordered unique remark texts (bank lines first, then row-level). */
+    $ordered = [];
+
+    $reconId = (int) ($row->id ?? 0);
+
+    if (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark') && $reconId > 0) {
+        $q = DB::table('bank_statements')
+            ->where('income_match_status', 'income_matched')
+            ->whereNotNull('income_tag_mismatch_remark')
+            ->where('income_tag_mismatch_remark', '!=', '')
+            ->where(function ($w) use ($reconId) {
+                $w->where('income_reconciliation_id', $reconId)
+                    ->orWhere('income_match_split_json', 'like', '%"'.$reconId.'"%')
+                    ->orWhere('income_match_split_json', 'like', '%['.$reconId.',%')
+                    ->orWhere('income_match_split_json', 'like', '%,'.$reconId.',%')
+                    ->orWhere('income_match_split_json', 'like', '%,'.$reconId.']%')
+                    ->orWhere('income_match_split_json', 'like', '%['.$reconId.']%')
+                    ->orWhere('income_match_split_json', 'like', '%:'.$reconId.',%')
+                    ->orWhere('income_match_split_json', 'like', '%:'.$reconId.'}%');
+            });
+
+        foreach ($q->orderBy('id')->pluck('income_tag_mismatch_remark') as $r) {
+            $t = trim((string) $r);
+            if ($t !== '' && ! isset($ordered[$t])) {
+                $ordered[$t] = $t;
+            }
+        }
+
+        if ($ordered === [] && $reconId > 0) {
+            $q2 = DB::table('bank_statements')
+                ->whereNotNull('income_tag_mismatch_remark')
+                ->where('income_tag_mismatch_remark', '!=', '')
+                ->where(function ($w) use ($reconId) {
+                    $w->where('income_reconciliation_id', $reconId)
+                        ->orWhere('income_match_split_json', 'like', '%"'.$reconId.'"%')
+                        ->orWhere('income_match_split_json', 'like', '%['.$reconId.',%')
+                        ->orWhere('income_match_split_json', 'like', '%,'.$reconId.',%')
+                        ->orWhere('income_match_split_json', 'like', '%,'.$reconId.']%')
+                        ->orWhere('income_match_split_json', 'like', '%['.$reconId.']%');
+                });
+            foreach ($q2->orderBy('id')->pluck('income_tag_mismatch_remark') as $r) {
+                $t = trim((string) $r);
+                if ($t !== '' && ! isset($ordered[$t])) {
+                    $ordered[$t] = $t;
+                }
+            }
+        }
+    }
+
+    if (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark')) {
+        $bankIds = [];
+        foreach (['cash_bank_id', 'card_upi_bank_id', 'neft_bank_id', 'other_bank_id'] as $col) {
+            if (isset($row->$col) && (int) $row->$col > 0) {
+                $bankIds[] = (int) $row->$col;
+            }
+        }
+        $bankIds = array_values(array_unique($bankIds));
+
+        if ($bankIds !== []) {
+            $rows = DB::table('bank_statements')
+                ->whereIn('id', $bankIds)
+                ->whereNotNull('income_tag_mismatch_remark')
+                ->orderBy('id')
+                ->pluck('income_tag_mismatch_remark');
+
+            foreach ($rows as $r) {
+                $t = trim((string) $r);
+                if ($t !== '' && ! isset($ordered[$t])) {
+                    $ordered[$t] = $t;
+                }
+            }
+        }
+    }
+
+    if (Schema::hasColumn('income_reconciliation_table', 'income_tag_mismatch_remark')) {
+        $t = trim((string) ($row->income_tag_mismatch_remark ?? ''));
+        if ($t !== '' && ! isset($ordered[$t])) {
+            $ordered[$t] = $t;
+        }
+    }
+
+    $row->display_bank_income_remarks = implode("\n\n", array_values($ordered));
+}
 
 public function overviewdataprocess($filter, $dateRange)
 {
@@ -775,6 +868,10 @@ public function overviewdataprocess($filter, $dateRange)
     $data = $query
         ->orderByRaw("STR_TO_DATE(date_range, '%d/%m/%Y') ASC")
         ->get();
+
+    foreach ($data as $rec) {
+        $this->appendIncomeReconciliationBankTagRemarksForOverview($rec);
+    }
 
     // -------- MOC DOC TOTAL --------
     $mocTotals = [

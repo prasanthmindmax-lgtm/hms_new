@@ -265,35 +265,52 @@ class RadiantMismatchService
 
     /**
      * Restrict a bank_statements query to rows that count toward Radiant pickup
-     * reconciliation for the given location (standard BY CASH patterns, or
-     * radiant_match_against linked to the pickup location name).
+     * reconciliation for the given location. Three strategies are applied (OR):
+     *   1. Description contains "BY CASH / BYCASH + location"
+     *   2. radiant_match_against keyword matches the location name
+     *   3. radiant_cash_pickup_id is directly linked to the given $pickupId
      *
      * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  int|null  $pickupId  If provided, rows with radiant_cash_pickup_id = this are also included.
      */
-    public static function applyRadiantBankLocationMatch($query, string $locationName): void
+    public static function applyRadiantBankLocationMatch($query, string $locationName, ?int $pickupId = null): void
     {
         $locationName = trim($locationName);
-        if ($locationName === '') {
-            $query->whereRaw('1 = 0');
+        $hasPickupId  = $pickupId && Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id');
 
+        // No criteria at all — return nothing
+        if ($locationName === '' && ! $hasPickupId) {
+            $query->whereRaw('1 = 0');
             return;
         }
 
-        $query->where(function ($q) use ($locationName) {
-            $q->where(function ($q1) use ($locationName) {
-                $q1->where('description', 'like', '%BY CASH%'.$locationName.'%')
-                    ->orWhere('description', 'like', '%BYCASH%'.$locationName.'%');
-            });
-            if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
-                $q->orWhere(function ($q2) use ($locationName) {
-                    $q2->whereNotNull('radiant_match_against')
-                        ->where('radiant_match_against', '!=', '')
-                        ->where(function ($q3) use ($locationName) {
-                            $q3->whereRaw('LOWER(TRIM(radiant_match_against)) = LOWER(?)', [$locationName])
-                                ->orWhereRaw('LOWER(?) LIKE CONCAT("%", LOWER(TRIM(radiant_match_against)), "%")', [$locationName])
-                                ->orWhereRaw('LOWER(TRIM(radiant_match_against)) LIKE CONCAT("%", LOWER(?), "%")', [$locationName]);
-                        });
+        $query->where(function ($q) use ($locationName, $hasPickupId, $pickupId) {
+
+            // Strategy 1 & 2 — description / keyword (only when location name is known)
+            if ($locationName !== '') {
+                // 1. Description pattern: BY CASH or BYCASH + location
+                $q->orWhere(function ($q1) use ($locationName) {
+                    $q1->where('description', 'like', '%BY CASH%'.$locationName.'%')
+                        ->orWhere('description', 'like', '%BYCASH%'.$locationName.'%');
                 });
+
+                // 2. radiant_match_against keyword matches location name (fuzzy)
+                if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
+                    $q->orWhere(function ($q2) use ($locationName) {
+                        $q2->whereNotNull('radiant_match_against')
+                            ->where('radiant_match_against', '!=', '')
+                            ->where(function ($q3) use ($locationName) {
+                                $q3->whereRaw('LOWER(TRIM(radiant_match_against)) = LOWER(?)', [$locationName])
+                                    ->orWhereRaw('LOWER(?) LIKE CONCAT("%", LOWER(TRIM(radiant_match_against)), "%")', [$locationName])
+                                    ->orWhereRaw('LOWER(TRIM(radiant_match_against)) LIKE CONCAT("%", LOWER(?), "%")', [$locationName]);
+                            });
+                    });
+                }
+            }
+
+            // Strategy 3 — direct radiant_cash_pickup_id link
+            if ($hasPickupId) {
+                $q->orWhere('radiant_cash_pickup_id', $pickupId);
             }
         });
     }
@@ -331,14 +348,28 @@ class RadiantMismatchService
         $bankEntries = 0;
         $bankStatus  = 'no_data';
 
-        if ($locationName) {
+        if ($locationName || $pickup->id) {
             $pd     = Carbon::parse($date);
             $bkFrom = $pd->copy()->subDay()->toDateString();
             $bkTo   = $pd->copy()->addDay()->toDateString();
+            $pickupId = (int) $pickup->id;
 
+            // Build query: (date-window AND desc/keyword match) OR (direct pickup_id link)
             $bankQuery = DB::table('bank_statements')
-                ->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo]);
-            self::applyRadiantBankLocationMatch($bankQuery, $locationName);
+                ->where(function ($outer) use ($bkFrom, $bkTo, $locationName, $pickupId) {
+                    // Strategy 1 & 2: description / keyword, confined to ±1 day window
+                    if ($locationName !== '') {
+                        $outer->orWhere(function ($dated) use ($bkFrom, $bkTo, $locationName) {
+                            $dated->whereRaw("STR_TO_DATE(transaction_date, '%d/%b/%Y') BETWEEN ? AND ?", [$bkFrom, $bkTo]);
+                            self::applyRadiantBankLocationMatch($dated, $locationName, null);
+                        });
+                    }
+                    // Strategy 3: direct radiant_cash_pickup_id — no date restriction
+                    if ($pickupId && Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')) {
+                        $outer->orWhere('radiant_cash_pickup_id', $pickupId);
+                    }
+                });
+
             $rows = $bankQuery->get();
 
             if ($rows->isNotEmpty()) {

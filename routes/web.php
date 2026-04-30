@@ -28,6 +28,7 @@ use App\Http\Controllers\LicenceDocumentCatalogController;
 use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\UserActivityController;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -113,6 +114,7 @@ Route::middleware(['auth','role_id:1','log.activity'])->group(function () {
     //vasanth -  Master Access
     Route::get('/superadmin/masteraccess',[SuperAdminController::class,'masteraccess'])->name('superadmin.masteraccess');
     Route::get('/superadmin/employee-data', [SuperAdminController::class, 'getEmployeeData'])->name('superadmin.employee-data');
+    Route::get('/superadmin/masteraccess-export', [SuperAdminController::class, 'exportAccessMaster'])->name('superadmin.masteraccess.export');
     Route::post('/superadmin/update-user-status', [SuperAdminController::class, 'updateUserStatus'])->name('update.status');
     Route::get('/superadmin/get-menu-permissions', [SuperAdminController::class,'getMenuPermissions']);
     Route::post('/superadmin/save-permissions', [SuperAdminController::class,'savePermissions']);
@@ -700,6 +702,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/statements-export', [BankStatementController::class, 'exportStatements'])->name('statements-export');
         Route::get('/matched-by-options', [BankStatementController::class, 'listMatchedByUsersForFilter'])->name('matched-by-options');
         Route::get('/quick-filter-options', [BankStatementController::class, 'statementQuickFilterOptions'])->name('quick-filter-options');
+        Route::get('/user-history', [BankStatementController::class, 'listBankReconUserHistory'])->name('user-history');
         Route::get('/chart-accounts', [BankStatementController::class, 'listChartAccounts'])->name('chart-accounts');
         // Search bills by amount
         Route::post('/search-bills', [BankStatementController::class, 'searchBills'])->name('search-bills');
@@ -719,10 +722,19 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/income-unmatch/{id}', [BankStatementController::class, 'unmatchIncome'])->name('income-unmatch');
         // Fetch single bank statement by ID (for income recon ref-number click)
         Route::get('/statement/{id}', [BankStatementController::class, 'getBankStatementById'])->name('statement.show');
+        // Salary UTR sheet: auto-match by UTR in description
+        Route::post('/salary-utr-upload', [BankStatementController::class, 'uploadSalaryUtr'])->name('salary-utr-upload');
+        Route::get('/salary-utr-uploads', [BankStatementController::class, 'listSalaryUtrUploads'])->name('salary-utr-uploads');
+        Route::get('/salary-utr-uploads/{id}/rows', [BankStatementController::class, 'salaryUtrUploadRows'])->name('salary-utr-uploads.rows');
+        Route::delete('/salary-utr-uploads/{id}', [BankStatementController::class, 'deleteSalaryUpload'])->name('salary-utr-uploads.delete');
+        Route::get('/salary-master', [BankStatementController::class, 'salaryMasterPage'])->name('salary-master');
+        Route::get('/salary-master/data', [BankStatementController::class, 'salaryMasterData'])->name('salary-master.data');
+        Route::get('/salary-master/export', [BankStatementController::class, 'exportSalaryMaster'])->name('salary-master.export');
         // Income Tag supporting dropdowns
         Route::get('/income-tag/zones', [BankStatementController::class, 'incomeTagZones'])->name('income-tag.zones');
         Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');
         Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
+        Route::get('/radiant-cash-pickups-for-date', [BankStatementController::class, 'radiantCashPickupsForTransactionDate'])->name('radiant-cash-pickups-for-date');
         Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
         Route::post('/radiant-unmatch/{id}', [BankStatementController::class, 'unmatchRadiant'])->name('radiant-unmatch');
         // Bank account master & batch history
@@ -743,6 +755,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     //income new stats
     Route::get('/billing-stats',  [BillingStatsController::class, 'index'])->name('superadmin.billingstats');
     Route::get('/billing-export/excel', [BillingStatsController::class, 'export'])->name('superadmin.billingexport');
+    Route::post('/billing-stats/fetch-insert', [BillingStatsController::class, 'fetchAndInsert'])->name('superadmin.billingstats.fetchinsert');
 
     // Bill Category routes
     Route::get('superadmin/bill_category', [VendorController::class, 'getBillCategory'])->name('superadmin.billcategory.index');
@@ -851,11 +864,17 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('superadmin/ticket-categories', [TicketController::class, 'getTicketCategories'])->name('superadmin.ticket.categories.index');
     Route::post('superadmin/ticket-categories', [TicketController::class, 'storeTicketCategories'])->name('superadmin.ticket.categories.store');
 
+    // Issue Category (department, SLA, linked to Ticket Category)
+    Route::get('superadmin/issue-categories', [TicketController::class, 'getIssueCategories'])->name('superadmin.issue.categories.index');
+    Route::post('superadmin/issue-categories', [TicketController::class, 'storeIssueCategories'])->name('superadmin.issue.categories.store');
+    Route::get('get-ticket-categories/{department_id}', [TicketController::class, 'getTicketCategoriesByDepartment'])->name('superadmin.ticket.categories.by-department');
+
     // Support tickets
     Route::get('superadmin/tickets', [TicketController::class, 'index'])->name('superadmin.tickets.index');
     Route::get('superadmin/tickets/data', [TicketController::class, 'data'])->name('superadmin.tickets.data');
     Route::get('superadmin/tickets/export', [TicketController::class, 'export'])->name('superadmin.tickets.export');
     Route::get('superadmin/tickets/categories-by-department', [TicketController::class, 'categoriesByDepartment'])->name('superadmin.tickets.categories');
+    Route::get('superadmin/tickets/ticket-category-list', [TicketController::class, 'listTicketCategoryParents'])->name('superadmin.tickets.ticket-category-list');
     Route::post('superadmin/tickets', [TicketController::class, 'store'])->name('superadmin.tickets.store');
     Route::post('superadmin/tickets/update', [TicketController::class, 'update'])->name('superadmin.tickets.update');
     Route::post('superadmin/tickets/status', [TicketController::class, 'updateStatus'])->name('superadmin.tickets.status');
@@ -979,9 +998,34 @@ Route::middleware(['auth','role_id:3'])->group(function () {
 });
 
 
+// Route::middleware('auth')->group(function () {
+//     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+//     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+//     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+// });
+
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/user-activity/client-event', [UserActivityController::class, 'storeClientEvent'])
+        ->name('user_activity.client_event')
+        ->middleware('throttle:30,1');
+    Route::post('/user-activity/beacon-session-end', [UserActivityController::class, 'beaconSessionEnd'])
+        ->name('user_activity.beacon_session_end')
+        ->middleware('throttle:60,1');
 });
+
+Route::middleware(['auth', 'role_id:1', 'log.activity', 'prevent-back-button'])->group(function () {
+    Route::get('/superadmin/user-activity', [UserActivityController::class, 'index'])
+        ->name('user_activity.dashboard');
+    Route::get('/superadmin/user-activity/data', [UserActivityController::class, 'dashboardData'])
+        ->name('user_activity.data');
+    Route::get('/superadmin/user-activity/user/{user}/events/{typeKey}', [UserActivityController::class, 'typeEventsByType'])
+        ->name('user_activity.user.type_events');
+    Route::get('/superadmin/user-activity/user/{user}', [UserActivityController::class, 'userShow'])
+        ->name('user_activity.user');
+});
+
 require __DIR__.'/auth.php';

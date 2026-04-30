@@ -1919,17 +1919,15 @@ function loadRadiantValues(tr) {
                 let td = tr.find(tdSelector);
                 td.find(".remark-preview-icon").remove();
 
-                // show icon if either file OR remark exists
-                if (file || remarkText) {
-                    let remarkIcon = $(`
-                        <i class="fa fa-eye remark-preview-icon"
-                        data-file="${file ?? ''}"
-                        data-remark="${remarkText ?? ''}"
-                        title="View Remark"
-                        style="cursor:pointer;margin-left:6px;color:#007bff;">
-                        </i>
-                    `);
+                const r = remarkText != null ? String(remarkText) : '';
+                const f = file != null ? String(file) : '';
 
+                if (f || r) {
+                    let remarkIcon = $(
+                        '<i class="fa fa-eye remark-preview-icon" title="View Remark" style="cursor:pointer;margin-left:6px;color:#007bff;"></i>'
+                    );
+                    remarkIcon.attr('data-file', f);
+                    remarkIcon.attr('data-remark', r);
                     td.append(remarkIcon);
                 }
             }
@@ -1983,7 +1981,7 @@ function loadRadiantValues(tr) {
 
             // ------------------- SET FILES -------------------
             // setFileIcon(".deposite_amount", d.deposite_amount_attachment ? JSON.parse(d.deposite_amount_attachment) : []);
-            setRemarkIcon(".cash_radiant", d.remark_files,d.remark);
+            setRemarkIcon('.cash_radiant', d.remark_files, d.remark);
 
             // ------------------- SET DATES -------------------
             if (d.date_collection) tr.find(".date_collection .selected-date").text(d.date_collection);
@@ -3010,6 +3008,81 @@ if (!document.getElementById('brc-styles-ov')) {
     `;
     document.head.appendChild(style);
 }
+
+    (function applyBankReconIncomeDeepLinkFromQuery() {
+        var dl = window.__bankReconDeepLink;
+        if (!dl || typeof dl !== 'object') {
+            return;
+        }
+        if (!dl.branch && window.__bankReconDeepBranchPending) {
+            dl.branch = window.__bankReconDeepBranchPending;
+        }
+        var branch = (dl.branch || '').toString().trim();
+        var zone = (dl.zone || '').toString().trim();
+        var df = (dl.dateFrom || '').toString().trim();
+        var dt = (dl.dateTo || '').toString().trim();
+        if (!df && !dt && !zone && !branch) {
+            return;
+        }
+        setTimeout(function () {
+            var mStart = df ? moment(df, ['YYYY-MM-DD', moment.ISO_8601], true) : null;
+            if (!mStart || !mStart.isValid()) {
+                return;
+            }
+            var mEnd = dt ? moment(dt, ['YYYY-MM-DD', moment.ISO_8601], true) : mStart.clone();
+            if (!mEnd || !mEnd.isValid()) {
+                mEnd = mStart.clone();
+            }
+            var drpEl = $('#reportrange');
+            var drp = drpEl.data('daterangepicker');
+            if (drp) {
+                drp.setStartDate(mStart);
+                drp.setEndDate(mEnd);
+            }
+            var dTxt = mStart.format('DD/MM/YYYY') + ' - ' + mEnd.format('DD/MM/YYYY');
+            $('#dateviewsall').text(dTxt);
+            $('#dateallviews').text(dTxt);
+            var spanInner = mStart.isSame(mEnd, 'day') ? mStart.format('DD/MM/YYYY') : dTxt;
+            $('#reportrange span').first().html(spanInner);
+
+            var filters = [];
+            if (zone) {
+                $('#izone_views')
+                    .val(zone.replace(/, /g, ','))
+                    .data('values', [zone]);
+                $('#izone_views')
+                    .closest('.dropdown')
+                    .find('.dropdown-options div[data-value]')
+                    .each(function () {
+                        var t = $(this).text().trim();
+                        $(this).toggleClass('selected', t === zone);
+                    });
+                filters.push("tblzones.name='" + zone.replace(/, /g, ',') + "'");
+            }
+            if (branch) {
+                $('#ibranch_views')
+                    .val(branch.replace(/, /g, ','))
+                    .data('values', [branch]);
+                $('#ibranch_views')
+                    .closest('.dropdown')
+                    .find('.branch_viewsall .dropdown-option')
+                    .each(function () {
+                        var t = $(this).text().trim();
+                        $(this).toggleClass('selected', t === branch);
+                    });
+                filters.push("tbl_locations.name='" + branch.replace(/, /g, ',') + "'");
+            }
+            fitterremovedata = filters;
+            marketersearchvalue = filters.slice();
+            $('.clear_views').show();
+            $('.cincome_view').show();
+            $('#cbranch_search').text(branch);
+            $('#czone_search').text(zone);
+            if (typeof ticketdatefillterrange === 'function' && typeof dateOverviewIncomeUrl !== 'undefined') {
+                ticketdatefillterrange($('#dateallviews').text(), dateOverviewIncomeUrl, 1, filters);
+            }
+        }, 600);
+    })();
 
 
 });

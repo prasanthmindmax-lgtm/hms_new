@@ -165,6 +165,11 @@ class FinancialReportController extends Controller
         $summary['net_amount'] =
             $summary['total_collection'] - $summary['total_deductions'];
 
+        $allowedBranchIdsForZonalApprove = array_map(
+            'intval',
+            $this->getAllowedBranches($admin)
+        );
+
         /* =========================
         AJAX RESPONSE
         ========================== */
@@ -175,7 +180,7 @@ class FinancialReportController extends Controller
             return response()->json([
                 'table' => view(
                     'branch.partials.reports-table',
-                    compact('reports', 'summary', 'admin')
+                    compact('reports', 'summary', 'admin', 'allowedBranchIdsForZonalApprove')
                 )->render(),
                 'summary' => $summary
             ]);
@@ -187,7 +192,10 @@ class FinancialReportController extends Controller
         $zones = $this->getAccessibleZones($admin);
         $branches = $this->getAccessibleBranches($admin);
 
-        return view('branch.index', compact('admin','reports','summary','zones','branches'));
+        return view(
+            'branch.index',
+            compact('admin', 'reports', 'summary', 'zones', 'branches', 'allowedBranchIdsForZonalApprove')
+        );
     }
 
     /**
@@ -480,11 +488,12 @@ class FinancialReportController extends Controller
     }
 
     /**
-     * Check if user can approve as Auditor
+     * First-level approval: Zonal Head (access_limits == 2) for reports in branches they can access.
+     * (Previously Auditor access_limits == 4 — replaced by zonal head workflow.)
      */
     private function canApproveAsAuditor($admin, $report)
     {
-        if ($admin->access_limits != 4) {
+        if ($admin->access_limits != 2) {
             return false;
         }
 
@@ -492,7 +501,9 @@ class FinancialReportController extends Controller
             return false;
         }
 
-        return true;
+        $allowedBranches = $this->getAllowedBranches($admin);
+
+        return in_array((int) $report->branch_id, array_map('intval', $allowedBranches), true);
     }
 
     /**
@@ -520,7 +531,7 @@ class FinancialReportController extends Controller
     }
 
     /**
-     * Approve by Auditor
+     * First-level approve (Zonal Head). Routes keep approve.auditor name for backward compatibility.
      */
     public function approveAuditor(Request $request, $id)
     {
@@ -529,7 +540,7 @@ class FinancialReportController extends Controller
         $report = BranchFinancialReport::findOrFail($id);
 
         if (!$this->canApproveAsAuditor($admin, $report)) {
-            return response()->json(['error' => 'You cannot approve this report at auditor level'], 403);
+            return response()->json(['error' => 'You cannot approve this report at zonal head level'], 403);
         }
 
         $report->auditor_approval_status = 1;
@@ -542,13 +553,13 @@ class FinancialReportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Report approved by Auditor successfully',
+            'message' => 'Report approved by Zonal Head successfully',
             'report' => $report->load(['auditorApprovedBy:id,user_fullname', 'managementApprovedBy:id,user_fullname'])
         ]);
     }
 
     /**
-     * Reject by Auditor
+     * First-level reject (Zonal Head).
      */
     public function rejectAuditor(Request $request, $id)
     {
@@ -557,7 +568,7 @@ class FinancialReportController extends Controller
         $report = BranchFinancialReport::findOrFail($id);
 
         if (!$this->canApproveAsAuditor($admin, $report)) {
-            return response()->json(['error' => 'You cannot reject this report at auditor level'], 403);
+            return response()->json(['error' => 'You cannot reject this report at zonal head level'], 403);
         }
 
         $request->validate([
@@ -574,7 +585,7 @@ class FinancialReportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Report rejected by Auditor',
+            'message' => 'Report rejected by Zonal Head',
             'report' => $report->load(['auditorApprovedBy:id,user_fullname', 'managementApprovedBy:id,user_fullname'])
         ]);
     }

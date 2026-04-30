@@ -15,9 +15,11 @@ final class MocdocLocationKeys
     {
         return [
             'location1' => 'Kerala - Palakkad',
+            'location6' => 'Kerala - Kozhikode',
             'location7' => 'Erode',
             'location14' => 'Tiruppur',
-            'location6' => 'Kerala - Kozhikode',
+            'location13' => 'Salem',
+            'location17' => 'Tiruppur',
             'location20' => 'Coimbatore - Ganapathy',
             'location21' => 'Hosur',
             'location22' => 'Chennai - Sholinganallur',
@@ -29,9 +31,9 @@ final class MocdocLocationKeys
             'location29' => 'Thiruvallur',
             'location30' => 'Pollachi',
             'location31' => 'Bengaluru - Electronic City',
-            'location32' => 'Bengaluru - Konanakunte',
             'location33' => 'Chennai - Tambaram',
             'location34' => 'Tanjore',
+            'location35' => 'Bengaluru - Konanakunte',
             'location36' => 'Harur',
             'location39' => 'Coimbatore - Thudiyalur',
             'location40' => 'Madurai',
@@ -47,10 +49,13 @@ final class MocdocLocationKeys
             'location50' => 'Pennagaram',
             'location51' => 'Thirupathur',
             'location52' => 'Sivakasi',
-            'location13' => 'Salem',
+            'location53' => 'Dharmapuri',
             'location54' => 'Nagapattinam',
+            'location55' => 'Chennai - Karapakkam',
             'location56' => 'Krishnagiri',
             'location57' => 'Karur',
+            'location59' => 'Ariyalur',
+            'location60' => 'Mayiladuthurai',
         ];
     }
 

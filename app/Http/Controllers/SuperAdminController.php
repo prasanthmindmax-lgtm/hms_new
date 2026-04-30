@@ -7342,9 +7342,10 @@ private function CCName(){
     //vasanth
       public function masteraccess()
     {
-        $admin = auth()->user();
+        $admin  = auth()->user();
         $locations = TblLocationModel::all();
-        return view('superadmin.masteraccess', ['admin' => $admin,'locations' => $locations]);
+        $menus  = DB::table('menus')->orderBy('sub_menus')->orderBy('menu_name')->get(['id', 'menu_name', 'sub_menus']);
+        return view('superadmin.masteraccess', ['admin' => $admin, 'locations' => $locations, 'menus' => $menus]);
     }
 
     // public function getEmployeeData()
@@ -7434,8 +7435,6 @@ private function CCName(){
                 $user->created_by_username = '-';
             }
         }
-        $activeCount = $users->where('active_status', 0)->count();   // active
-        $inactiveCount = $users->where('active_status', 1)->count(); // inactive
         $formattedData = array_map(function ($employee) use ($zones, $branches, $usersByUsername, $usersById) {
 
             // Match user by employment_id or fallback to "Aravind"
@@ -7487,16 +7486,175 @@ private function CCName(){
             ];
         }, $employees);
 
-        // dd($formattedData);
+        // ── Counts from formattedData — use strict (===) to exclude null ─────────
+        // PHP: null == 0 is true (loose), so we must use filter with ===
+        $formattedCollection = collect($formattedData);
+        $activeCount   = $formattedCollection->filter(fn($e) => $e['active_status'] === 0)->count();
+        $inactiveCount = $formattedCollection->filter(fn($e) => $e['active_status'] === 1)->count();
+
+        // ── Auto-inactive: users in local DB not found in HRM API ──────────────────
+        // Build set of employment IDs returned by HRM API
+        $hrmEmploymentIds = collect($employees)->pluck('employment_id')
+            ->map(fn($id) => $id === '00000' ? 'Aravind' : $id)
+            ->filter()
+            ->flip(); // keyed by id for O(1) lookup
+
+        // Find local users whose username is NOT in the HRM list and are currently active
+        $autoInactivated = DB::table('users')
+            ->whereNotNull('username')
+            ->where('username', '!=', '')
+            ->where('active_status', 0)   // currently marked active
+            ->get(['id', 'username'])
+            ->filter(fn($u) => !isset($hrmEmploymentIds[$u->username]));
+
+        if ($autoInactivated->isNotEmpty()) {
+            // These users are NOT in the HRM API — mark them inactive in DB silently
+            DB::table('users')
+                ->whereIn('id', $autoInactivated->pluck('id'))
+                ->update(['active_status' => 1]);
+            // Note: these users don't appear in formattedData (not in HRM), so
+            // no count adjustment needed — counts stay consistent with the table
+        }
+        // ────────────────────────────────────────────────────────────────────────────
+
+        // Attach allowed menu IDs per user (status=1 in user_menus)
+        $userIds = collect($formattedData)->pluck('user_id')->filter()->values()->all();
+        $allUserMenus = DB::table('user_menus')
+            ->whereIn('user_id', $userIds)
+            ->where('status', '1')
+            ->get(['user_id', 'menu_id']);
+        $menusByUser = $allUserMenus->groupBy('user_id')->map(function ($rows) {
+            return $rows->pluck('menu_id')->values()->all();
+        });
+
+        foreach ($formattedData as &$emp) {
+            $uid = $emp['user_id'];
+            $emp['allowed_menu_ids'] = $uid ? ($menusByUser[$uid] ?? []) : [];
+        }
+        unset($emp);
 
         return response()->json([
-            'data' => $formattedData,
-            'activeCount' => $activeCount,
+            'data'          => $formattedData,
+            'activeCount'   => $activeCount,
             'inactiveCount' => $inactiveCount,
-            'total' => count($formattedData)
-
+            'total'         => count($formattedData),
+            'autoInactivated' => $autoInactivated->isNotEmpty() ? $autoInactivated->count() : 0,
         ]);
     }
+
+    /**
+     * Export access master data as CSV or XLSX.
+     * Accepts query params: format (csv|xlsx), role, zone, branch, name, empnum, menu_id, status
+     */
+    public function exportAccessMaster(\Illuminate\Http\Request $request)
+    {
+        $format   = strtolower($request->get('format', 'csv'));
+        $menuId   = $request->get('menu_id');
+        $role     = $request->get('role');
+        $zone     = $request->get('zone');
+        $branch   = $request->get('branch');
+        $name     = $request->get('name');
+        $search   = $request->get('empnum');
+        $status   = $request->get('status'); // active|inactive|not_used
+
+        // Base users query
+        $users = DB::table('users as u')
+            ->leftJoin('tblzones as z', 'z.id', '=', 'u.zone_id')
+            ->leftJoin('tbl_locations as l', 'l.id', '=', 'u.branch_id')
+            ->leftJoin('users as mod', 'mod.id', '=', 'u.status_modified_by')
+            ->select(
+                'u.id', 'u.username', 'u.user_fullname', 'u.email',
+                'u.active_status', 'u.status_changed_on',
+                'mod.user_fullname as modifier_name',
+                'z.name as zone_name', 'l.name as branch_name'
+            );
+
+        if ($menuId) {
+            $users->whereExists(function ($q) use ($menuId) {
+                $q->from('user_menus')
+                  ->whereColumn('user_menus.user_id', 'u.id')
+                  ->where('user_menus.menu_id', $menuId)
+                  ->where('user_menus.status', '1');
+            });
+        }
+        if ($zone)   { $users->where('z.name', $zone); }
+        if ($branch) { $users->where('l.name', $branch); }
+        if ($name)   { $users->where('u.user_fullname', 'like', "%{$name}%"); }
+        if ($search) {
+            $users->where(function ($q) use ($search) {
+                $q->where('u.username', 'like', "%{$search}%")
+                  ->orWhere('u.user_fullname', 'like', "%{$search}%")
+                  ->orWhere('u.email', 'like', "%{$search}%");
+            });
+        }
+        if ($status === 'active')   { $users->where('u.active_status', 0); }
+        if ($status === 'inactive') { $users->where('u.active_status', 1); }
+        if ($status === 'not_used') { $users->whereNull('u.active_status'); }
+
+        $rows = $users->orderBy('u.user_fullname')->get();
+
+        // Fetch menu names if filtering by menu
+        $menuName = $menuId
+            ? (DB::table('menus')->where('id', $menuId)->value('menu_name') ?? 'Menu')
+            : 'All';
+
+        // Build export headers & rows
+        $headers = ['Employee ID', 'Full Name', 'Email', 'Zone', 'Branch', 'Status', 'Status Changed On', 'Modified By'];
+        $exportRows = $rows->map(function ($r) {
+            $statusLabel = $r->active_status === null ? 'Not Used'
+                : ($r->active_status == 0 ? 'Active' : 'Inactive');
+            return [
+                $r->username ?? '',
+                $r->user_fullname ?? '',
+                $r->email ?? '',
+                $r->zone_name ?? '',
+                $r->branch_name ?? '',
+                $statusLabel,
+                $r->status_changed_on ?? '',
+                $r->modifier_name ?? '',
+            ];
+        })->toArray();
+
+        $filename = 'access_master_' . ($menuId ? 'menu_' . $menuId . '_' : '') . date('Ymd_His');
+
+        if ($format === 'xlsx') {
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Access Master');
+            // Title row
+            $sheet->setCellValue('A1', 'Access Master Export — Menu: ' . $menuName);
+            $sheet->mergeCells('A1:H1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+            $sheet->fromArray($headers, null, 'A2');
+            $sheet->getStyle('A2:H2')->getFont()->setBold(true);
+            $rowNum = 3;
+            foreach ($exportRows as $row) {
+                $sheet->fromArray($row, null, 'A' . $rowNum);
+                $rowNum++;
+            }
+            foreach (range('A', 'H') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            return response()->streamDownload(function () use ($writer) {
+                $writer->save('php://output');
+            }, $filename . '.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        }
+
+        // Default: CSV
+        return response()->streamDownload(function () use ($headers, $exportRows) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
+            fputcsv($out, $headers);
+            foreach ($exportRows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
     public function updateUserStatus(Request $request)
     {
         // dd($request);
