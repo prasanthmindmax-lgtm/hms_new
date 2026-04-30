@@ -71,6 +71,19 @@
               @csrf
 
             <div class="container mt-4">
+                <div class="row mb-3 align-items-start" id="bill-pr-number-row">
+                    <label for="payment_request_number_input" class="col-md-2 fw-semibold">Payment request</label>
+                    <div class="col-md-4 position-relative">
+                        <input type="text" class="form-control" id="payment_request_number_input" autocomplete="off" placeholder="Type number or pick from list (approved only)" value="{{ !empty($bill) && isset($bill[0]) && $bill[0]->paymentRequest ? $bill[0]->paymentRequest->request_no : '' }}">
+                        <input type="hidden" name="payment_request_id" id="payment_request_id" value="{{ !empty($bill) && isset($bill[0]) ? ($bill[0]->payment_request_id ?? '') : '' }}">
+                        <div id="payment-request-suggest" class="list-group position-absolute w-100 shadow-sm bg-white border rounded" style="z-index:1050; display:none; max-height:220px; overflow-y:auto;"></div>
+                        <span class="error_payment_request_id d-block text-danger small"></span>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-2 d-none d-md-block"></div>
+                    <div class="col-md-10 small text-muted" id="payment-request-meta" aria-live="polite"></div>
+                </div>
                 <div class="row mb-3 align-items-start">
                     <!-- Vendor Name -->
                     <div class="col-md-6">
@@ -1537,6 +1550,119 @@ function calculateFinalTotals() {
 
 </script>
  <script>
+   window.applyPurchaseHeaderToBillForm = function (header) {
+     $('#purchase_id').val(header.id);
+     $('#po_against_display').val(header.purchase_gen_order || header.purchase_order_number || '');
+     $('#vendor-search').val(header.vendor_name);
+     $('#selected-vendor-id').val(header.vendor_id).trigger('change');
+     $('#delivery_address').val(header.delivery_address);
+     $('#order_number').val(header.order_number);
+     $('#bill_number').val(header.purchase_order_number);
+     $('#bill_date').val(header.bill_date);
+     $('#due_date').val(header.due_date);
+     $('#timeline_date').val(header.timeline_date || '').trigger('change');
+     $('.zone-search-input').val(header.zone_name);
+     $('.zone_id').val(header.zone_id).trigger('change');
+     $('.branch-search-input').val(header.branch_name);
+     $('.branch_id').val(header.branch_id).trigger('change');
+     $('.department-search-input').val(header.department_name || '');
+     $('.department_id').val(header.department_id || '').trigger('change');
+     $('.discount_type').val(header.discount_type);
+     $('.company_id').val(header.company_id).trigger('change');
+     $('.company-search-input').val(header.company_name);
+     const purchase_line = header.bill_lines || [];
+     let isFirst = true;
+     purchase_line.forEach(function (lines, index) {
+       let currentRow;
+       if (isFirst) {
+         currentRow = $('.item-row:first');
+         isFirst = false;
+       } else {
+         $('.add-row').trigger('click');
+         currentRow = $('.item-row').last();
+       }
+       setTimeout(function () {
+         currentRow.find('.item-id').val(lines.id);
+         currentRow.find('.item-details').val(lines.item_details);
+         currentRow.find('.account-search-input').val(lines.account);
+         currentRow.find('.account_name').val(lines.account);
+         currentRow.find('.account_id').val(lines.account_id);
+         currentRow.find('.quantity').val(lines.quantity);
+         currentRow.find('.rate').val(lines.rate);
+         currentRow.find('.gst-search-input').val(lines.gst_name);
+         currentRow.find('.selected-gst-tax').val(lines.gst_rate).trigger('change');
+         currentRow.find('.gst-tax-id').val(lines.gst_tax_id);
+         currentRow.find('.gst_tax_type').val(lines.gst_type);
+         currentRow.find('.cgst_amount').val(lines.cgst_amount);
+         currentRow.find('.sgst_amount').val(lines.sgst_amount);
+         currentRow.find('.gst_amount').val(lines.gst_amount);
+         currentRow.find('.selected-customer-id').val(lines.customer);
+         currentRow.find('.amount').val(lines.amount);
+         gstcalculate(currentRow);
+       }, 100);
+     });
+     $('.discount-percent').val(header.discount_percent).trigger('change');
+     function formatCurrency(value) {
+       let amount = parseFloat(value || 0);
+       return '₹' + amount.toLocaleString('en-IN', {
+         minimumFractionDigits: 2,
+         maximumFractionDigits: 2
+       });
+     }
+     setTimeout(function () {
+       if (header.discount_tax === 'Apply After Tax') {
+         $('.discount-toggle').trigger('click');
+       }
+       $('.adjustment-reason').val(header.adjustment_reason);
+       $('.export_name').val(header.export_name);
+       $('.export_amount').val(header.export_amount);
+       $('.loading_unloading_name').val(header.loading_unloading_name || '');
+       $('.loading_unloading_amount').val(header.loading_unloading_amount || '');
+       $('.discount-percent').val(header.discount_percent).trigger('change');
+       $('.discount-amount').text(formatCurrency(header.discount_amount));
+       $('.adjustment-amount').text(formatCurrency(header.adjustment_value));
+       $('.tax-amount').text(formatCurrency(header.tax_amount));
+       $('.grand-total-amount').text(formatCurrency(header.grand_total_amount));
+       $('.adjustment-value').val(header.adjustment_value).trigger('change');
+       if (header.tax_type === 'TDS') {
+         $('input[name="tax_type"][value="TDS"]').prop('checked', true).trigger('change');
+         $('.tax-search-input').val(header.tax_name);
+         $('.selected-tds-tax').val(header.tax_rate).trigger('change');
+         $('.tds-tax-id').val(header.tds_tax_id);
+       }
+       if (typeof calculateFinalTotals === 'function') {
+         calculateFinalTotals();
+       }
+     }, 100);
+   };
+
+   window.applyBillPartyFromPaymentRequest = function (party) {
+     if (!party) {
+       return;
+     }
+     if (party.zone_id != null && String(party.zone_id) !== '') {
+       $('.zone-search-input').val(party.zone_name || '');
+       $('.zone_id').val(party.zone_id).trigger('change');
+     }
+     if (party.branch_id != null && String(party.branch_id) !== '') {
+       $('.branch-search-input').val(party.branch_name || '');
+       $('.branch_id').val(party.branch_id).trigger('change');
+     }
+     if (party.company_id != null && String(party.company_id) !== '') {
+       $('.company-search-input').val(party.company_name || '');
+       $('.company_id').val(party.company_id).trigger('change');
+     }
+     if (party.vendor_id != null && String(party.vendor_id) !== '') {
+       $('#vendor-search').val(party.vendor_name || '');
+       $('#selected-vendor-id').val(party.vendor_id).trigger('change');
+     }
+     $('#purchase_id').val('');
+     $('#quotation_id').val('');
+     $('#po_against_display').val('');
+     $('#quotation_against_display').val('');
+     $('#order_number').val('');
+   };
+
    $(document).ready(function() {
 
     toastr.options = {
@@ -3460,6 +3586,173 @@ function calculateFinalTotals() {
 
               $(document).ready(function () {
 
+                let billPrSearchTimer = null;
+                let billPrBlurTimer = null;
+
+                function updatePaymentRequestMeta() {
+                    const hasId = ($('#payment_request_id').val() || '').trim() !== '';
+                    if (hasId) {
+                        return;
+                    }
+                    const typed = ($('#payment_request_number_input').val() || '').trim();
+                    if (typed) {
+                        $('#payment-request-meta').text('Pick an approved payment request from the list, or tab away to resolve the number.');
+                    } else {
+                        $('#payment-request-meta').text('Link an approved payment request to pre-fill party or PO details.');
+                    }
+                }
+
+                function syncBillVendorFieldLock() {
+                    const hasPr = ($('#payment_request_id').val() || '').trim() !== '';
+                    if (hasPr) {
+                        $('#vendor-search').attr('readonly', true).addClass('bg-light');
+                    } else {
+                        $('#vendor-search').attr('readonly', false).removeClass('bg-light');
+                    }
+                }
+
+                function stabilizePaymentRequestBillLinkFields(resp) {
+                    if (!resp || !resp.payment_request) {
+                        return;
+                    }
+                    $('#payment_request_id').val(resp.payment_request.id);
+                    $('#payment_request_number_input').val(resp.payment_request.request_number || '');
+                }
+
+                function applyPaymentRequestBillResponse(resp) {
+                    if (!resp || !resp.payment_request) {
+                        return;
+                    }
+                    $('#payment_request_id').val(resp.payment_request.id);
+                    $('#payment_request_number_input').val(resp.payment_request.request_number || '');
+                    const prLabel = (resp.payment_request.request_number || '') + ' — ' + (resp.payment_request.payment_type_label || '');
+                    if (resp.populate_mode === 'full_po' && resp.purchase && resp.purchase.length) {
+                        window.applyPurchaseHeaderToBillForm(resp.purchase[0]);
+                        stabilizePaymentRequestBillLinkFields(resp);
+                        $('#payment-request-meta').text('Linked: ' + prLabel + ' · PO header and lines loaded.');
+                    } else if (resp.populate_mode === 'party_only' && resp.party) {
+                        window.applyBillPartyFromPaymentRequest(resp.party);
+                        stabilizePaymentRequestBillLinkFields(resp);
+                        $('#payment-request-meta').text('Linked: ' + prLabel + ' · company, zone, branch, and vendor applied. Enter bill lines and PO reference as needed.');
+                    }
+                    toastr.success(resp.message || 'Payment request applied.');
+                    syncBillVendorFieldLock();
+                    checkRequiredFields();
+                }
+
+                function loadPaymentRequestPurchaseById(id) {
+                    if (!id) {
+                        return;
+                    }
+                    $.ajax({
+                        url: '{{ route("superadmin.billPaymentRequestForBill") }}',
+                        data: { id: id },
+                        dataType: 'json',
+                        success: function (resp) {
+                            applyPaymentRequestBillResponse(resp);
+                        },
+                        error: function (xhr) {
+                            const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Could not load payment request.';
+                            toastr.error(msg);
+                            $('#payment_request_id').val('');
+                            updatePaymentRequestMeta();
+                            syncBillVendorFieldLock();
+                        }
+                    });
+                }
+
+                $('#payment_request_number_input').on('input', function () {
+                    $('#payment_request_id').val('');
+                    updatePaymentRequestMeta();
+                    const q = ($(this).val() || '').trim();
+                    clearTimeout(billPrSearchTimer);
+                    if (q.length < 1) {
+                        $('#payment-request-suggest').hide().empty();
+                        syncBillVendorFieldLock();
+                        checkRequiredFields();
+                        return;
+                    }
+                    billPrSearchTimer = setTimeout(function () {
+                        $.ajax({
+                            url: '{{ route("superadmin.billPaymentRequestsSearch") }}',
+                            data: { q: q },
+                            dataType: 'json',
+                            success: function (resp) {
+                                const $box = $('#payment-request-suggest');
+                                $box.empty();
+                                if (!resp.data || !resp.data.length) {
+                                    $box.hide();
+                                    return;
+                                }
+                                resp.data.forEach(function (row) {
+                                    const label = row.request_number + ' — ' + row.payment_type_label + (row.vendor_name ? ' (' + row.vendor_name + ')' : '');
+                                    $box.append(
+                                        $('<button type="button" class="list-group-item list-group-item-action py-2 text-start"></button>')
+                                            .text(label)
+                                            .data('id', row.id)
+                                            .data('num', row.request_number)
+                                    );
+                                });
+                                $box.show();
+                            },
+                            error: function () {
+                                $('#payment-request-suggest').hide().empty();
+                            }
+                        });
+                    }, 280);
+                    syncBillVendorFieldLock();
+                    checkRequiredFields();
+                });
+
+                $('#payment-request-suggest').on('mousedown', 'button.list-group-item-action', function (e) {
+                    e.preventDefault();
+                });
+
+                $('#payment-request-suggest').on('click', 'button.list-group-item-action', function () {
+                    const id = $(this).data('id');
+                    const num = $(this).data('num');
+                    $('#payment_request_number_input').val(num);
+                    $('#payment-request-suggest').hide().empty();
+                    loadPaymentRequestPurchaseById(id);
+                });
+
+                $(document).on('click', function (e) {
+                    if (!$(e.target).closest('#payment-request-suggest, #payment_request_number_input').length) {
+                        $('#payment-request-suggest').hide();
+                    }
+                });
+
+                $('#payment_request_number_input').on('blur', function () {
+                    clearTimeout(billPrBlurTimer);
+                    const $input = $(this);
+                    billPrBlurTimer = setTimeout(function () {
+                        if (($('#payment_request_id').val() || '').trim() !== '') {
+                            return;
+                        }
+                        const num = ($input.val() || '').trim();
+                        if (!num) {
+                            updatePaymentRequestMeta();
+                            return;
+                        }
+                        $.ajax({
+                            url: '{{ route("superadmin.billPaymentRequestForBill") }}',
+                            data: { number: num },
+                            dataType: 'json',
+                            success: function (resp) {
+                                applyPaymentRequestBillResponse(resp);
+                            },
+                            error: function (xhr) {
+                                const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Could not load payment request.';
+                                toastr.warning(msg);
+                                $('#payment_request_id').val('');
+                                updatePaymentRequestMeta();
+                                syncBillVendorFieldLock();
+                                checkRequiredFields();
+                            }
+                        });
+                    }, 320);
+                });
+
                 function checkRequiredFields() {
                     const vendorFilled   = ($('#selected-vendor-id').val() || '').trim() !== '';
                     const billDateFilled = ($('#bill_date').val() || '').trim() !== '';
@@ -3595,7 +3888,17 @@ function calculateFinalTotals() {
                         },
                         error: function (xhr) {
                             console.error("Error saving form:", xhr);
-                            toastr.error("Something went wrong!");
+                            if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                                $.each(xhr.responseJSON.errors, function (key, value) {
+                                    if ($('.error_' + key).length) {
+                                        $('.error_' + key).text(value[0]);
+                                    }
+                                });
+                                toastr.error('Please fix the highlighted fields.');
+                            } else {
+                                toastr.error("Something went wrong!");
+                            }
+                            $btn.prop('disabled', false).html(originalText);
                         },
                         // complete: function () {
                         //     // Reset button back
@@ -3626,6 +3929,11 @@ function calculateFinalTotals() {
                 $(document).on('change', '.zone_id, .branch_id, .department_id, .company_id', function () {
                     checkRequiredFields();
                 });
+                $(document).on('input change', '#payment_request_number_input, #payment_request_id', function () {
+                    checkRequiredFields();
+                });
+                updatePaymentRequestMeta();
+                syncBillVendorFieldLock();
             });
 
           $(document).ready(function () {
@@ -3750,6 +4058,21 @@ function calculateFinalTotals() {
                                 $('#po_against_display').val(bill_header[0].Purchase.purchase_gen_order || bill_header[0].Purchase.purchase_order_number || '');
                             }
                         }
+
+                        (function syncBillPrFromEditHeader() {
+                            const bh = bill_header[0];
+                            const prn = (bh.payment_request && bh.payment_request.request_number) ? bh.payment_request.request_number : '';
+                            $('#payment_request_number_input').val(prn);
+                            $('#payment_request_id').val(bh.payment_request_id || '');
+                            const hasPr = ($('#payment_request_id').val() || '').trim() !== '';
+                            if (hasPr) {
+                                $('#vendor-search').attr('readonly', true).addClass('bg-light');
+                                $('#payment-request-meta').text('Linked: ' + prn + ' (payment request).');
+                            } else {
+                                $('#vendor-search').attr('readonly', false).removeClass('bg-light');
+                                $('#payment-request-meta').text('Optional: link an approved payment request to pre-fill party or PO details.');
+                            }
+                        })();
 
                         let isFirst = true;
 

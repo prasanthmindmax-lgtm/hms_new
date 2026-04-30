@@ -858,6 +858,14 @@ body > .dropdown-menu.tax-dropdown.tk-ticket-filter-dd .tk-ticket-status-list di
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.tk-tickets-page .tk-table-card .qdt-table td.text-nowrap,
+.tk-tickets-page .tk-table-card .qdt-table th.text-nowrap {
+  white-space: nowrap;
+}
+.tk-tickets-page .tk-table-card .qdt-table td.text-nowrap .tk-tk-stack-primary,
+.tk-tickets-page .tk-table-card .qdt-table td.text-nowrap .tk-tk-stack-primary > div {
+  white-space: nowrap;
+}
 .tk-table-card .tk-td-closedby-inline {
   white-space: nowrap;
   font-size: 13px;
@@ -2217,4 +2225,100 @@ body > .dropdown-menu.tax-dropdown.tk-ticket-filter-dd .tk-ticket-status-list di
   font-size: 15px;
   padding: 14px 16px;
   border-radius: 12px;
+  cursor: pointer;
+}
+
+/* Ticket attachment preview */
+#modalOverlay.tk-overlay-boost {
+  z-index: 10040;
+}
+.tk-att-preview-modal {
+  z-index: 10050;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+}
+.tk-att-preview-box {
+  max-width: min(96vw, 1100px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+}
+.tk-att-preview-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.tk-att-preview-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+}
+.tk-att-preview-canvas {
+  flex: 1 1 auto;
+  min-height: 220px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+}
+.tk-att-preview-img-el {
+  max-width: 100%;
+  max-height: min(75vh, 720px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+.tk-att-iframe-h {
+  min-height: min(70vh, 700px);
+  height: 70vh;
+}
+.tk-att-preview-iframe-el {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+.tk-att-office-msg {
+  padding: 32px 20px;
+  text-align: center;
+  color: #475569;
+  font-size: 14px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.tk-att-office-ico {
+  font-size: 2.5rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 12px;
+}
+.tk-att-preview-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+.tk-att-open-duplicate {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4f6ef7;
+  margin-right: auto;
+}
+.tk-att-open-duplicate:hover {
+  color: #312e81;
 }

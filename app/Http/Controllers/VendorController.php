@@ -57,6 +57,7 @@ use App\Models\Tblnaturepayment;
 use App\Models\Tblneft;
 use App\Models\Tblneftlines;
 use App\Models\TblPoEmail;
+use App\Models\PaymentRequest;
 use App\Models\TblPurchaseorder;
 use App\Models\TblPurchaseorderLines;
 use App\Models\TblQuotation;
@@ -101,6 +102,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Log;
 use Maatwebsite\Excel\Excel as ExcelExcel;
 use Maatwebsite\Excel\Facades\Excel;
@@ -1880,7 +1882,7 @@ public function statementprint(Request $request, $id)
         $billcategories = BillCategory::orderBy('name', 'asc')->get();
 
         if ($id !== "") {
-            $bill = Tblbill::with(['TblBilling', 'BillLines', 'Tblvendor', 'Quotation', 'Purchase'])->where('delete_status',0)->where('id',$id)->get();
+            $bill = Tblbill::with(['TblBilling', 'BillLines', 'Tblvendor', 'Quotation', 'Purchase', 'paymentRequest'])->where('delete_status',0)->where('id',$id)->get();
             if($type == 'edit'){
                 return view('vendor.bill_create', compact(
                     'admin','locations','vendor','customer',
@@ -2109,6 +2111,19 @@ public function statementprint(Request $request, $id)
         $user_id = auth()->user()->id;
         $admin = auth()->user();
 
+        $request->validate([
+            'payment_request_id' => 'nullable|integer|exists:payment_requests,id',
+        ]);
+
+        if ($request->filled('payment_request_id')) {
+            $pr = PaymentRequest::find($request->payment_request_id);
+            if (! $pr || $pr->status !== PaymentRequest::STATUS_APPROVED) {
+                throw ValidationException::withMessages([
+                    'payment_request_id' => ['Select an approved payment request.'],
+                ]);
+            }
+        }
+
         $data = [
             'user_id' => $user_id,
             'vendor_id' => $request->vendor_id,
@@ -2163,6 +2178,8 @@ public function statementprint(Request $request, $id)
             'status' => $request->save_status,
             'note' => $request->note,
             'created_at' => $now,
+            'bill_pr_link_mode' => $request->filled('payment_request_id') ? 'payment_request' : null,
+            'payment_request_id' => $request->filled('payment_request_id') ? (int) $request->input('payment_request_id') : null,
         ];
         // dd($data);
         if (!$isUpdate) {
@@ -3665,6 +3682,175 @@ public function getpurchaseorder(Request $request)
 
     }
 
+    /**
+     * Autocomplete for bill create: approved payment requests only
+     */
+    public function searchPaymentRequestsForBill(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
+
+        $query = PaymentRequest::query()
+            ->where('status', PaymentRequest::STATUS_APPROVED);
+
+        if ($q !== '') {
+            $like = '%'.addcslashes($q, '%_\\').'%';
+            $query->where('request_no', 'like', $like);
+        }
+
+        $rows = $query->orderByDesc('id')->limit(25)->get([
+            'id',
+            'request_no',
+            'payment_type',
+            'vendor_id',
+            'purchase_order_id',
+        ]);
+
+        return response()->json([
+            'data' => $rows->map(function (PaymentRequest $pr) {
+                return [
+                    'id' => $pr->id,
+                    'request_number' => $pr->request_no,
+                    'payment_type' => $pr->payment_type,
+                    'payment_type_label' => PaymentRequest::typeLabel($pr->payment_type),
+                    'vendor_id' => $pr->vendor_id,
+                    'purchase_order_id' => $pr->purchase_order_id,
+                ];
+            }),
+        ]);
+    }
+
+    private function buildPartyPayloadFromPaymentRequest(PaymentRequest $pr): array
+    {
+        $pr->loadMissing([
+            'zone:id,name',
+            'branch:id,name',
+            'company:id,company_name',
+            'sourceVendor:id,display_name,company_name',
+        ]);
+
+        $vendorId = $pr->vendor_id;
+        $vendorLabel = '';
+        if ($pr->sourceVendor) {
+            $vendorLabel = trim((string) (($pr->sourceVendor->display_name ?: '') ?: ($pr->sourceVendor->company_name ?? '')));
+        }
+
+        return [
+            'zone_id' => $pr->zone_id,
+            'zone_name' => $pr->zone?->name,
+            'branch_id' => $pr->branch_id,
+            'branch_name' => $pr->branch?->name,
+            'company_id' => $pr->company_id,
+            'company_name' => $pr->company?->company_name,
+            'vendor_id' => $vendorId,
+            'vendor_name' => $vendorLabel,
+        ];
+    }
+
+    public function getPaymentRequestPurchaseForBill(Request $request)
+    {
+        $id = $request->get('id');
+        $number = trim((string) $request->get('number', ''));
+
+        $pr = null;
+        if ($id !== null && $id !== '') {
+            $pr = PaymentRequest::query()
+                ->where('id', $id)
+                ->where('status', PaymentRequest::STATUS_APPROVED)
+                ->first();
+        } elseif ($number !== '') {
+            $pr = $this->resolvePaymentRequestByNumber($number);
+        }
+
+        if (! $pr) {
+            return response()->json(['message' => 'Payment request not found. Check the number (e.g. PAY-2026-00001), spelling, and spaces.'], 404);
+        }
+
+        if ($pr->status !== PaymentRequest::STATUS_APPROVED) {
+            return response()->json(['message' => 'Only approved payment requests can be linked to a bill.'], 422);
+        }
+
+        $partyPayload = $this->buildPartyPayloadFromPaymentRequest($pr);
+
+        $paymentRequestMeta = [
+            'id' => $pr->id,
+            'request_number' => $pr->request_no,
+            'payment_type' => $pr->payment_type,
+            'payment_type_label' => PaymentRequest::typeLabel($pr->payment_type),
+        ];
+
+        $useFullPo = in_array($pr->payment_type, PaymentRequest::PO_LINKED_TYPES, true)
+            && $pr->purchase_order_id;
+
+        if (! $useFullPo) {
+            return response()->json([
+                'message' => 'Payment request location and vendor applied. Enter bill lines and PO reference as needed.',
+                'populate_mode' => 'party_only',
+                'party' => $partyPayload,
+                'purchase' => [],
+                'payment_request' => $paymentRequestMeta,
+            ]);
+        }
+
+        $purchase = TblPurchaseorder::with(['TblBilling', 'BillLines', 'Tblvendor'])
+            ->where('delete_status', 0)
+            ->where('id', $pr->purchase_order_id)
+            ->first();
+
+        if (! $purchase) {
+            return response()->json(['message' => 'Purchase order for this payment request was not found.'], 422);
+        }
+
+        $purchasePayload = $purchase->toArray();
+        $purchasePayload['zone_id'] = $partyPayload['zone_id'] ?? $purchase->zone_id;
+        $purchasePayload['zone_name'] = $partyPayload['zone_name'] ?? $purchase->zone_name;
+        $purchasePayload['branch_id'] = $partyPayload['branch_id'] ?? $purchase->branch_id;
+        $purchasePayload['branch_name'] = $partyPayload['branch_name'] ?? $purchase->branch_name;
+        $purchasePayload['company_id'] = $partyPayload['company_id'] ?? $purchase->company_id;
+        $purchasePayload['company_name'] = $partyPayload['company_name'] ?? $purchase->company_name;
+        $purchasePayload['vendor_id'] = $partyPayload['vendor_id'] ?? $purchase->vendor_id;
+        $purchasePayload['vendor_name'] = ($partyPayload['vendor_name'] ?? '') !== ''
+            ? $partyPayload['vendor_name']
+            : (string) ($purchase->vendor_name ?? '');
+
+        return response()->json([
+            'message' => 'Purchase loaded from payment request.',
+            'populate_mode' => 'full_po',
+            'party' => $partyPayload,
+            'purchase' => [$purchasePayload],
+            'payment_request' => $paymentRequestMeta,
+        ]);
+    }
+    
+    private function resolvePaymentRequestByNumber(string $raw): ?PaymentRequest
+    {
+        $n = trim($raw);
+        if ($n === '') {
+            return null;
+        }
+
+        $base = PaymentRequest::query()->where('status', PaymentRequest::STATUS_APPROVED);
+
+        $pr = (clone $base)
+            ->whereRaw('LOWER(TRIM(request_no)) = LOWER(?)', [$n])
+            ->first();
+        if ($pr) {
+            return $pr;
+        }
+
+        $prefix = addcslashes($n, '%_\\').'%';
+        $matches = (clone $base)
+            ->where('request_no', 'like', $prefix)
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get();
+
+        if ($matches->count() === 1) {
+            return $matches->first();
+        }
+
+        return null;
+    }
+
 //     public function getpurchaseprint(Request $request)
 // {
 //     $purchaseId = $request->id;
@@ -3726,8 +3912,8 @@ public function getpurchasepdf(Request $request)
 {
     $purchaseId = $request->id;
 
-    $purchase = TblPurchaseorder::with(['BillLines','Tblvendor','TblBilling','TblCompany'])->findOrFail($purchaseId);
-    $pdf = PDF::loadView('vendor.pdf.quotationprint', compact('quotation'));
+    $purchase = TblPurchaseorder::with(['BillLines', 'Tblvendor', 'TblBilling', 'TblCompany'])->findOrFail($purchaseId);
+    $pdf = PDF::loadView('vendor.pdf.purchaseprint', compact('purchase'));
 
     $pdf->setPaper('A4', 'portrait');
     $pdf->setOptions([
@@ -3738,8 +3924,7 @@ public function getpurchasepdf(Request $request)
         'isFontSubsettingEnabled' => true,
     ]);
 
-    // Download the PDF with a filename
-    return $pdf->download('Purchase_' . $purchase->purchase_gen_order . '.pdf');
+    return $pdf->download('Purchase_'.$purchase->purchase_gen_order.'.pdf');
 }
 
 public function purchasetemplate()
@@ -5631,24 +5816,24 @@ public function savegrn(Request $request)
         }
 
         // Post GRN lines to Consumable Store when saved as Open, not draft.
-        if ($request->input('save_status') === 'save' && $request->has('linesdata')) {
-            ConsumableStore::where('grn_id', $grn_id)->delete();
-            $deptId = $request->department_id;
-            foreach ($request->linesdata as $linesData) {
-                $itemName = trim((string) ($linesData['item_details'] ?? ''));
-                if ($itemName === '') {
-                    continue;
-                }
-                $qty = (float) ($linesData['acceptable_quantity'] ?? $linesData['receivable_quantity'] ?? $linesData['quantity'] ?? 0);
-                ConsumableStore::create([
-                    'grn_id' => $grn_id,
-                    'grn_number' => $grn->grn_number,
-                    'department_id' => $deptId,
-                    'item_name' => $itemName,
-                    'quantity' => $qty,
-                ]);
-            }
-        }
+        // if ($request->input('save_status') === 'save' && $request->has('linesdata')) {
+        //     ConsumableStore::where('grn_id', $grn_id)->delete();
+        //     $deptId = $request->department_id;
+        //     foreach ($request->linesdata as $linesData) {
+        //         $itemName = trim((string) ($linesData['item_details'] ?? ''));
+        //         if ($itemName === '') {
+        //             continue;
+        //         }
+        //         $qty = (float) ($linesData['acceptable_quantity'] ?? $linesData['receivable_quantity'] ?? $linesData['quantity'] ?? 0);
+        //         ConsumableStore::create([
+        //             'grn_id' => $grn_id,
+        //             'grn_number' => $grn->grn_number,
+        //             'department_id' => $deptId,
+        //             'item_name' => $itemName,
+        //             'quantity' => $qty,
+        //         ]);
+        //     }
+        // }
 
          return response()->json([
             'success' => true,
