@@ -2011,19 +2011,19 @@ input:focus {
 }
 
 /* Tax list scrolls */
-.tax-list ,.tax-tcs-list ,.tax-gst-list,.account-list,.zone-list,.branch-list,.tds-section-list,.company-list,.category-list,.vendor-list,.status-list,.state-list,.financial-year-list,.delivery-list,.department-list,.user-list{
+.tax-list ,.tax-tcs-list ,.tax-gst-list,.account-list,.zone-list,.branch-list,.tds-section-list,.company-list,.category-list,.vendor-list,.status-list,.state-list,.financial-year-list,.delivery-list,.department-list,.user-list,.pay-pr-status-list,.pay-pr-type-list{
   max-height: 150px;
   overflow-y: auto;
 }
 
 /* Tax items */
-.tax-list div ,.tax-tcs-list div ,.tax-gst-list div ,.account-list div,.zone-list div,.branch-list div,.tds-section-list div,.company-list div,.category-list div,.vendor-list div,.status-list div,.state-list div,.financial-year-list div,.delivery-list div,.department-list div,.user-list div{
+.tax-list div ,.tax-tcs-list div ,.tax-gst-list div ,.account-list div,.zone-list div,.branch-list div,.tds-section-list div,.company-list div,.category-list div,.vendor-list div,.status-list div,.state-list div,.financial-year-list div,.delivery-list div,.department-list div,.user-list div,.pay-pr-status-list div,.pay-pr-type-list div{
   padding: 8px;
   cursor: pointer;
 }
 
 .tax-list div:hover ,.tax-tcs-list div:hover ,.tax-gst-list div:hover ,.account-list div:hover,.zone-list div:hover,.branch-list div:hover ,.tds-section-list div:hover,.company-list div:hover,.category-list div:hover,.vendor-list div:hover,.status-list div:hover,.state-list div:hover,
-.financial-year-list div:hover,.delivery-list div:hover,.department-list div:hover,.user-list div:hover {
+.financial-year-list div:hover,.delivery-list div:hover,.department-list div:hover,.user-list div:hover,.pay-pr-status-list div:hover,.pay-pr-type-list div:hover {
   background-color: #f0f0f0;
 }
 
@@ -2963,7 +2963,10 @@ hr {
 .status-list div,
 .state-list div,
 .vendor-list div,
-.category-list div {
+.category-list div,
+.pay-pr-type-list div,
+.pay-pr-status-list div
+ {
   position: relative;
   padding: 8px 35px 8px 10px;
   cursor: pointer;
@@ -2978,7 +2981,9 @@ hr {
 .status-list div:hover,
 .state-list div:hover,
 .vendor-list div:hover,
-.category-list div:hover {
+.category-list div:hover,
+.pay-pr-type-list div:hover,
+.pay-pr-status-list div:hover {
   background: #f0f0f0;
 }
 
@@ -2990,7 +2995,9 @@ hr {
 .status-list div.selected,
 .state-list div.selected,
 .vendor-list div.selected,
-.category-list div.selected {
+.category-list div.selected,
+.pay-pr-type-list div.selected,
+.pay-pr-status-list div.selected {
   background: #e7f7ef;
   font-weight: 500;
 }
@@ -3003,7 +3010,9 @@ hr {
 .status-list div.selected::after,
 .state-list div.selected::after,
 .vendor-list div.selected::after,
-.category-list div.selected::after {
+.category-list div.selected::after,
+.pay-pr-type-list div.selected::after,
+.pay-pr-status-list div.selected::after {
   content: "✔";
   color: #0aad0a;
   position: absolute;

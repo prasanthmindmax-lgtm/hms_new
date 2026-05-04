@@ -20,6 +20,8 @@ class Tblbill extends Authenticatable
         'vendor_id',
         'quotation_id',
         'purchase_id',
+        'payment_request_id',
+        'bill_pr_link_mode',
         'vendor_name',
         'zone_id',
         'zone_name',
@@ -136,5 +138,15 @@ class Tblbill extends Authenticatable
     public function department()
     {
         return $this->belongsTo(Department::class, 'department_id');
+    }
+
+    public function paymentRequest()
+    {
+        return $this->belongsTo(PaymentRequest::class, 'payment_request_id');
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(usermanagementdetails::class, 'user_id');
     }
 }

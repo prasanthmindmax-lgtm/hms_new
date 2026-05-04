@@ -28,6 +28,7 @@ use App\Http\Controllers\LicenceDocumentCatalogController;
 use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\PaymentRequestController;
 use App\Http\Controllers\UserActivityController;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
@@ -507,6 +508,8 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     // Bill
     Route::get('/superadmin/bill_dashboard', [VendorController::class, 'getbill'])->name('superadmin.getbill');
     Route::get('/superadmin/bill_create', [VendorController::class, 'getbillcreate'])->name('superadmin.getbillcreate');
+    Route::get('/superadmin/bill/payment-requests-search', [VendorController::class, 'searchPaymentRequestsForBill'])->name('superadmin.billPaymentRequestsSearch');
+    Route::get('/superadmin/bill/payment-request-for-bill', [VendorController::class, 'getPaymentRequestPurchaseForBill'])->name('superadmin.billPaymentRequestForBill');
     Route::post('/save-bill', [VendorController::class, 'savebill'])->name('superadmin.savebill');
     Route::get('/superadmin/bill_print', [VendorController::class, 'getbillprint'])->name('superadmin.getbillprint');
     Route::get('/superadmin/bill_pdf', [VendorController::class, 'getbillpdf'])->name('superadmin.getbillpdf');
@@ -863,7 +866,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('superadmin/departments', [TicketController::class, 'storeDepartments'])->name('superadmin.departments.store');
     Route::get('superadmin/departments/users', [TicketController::class, 'departmentAssignedUsers'])->name('superadmin.departments.users');
 
-    // Ticket Category Routes
+    // Ticket Category
     Route::get('superadmin/ticket-categories', [TicketController::class, 'getTicketCategories'])->name('superadmin.ticket.categories.index');
     Route::post('superadmin/ticket-categories', [TicketController::class, 'storeTicketCategories'])->name('superadmin.ticket.categories.store');
 
@@ -919,6 +922,15 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('superadmin/indents/{indent}/history', [IndentController::class, 'history'])->name('superadmin.indents.history');
     Route::get('superadmin/indents/{indent}/detail', [IndentController::class, 'show'])->name('superadmin.indents.show');
     Route::get('superadmin/indents', [IndentController::class, 'index'])->name('superadmin.indents.index');
+
+    // Payment requests
+    Route::get('superadmin/payment-requests', [PaymentRequestController::class, 'index'])->name('superadmin.payment-requests.index');
+    Route::get('superadmin/payment-requests/create', [PaymentRequestController::class, 'create'])->name('superadmin.payment-requests.create');
+    Route::get('superadmin/payment-requests/lookup-po', [PaymentRequestController::class, 'lookupPo'])->name('superadmin.payment-requests.lookup-po');
+    Route::post('superadmin/payment-requests', [PaymentRequestController::class, 'store'])->name('superadmin.payment-requests.store');
+    Route::post('superadmin/payment-requests/{paymentRequest}/approve', [PaymentRequestController::class, 'approve'])->name('superadmin.payment-requests.approve');
+    Route::post('superadmin/payment-requests/{paymentRequest}/reject', [PaymentRequestController::class, 'reject'])->name('superadmin.payment-requests.reject');
+    Route::get('superadmin/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('superadmin.payment-requests.show');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {

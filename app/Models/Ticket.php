@@ -69,6 +69,11 @@ class Ticket extends Model
         return $this->belongsTo(usermanagementdetails::class, 'status_updated_by');
     }
 
+    public function entityComments(): MorphMany
+    {
+        return $this->morphMany(EntityComment::class, 'commentable');
+    }
+
     /** @return list<array<string, mixed>> */
     public function normalizedSolutionEntries(): array
     {

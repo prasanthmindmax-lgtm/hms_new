@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\EntityComment;
 use App\Models\Ticket;
 use App\Models\TblLocationModel;
 use App\Models\TblZonesModel;
@@ -949,8 +950,17 @@ class TicketController extends Controller
         }
 
         $paths = $this->uploadAttachments($request->file('attachments'));
+        $lastTicket = Ticket::orderBy('id', 'desc')->value('ticket_no');
+
+        if ($lastTicket && preg_match('/TKT-(\d+)/', $lastTicket, $matches)) {
+            $nextNumber = (int) $matches[1] + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        $ticketNo = 'TKT-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
         $ticket = Ticket::create([
-            'ticket_no' => 'TKT-TMP-' . uniqid('', true),
+            'ticket_no' => $ticketNo,
             'location_id' => $validated['location_id'],
             'from_department_id' => $validated['from_department_id'],
             'to_department_id' => $validated['to_department_id'],
@@ -962,7 +972,6 @@ class TicketController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        $ticket->ticket_no = 'TKT-' . str_pad((string) $ticket->id, 5, '0', STR_PAD_LEFT);
         $uid = (int) auth()->id();
         $creatorName = (string) (usermanagementdetails::query()->where('id', $uid)->value('user_fullname') ?? '—');
         $ticket->solution = [
@@ -993,7 +1002,6 @@ class TicketController extends Controller
             'to_department_id' => 'required|integer|exists:departments,id',
             'issue_category_id' => 'required|integer|exists:issue_categories,id',
             'priority' => 'required|string|in:' . implode(',', Ticket::PRIORITIES),
-            'subject' => 'required|string|max:500',
             'description' => 'required|string|max:10000',
             'attachments.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,pdf,doc,docx,xls,xlsx|max:10240',
         ]);
@@ -1072,7 +1080,6 @@ class TicketController extends Controller
         $ticket->to_department_id = $validated['to_department_id'];
         $ticket->issue_category_id = $validated['issue_category_id'];
         $ticket->priority = $validated['priority'];
-        $ticket->subject = $validated['subject'];
         $ticket->description = $validated['description'];
         $ticket->attachments = array_values($merged);
         $ticket->save();
@@ -1255,6 +1262,30 @@ class TicketController extends Controller
             }
         }
 
+        $commentRows = EntityComment::query()
+            ->where('commentable_type', Ticket::class)
+            ->where('commentable_id', $ticket->id)
+            ->orderBy('id')
+            ->get(['id', 'body', 'user_id', 'created_at']);
+
+        $commentUserIds = $commentRows->pluck('user_id')->filter()->unique();
+        $commentNames = $this->namesForUsers($commentUserIds);
+
+        foreach ($commentRows as $row) {
+            $at = $row->created_at;
+            $uid = (int) ($row->user_id ?? 0);
+            $userName = $uid > 0 ? (string) ($commentNames[$uid] ?? '—') : '—';
+            $iso = $at ? $at->toIso8601String() : '';
+            $items[] = [
+                'type' => 'comment',
+                'id' => (int) $row->id,
+                'created_at' => $at ? $this->fmtAt($at) : '',
+                'created_at_iso' => $iso,
+                'user_name' => $userName,
+                'body' => (string) $row->body,
+            ];
+        }
+
         usort($items, function (array $a, array $b) {
             return strcmp((string) ($a['created_at_iso'] ?? ''), (string) ($b['created_at_iso'] ?? ''));
         });
@@ -1262,6 +1293,37 @@ class TicketController extends Controller
         return response()->json([
             'success' => true,
             'items' => array_values($items),
+        ]);
+    }
+
+    public function storeComment(Request $request, Ticket $ticket): JsonResponse
+    {
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $access = $this->ticketAccessFromAuth();
+        if (! $access) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        if (! $this->ticketAccessAllows($access, $ticket)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot add comments on this ticket.',
+            ], 403);
+        }
+
+        EntityComment::query()->create([
+            'commentable_type' => Ticket::class,
+            'commentable_id' => $ticket->id,
+            'body' => $validated['body'],
+            'user_id' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment added.',
         ]);
     }
 
