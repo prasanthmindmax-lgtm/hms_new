@@ -144,4 +144,9 @@ class Tblbill extends Authenticatable
     {
         return $this->belongsTo(PaymentRequest::class, 'payment_request_id');
     }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(usermanagementdetails::class, 'user_id');
+    }
 }

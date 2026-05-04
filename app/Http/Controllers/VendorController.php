@@ -1611,7 +1611,7 @@ public function statementprint(Request $request, $id)
         $Tblvendor = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
         $Tblaccount = Tblaccount::orderBy('id', 'asc')->get();
         $Tblcategory = BillCategory::orderBy('id', 'asc')->get();
-        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments','TblTDSsection.section','category'])->where('delete_status',0)->orderBy('id', 'desc');
+        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments','TblTDSsection.section','category', 'createdBy'])->where('delete_status',0)->orderBy('id', 'desc');
 
         // Apply filters
         if ($request->filled('date_from') && $request->filled('date_to')) {
@@ -2111,18 +2111,22 @@ public function statementprint(Request $request, $id)
         $user_id = auth()->user()->id;
         $admin = auth()->user();
 
-        $request->validate([
-            'payment_request_id' => 'nullable|integer|exists:payment_requests,id',
-        ]);
+        // $request->validate([
+        //     'payment_request_id' => 'nullable|integer|exists:payment_requests,id',
+        // ]);
 
-        if ($request->filled('payment_request_id')) {
-            $pr = PaymentRequest::find($request->payment_request_id);
-            if (! $pr || $pr->status !== PaymentRequest::STATUS_APPROVED) {
-                throw ValidationException::withMessages([
-                    'payment_request_id' => ['Select an approved payment request.'],
-                ]);
-            }
-        }
+        // if ($request->filled('payment_request_id')) {
+        //     $pr = PaymentRequest::query()
+        //         ->where('id', (int) $request->input('payment_request_id'))
+        //         ->where('status', PaymentRequest::STATUS_APPROVED)
+        //         ->whereIn('payment_type', PaymentRequest::PO_LINKED_TYPES)
+        //         ->first();
+        //     if (! $pr) {
+        //         throw ValidationException::withMessages([
+        //             'payment_request_id' => ['Link an approved Advance, Part payment, or Settlement payment request (PO-linked types only).'],
+        //         ]);
+        //     }
+        // }
 
         $data = [
             'user_id' => $user_id,
@@ -3691,7 +3695,7 @@ public function getpurchaseorder(Request $request)
 
         $query = PaymentRequest::query()
             ->where('status', PaymentRequest::STATUS_APPROVED);
-
+            
         if ($q !== '') {
             $like = '%'.addcslashes($q, '%_\\').'%';
             $query->where('request_no', 'like', $like);
@@ -3820,7 +3824,7 @@ public function getpurchaseorder(Request $request)
             'payment_request' => $paymentRequestMeta,
         ]);
     }
-    
+
     private function resolvePaymentRequestByNumber(string $raw): ?PaymentRequest
     {
         $n = trim($raw);

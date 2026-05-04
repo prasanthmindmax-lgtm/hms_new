@@ -26,6 +26,7 @@
         <th>DUE DATE</th>
         <th class="text-end">AMOUNT</th>
         <th>ATTACH</th>
+        <th>CREATED BY</th>
         <th>STATUS</th>
         <th>PAID STATUS</th>
         <th>ASSET</th>
@@ -156,6 +157,8 @@
                     <span class="qdt-dash">—</span>
                 @endif
             </td>
+
+            <td>{{ $bill->createdBy->user_fullname ?? '-' }}</td>
 
             <td><span class="{{ $badgeCls }}">{{ ucfirst($bill->status ?? '-') }}</span></td>
 
