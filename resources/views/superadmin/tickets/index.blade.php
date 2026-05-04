@@ -259,11 +259,11 @@
         <div class="raise-head-inner">
           <div class="raise-title-wrap">
             <div class="raise-icon" aria-hidden="true"><i class="bi bi-ticket-perforated"></i></div>
-            <div>
-              <h2 class="raise-title" id="raiseModalTitle">Raise ticket</h2>
-            </div>
+            <h2 class="raise-title" id="raiseModalTitle">Raise ticket</h2>
           </div>
-          <button type="button" class="sm-modal-close close-modal" aria-label="Close dialog">&times;</button>
+          <button type="button" class="sm-modal-close close-modal raise-head-close" aria-label="Close dialog">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
 
@@ -381,13 +381,13 @@
       <div class="detail-head">
         <div class="detail-head-inner">
           <div class="detail-head-left">
-            <h2 class="detail-head-title" id="detailModalTitle">
-              <i class="bi bi-eye" aria-hidden="true"></i>
-              <span>Ticket <span class="detail-head-ref" id="detail_ref"></span></span>
-            </h2>
-            <p class="detail-head-meta">
-              <span id="detail_head_status" class="tk-head-status-pill" aria-live="polite"></span>
-            </p>
+            <div class="detail-head-row">
+              <h2 class="detail-head-title" id="detailModalTitle">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+                <span class="detail-head-title-text">Ticket <span class="detail-head-ref" id="detail_ref"></span></span>
+              </h2>
+              <span id="detail_head_status" class="tk-head-status-pill detail-head-status-slot" aria-live="polite"></span>
+            </div>
           </div>
           <button type="button" class="sm-modal-close close-modal" aria-label="Close dialog">&times;</button>
         </div>
@@ -443,10 +443,10 @@
               </div>
             </div>
             <div class="tk-detail-prose-stack">
-              <div class="tk-prose-block">
+              {{--  <div class="tk-prose-block">
                 <span class="tk-meta-label">Subject</span>
                 <p class="tk-prose-subject" id="detail_subject"></p>
-              </div>
+              </div>  --}}
               <div class="tk-prose-block tk-prose-block--desc">
                 <span class="tk-meta-label">Description</span>
                 <div class="tk-prose-desc" id="detail_description"></div>
@@ -471,6 +471,15 @@
               <i class="bi bi-clock-history" aria-hidden="true"></i>
               Activity
             </h3>
+            <div class="tk-comment-compose" id="tk_comment_compose_wrap">
+              <label class="tk-meta-label" for="detail_comment_body">Add comment</label>
+              <textarea id="detail_comment_body" class="form-control tk-comment-textarea" rows="3" maxlength="5000" placeholder="Write an internal note or reply…" autocomplete="off"></textarea>
+              <div class="tk-comment-compose-actions">
+                <button type="button" class="sm-btn-primary" id="btn_detail_comment_post">
+                  <i class="bi bi-chat-left-text me-1" aria-hidden="true"></i>Post comment
+                </button>
+              </div>
+            </div>
             <ul id="detail_timeline" class="tk-timeline" aria-live="polite">
               <li class="tk-timeline-loading">Loading activity…</li>
             </ul>
@@ -492,7 +501,9 @@
           <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
           <span>Update status — <span id="quick_status_ref"></span></span>
         </h2>
-        <button type="button" class="tk-quick-status-close" id="btnQuickStatusCloseX" aria-label="Close dialog">&times;</button>
+        <button type="button" class="tk-quick-status-close" id="btnQuickStatusCloseX" aria-label="Close dialog">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
       </div>
       <div class="tk-quick-status-body">
         <input type="hidden" id="quick_status_ticket_id" value="">
@@ -1174,6 +1185,27 @@
               '</div>' +
               changeLine +
               noteBlock +
+              '</div></li>'
+            );
+          } else if (it.type === 'comment') {
+            var metaC =
+              '<span class="tk-tl-who">' +
+              tkEscapeHtml(it.user_name || '—') +
+              '</span><time>' +
+              tkEscapeHtml(it.created_at || '') +
+              '</time><span class="tk-tl-badge tk-tl-badge--comment">Comment</span>';
+            var bodyC =
+              '<div class="tk-timeline-comment-body">' +
+              tkEscapeHtml(it.body || '') +
+              '</div>';
+            $ul.append(
+              '<li class="tk-timeline-item tk-timeline-item--comment">' +
+              '<span class="tk-timeline-dot" aria-hidden="true"></span>' +
+              '<div class="tk-timeline-card">' +
+              '<div class="tk-timeline-meta">' +
+              metaC +
+              '</div>' +
+              bodyC +
               '</div></li>'
             );
           }
@@ -2437,8 +2469,58 @@
             .join('');
         }
         $('#detail_files').html(filesHtml);
+        $('#detail_comment_body').val('');
         loadTicketTimeline(t.id);
         openModal('#detailModal');
+      });
+
+      $(document).on('click', '#btn_detail_comment_post', function() {
+        var idStr = ($('#detail_id').val() || '').trim();
+        var body = ($('#detail_comment_body').val() || '').trim();
+        if (!idStr) {
+          return;
+        }
+        if (!body) {
+          toastr.warning('Enter a comment.');
+          $('#detail_comment_body').focus();
+          return;
+        }
+        var tid = parseInt(idStr, 10);
+        if (!tid) {
+          return;
+        }
+        var $btn = $('#btn_detail_comment_post');
+        $btn.prop('disabled', true);
+        $.ajax({
+          url: routes.timeline + '/' + tid + '/comments',
+          type: 'POST',
+          data: {
+            _token: csrf,
+            body: body
+          },
+          success: function(res) {
+            if (res.success) {
+              $('#detail_comment_body').val('');
+              toastr.success(res.message || 'Comment added');
+              loadTicketTimeline(tid);
+            } else {
+              toastr.error(res.message || 'Could not save comment');
+            }
+          },
+          error: function(xhr) {
+            var j = xhr.responseJSON;
+            if (j && j.errors && j.errors.body && j.errors.body.length) {
+              toastr.error(j.errors.body[0]);
+            } else if (j && j.message) {
+              toastr.error(j.message);
+            } else {
+              toastr.error('Could not save comment');
+            }
+          },
+          complete: function() {
+            $btn.prop('disabled', false);
+          }
+        });
       });
 
       $(document).on('click', 'a.tk-detail-attachment', function(e) {

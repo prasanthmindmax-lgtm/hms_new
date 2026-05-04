@@ -1,11 +1,5 @@
 /**
  * No per-blade JS: mark form duration from modals and inject into jQuery FormData on save.
- *
- * 1) Add data-cfd to the modal root (e.g. <div class="sm-modal" data-cfd>).
- * 2) When the modal’s class list gains "show", a session timer starts (restarts each open).
- * 3) On the next jQuery $.ajax/$.post that sends FormData while that modal is visible,
- *    appends create_form_duration_ms (unless the field is already set).
- *
  * Requires: create_form_duration.js (createFormDurationSession) + superadminfooter __CREATE_FORM_DURATION.
  */
 (function () {
@@ -79,46 +73,6 @@
   }
 
   window.getActiveCfdFormDurationMs = getActiveCfdFormDurationMs;
-
-  function appendTimeOnFormToToastrMessage(msg) {
-    if (typeof msg !== 'string' || msg === '') {
-      return msg;
-    }
-    if (msg.indexOf('Time on form:') !== -1) {
-      return msg;
-    }
-    if (typeof window.formatCreateFormDurationMs !== 'function') {
-      return msg;
-    }
-    var t = getActiveCfdFormDurationMs();
-    if (t == null || t <= 0) {
-      return msg;
-    }
-    return msg + ' · Time on form: ' + window.formatCreateFormDurationMs(t);
-  }
-
-  function wrapToastrSuccess() {
-    if (window.__uapCfdToastrSuccess) {
-      return;
-    }
-    if (!window.toastr || typeof toastr.success !== 'function') {
-      return;
-    }
-    window.__uapCfdToastrSuccess = true;
-    var orig = toastr.success;
-    toastr.success = function (message) {
-      var rest = Array.prototype.slice.call(arguments, 1);
-      if (typeof message === 'string') {
-        message = appendTimeOnFormToToastrMessage(message);
-      }
-      return orig.apply(toastr, [message].concat(rest));
-    };
-  }
-
-  wrapToastrSuccess();
-  $(function () { wrapToastrSuccess(); });
-  setTimeout(wrapToastrSuccess, 0);
-  setTimeout(wrapToastrSuccess, 300);
 
   function appendCfdToFormData(fd) {
     if (!fd || typeof fd.append !== 'function') {

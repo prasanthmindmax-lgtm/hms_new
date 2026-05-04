@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\EntityComment;
 use App\Models\Ticket;
 use App\Models\TblLocationModel;
 use App\Models\TblZonesModel;
@@ -1261,6 +1262,30 @@ class TicketController extends Controller
             }
         }
 
+        $commentRows = EntityComment::query()
+            ->where('commentable_type', Ticket::class)
+            ->where('commentable_id', $ticket->id)
+            ->orderBy('id')
+            ->get(['id', 'body', 'user_id', 'created_at']);
+
+        $commentUserIds = $commentRows->pluck('user_id')->filter()->unique();
+        $commentNames = $this->namesForUsers($commentUserIds);
+
+        foreach ($commentRows as $row) {
+            $at = $row->created_at;
+            $uid = (int) ($row->user_id ?? 0);
+            $userName = $uid > 0 ? (string) ($commentNames[$uid] ?? '—') : '—';
+            $iso = $at ? $at->toIso8601String() : '';
+            $items[] = [
+                'type' => 'comment',
+                'id' => (int) $row->id,
+                'created_at' => $at ? $this->fmtAt($at) : '',
+                'created_at_iso' => $iso,
+                'user_name' => $userName,
+                'body' => (string) $row->body,
+            ];
+        }
+
         usort($items, function (array $a, array $b) {
             return strcmp((string) ($a['created_at_iso'] ?? ''), (string) ($b['created_at_iso'] ?? ''));
         });
@@ -1268,6 +1293,37 @@ class TicketController extends Controller
         return response()->json([
             'success' => true,
             'items' => array_values($items),
+        ]);
+    }
+
+    public function storeComment(Request $request, Ticket $ticket): JsonResponse
+    {
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $access = $this->ticketAccessFromAuth();
+        if (! $access) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        if (! $this->ticketAccessAllows($access, $ticket)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot add comments on this ticket.',
+            ], 403);
+        }
+
+        EntityComment::query()->create([
+            'commentable_type' => Ticket::class,
+            'commentable_id' => $ticket->id,
+            'body' => $validated['body'],
+            'user_id' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment added.',
         ]);
     }
 
