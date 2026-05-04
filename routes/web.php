@@ -31,7 +31,10 @@ use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\UserActivityController;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
-
+// ─── Checkin Report Module ───────────────────────────────────────────────────
+use App\Http\Controllers\CheckinReportController;
+use App\Http\Controllers\RegistrationReportController;
+use App\Http\Controllers\ArtBankController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -1026,6 +1029,33 @@ Route::middleware(['auth', 'role_id:1', 'log.activity', 'prevent-back-button'])-
         ->name('user_activity.user.type_events');
     Route::get('/superadmin/user-activity/user/{user}', [UserActivityController::class, 'userShow'])
         ->name('user_activity.user');
+});
+
+
+
+Route::middleware(['auth', 'role_id:1', 'log.activity'])->group(function () {
+    // Check-in Report
+    Route::get('/modules/checkin',                [CheckinReportController::class, 'index'])->name('checkin.index');
+    Route::get('/modules/checkin/fetch',          [CheckinReportController::class, 'fetch'])->name('checkin.fetch');
+    Route::get('/modules/checkin/locations',      [CheckinReportController::class, 'getLocations'])->name('checkin.locations');
+    Route::get('/modules/checkin/zones',          [CheckinReportController::class, 'getZones'])->name('checkin.zones');
+    Route::get('/modules/checkin/branches',       [CheckinReportController::class, 'getBranches'])->name('checkin.branches');
+    Route::get('/modules/checkin/last-sync',      [CheckinReportController::class, 'getLastSync'])->name('checkin.last-sync');
+
+    // Registration Report
+    Route::get('/modules/registration',           [RegistrationReportController::class, 'index'])->name('registration.index');
+    Route::get('/modules/registration/fetch',     [RegistrationReportController::class, 'fetch'])->name('registration.fetch');
+    Route::get('/modules/registration/areas',     [RegistrationReportController::class, 'getAreas'])->name('registration.areas');
+    Route::get('/modules/registration/zones',     [RegistrationReportController::class, 'getZones'])->name('registration.zones');
+    Route::get('/modules/registration/branches',  [RegistrationReportController::class, 'getBranches'])->name('registration.branches');
+    Route::get('/modules/registration/last-sync', [RegistrationReportController::class, 'getLastSync'])->name('registration.last-sync');
+
+    Route::get('report/art-bank',                 [ArtBankController::class, 'artBankModule'])
+    ->name('report.art_bank_module');
+
+    Route::get('report/art-bank/{donor_id}',      [ArtBankController::class, 'artBankDetail'])
+        ->name('report.art_bank_detail');
+
 });
 
 require __DIR__.'/auth.php';

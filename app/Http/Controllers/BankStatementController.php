@@ -10,6 +10,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -329,18 +330,21 @@ class BankStatementController extends Controller
             return response()->json($this->buildDashboardStatistics($request));
         }
 
-        $perPage = $request->get('per_page', 50);
+        $perPage = (int) $request->get('per_page', 50);
+        $perPage = max(1, min(500, $perPage));
 
-        $paginator = $this->bankStatementsFilteredQuery($request)->paginate($perPage);
+        $dashboard = $this->buildDashboardStatistics($request);
+        $paginator = $this->bankStatementsFilteredQuery($request)->simplePaginate($perPage);
+        $this->hydrateBillLineAccountNamesForStatementRows($paginator->getCollection());
+        $this->hydrateIncomeBillingListForStatementRows($paginator->getCollection());
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
-            $this->hydrateIncomeBillingListForStatementRow($row);
 
             return $row;
         });
 
-        $payload = $paginator->toArray();
-        $payload['dashboard'] = $this->buildDashboardStatistics($request);
+        $payload = $this->mergeLengthAwarePaginationMeta($paginator, (int) ($dashboard['total'] ?? 0));
+        $payload['dashboard'] = $dashboard;
 
         return response()->json($payload);
     }
@@ -455,9 +459,10 @@ class BankStatementController extends Controller
         });
 
         $paginator = $query->paginate($perPage);
+        $this->hydrateBillLineAccountNamesForStatementRows($paginator->getCollection());
+        $this->hydrateIncomeBillingListForStatementRows($paginator->getCollection());
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
-            $this->hydrateIncomeBillingListForStatementRow($row);
 
             return $row;
         });
@@ -490,9 +495,10 @@ class BankStatementController extends Controller
         }
 
         $paginator = $query->paginate($perPage);
+        $this->hydrateBillLineAccountNamesForStatementRows($paginator->getCollection());
+        $this->hydrateIncomeBillingListForStatementRows($paginator->getCollection());
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
-            $this->hydrateIncomeBillingListForStatementRow($row);
 
             return $row;
         });
@@ -511,6 +517,8 @@ class BankStatementController extends Controller
         }
 
         $rows = $this->bankStatementsFilteredQuery($request)->limit(25000)->get();
+        $this->hydrateBillLineAccountNamesForStatementRows($rows);
+        $this->hydrateIncomeBillingListForStatementRows($rows);
         // dd($rows);
         $headers = [
             'ID',
@@ -668,14 +676,17 @@ class BankStatementController extends Controller
     /**
      * When income_match_split_json has no modes (legacy rows), infer from income_reconciliation_table bank id columns.
      *
+     * @param  object|null  $rec  Pre-loaded row keyed by id (batch hydrate); if null, loads by $reconId.
      * @return list<string>
      */
-    private function inferIncomeTagModesFromReconciliation(int $statementId, int $reconId): array
+    private function inferIncomeTagModesFromReconciliation(int $statementId, int $reconId, ?object $rec = null): array
     {
         if ($reconId <= 0 || $statementId <= 0 || ! Schema::hasTable('income_reconciliation_table')) {
             return [];
         }
-        $rec = DB::table('income_reconciliation_table')->where('id', $reconId)->first();
+        if ($rec === null) {
+            $rec = DB::table('income_reconciliation_table')->where('id', $reconId)->first();
+        }
         if (! $rec) {
             return [];
         }
@@ -819,24 +830,20 @@ class BankStatementController extends Controller
     }
 
     /**
-     * Attach billing_list-derived income bill lines for API consumers (bank reconciliation grid).
+     * Resolve branch / collection dates / payment modes for income-tag billing_list hydration.
+     *
+     * @param  array<int, object>  $reconById  income_reconciliation_table rows keyed by numeric id (batch); empty = per-row DB fetch when inferring modes.
+     * @return array{branch: string, dates_ymd: list<string>, modes: list<string>}|null
      */
-    private function hydrateIncomeBillingListForStatementRow(object $row): void
+    private function resolveIncomeTagBillingListParams(object $row, array $reconById = []): ?array
     {
-        $row->income_billing_list = null;
-        $row->income_billing_list_total = null;
-        $row->income_tag_billing_modes = null;
-
-        if (! Schema::hasTable('billing_list')) {
-            return;
-        }
         if (($row->income_match_status ?? '') !== 'income_matched') {
-            return;
+            return null;
         }
 
         $branch = trim((string) ($row->income_matched_branch ?? ''));
         if ($branch === '') {
-            return;
+            return null;
         }
 
         $datesYmd = [];
@@ -874,7 +881,7 @@ class BankStatementController extends Controller
         }
         $datesYmd = array_values(array_unique($datesYmd));
         if ($datesYmd === []) {
-            return;
+            return null;
         }
 
         $modes = [];
@@ -887,21 +894,136 @@ class BankStatementController extends Controller
             }
             $modes = array_values(array_unique($modes));
         }
+
+        $reconId = (int) ($row->income_reconciliation_id ?? 0);
         if ($modes === []) {
+            $rec = ($reconId > 0 && isset($reconById[$reconId])) ? $reconById[$reconId] : null;
             $modes = $this->inferIncomeTagModesFromReconciliation(
                 (int) ($row->id ?? 0),
-                (int) ($row->income_reconciliation_id ?? 0)
+                $reconId,
+                $rec
             );
         }
         if ($modes === []) {
+            return null;
+        }
+
+        return [
+            'branch'    => $branch,
+            'dates_ymd' => $datesYmd,
+            'modes'     => array_values($modes),
+        ];
+    }
+
+    /**
+     * Batch billing_list hydration for a page of statements (dedupes identical branch/date/mode groups).
+     *
+     * @param  \Illuminate\Support\Collection<int, object>|\Illuminate\Database\Eloquent\Collection<int, object>  $rows
+     */
+    private function hydrateIncomeBillingListForStatementRows($rows): void
+    {
+        if (! Schema::hasTable('billing_list') || $rows->isEmpty()) {
             return;
         }
 
-        $row->income_tag_billing_modes = array_values($modes);
+        foreach ($rows as $row) {
+            $row->income_billing_list = null;
+            $row->income_billing_list_total = null;
+            $row->income_tag_billing_modes = null;
+        }
 
-        $result = $this->queryBillingListRowsForIncomeTag($branch, $datesYmd, $modes);
-        $row->income_billing_list = $result['rows'];
-        $row->income_billing_list_total = $result['total'];
+        $reconIds = [];
+        foreach ($rows as $row) {
+            if (($row->income_match_status ?? '') !== 'income_matched') {
+                continue;
+            }
+            $rid = (int) ($row->income_reconciliation_id ?? 0);
+            if ($rid > 0) {
+                $reconIds[$rid] = true;
+            }
+        }
+
+        $reconById = [];
+        if ($reconIds !== [] && Schema::hasTable('income_reconciliation_table')) {
+            foreach (DB::table('income_reconciliation_table')->whereIn('id', array_keys($reconIds))->get() as $rec) {
+                $reconById[(int) $rec->id] = $rec;
+            }
+        }
+
+        $groups = [];
+        foreach ($rows as $row) {
+            $params = $this->resolveIncomeTagBillingListParams($row, $reconById);
+            if ($params === null) {
+                continue;
+            }
+            $d = $params['dates_ymd'];
+            $m = $params['modes'];
+            sort($d);
+            sort($m);
+            $key = $params['branch']."\0".implode(',', $d)."\0".implode(',', $m);
+            if (! isset($groups[$key])) {
+                $groups[$key] = ['params' => $params, 'rows' => []];
+            }
+            $groups[$key]['rows'][] = $row;
+        }
+
+        foreach ($groups as $group) {
+            $p = $group['params'];
+            $result = $this->queryBillingListRowsForIncomeTag($p['branch'], $p['dates_ymd'], $p['modes']);
+            foreach ($group['rows'] as $row) {
+                $row->income_tag_billing_modes = array_values($p['modes']);
+                $row->income_billing_list = $result['rows'];
+                $row->income_billing_list_total = $result['total'];
+            }
+        }
+    }
+
+    /**
+     * Attach billing_list-derived income bill lines for API consumers (bank reconciliation grid).
+     */
+    private function hydrateIncomeBillingListForStatementRow(object $row): void
+    {
+        $this->hydrateIncomeBillingListForStatementRows(collect([$row]));
+    }
+
+    /**
+     * Replace per-row correlated bill_lines subquery with one grouped query per page/export chunk.
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $rows
+     */
+    private function hydrateBillLineAccountNamesForStatementRows($rows): void
+    {
+        if (! Schema::hasTable('bill_lines_tbl') || $rows->isEmpty()) {
+            return;
+        }
+
+        $billIds = $rows->pluck('resolved_bill_id')
+            ->map(static fn ($id) => (int) $id)
+            ->filter(static fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $byBillId = [];
+        if ($billIds !== []) {
+            $rawMap = DB::table('bill_lines_tbl')
+                ->selectRaw('bill_id, GROUP_CONCAT(DISTINCT TRIM(account) SEPARATOR \', \') AS names')
+                ->whereIn('bill_id', $billIds)
+                ->whereRaw("TRIM(IFNULL(account, '')) <> ''")
+                ->groupBy('bill_id')
+                ->pluck('names', 'bill_id')
+                ->all();
+            foreach ($rawMap as $k => $v) {
+                $byBillId[(int) $k] = (string) $v;
+            }
+        }
+
+        foreach ($rows as $row) {
+            $bid = (int) ($row->resolved_bill_id ?? 0);
+            $row->bill_line_account_names = ($bid > 0 && isset($byBillId[$bid]))
+                ? $byBillId[$bid]
+                : '';
+        }
     }
 
     private function applyBankStatementBillJoins(Builder $query): void
@@ -980,6 +1102,18 @@ class BankStatementController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * SQL expression for date range / ORDER BY on bank statements (indexed column when migration has run).
+     */
+    private function bankStatementTransactionDateSortSql(): string
+    {
+        if (Schema::hasColumn('bank_statements', 'transaction_date_sort')) {
+            return 'bs.transaction_date_sort';
+        }
+
+        return "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y')";
     }
 
     /**
@@ -1402,13 +1536,6 @@ class BankStatementController extends Controller
             $select[] = 'bs.br_nature_account_ids as resolved_br_nature_account_ids';
         }
 
-        if (Schema::hasTable('bill_lines_tbl')) {
-            $select[] = DB::raw("(SELECT GROUP_CONCAT(DISTINCT TRIM(bl.account) SEPARATOR ', ')
-                FROM bill_lines_tbl AS bl
-                WHERE bl.bill_id = bill.id
-                  AND TRIM(IFNULL(bl.account, '')) <> '') AS bill_line_account_names");
-        }
-
         if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
             $select[] = 'bsr.id as salary_recon_row_id';
             $select[] = 'bsr.utr as salary_utr';
@@ -1463,35 +1590,25 @@ class BankStatementController extends Controller
             $query->where('bra.company_id', (int) $request->company_id);
         }
 
+        $dateSortSql = $this->bankStatementTransactionDateSortSql();
         $fyRanges = $this->requestFinancialYearRanges($request);
         if (count($fyRanges) > 0) {
-            $query->where(function ($outer) use ($fyRanges) {
+            $query->where(function ($outer) use ($fyRanges, $dateSortSql) {
                 foreach ($fyRanges as $pair) {
                     [$df, $dt] = $pair;
-                    $outer->orWhere(function ($q) use ($df, $dt) {
-                        $q->whereRaw(
-                            "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') >= ?",
-                            [$df]
-                        )->whereRaw(
-                            "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') <= ?",
-                            [$dt]
-                        );
+                    $outer->orWhere(function ($q) use ($df, $dt, $dateSortSql) {
+                        $q->whereRaw("{$dateSortSql} >= ?", [$df])
+                            ->whereRaw("{$dateSortSql} <= ?", [$dt]);
                     });
                 }
             });
         } else {
             if ($request->filled('date_from')) {
-                $query->whereRaw(
-                    "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') >= ?",
-                    [$request->date_from]
-                );
+                $query->whereRaw("{$dateSortSql} >= ?", [$request->date_from]);
             }
 
             if ($request->filled('date_to')) {
-                $query->whereRaw(
-                    "STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') <= ?",
-                    [$request->date_to]
-                );
+                $query->whereRaw("{$dateSortSql} <= ?", [$request->date_to]);
             }
         }
 
@@ -1718,15 +1835,40 @@ class BankStatementController extends Controller
         $sortDir = strtolower((string) $request->get('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         if ($sortBy === 'transaction_date') {
-            $query->orderByRaw("STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') {$sortDir}")
-                ->orderBy('bs.id', $sortDir);
+            if (Schema::hasColumn('bank_statements', 'transaction_date_sort')) {
+                $query->orderBy('bs.transaction_date_sort', $sortDir)
+                    ->orderBy('bs.id', $sortDir);
+            } else {
+                $query->orderByRaw("STR_TO_DATE(bs.transaction_date, '%d/%b/%Y') {$sortDir}")
+                    ->orderBy('bs.id', $sortDir);
+            }
         } else {
             $query->orderBy('bs.id', 'desc');
         }
 
         return $query;
     }
-    
+
+    /**
+     * Add total / last_page / from / to for JSON consumers that expect LengthAwarePaginator shape.
+     * Used with simplePaginate() to avoid a separate COUNT(*) over the full joined filter query.
+     *
+     * @return array<string, mixed>
+     */
+    private function mergeLengthAwarePaginationMeta(Paginator $paginator, int $total): array
+    {
+        $perPage = max(1, (int) $paginator->perPage());
+        $lastPage = $total > 0 ? max(1, (int) ceil($total / $perPage)) : 1;
+        $payload = $paginator->toArray();
+        $payload['total'] = $total;
+        $payload['last_page'] = $lastPage;
+        $cur = (int) ($payload['current_page'] ?? 1);
+        $payload['from'] = $total > 0 ? (($cur - 1) * $perPage + 1) : null;
+        $payload['to'] = $total > 0 ? min($total, $cur * $perPage) : null;
+
+        return $payload;
+    }
+
     /**
      * Dashboard stats for the same filter set as the statement list (date range, account, search, etc.).
      *
@@ -1734,90 +1876,79 @@ class BankStatementController extends Controller
      */
     private function buildDashboardStatistics(Request $request): array
     {
-        $q = clone $this->bankStatementsFilteredQuery($request);
-        // bankStatementsFilteredQuery returns DB Query\Builder (not Eloquent) — no getQuery().
-        $q->reorder();
-        $ids = $q->select('bs.id')->distinct()->pluck('id')->filter()->values();
+        $empty = [
+            'total'                => 0,
+            'matched'              => 0,
+            'unmatched'            => 0,
+            'partially_matched'    => 0,
+            'total_amount'         => 0,
+            'income_matched'       => 0,
+            'income_unmatched'     => 0,
+            'radiant_matched'      => 0,
+            'radiant_unmatched'    => 0,
+            'radiant_keyword_only' => 0,
+        ];
 
-        if ($ids->isEmpty()) {
-            return [
-                'total'                => 0,
-                'matched'              => 0,
-                'unmatched'            => 0,
-                'partially_matched'    => 0,
-                'total_amount'         => 0,
-                'income_matched'       => 0,
-                'income_unmatched'     => 0,
-                'radiant_matched'      => 0,
-                'radiant_unmatched'    => 0,
-                'radiant_keyword_only' => 0,
-            ];
-        }
+        $idSub = $this->bankStatementsFilteredQuery($request);
+        $idSub->reorder();
+        $idSub->select('bs.id')->distinct();
 
-        $idList = $ids->all();
+        $aggregates = [
+            'COUNT(*) as agg_total',
+            "SUM(CASE WHEN bs.match_status = 'matched' THEN 1 ELSE 0 END) as agg_matched",
+            "SUM(CASE WHEN bs.match_status = 'unmatched' THEN 1 ELSE 0 END) as agg_unmatched",
+            'SUM(COALESCE(bs.withdrawal, 0)) as agg_sum_withdrawal',
+            'SUM(COALESCE(bs.deposit, 0)) as agg_sum_deposit',
+        ];
 
-        $total = $ids->count();
-        $matched = DB::table('bank_statements')->whereIn('id', $idList)->where('match_status', 'matched')->count();
-        $unmatched = DB::table('bank_statements')->whereIn('id', $idList)->where('match_status', 'unmatched')->count();
-
-        $totalWithdrawal = (float) DB::table('bank_statements')->whereIn('id', $idList)->sum('withdrawal');
-        $totalDeposit = (float) DB::table('bank_statements')->whereIn('id', $idList)->sum('deposit');
-
-        $incomeMatched = 0;
-        $incomeUnmatched = 0;
         if (Schema::hasColumn('bank_statements', 'income_match_status')) {
-            $incomeMatched = DB::table('bank_statements')
-                ->whereIn('id', $idList)
-                ->where('income_match_status', 'income_matched')
-                ->count();
-            $incomeUnmatched = DB::table('bank_statements')
-                ->whereIn('id', $idList)
-                ->where(function ($q) {
-                    $q->where('income_match_status', 'income_unmatched')
-                        ->orWhereNull('income_match_status');
-                })
-                ->count();
+            $aggregates[] = "SUM(CASE WHEN bs.income_match_status = 'income_matched' THEN 1 ELSE 0 END) as agg_income_matched";
+            $aggregates[] = "SUM(CASE WHEN bs.income_match_status = 'income_unmatched' OR bs.income_match_status IS NULL THEN 1 ELSE 0 END) as agg_income_unmatched";
+        } else {
+            $aggregates[] = '0 as agg_income_matched';
+            $aggregates[] = '0 as agg_income_unmatched';
         }
 
-        $radiantMatched = 0;
-        $radiantUnmatched = 0;
-        $radiantKeywordOnly = 0;
         if (Schema::hasColumn('bank_statements', 'radiant_match_status')) {
-            $radiantMatched = DB::table('bank_statements')
-                ->whereIn('id', $idList)
-                ->where('radiant_match_status', 'radiant_matched')
-                ->count();
-            $radiantUnmatched = DB::table('bank_statements')
-                ->whereIn('id', $idList)
-                ->where(function ($q) {
-                    $q->where('radiant_match_status', 'radiant_unmatched')
-                        ->orWhereNull('radiant_match_status');
-                })
-                ->count();
+            $aggregates[] = "SUM(CASE WHEN bs.radiant_match_status = 'radiant_matched' THEN 1 ELSE 0 END) as agg_radiant_matched";
+            $aggregates[] = "SUM(CASE WHEN bs.radiant_match_status = 'radiant_unmatched' OR bs.radiant_match_status IS NULL THEN 1 ELSE 0 END) as agg_radiant_unmatched";
             if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
-                $radiantKeywordOnly = DB::table('bank_statements')
-                    ->whereIn('id', $idList)
-                    ->whereNotNull('radiant_match_against')
-                    ->where('radiant_match_against', '!=', '')
-                    ->where(function ($q) {
-                        $q->whereNull('radiant_match_status')
-                            ->orWhere('radiant_match_status', '!=', 'radiant_matched');
-                    })
-                    ->count();
+                $aggregates[] = "SUM(CASE WHEN bs.radiant_match_against IS NOT NULL AND TRIM(bs.radiant_match_against) <> '' AND (bs.radiant_match_status IS NULL OR bs.radiant_match_status <> 'radiant_matched') THEN 1 ELSE 0 END) as agg_radiant_keyword_only";
+            } else {
+                $aggregates[] = '0 as agg_radiant_keyword_only';
             }
+        } else {
+            $aggregates[] = '0 as agg_radiant_matched';
+            $aggregates[] = '0 as agg_radiant_unmatched';
+            $aggregates[] = '0 as agg_radiant_keyword_only';
         }
+
+        $row = DB::table('bank_statements as bs')
+            ->joinSub($idSub, 'br_filtered', function ($join) {
+                $join->on('br_filtered.id', '=', 'bs.id');
+            })
+            ->selectRaw(implode(', ', $aggregates))
+            ->first();
+
+        if ($row === null || (int) ($row->agg_total ?? 0) === 0) {
+            return $empty;
+        }
+
+        $total = (int) $row->agg_total;
+        $matched = (int) $row->agg_matched;
+        $unmatched = (int) $row->agg_unmatched;
 
         return [
             'total'                => $total,
             'matched'              => $matched,
             'unmatched'            => $unmatched,
-            'partially_matched'    => $total - $matched - $unmatched,
-            'total_amount'         => $totalWithdrawal + $totalDeposit,
-            'income_matched'       => $incomeMatched,
-            'income_unmatched'     => $incomeUnmatched,
-            'radiant_matched'      => $radiantMatched,
-            'radiant_unmatched'    => $radiantUnmatched,
-            'radiant_keyword_only' => $radiantKeywordOnly,
+            'partially_matched'    => max(0, $total - $matched - $unmatched),
+            'total_amount'         => (float) $row->agg_sum_withdrawal + (float) $row->agg_sum_deposit,
+            'income_matched'       => (int) $row->agg_income_matched,
+            'income_unmatched'     => (int) $row->agg_income_unmatched,
+            'radiant_matched'      => (int) $row->agg_radiant_matched,
+            'radiant_unmatched'    => (int) $row->agg_radiant_unmatched,
+            'radiant_keyword_only' => (int) $row->agg_radiant_keyword_only,
         ];
     }
     
@@ -3026,7 +3157,7 @@ class BankStatementController extends Controller
                     $newBalance = $bill->balance_amount + $match->matched_amount;
                     $billUpdate = [
                         'balance_amount' => $newBalance,
-                        'bill_status' => $newBalance >= ($bill->grand_total_amount ?? 0) ? 'unpaid' : 'partially_paid',
+                        'bill_status' => $newBalance >= ($bill->grand_total_amount ?? 0) ? 'Due to Pay' : 'partially_paid',
                         'updated_at' => now()
                     ];
                     if (Schema::hasColumn('bill_tbl', 'bill_made_status')) {

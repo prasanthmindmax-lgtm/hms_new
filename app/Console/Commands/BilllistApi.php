@@ -23,7 +23,7 @@ class BilllistApi extends Command
         // $endDate   = Carbon::yesterday()->endOfDay();
         // $endDate   = Carbon::now()->startOfMonth()->day(20)->startOfDay();
 
-        $startDate = Carbon::createFromDate(2026, 4, 24)->startOfDay();
+        $startDate = Carbon::createFromDate(2026, 4, 30)->startOfDay();
         $endDate   = Carbon::yesterday()->endOfDay();
 
         while ($startDate <= $endDate) {
