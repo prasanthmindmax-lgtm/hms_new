@@ -2673,3 +2673,62 @@ a.uap-upp-stat-link .upp-sc .l {
     font-size: 0.8rem;
   }
 }
+
+/* Custom Dropdown Search UI & Overrides */
+.uap-filters, .upp-filters { overflow: visible !important; position: relative; z-index: 100; }
+.tax-dropdown-wrapper { position: relative; }
+.tax-dropdown-wrapper .uap-dd-input { cursor: pointer; }
+.tax-dropdown-wrapper .tax-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1050;
+  display: none;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  width: 100%;
+  min-width: 15rem;
+  margin-top: 0.25rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.tax-dropdown-wrapper .inner-search-container { padding: 0.5rem; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.tax-dropdown-wrapper .inner-search {
+  width: 100%;
+  padding: 0.4rem 0.75rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.85rem;
+}
+.tax-dropdown-wrapper .inner-search:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.tax-dropdown-wrapper .dropdown-list { max-height: 220px; overflow-y: auto; padding: 0; margin: 0; background: #fff; }
+.tax-dropdown-wrapper .dropdown-list div {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  color: #334155;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+}
+.tax-dropdown-wrapper .dropdown-list div:hover { background-color: #f1f5f9; color: #0f172a; }
+.tax-dropdown-wrapper .dropdown-list div.selected { background-color: rgba(79,70,229,0.08); color: #4f46e5; font-weight: 600; }
+.uap-filters .uap-filters-apply-lbl { visibility: hidden; user-select: none; margin-bottom: 0.35rem; }
+.uap-filters .uap-filters-apply .uap-btn-apply {
+  white-space: nowrap;
+  min-height: 2.125rem;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+.uap-filters .form-control.form-control-sm, .upp-filters .form-control-sm { min-height: 2.125rem; }
+/* # column, row, and View: open the same per-user all-events modal (Full page in modal for deep link) */
+tr.uap-user-list-row { cursor: pointer; }
+tr.uap-user-list-row:hover { background: rgba(99, 102, 241, 0.04); }
+.uap-user-all-events-idx {
+  cursor: pointer;
+}
+.uap-user-all-events-idx:hover {
+  color: #7c3aed !important;
+  text-decoration: underline;
+}

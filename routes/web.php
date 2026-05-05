@@ -885,6 +885,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('superadmin/tickets/update', [TicketController::class, 'update'])->name('superadmin.tickets.update');
     Route::post('superadmin/tickets/status', [TicketController::class, 'updateStatus'])->name('superadmin.tickets.status');
     Route::get('superadmin/tickets/{ticket}/timeline', [TicketController::class, 'timeline'])->name('superadmin.tickets.timeline');
+    Route::post('superadmin/tickets/{ticket}/comments', [TicketController::class, 'storeComment'])->name('superadmin.tickets.comments.store');
     Route::get('superadmin/tickets/attachment', [TicketController::class, 'viewAttachment'])->name('superadmin.tickets.attachment');
 
     // Licence Documents Routes
