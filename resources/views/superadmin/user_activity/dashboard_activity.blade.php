@@ -5,25 +5,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" />
 <link rel="stylesheet" href="{{ asset('assets/css/user_activity.css') }}?v=47" />
-<style>
-  .upp-filters .select2-container--default .select2-selection--single {
-    height: 2.125rem;
-    min-height: 2.125rem;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-  }
-  .upp-filters .select2-container--default .select2-selection--single .select2-selection__rendered {
-    line-height: 1.5;
-    padding-left: 0.5rem;
-    color: #0f172a;
-  }
-  .upp-filters .select2-container--default .select2-selection--single .select2-selection__arrow { height: 2.125rem; top: 0; }
-  .uap-user-activity-s2dd.select2-dropdown { z-index: 2005 !important; }
-  .upp-filters .select2-container { width: 100% !important; max-width: 100%; }
-  .upp-filters .form-control-sm { min-height: 2.125rem; }
-</style>
 @inject('uap', 'App\Services\UserActivity\UserActivityService')
 
 @php
@@ -103,12 +84,32 @@
           </div>
           <div class="col-md-4 col-lg-3" style="min-width: 12rem;">
             <label for="uap-user-activity">User (optional)</label>
-            <select id="uap-user-activity" name="user_id" class="form-select form-select-sm uap-user-select" data-placeholder="All users" title="Type to search">
-              <option value="">All users</option>
-              @foreach($usersForFilter as $u)
-                <option value="{{ $u->id }}" @selected((string)$userId === (string)$u->id)>{{ $uapNameWithEmp($u) }}</option>
-              @endforeach
-            </select>
+            <div class="tax-dropdown-wrapper uap-custom-dd w-100">
+              @php
+                $selectedUserName = 'All users';
+                if ($userId) {
+                  $selUser = collect($usersForFilter)->firstWhere('id', $userId);
+                  if ($selUser) {
+                    $selectedUserName = $uapNameWithEmp($selUser);
+                  }
+                }
+              @endphp
+              <input type="text" class="form-control form-control-sm dropdown-search-input uap-dd-input" placeholder="Select a user" value="{{ $selectedUserName }}" readonly autocomplete="off">
+              <input type="hidden" name="user_id" id="uap-user-hidden" value="{{ $userId }}">
+              <div class="dropdown-menu tax-dropdown uap-tax-dd w-100">
+                <div class="inner-search-container">
+                  <input type="text" class="inner-search form-control form-control-sm" placeholder="Search..." autocomplete="off">
+                </div>
+                <div class="dropdown-list">
+                  <div data-value="" data-id="" @class(['selected' => !$userId])>All users</div>
+                  @foreach($usersForFilter as $u)
+                    <div data-value="{{ $uapNameWithEmp($u) }}" data-id="{{ $u->id }}" @class(['selected' => (string)$userId===(string)$u->id])>
+                      {{ $uapNameWithEmp($u) }}
+                    </div>
+                  @endforeach
+                </div>
+              </div>
+            </div>
           </div>
           <div class="col-auto d-flex gap-2">
             <button type="submit" class="btn btn-apply btn-sm" style="min-height: 2.125rem;">Apply filters</button>
@@ -331,19 +332,42 @@
 @include('superadmin.superadminfooter')
 <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 <script>
-(function() {
-  if (typeof jQuery === 'undefined' || !jQuery.fn.select2) return;
-  var $sel = jQuery('#uap-user-activity');
-  if (!$sel.length) return;
-  $sel.select2({
-    width: '100%',
-    placeholder: $sel.data('placeholder') || 'All users',
-    allowClear: true,
-    minimumResultsForSearch: 0,
-    dropdownParent: jQuery(document.body),
-    dropdownCssClass: 'uap-user-activity-s2dd'
+(function($) {
+  if (!$('.uap-custom-dd').length) return;
+  $(document).on('click', '.uap-custom-dd .uap-dd-input', function(e) {
+    e.stopPropagation();
+    var $dd = $(this).siblings('.tax-dropdown');
+    $('.tax-dropdown').not($dd).hide();
+    $dd.toggle();
+    if ($dd.is(':visible')) {
+      $dd.find('.inner-search').val('').focus();
+      $dd.find('.dropdown-list div').show();
+    }
   });
-})();
+
+  $(document).on('keyup', '.uap-custom-dd .inner-search', function() {
+    var q = ($(this).val() || '').toLowerCase();
+    $(this).closest('.tax-dropdown').find('.dropdown-list div').each(function() {
+      $(this).toggle($(this).text().toLowerCase().indexOf(q) > -1);
+    });
+  });
+
+  $(document).on('click', '.uap-custom-dd .dropdown-list div', function(e) {
+    e.stopPropagation();
+    var $wrapper = $(this).closest('.tax-dropdown-wrapper');
+    $wrapper.find('.dropdown-list div').removeClass('selected');
+    $(this).addClass('selected');
+    $wrapper.find('.uap-dd-input').val($(this).text().trim());
+    $wrapper.find('#uap-user-hidden').val($(this).attr('data-id'));
+    $(this).closest('.tax-dropdown').hide();
+  });
+
+  $(document).on('click', function(e) {
+    if (!$(e.target).closest('.uap-custom-dd').length) {
+      $('.tax-dropdown').hide();
+    }
+  });
+})(jQuery);
 </script>
 <script>
   var uapDataUrl = @json(route('user_activity.data'));
