@@ -447,6 +447,12 @@ class FinancialReportController extends Controller
                 'label' => 'Radiant Collection Files',
                 'files' => $report->radiant_collection_files ?? [],
             ],
+            'radiant_ledger' => [
+                'label' => 'Radiant – Ledger Book',
+                'files' => isset($report->radiant_ledger_book_files)
+                    ? (is_array($report->radiant_ledger_book_files) ? $report->radiant_ledger_book_files : (json_decode($report->radiant_ledger_book_files, true) ?? []))
+                    : [],
+            ],
             'card' => [
                 'label' => 'Card Payment Files',
                 'files' => $report->actual_card_files ?? [],

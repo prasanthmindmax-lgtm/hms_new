@@ -224,42 +224,62 @@
                                 <h5 class="mb-0"><i class="fas fa-paperclip me-2"></i>Attachments</h5>
                             </div>
                             <div class="card-body">
-                                @if($report->radiant_collection_files && count($report->radiant_collection_files) > 0)
-                                    <h6 class="text-success mb-2">Radiant Cash Files</h6>
-                                    <div class="list-group mb-3">
-                                        @foreach($report->radiant_collection_files as $file)
-                                            <a href="{{ asset('/' . $file) }}" target="_blank" class="list-group-item list-group-item-action">
-                                                <i class="fas fa-file me-2"></i>{{ basename($file) }}
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                @endif
+                                @php
+                                    $showFiles = [
+                                        
+                                        ['label' => 'Radiant Cash Files',     'color' => 'text-success', 'icon' => 'fa-wallet',        'files' => $report->radiant_collection_files ?? []],
+                                        ['label' => 'Radiant – Ledger Book',  'color' => 'text-info',    'icon' => 'fa-book',          'files' => is_array($report->radiant_ledger_book_files ?? null) ? $report->radiant_ledger_book_files : json_decode($report->radiant_ledger_book_files ?? '[]', true) ?? []],
+                                        ['label' => 'Deposit Files',          'color' => 'text-warning', 'icon' => 'fa-hand-holding-usd','files' => $report->deposit_files ?? []],
+                                        ['label' => 'Card Files',             'color' => 'text-primary', 'icon' => 'fa-credit-card',   'files' => $report->actual_card_files ?? []],
+                                        ['label' => 'UPI Files',              'color' => 'text-purple',  'icon' => 'fa-mobile-alt',    'files' => $report->upi_files ?? []],
+                                        ['label' => 'Bank Deposit Files',     'color' => 'text-warning', 'icon' => 'fa-university',    'files' => $report->bank_deposit_files ?? []],
+                                    ];
+                                    $hasAny = collect($showFiles)->contains(fn($g) => !empty($g['files']));
+                                @endphp
 
-                                @if($report->actual_card_files && count($report->actual_card_files) > 0)
-                                    <h6 class="text-primary mb-2">Card Files</h6>
-                                    <div class="list-group mb-3">
-                                        @foreach($report->actual_card_files as $file)
-                                            <a href="{{ asset('/' . $file) }}" target="_blank" class="list-group-item list-group-item-action">
-                                                <i class="fas fa-file me-2"></i>{{ basename($file) }}
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                @endif
-
-                                @if($report->bank_deposit_files && count($report->bank_deposit_files) > 0)
-                                    <h6 class="text-warning mb-2">Bank Deposit Files</h6>
-                                    <div class="list-group mb-3">
-                                        @foreach($report->bank_deposit_files as $file)
-                                            <a href="{{ asset('/' . $file) }}" target="_blank" class="list-group-item list-group-item-action">
-                                                <i class="fas fa-file me-2"></i>{{ basename($file) }}
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                @endif
-
-                                @if((!$report->radiant_collection_files || count($report->radiant_collection_files) == 0) &&
-                                    (!$report->actual_card_files || count($report->actual_card_files) == 0) &&
-                                    (!$report->bank_deposit_files || count($report->bank_deposit_files) == 0))
+                                @if($hasAny)
+                                    @foreach($showFiles as $group)
+                                        @if(!empty($group['files']))
+                                            <h6 class="{{ $group['color'] }} mb-2">
+                                                <i class="fas {{ $group['icon'] }} me-1"></i>{{ $group['label'] }}
+                                                <span class="badge bg-secondary ms-1">{{ count($group['files']) }}</span>
+                                            </h6>
+                                            <div class="row g-2 mb-3">
+                                                @foreach($group['files'] as $file)
+                                                    @php
+                                                        $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                                        $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+                                                        $isPdf = $ext === 'pdf';
+                                                        $url   = asset('/' . ltrim($file, '/'));
+                                                    @endphp
+                                                    <div class="col-6 col-md-3">
+                                                        @if($isImg)
+                                                            <a href="{{ $url }}" target="_blank" title="{{ basename($file) }}">
+                                                                <img src="{{ $url }}" alt="{{ basename($file) }}"
+                                                                     class="img-thumbnail w-100"
+                                                                     style="height:110px;object-fit:cover;cursor:pointer;">
+                                                            </a>
+                                                        @elseif($isPdf)
+                                                            <a href="{{ $url }}" target="_blank"
+                                                               class="d-flex flex-column align-items-center justify-content-center border rounded p-3 text-decoration-none text-danger"
+                                                               style="height:110px;background:#fff5f5;">
+                                                                <i class="fas fa-file-pdf fa-2x mb-1"></i>
+                                                                <small class="text-truncate w-100 text-center">{{ basename($file) }}</small>
+                                                            </a>
+                                                        @else
+                                                            <a href="{{ $url }}" target="_blank"
+                                                               class="d-flex flex-column align-items-center justify-content-center border rounded p-3 text-decoration-none text-secondary"
+                                                               style="height:110px;background:#f8fafc;">
+                                                                <i class="fas fa-file fa-2x mb-1"></i>
+                                                                <small class="text-truncate w-100 text-center">{{ basename($file) }}</small>
+                                                            </a>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                @else
                                     <p class="text-muted text-center mb-0">No files attached</p>
                                 @endif
                             </div>

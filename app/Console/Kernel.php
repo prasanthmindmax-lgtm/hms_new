@@ -34,7 +34,7 @@ class Kernel extends ConsoleKernel
                 ->appendOutputTo(storage_path('logs/mocdoc-checkin-sync.log'));
 
        $schedule->command('mocdoc:sync-registration --days=1')
-                ->dailyAt('13:22')
+                ->dailyAt('13:15')
                 ->timezone('Asia/Kolkata')
                 ->withoutOverlapping()
                 ->appendOutputTo(storage_path('logs/mocdoc-registration-sync.log'));

@@ -55,6 +55,7 @@ class BranchFinancialReport extends Model
         // UPI Section - NEW FIELDS
         'upi_amount',
         'upi_files',
+
         
         // Deductions
         'today_discount_amount',
@@ -129,6 +130,7 @@ class BranchFinancialReport extends Model
         'bank_deposit_files' => 'array',
         'deposit_files' => 'array',
         'upi_files' => 'array',
+        'ledger_files' => 'array',
         
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

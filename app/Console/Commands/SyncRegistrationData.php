@@ -187,8 +187,8 @@ class SyncRegistrationData extends Command
     {
         $tz = 'Asia/Kolkata';
 
-        $fromOpt = $this->option('from');
-        $toOpt   = $this->option('to');
+        $fromOpt = Carbon::createFromDate(2025, 4, 01)->startOfDay();
+        $toOpt   = Carbon::yesterday()->endOfDay();
         $fromSet = $fromOpt !== null && $fromOpt !== '';
         $toSet   = $toOpt   !== null && $toOpt   !== '';
 
