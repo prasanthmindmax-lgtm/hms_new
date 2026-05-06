@@ -43,6 +43,34 @@
 #documentModal1{
   z-index: 999999;
 }
+
+.btn-new-tab-premium {
+    background: linear-gradient(135deg, #6a6ee4, #4a4de4);
+    color: #ffffff !important;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 10px rgba(106, 110, 228, 0.3);
+    transition: all 0.3s ease;
+    text-decoration: none;
+    letter-spacing: 0.3px;
+}
+.btn-new-tab-premium i {
+    font-size: 15px;
+}
+.btn-new-tab-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(106, 110, 228, 0.45);
+    background: linear-gradient(135deg, #5c60d4, #3a3dc4);
+}
+.btn-new-tab-premium:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 5px rgba(106, 110, 228, 0.3);
+}
 </style>
 
 <body style="overflow-x: hidden;">
@@ -945,6 +973,11 @@
                                   </div>
                                   </div>
                                       <div class="col-sm-9">
+                                      <div class="text-end mb-2 pe-3 pt-2">
+                                          <a href="#" id="openInNewTabBtn1" target="_blank" class="btn-new-tab-premium">
+                                              <i class="bi bi-box-arrow-up-right me-2"></i> Open in New Tab
+                                          </a>
+                                      </div>
                                       <embed id="pdfmain" src="" width="100%" height="600px" />
                                   </div>
                           </div>
@@ -1924,6 +1957,7 @@ $(document).ready(function () {
 
     const firstFile = fileArray[0];
     $('#pdfmain').attr('src', firstFile);
+    $('#openInNewTabBtn1').attr('href', firstFile);
 
     let views = '';
     fileArray.forEach(file => {
@@ -1961,6 +1995,7 @@ $(document).ready(function () {
 
       // Show first file in iframe/img
       $('#pdfmain').attr('src', files[0]);
+      $('#openInNewTabBtn1').attr('href', files[0]);
 
       // Build buttons list
       let html = '';
@@ -1981,6 +2016,7 @@ $(document).ready(function () {
     $(this).addClass('active');
     const filePath = $(this).data('filepath');
     $('#pdfmain').attr('src', filePath);
+    $('#openInNewTabBtn1').attr('href', filePath);
   });
 });
 
