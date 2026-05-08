@@ -102,7 +102,6 @@
         <h1 class="tk-hero-title" id="pay-dash-title">
           <i class="bi bi-cash-stack" aria-hidden="true"></i> Payment requests
         </h1>
-        <p class="pay-pr-hero-sub">Review filtered totals, then open a request to approve or follow up.</p>
       </div>
       <div class="tk-hero-actions flex-wrap">
         <a href="{{ route('superadmin.payment-requests.create') }}" class="tk-btn-raise">
@@ -306,19 +305,6 @@
           </div>
         </div>
 
-        <div class="qd-search-row">
-          <div class="qd-search-wrap">
-            <i class="bi bi-search" aria-hidden="true"></i>
-            <input type="text"
-              name="universal_search"
-              id="pay_pr_universal_search"
-              value="{{ request('universal_search') }}"
-              maxlength="200"
-              placeholder="Search payment requests..."
-              autocomplete="off">
-          </div>
-        </div>
-
         @if($payPrHasFilterChips)
           <div class="qd-applied-bar pay-pr-applied-bar">
             <span class="applied-label">Filters:</span>
@@ -367,6 +353,31 @@
             <a href="{{ route('superadmin.payment-requests.index') }}" class="filter-badge filter-clear text-decoration-none ms-auto">Clear all</a>
           </div>
         @endif
+
+        <div class="row align-items-end justify-content-between pay-pr-table-toolbar mt-3 g-2 g-md-3 mx-0 w-100">
+          <div class="col-12 col-md-4 pay-pr-table-toolbar-search">
+            <div class="qd-search-row pay-pr-toolbar-search-row mb-0">
+              <div class="qd-search-wrap pay-pr-toolbar-search-wrap w-100">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="text"
+                  name="universal_search"
+                  id="pay_pr_universal_search"
+                  value="{{ request('universal_search') }}"
+                  maxlength="200"
+                  placeholder="Search payment requests…"
+                  autocomplete="off">
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-auto pay-pr-per-page-field pay-pr-per-page-field--toolbar">
+            <label class="form-label pay-pr-per-page-label mb-1 d-block text-md-end" for="pay-pr-per-page">Rows per page</label>
+            <select id="pay-pr-per-page" name="per_page" class="form-select form-select-sm pay-pr-per-page-select" autocomplete="off" aria-label="Rows per page">
+              @foreach ($pr_per_page_choices ?? [10, 15, 25, 50, 100] as $pp)
+                <option value="{{ $pp }}" @selected((int) ($pr_per_page ?? 25) === (int) $pp)>{{ $pp }}</option>
+              @endforeach
+            </select>
+          </div>
+        </div>
       </form>
     </div>
 
@@ -376,6 +387,7 @@
           <thead class="qdt-head pay-pr-thead">
             <tr>
               <th scope="col" class="pay-pr-th-num">Request Number</th>
+              <th scope="col" class="pay-pr-th-date">Date</th>
               <th scope="col" class="pay-pr-th-type">Type</th>
               <th scope="col" class="pay-pr-th-loc">Location</th>
               <th scope="col" class="text-end pay-pr-th-amt">Amount</th>
@@ -391,6 +403,9 @@
               <tr class="qdt-row pay-pr-row">
                 <td class="text-nowrap pay-pr-td-num">
                   <a class="tk-pr-num-link pay-pr-ref" href="{{ route('superadmin.payment-requests.show', $r) }}">{{ $r->request_no }}</a>
+                </td>
+                <td class="pay-pr-td-date text-nowrap">
+                  <time datetime="{{ $r->created_at->toIso8601String() }}">{{ $r->created_at->format('d M Y') }}</time>
                 </td>
                 <td class="pay-pr-td-type">
                   <span class="pay-pr-type-pill pay-pr-type-pill--{{ $r->payment_type }}" title="{{ \App\Models\PaymentRequest::typeLabel($r->payment_type) }}">
@@ -437,11 +452,24 @@
                     {{ \App\Models\PaymentRequest::billDisbursementLabel($billPay) }}
                   </span>
                 </td>
-                <td class="text-end text-nowrap pay-pr-td-action">
-                  <a class="pay-pr-btn-view" href="{{ route('superadmin.payment-requests.show', $r) }}">
-                    <span class="pay-pr-btn-view-ic" aria-hidden="true"><i class="bi bi-eye"></i></span>
-                    <span>View</span>
-                  </a>
+                <td class="text-end pay-pr-td-action">
+                  @php
+                    $isAdminScope = (int) ($admin->access_limits ?? 0) === 1;
+                    $isOwner = (int) $r->created_by === (int) auth()->id();
+                    $canEditRow = $r->isPendingReview() && ($isAdminScope || $isOwner);
+                  @endphp
+                  <div class="pay-pr-action-group" role="group" aria-label="Row actions">
+                    <a class="pay-pr-btn-view" href="{{ route('superadmin.payment-requests.show', $r) }}">
+                      <span class="pay-pr-btn-view-ic" aria-hidden="true"><i class="bi bi-eye"></i></span>
+                      <span>View</span>
+                    </a>
+                    @if($canEditRow)
+                      <a class="pay-pr-btn-edit" href="{{ route('superadmin.payment-requests.edit', $r) }}" title="Edit this pending request">
+                        <span class="pay-pr-btn-edit-ic" aria-hidden="true"><i class="bi bi-pencil-square"></i></span>
+                        <span>Edit</span>
+                      </a>
+                    @endif
+                  </div>
                 </td>
               </tr>
             @empty
@@ -463,7 +491,19 @@
 
     @if($rows->total() > 0)
       <div class="pay-pr-pagination-bar">
-        {{ $rows->links('vendor.pagination.bootstrap-5') }}
+        @if($rows->hasPages())
+          <div class="pay-pr-pag-nav pay-pr-pag-nav--full">
+            {{ $rows->links('vendor.pagination.bootstrap-5') }}
+          </div>
+        @else
+          <p class="pay-pr-pag-summary mb-0 px-1">
+            @if($rows->firstItem())
+              Showing <strong>{{ $rows->firstItem() }}</strong> to <strong>{{ $rows->lastItem() }}</strong> of <strong>{{ $rows->total() }}</strong> results
+            @else
+              Showing <strong>0</strong> of <strong>{{ $rows->total() }}</strong> results
+            @endif
+          </p>
+        @endif
       </div>
     @endif
     </div>
@@ -649,6 +689,17 @@
       submitPayPrFilterNow();
     });
   }
+
+  $('#pay-pr-per-page').on('change', function() {
+    if (payPrFilterSubmitTimer) {
+      clearTimeout(payPrFilterSubmitTimer);
+      payPrFilterSubmitTimer = null;
+    }
+    var el = $form[0];
+    if (el) {
+      el.submit();
+    }
+  });
 })(jQuery);
 </script>
 

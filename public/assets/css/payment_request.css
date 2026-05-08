@@ -623,6 +623,37 @@ body.pay-pr-show-page.modal-open .modal.show {
   backdrop-filter: blur(4px);
 }
 
+.pay-create-hero .pay-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #f8fafc !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+  border: 1px solid rgba(248, 250, 252, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.pay-create-hero .pay-btn-ghost:hover {
+  color: #1e1b4b !important;
+  background: #f8fafc;
+  border-color: transparent;
+  box-shadow: none;
+}
+.pay-create-hero .pay-btn-ghost:focus-visible {
+  outline: 2px solid #c7d2fe;
+  outline-offset: 3px;
+}
+.pay-create-hero .pay-btn-ghost i {
+  color: inherit;
+}
+
 .pay-step-strip {
   display: flex;
   flex-wrap: wrap;
@@ -824,19 +855,97 @@ body.pay-pr-show-page.modal-open .modal.show {
   color: #475569;
   margin-bottom: 0.4rem;
 }
-.pay-po-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.9rem;
+.pay-po-link-head {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
 }
-.pay-po-hero-text p { margin: 0; }
-.pay-po-hero-text .lead { font-size: 0.88rem; line-height: 1.5; }
+#pay-po-block .pay-po-link-title {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.pay-po-link-lead {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin: 0 0 1rem;
+  max-width: 52rem;
+}
+.pay-po-mode-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+.pay-po-mode-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin: 0;
+  flex-shrink: 0;
+}
+.pay-po-mode-seg {
+  display: inline-flex;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+#pay-po-block .pay-po-mode-seg .btn-check + label.btn {
+  margin: 0;
+  border: none;
+  border-radius: 0 !important;
+  padding: 0.5rem 1.15rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: #475569;
+  background: transparent;
+  line-height: 1.3;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+#pay-po-block .pay-po-mode-seg .btn-check + label.btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+#pay-po-block .pay-po-mode-seg label[for="pay_link_mode_bill"] {
+  border-left: 1px solid #e2e8f0;
+}
+#pay-po-block .pay-po-mode-seg .btn-check:checked + label.btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #fff;
+  box-shadow: none;
+}
+#pay-po-block .pay-po-mode-seg .btn-check:focus-visible + label.btn {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+  z-index: 1;
+  position: relative;
+}
+@media (max-width: 575.98px) {
+  .pay-po-mode-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pay-po-mode-seg {
+    width: 100%;
+    justify-content: stretch;
+  }
+  #pay-po-block .pay-po-mode-seg .btn-check + label.btn {
+    flex: 1;
+    text-align: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
 
 #pay-po-balance-panel,
+#pay-bill-detail-panel,
 #pay-po-lookup-hint { font-size: 0.875rem; }
-#pay-po-balance-panel {
+#pay-po-balance-panel,
+#pay-bill-detail-panel {
   width: 100%;
   background: rgba(240, 253, 244, 0.6);
   backdrop-filter: blur(12px);
@@ -848,14 +957,16 @@ body.pay-pr-show-page.modal-open .modal.show {
   position: relative;
   overflow: hidden;
 }
-#pay-po-balance-panel::before {
+#pay-po-balance-panel::before,
+#pay-bill-detail-panel::before {
   content: '';
   position: absolute;
   top: 0; right: 0; bottom: 0; left: 0;
   background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 100%);
   pointer-events: none;
 }
-#pay-po-balance-panel .row-line {
+#pay-po-balance-panel .row-line,
+#pay-bill-detail-panel .row-line {
   position: relative;
   display: flex;
   flex-wrap: wrap;
@@ -865,17 +976,25 @@ body.pay-pr-show-page.modal-open .modal.show {
   padding: 0.6rem 0;
   font-size: 0.9rem;
 }
-#pay-po-balance-panel .row-line + .row-line {
+#pay-po-balance-panel .row-line + .row-line,
+#pay-bill-detail-panel .row-line + .row-line {
   border-top: 1px solid rgba(16, 185, 129, 0.2);
 }
-#pay-po-balance-panel .lbl {
+#pay-bill-detail-panel #pay-bill-po-detail-rows .row-line:first-child {
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.22);
+}
+#pay-po-balance-panel .lbl,
+#pay-bill-detail-panel .lbl {
   color: #334155;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-#pay-po-balance-panel .val {
+#pay-po-balance-panel .val,
+#pay-bill-detail-panel .val {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: #047857;
@@ -884,6 +1003,64 @@ body.pay-pr-show-page.modal-open .modal.show {
   padding: 4px 10px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+#pay-bill-detail-panel {
+  background: rgba(238, 242, 255, 0.72);
+  border-color: rgba(165, 180, 252, 0.85);
+  box-shadow: 0 10px 28px rgba(79, 70, 229, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+#pay-bill-detail-panel .row-line + .row-line {
+  border-top-color: rgba(99, 102, 241, 0.18);
+}
+#pay-bill-detail-panel .val {
+  color: #4338ca;
+}
+#pay-bill-detail-panel .val.pay-bill-panel-meta {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #4f46e5;
+  line-height: 1.35;
+  text-align: right;
+  max-width: 100%;
+}
+
+/* PO linked summary card: match vendor bill panel (lavender / indigo) */
+#pay-po-balance-panel.pay-po-linked-as-bill {
+  background: rgba(238, 242, 255, 0.72) !important;
+  border-color: rgba(165, 180, 252, 0.85) !important;
+  box-shadow: 0 10px 28px rgba(79, 70, 229, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.55) !important;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill::before {
+  background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 100%) !important;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill .row-line + .row-line {
+  border-top-color: rgba(99, 102, 241, 0.18) !important;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill .val {
+  color: #4338ca !important;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill .val.text-danger {
+  color: #b91c1c !important;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill .val.pay-bill-panel-meta {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #4f46e5 !important;
+  line-height: 1.35;
+  text-align: right;
+  max-width: 100%;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill #pay-po-past-payments-container .row-line {
+  border-top: 1px solid rgba(99, 102, 241, 0.12);
+}
+#pay-po-balance-panel.pay-po-linked-as-bill #pay-po-past-payments-container .lbl {
+  font-weight: 500 !important;
+  color: #475569 !important;
+}
+#pay-po-balance-panel.pay-po-linked-as-bill #pay-po-past-payments-container .val {
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  color: #4f46e5 !important;
 }
 
 #pay-po-block .input-group {
@@ -948,12 +1125,12 @@ body.pay-pr-show-page.modal-open .modal.show {
   padding: 1.1rem 1.2rem 1.1rem;
   margin-bottom: 1.25rem;
 }
-#pay-po-block .pay-po-hero {
-  margin-bottom: 0.45rem;
+#pay-po-block .pay-po-link-head {
+  margin-bottom: 0.35rem;
 }
-#pay-po-block .pay-po-hero-text .lead {
-  font-size: 0.8125rem;
-  line-height: 1.42;
+#pay-po-block .pay-po-link-lead {
+  font-size: 0.8rem;
+  margin-bottom: 0.85rem;
 }
 #pay-po-block .row.g-3 {
   --bs-gutter-x: 0.75rem;
@@ -992,11 +1169,13 @@ body.pay-pr-show-page.modal-open .modal.show {
 #pay-po-block .pr-pay-attachment-zone > p.small.text-muted.mt-2 {
   margin-top: 0.45rem !important;
 }
-#pay-po-block #pay-po-balance-panel {
+#pay-po-block #pay-po-balance-panel,
+#pay-po-block #pay-bill-detail-panel {
   padding: 0.75rem 0.95rem;
   border-radius: 12px;
 }
-#pay-po-block #pay-po-balance-panel .row-line {
+#pay-po-block #pay-po-balance-panel .row-line,
+#pay-po-block #pay-bill-detail-panel .row-line {
   padding: 0.4rem 0;
   font-size: 0.84rem;
 }
@@ -1193,7 +1372,7 @@ body.pay-pr-show-page.modal-open .modal.show {
   color: #94a3b8;
   max-width: 20rem;
 }
-.pay-form-footer .btn { min-width: 6rem; }
+.pay-form-footer .btn { min-width: 6rem; color: black;}
 
 .pay-alert-err { border-left: 4px solid #f87171; }
 
@@ -1320,6 +1499,37 @@ body.pay-pr-show-page .pr-show-bill-pay-badge--paid {
   background: linear-gradient(145deg, #d1fae5, #a7f3d0);
   color: #047857;
   box-shadow: 0 2px 6px rgba(5, 150, 105, 0.15);
+}
+.pr-show-section-head-ic--bill {
+  background: linear-gradient(145deg, #e0e7ff, #c7d2fe);
+  color: #4338ca;
+  box-shadow: 0 2px 6px rgba(67, 56, 202, 0.14);
+}
+.pr-show-section--bill-settled {
+  border-color: rgba(165, 180, 252, 0.85) !important;
+  background: linear-gradient(175deg, #ffffff 0%, #f5f3ff 36%, #fafafc 100%) !important;
+}
+.pr-show-bill-panel.pr-show-po-panel {
+  background: linear-gradient(160deg, #eef2ff, #fafbff 72%);
+  border: 1px solid #a5b4fc;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+}
+.pr-show-bill-panel.pr-show-po-panel .pr-show-po-settlement-title {
+  color: #4338ca;
+}
+.pr-show-bill-panel.pr-show-po-panel .pr-show-po-title-row {
+  border-bottom-color: rgba(67, 56, 202, 0.14);
+}
+.pr-show-bill-panel.pr-show-po-panel .row-line:has(.pr-show-val-highlight) {
+  background: rgba(238, 242, 255, 0.88);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-left: 3px solid #6366f1;
+}
+.pr-show-bill-panel.pr-show-po-panel .pr-show-val-highlight {
+  color: #4338ca;
+}
+.pr-show-bill-panel.pr-show-po-panel .row-line + .row-line {
+  border-top-color: rgba(99, 102, 241, 0.12);
 }
 .pr-show-section-head--amount {
   margin-bottom: 0.85rem;
@@ -1512,14 +1722,27 @@ body.pay-pr-show-page .pr-show-bill-pay-badge--paid {
   padding-bottom: 0.65rem;
   margin-bottom: 0.35rem;
 }
-/* Highlight "remaining" row */
+.pr-show-po-panel .pr-show-po-detail-wrap {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(6, 95, 70, 0.12);
+  padding: 0.5rem 0.55rem 0.65rem;
+}
+.pr-show-po-panel .pr-show-po-pay-detail-row {
+  background: rgba(236, 253, 245, 0.75);
+  border-radius: 8px;
+  padding: 0.28rem 0.4rem !important;
+  margin-top: 0.22rem;
+  border-top: none !important;
+}
+/* Highlight "remaining" row (aligned with bill settlement “Still on bill” styling) */
 .pr-show-po-panel .row-line:has(.pr-show-val-highlight) {
   margin-top: 0.35rem;
   padding: 0.5rem 0.5rem 0.55rem 0.55rem;
   border-radius: 10px;
-  background: rgba(236, 253, 245, 0.65);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  border-left: 3px solid #10b981;
+  background: rgba(239, 246, 255, 0.85);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-left: 3px solid #2563eb;
 }
 #pay-po-balance-panel.pr-show-po-panel .row-line,
 .pr-show-po-panel .row-line {
@@ -1560,7 +1783,7 @@ body.pay-pr-show-page .pr-show-bill-pay-badge--paid {
   font-variant-numeric: tabular-nums;
   color: #0f172a;
 }
-.pr-show-po-panel .pr-show-val-highlight { color: #047857; }
+.pr-show-po-panel .pr-show-val-highlight { color: #1d4ed8; }
 .pr-show-po-ref {
   display: inline-flex;
   align-items: center;
@@ -1811,11 +2034,33 @@ button.pr-show-file-tile {
 .tk-pr-index .pay-pr-table-card .pay-pr-thead.qdt-head th.pay-pr-th-num {
   width: 1%;
 }
+.tk-pr-index .pay-pr-table-card .pay-pr-thead.qdt-head th.pay-pr-th-date {
+  width: 1%;
+  white-space: nowrap;
+}
 .tk-pr-index .pay-pr-table-card .pay-pr-thead.qdt-head th.pay-pr-th-amt {
   white-space: nowrap;
 }
 .tk-pr-index .pay-pr-table-card .pay-pr-thead.qdt-head th.pay-pr-th-action {
-  width: 1%;
+  width: auto;
+  min-width: 10.5rem;
+  white-space: nowrap;
+}
+
+.tk-pr-index .pay-pr-td-action {
+  white-space: nowrap;
+  vertical-align: middle !important;
+  padding-left: 0.75rem !important;
+}
+
+.tk-pr-index .pay-pr-action-group {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 100%;
 }
 
 .tk-pr-index .pay-pr-tbody .pay-pr-row.qdt-row {
@@ -2019,8 +2264,11 @@ button.pr-show-file-tile {
 .tk-pr-index .pay-pr-btn-view {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.42rem 0.95rem;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.125rem;
+  min-width: 4.75rem;
+  padding: 0.35rem 0.7rem;
   font-size: 0.8125rem;
   font-weight: 600;
   color: #2563eb;
@@ -2030,6 +2278,7 @@ button.pr-show-file-tile {
   text-decoration: none;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.06);
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  flex: 0 0 auto;
 }
 .tk-pr-index .pay-pr-btn-view:hover {
   background: #eff6ff;
@@ -2074,14 +2323,79 @@ button.pr-show-file-tile {
   margin-top: 0.35rem;
 }
 
-/* Pagination bar — “Showing 1 to 15 of 42 results” + grouped indigo controls */
 .tk-pr-index .pay-pr-pagination-bar {
   padding: 14px 18px;
   border-top: 1px solid #eef0f7;
   background: linear-gradient(180deg, #fcfcfd 0%, #fafbfc 100%);
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pag-nav {
+.tk-pr-index .pay-pr-pagination-bar .pay-pr-pag-toolbar {
   width: 100%;
+  align-items: flex-end;
+}
+.tk-pr-index .pay-pr-pagination-bar .pay-pr-pag-nav {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.tk-pr-index .pay-pr-pagination-bar .pay-pr-pag-nav--full {
+  width: 100%;
+}
+.tk-pr-index .pay-pr-pagination-bar .pay-pr-pag-nav--full > nav {
+  width: 100%;
+}
+.tk-pr-index .pay-pr-table-toolbar {
+  width: 100%;
+  border-top: 1px solid #eef0f7;
+  padding: 6px 18px 12px;
+}
+.tk-pr-index .pay-pr-table-toolbar-search {
+  max-width: 100%;
+}
+.tk-pr-index .pay-pr-toolbar-search-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+.tk-pr-index .pay-pr-toolbar-search-row {
+  padding: 0 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+}
+.tk-pr-index .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 100%;
+  max-width: none;
+}
+.tk-pr-index .pay-pr-toolbar-search-wrap.qd-search-wrap input {
+  height: 38px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+.tk-pr-index .pay-pr-per-page-field {
+  flex: 0 0 auto;
+}
+.tk-pr-index .pay-pr-per-page-field--toolbar {
+  align-self: flex-end;
+}
+.tk-pr-index .pay-pr-per-page-field .pay-pr-per-page-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+.tk-pr-index .pay-pr-per-page-select {
+  min-width: 5.75rem;
+  max-width: 100%;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #0f172a;
+  border-color: #e2e8f0;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+.tk-pr-index .pay-pr-per-page-select:focus {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.15);
 }
 .tk-pr-index .pay-pr-pag-summary {
   font-size: 0.875rem;
@@ -2097,7 +2411,7 @@ button.pr-show-file-tile {
 .tk-pr-index .pay-pr-pagination-bar .pagination {
   margin-bottom: 0;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul.pagination {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination {
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
@@ -2109,13 +2423,13 @@ button.pr-show-file-tile {
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item {
   display: flex;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item + .page-item {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item + .page-item {
   margin-left: -1px;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-link {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-link {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2132,30 +2446,30 @@ button.pr-show-file-tile {
   line-height: 1.2;
   box-shadow: none;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item:last-child .page-link {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item:last-child .page-link {
   border-right: none;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-link:hover {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-link:hover {
   background: #f5f3ff;
   color: #4c1d95;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item.active .page-link {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item.active .page-link {
   background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
   border-color: transparent;
   color: #fff;
   z-index: 1;
   cursor: default;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item.active .page-link:hover {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item.active .page-link:hover {
   background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
   color: #fff;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item.disabled .page-link {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item.disabled .page-link {
   color: #cbd5e1;
   background: #f8fafc;
   pointer-events: none;
 }
-.tk-pr-index .pay-pr-pagination-bar .pay-pr-pagination-ul .page-item.disabled .page-link:hover {
+.tk-pr-index .pay-pr-pagination-bar nav .pagination .page-item.disabled .page-link:hover {
   background: #f8fafc;
   color: #cbd5e1;
 }
@@ -2317,4 +2631,460 @@ body.pay-pr-index-page > .pay-pr-tax-dd .inner-search {
 .pr-form-page.pr-pay-form-page .pr-pay-upload-box.pay-pr-upload-err {
   box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.85);
   border-radius: 12px;
+}
+
+.tk-pr-index .pay-pr-btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.125rem;
+  min-width: 4.75rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #b45309;
+  background: #fff;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(180, 83, 9, 0.06);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  flex: 0 0 auto;
+}
+.tk-pr-index .pay-pr-btn-edit:hover {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+.tk-pr-index .pay-pr-btn-edit-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.tk-pr-index .pay-pr-btn-edit:hover .pay-pr-btn-edit-ic {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tk-hero .pr-show-btn-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.45);
+  border: 1px solid rgba(253, 230, 138, 0.5);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s, border-color 0.15s, color 0.15s;
+}
+.tk-hero .pr-show-btn-edit:hover {
+  background: rgba(146, 64, 14, 0.6);
+  color: #fff;
+  border-color: #fde68a;
+  transform: translateY(-1px);
+}
+
+.pr-form-page.pr-pay-form-page .pr-pay-existing-file {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+.pr-form-page.pr-pay-form-page .pr-pay-existing-file i {
+  color: #475569;
+}
+.pr-form-page.pr-pay-form-page .pr-pay-existing-file a {
+  color: #1d4ed8;
+  word-break: break-all;
+}
+.pr-form-page.pr-pay-form-page .pr-pay-existing-file a:hover {
+  color: #1e40af;
+  text-decoration: underline !important;
+}
+
+/* ===== PR show: PO / Bill settlement two-column overview ===== */
+.pr-show-po-panel.pr-pay-overview-panel {
+  padding: 1.1rem 1.15rem 1.15rem;
+}
+.pr-pay-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.pr-pay-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 2px 6px rgba(15, 23, 42, 0.04);
+  min-height: 82px;
+}
+.pr-pay-stat-tile .pr-pay-stat-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+}
+.pr-pay-stat-tile .pr-pay-stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+}
+.pr-pay-stat-tile .pr-pay-stat-hint {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+.pr-pay-stat-tile--total {
+  background: linear-gradient(160deg, #ecfdf5, #ffffff 78%);
+  border-color: rgba(16, 185, 129, 0.32);
+}
+.pr-pay-stat-tile--total .pr-pay-stat-value { color: #047857; }
+.pr-pay-stat-tile--paid {
+  background: linear-gradient(160deg, #eff6ff, #ffffff 78%);
+  border-color: rgba(37, 99, 235, 0.28);
+}
+.pr-pay-stat-tile--paid .pr-pay-stat-value { color: #1d4ed8; }
+.pr-pay-stat-tile--balance {
+  background: linear-gradient(160deg, #fff7ed, #ffffff 78%);
+  border-color: rgba(234, 88, 12, 0.32);
+}
+.pr-pay-stat-tile--balance .pr-pay-stat-value { color: #c2410c; }
+.pr-show-bill-panel.pr-pay-overview-panel .pr-pay-stat-tile {
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+.pr-pay-overview-row .pr-pay-history-card,
+.pr-pay-overview-row .pr-pay-pr-card {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.pr-pay-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.9rem;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+.pr-pay-card-head .pr-pay-card-head-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.pr-pay-card-head .pr-pay-card-head-ic--alt {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.pr-pay-card-head .pr-pay-card-head-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pr-pay-card-head .pr-pay-card-head-meta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pr-pay-history-list,
+.pr-pay-pr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0.4rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pr-pay-history-list::-webkit-scrollbar,
+.pr-pay-pr-list::-webkit-scrollbar { width: 6px; }
+.pr-pay-history-list::-webkit-scrollbar-thumb,
+.pr-pay-pr-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.pr-pay-history-item {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+.pr-pay-history-item + .pr-pay-history-item {
+  border-top: 1px dashed rgba(15, 23, 42, 0.08);
+}
+.pr-pay-history-item:hover {
+  background: #f8fafc;
+}
+.pr-pay-history-item .pr-pay-history-date {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.pr-pay-history-item .pr-pay-history-date i {
+  color: #475569;
+  font-size: 0.9rem;
+}
+.pr-pay-history-item .pr-pay-history-caption {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.pr-pay-history-item .pr-pay-history-amt {
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+
+.pr-pay-pr-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+.pr-pay-pr-item + .pr-pay-pr-item {
+  border-top: 1px dashed rgba(15, 23, 42, 0.08);
+}
+.pr-pay-pr-item:hover {
+  background: #f8fafc;
+}
+.pr-pay-pr-item .pr-pay-pr-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pr-pay-pr-item .pr-pay-pr-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+  width: 100%;
+}
+.pr-pay-pr-item .pr-pay-pr-date {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #334155;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+.pr-pay-pr-item .pr-pay-pr-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pr-pay-pr-item .pr-pay-pr-status--pending {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.pr-pay-pr-item .pr-pay-pr-status--approved {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+.pr-pay-pr-item .pr-pay-pr-status--rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.pr-pay-pr-item .pr-pay-pr-anchor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pr-pay-pr-item .pr-pay-pr-anchor i {
+  font-size: 0.8rem;
+}
+.pr-pay-pr-item .pr-pay-pr-anchor--po {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.pr-pay-pr-item .pr-pay-pr-anchor--bill {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
+}
+.pr-pay-pr-item .pr-pay-pr-date i {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+.pr-pay-pr-item .pr-pay-pr-caption {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+  word-break: break-word;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pr-pay-pr-item .pr-pay-pr-amt {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #6d28d9;
+  white-space: nowrap;
+}
+
+.pr-pay-card-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.pr-pay-card-empty i {
+  font-size: 1.55rem;
+  opacity: 0.75;
+}
+
+.pr-pay-this-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pr-pay-this-bar-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.6rem 0.85rem;
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
+}
+.pr-pay-this-bar-cell:last-child { border-right: none; }
+.pr-pay-this-bar-cell .pr-pay-this-bar-lbl {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #334155;
+}
+.pr-pay-this-bar-cell .pr-pay-this-bar-val {
+  font-size: 1.12rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  letter-spacing: 0.005em;
+}
+.pr-pay-this-bar-cell--strong {
+  background: rgba(239, 246, 255, 0.7);
+}
+.pr-pay-this-bar-cell--strong .pr-pay-this-bar-val { color: #1d4ed8; }
+.pr-show-bill-panel.pr-pay-overview-panel .pr-pay-this-bar-cell--strong {
+  background: rgba(238, 242, 255, 0.78);
+}
+.pr-show-bill-panel.pr-pay-overview-panel .pr-pay-this-bar-cell--strong .pr-pay-this-bar-val {
+  color: #4338ca;
+}
+
+@media (max-width: 575.98px) {
+  .pr-pay-stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .pr-pay-this-bar {
+    grid-template-columns: 1fr;
+  }
+  .pr-pay-this-bar-cell {
+    border-right: none;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  }
+  .pr-pay-this-bar-cell:last-child { border-bottom: none; }
+  .pr-pay-history-item {
+    grid-template-columns: 1fr;
+  }
+  .pr-pay-history-item .pr-pay-history-amt {
+    justify-self: flex-start;
+  }
 }

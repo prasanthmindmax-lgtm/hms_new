@@ -71,18 +71,17 @@
               @csrf
 
             <div class="container mt-4">
-                <div class="row mb-3 align-items-start" id="bill-pr-number-row">
+                <div class="row mb-2 align-items-start" id="bill-pr-number-row">
                     <label for="payment_request_number_input" class="col-md-2 fw-semibold">Payment request</label>
-                    <div class="col-md-4 position-relative">
-                        <input type="text" class="form-control" id="payment_request_number_input" autocomplete="off" placeholder="Type number or pick from list (approved only)" value="{{ !empty($bill) && isset($bill[0]) && $bill[0]->paymentRequest ? $bill[0]->paymentRequest->request_no : '' }}">
-                        <input type="hidden" name="payment_request_id" id="payment_request_id" value="{{ !empty($bill) && isset($bill[0]) ? ($bill[0]->payment_request_id ?? '') : '' }}">
-                        <div id="payment-request-suggest" class="list-group position-absolute w-100 shadow-sm bg-white border rounded" style="z-index:1050; display:none; max-height:220px; overflow-y:auto;"></div>
-                        <span class="error_payment_request_id d-block text-danger small"></span>
+                    <div class="col-md-4">
+                        <div class="position-relative" style="max-width: 28rem;">
+                            <input type="text" class="form-control" id="payment_request_number_input" autocomplete="off" placeholder="Enter Payment Request No (Ex: PAY-2026-00001)" value="{{ !empty($bill) && isset($bill[0]) && $bill[0]->paymentRequest ? $bill[0]->paymentRequest->request_no : '' }}">
+                            <input type="hidden" name="payment_request_id" id="payment_request_id" value="{{ !empty($bill) && isset($bill[0]) ? ($bill[0]->payment_request_id ?? '') : '' }}">
+                            <div id="payment-request-suggest" class="list-group position-absolute w-100 shadow-sm bg-white border rounded" style="z-index:1050; display:none; max-height:220px; overflow-y:auto;"></div>
+                            <span class="error_payment_request_id d-block text-danger small"></span>
+                        </div>
+                        <div id="payment-request-meta" class="small text-muted mt-1 mb-3 lh-sm" aria-live="polite"></div>
                     </div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-md-2 d-none d-md-block"></div>
-                    <div class="col-md-10 small text-muted" id="payment-request-meta" aria-live="polite"></div>
                 </div>
                 <div class="row mb-3 align-items-start">
                     <!-- Vendor Name -->
