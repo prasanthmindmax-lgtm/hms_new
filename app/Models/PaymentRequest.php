@@ -33,8 +33,8 @@ class PaymentRequest extends Model
         self::TYPE_ADVANCE,
         self::TYPE_PART_PAYMENT,
         self::TYPE_SETTLEMENT,
-        self::TYPE_PETTY_CASH_ADVANCE,
-        self::TYPE_REIMBURSEMENT,
+        // self::TYPE_PETTY_CASH_ADVANCE,
+        // self::TYPE_REIMBURSEMENT,
         self::TYPE_REFUND,
         self::TYPE_PATIENT_REFUND,
         self::TYPE_INSTANT_PAYMENT,
@@ -46,8 +46,8 @@ class PaymentRequest extends Model
         self::TYPE_ADVANCE => 'Advance',
         self::TYPE_PART_PAYMENT => 'Part Payment',
         self::TYPE_SETTLEMENT => 'Settlement',
-        self::TYPE_PETTY_CASH_ADVANCE => 'Petty Cash Advance',
-        self::TYPE_REIMBURSEMENT => 'Reimbursement',
+        // self::TYPE_PETTY_CASH_ADVANCE => 'Petty Cash Advance',
+        // self::TYPE_REIMBURSEMENT => 'Reimbursement',
         self::TYPE_REFUND => 'Refund',
         self::TYPE_PATIENT_REFUND => 'Patient Refund Payment',
         self::TYPE_INSTANT_PAYMENT => 'Instant Payment',
@@ -126,6 +126,9 @@ class PaymentRequest extends Model
         'payment_type',
         'amount',
         'purchase_order_id',
+        'bill_id',
+        'bill_total_snapshot',
+        'bill_balance_snapshot',
         'po_total_snapshot',
         'po_attachment_path',
         'document_attachment_path',
@@ -144,6 +147,8 @@ class PaymentRequest extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'po_total_snapshot' => 'decimal:2',
+        'bill_total_snapshot' => 'decimal:2',
+        'bill_balance_snapshot' => 'decimal:2',
         'reviewed_at' => 'datetime',
     ];
 
@@ -220,16 +225,29 @@ class PaymentRequest extends Model
             default => 'badge rounded-pill text-bg-secondary',
         };
     }
-
-    /**
-     * Settlement of vendor bill(s) tied to this request: none / unpaid / partial / paid.
-     * Uses each bill's grand total vs balance (same basis as vendor billing screens).
-     */
     public function billDisbursementState(): string
     {
-        $bills = $this->relationLoaded('linkedBills')
-            ? $this->linkedBills
-            : $this->linkedBills()->get(['id', 'grand_total_amount', 'balance_amount', 'delete_status']);
+        $bills = collect();
+
+        if ($this->bill_id) {
+            $src = $this->relationLoaded('sourceBill') ? $this->sourceBill : $this->sourceBill()->first([
+                'id', 'grand_total_amount', 'balance_amount', 'delete_status',
+            ]);
+            if ($src && (int) ($src->delete_status ?? 0) === 0) {
+                $bills->push($src);
+            }
+        }
+
+        if ($bills->isEmpty()) {
+            $linked = $this->relationLoaded('linkedBills')
+                ? $this->linkedBills
+                : $this->linkedBills()->get(['id', 'grand_total_amount', 'balance_amount', 'delete_status']);
+            foreach ($linked as $b) {
+                if ((int) ($b->delete_status ?? 0) === 0) {
+                    $bills->push($b);
+                }
+            }
+        }
 
         if ($bills->isEmpty()) {
             return self::BILL_DISBURSE_NONE;
@@ -272,6 +290,27 @@ class PaymentRequest extends Model
         return $query->whereIn('status', [self::STATUS_PENDING, self::STATUS_APPROVED]);
     }
 
+    public function scopeCountingTowardBill(Builder $query): Builder
+    {
+        return $query->whereIn('status', [self::STATUS_PENDING, self::STATUS_APPROVED]);
+    }
+
+    public static function attachmentPublicUrl(?string $storedPath): ?string
+    {
+        if ($storedPath === null || $storedPath === '') {
+            return null;
+        }
+        if (str_starts_with($storedPath, 'uploads/')) {
+            return asset($storedPath);
+        }
+        $name = basename(str_replace('\\', '/', $storedPath));
+        if ($name === '' || $name === '.' || $name === '..') {
+            return null;
+        }
+
+        return rtrim(asset('/public/payment_request_attachments'), '/').'/'.rawurlencode($name);
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(TblLocationModel::class, 'branch_id');
@@ -297,12 +336,15 @@ class PaymentRequest extends Model
         return $this->belongsTo(TblPurchaseorder::class, 'purchase_order_id');
     }
 
-    /**
-     * Vendor bills created with this payment request (non-deleted rows only).
-     */
+    public function sourceBill(): BelongsTo
+    {
+        return $this->belongsTo(Tblbill::class, 'bill_id');
+    }
+
     public function linkedBills(): HasMany
     {
         return $this->hasMany(Tblbill::class, 'payment_request_id')
+            ->where('bill_pr_link_mode', 'payment_request')
             ->where(function (Builder $q) {
                 $q->where('delete_status', 0)->orWhereNull('delete_status');
             });
@@ -317,11 +359,7 @@ class PaymentRequest extends Model
     {
         return $this->belongsTo(usermanagementdetails::class, 'reviewed_by');
     }
-
-    /**
-     * Vendor label for UI: Tblvendor uses display_name / company_name (not vendor_name).
-     * payment_requests.vendor_id may match vendor_tbl.id or vendor_tbl.vendor_id (PO snapshot).
-     */
+    
     public function getVendorDisplayNameAttribute(): string
     {
         if ($this->relationLoaded('sourceVendor') && $this->sourceVendor) {

@@ -925,7 +925,10 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('superadmin/payment-requests', [PaymentRequestController::class, 'index'])->name('superadmin.payment-requests.index');
     Route::get('superadmin/payment-requests/create', [PaymentRequestController::class, 'create'])->name('superadmin.payment-requests.create');
     Route::get('superadmin/payment-requests/lookup-po', [PaymentRequestController::class, 'lookupPo'])->name('superadmin.payment-requests.lookup-po');
+    Route::get('superadmin/payment-requests/lookup-bill', [PaymentRequestController::class, 'lookupBill'])->name('superadmin.payment-requests.lookup-bill');
     Route::post('superadmin/payment-requests', [PaymentRequestController::class, 'store'])->name('superadmin.payment-requests.store');
+    Route::get('superadmin/payment-requests/{paymentRequest}/edit', [PaymentRequestController::class, 'edit'])->name('superadmin.payment-requests.edit');
+    Route::put('superadmin/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'update'])->name('superadmin.payment-requests.update');
     Route::post('superadmin/payment-requests/{paymentRequest}/approve', [PaymentRequestController::class, 'approve'])->name('superadmin.payment-requests.approve');
     Route::post('superadmin/payment-requests/{paymentRequest}/reject', [PaymentRequestController::class, 'reject'])->name('superadmin.payment-requests.reject');
     Route::get('superadmin/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('superadmin.payment-requests.show');

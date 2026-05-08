@@ -1,8 +1,18 @@
 @php
-  $o = function ($key, $default = null) {
+  $isEdit = ! empty($isEdit) && isset($paymentRequest);
+  $pr = $isEdit ? $paymentRequest : null;
+
+  /** Old input wins (validation redirect); otherwise fall back to the existing model value when editing. */
+  $o = function ($key, $default = null) use ($pr) {
     $v = old($key);
     if ($v !== null && $v !== '') {
         return $v;
+    }
+    if ($pr !== null) {
+        $val = data_get($pr, $key);
+        if ($val !== null && $val !== '') {
+            return $val;
+        }
     }
     return $default;
   };
@@ -20,8 +30,35 @@
           $dispVendor = trim((string) ($vRow->display_name ?? '')) !== '' ? (string) $vRow->display_name : (string) ($vRow->company_name ?? '');
       }
   }
-  $formAction = route('superadmin.payment-requests.store');
+
+  /** PO/bill identifiers stored on payment_requests are integers; the form needs the human-readable refs. */
+  $editPoGen = '';
+  $editBillRef = '';
+  if ($isEdit) {
+      $poRel = $pr->relationLoaded('legacyPurchaseOrder') ? $pr->legacyPurchaseOrder : $pr->legacyPurchaseOrder()->first(['id', 'purchase_gen_order']);
+      if ($poRel) {
+          $editPoGen = (string) ($poRel->purchase_gen_order ?? '');
+      }
+      $billRel = $pr->relationLoaded('sourceBill') ? $pr->sourceBill : $pr->sourceBill()->first(['id', 'bill_gen_number', 'bill_number']);
+      if ($billRel) {
+          $editBillRef = trim((string) ($billRel->bill_gen_number ?? '')) !== ''
+              ? (string) $billRel->bill_gen_number
+              : (string) ($billRel->bill_number ?? '');
+      }
+  }
+
+  $formAction = $isEdit
+      ? route('superadmin.payment-requests.update', $pr)
+      : route('superadmin.payment-requests.store');
   $lookupUrl = route('superadmin.payment-requests.lookup-po');
+  $lookupBillUrl = $lookupBillUrl ?? route('superadmin.payment-requests.lookup-bill');
+
+  $existingPoUrl = $isEdit ? \App\Models\PaymentRequest::attachmentPublicUrl($pr->po_attachment_path) : null;
+  $existingDocUrl = $isEdit ? \App\Models\PaymentRequest::attachmentPublicUrl($pr->document_attachment_path) : null;
+  $existingBankUrl = $isEdit ? \App\Models\PaymentRequest::attachmentPublicUrl($pr->bank_document_path) : null;
+  $existingPoName = $existingPoUrl ? basename((string) $pr->po_attachment_path) : '';
+  $existingDocName = $existingDocUrl ? basename((string) $pr->document_attachment_path) : '';
+  $existingBankName = $existingBankUrl ? basename((string) $pr->bank_document_path) : '';
 @endphp
 <!doctype html>
 <html lang="en">
@@ -57,11 +94,14 @@
       <div>
         <h1>
           <i class="bi bi-cash-coin me-1" style="color:#a5b4fc;" aria-hidden="true"></i>
-          New payment request
+          {{ $isEdit ? 'Edit payment request' : 'New payment request' }}
+          @if($isEdit)
+            <span class="ms-1 align-middle" style="font-size: 0.85rem; opacity: 0.85;">· {{ $pr->request_no }}</span>
+          @endif
         </h1>
       </div>
-      <a href="{{ route('superadmin.payment-requests.index') }}" class="pay-btn-ghost align-self-center">
-        <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to list
+      <a href="{{ $isEdit ? route('superadmin.payment-requests.show', $pr) : route('superadmin.payment-requests.index') }}" class="pay-btn-ghost align-self-center">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> {{ $isEdit ? 'Back to request' : 'Back to list' }}
       </a>
     </div>
   </header>
@@ -71,9 +111,24 @@
       <div class="col-12 col-xl-8 pay-layout-main">
         <div class="pr-form-card-body p-3 p-lg-4">
           <form method="post" action="{{ $formAction }}" enctype="multipart/form-data" id="pay-req-form" class="pr-form-premium" novalidate
-            data-create-form-duration="1">
+            data-create-form-duration="1" data-pr-edit-mode="{{ $isEdit ? '1' : '0' }}">
             @csrf
+            @if($isEdit)
+              @method('PUT')
+            @endif
             <input type="hidden" name="{{ config('create_form_duration.input_name', 'create_form_duration_ms') }}" value="0" id="pay-create-form-duration-ms" autocomplete="off" />
+            @php
+              $payPoMergedSelfAdjust = 0.0;
+              $payBillHeadroomSelfAdjust = 0.0;
+              if (! empty($isEdit) && isset($paymentRequest) && $paymentRequest->isPendingReview()) {
+                  $payBillHeadroomSelfAdjust = (float) ($paymentRequest->amount ?? 0);
+                  if ($paymentRequest->purchase_order_id && \App\Models\PaymentRequest::requiresPoAttachment((string) $paymentRequest->payment_type)) {
+                      $payPoMergedSelfAdjust = (float) ($paymentRequest->amount ?? 0);
+                  }
+              }
+            @endphp
+            <input type="hidden" id="pay_po_merged_self_adjust" value="{{ number_format($payPoMergedSelfAdjust, 2, '.', '') }}" autocomplete="off">
+            <input type="hidden" id="pay_bill_headroom_self_adjust" value="{{ number_format($payBillHeadroomSelfAdjust, 2, '.', '') }}" autocomplete="off">
 
             <div class="pr-pay-sec pr-pay-sec--location pr-pay-form-section">
 
@@ -185,13 +240,11 @@
                   <div class="tax-dropdown-wrapper account-section pr-dd-wrap">
                     <label class="form-label mb-0" for="pay_type_search">Payment type <span class="text-danger">*</span></label>
                     @php
-                      $ptOld = old('payment_type');
+                      $ptOld = $o('payment_type');
                       $ptLabels = [
                           'advance' => 'Advance',
                           'part_payment' => 'Part Payment',
                           'settlement' => 'Settlement',
-                          'petty_cash_advance' => 'Petty Cash Advance',
-                          'reimbursement' => 'Reimbursement',
                           'refund' => 'Ref Payment',
                           'patient_refund' => 'Patient Refund',
                           'instant_payment' => 'Insta Payment',
@@ -220,26 +273,88 @@
                   <label class="form-label" for="pay_amount">Request amount <span class="text-danger">*</span></label>
                   <div class="input-group pay-input-money">
                     <span class="input-group-text">₹</span>
-                    <input type="number" name="amount" id="pay_amount" class="form-control" required min="0.01" step="0.01" value="{{ old('amount') }}" placeholder="0.00">
+                    <input type="number" name="amount" id="pay_amount" class="form-control" required min="0.01" step="0.01" value="{{ $o('amount') }}" placeholder="0.00">
                   </div>
                 </div>
               </div>
             </div>
 
             <div class="pr-form-section pr-pay-sec pr-pay-sec--accent d-none" id="pay-po-block">
-              <div class="pay-po-hero">
-                <div class="pay-po-hero-text">
-                  <div class="pr-pay-form-section-title mb-2" style="border:0; padding:0; margin:0;">
-                    <i class="bi bi-file-earmark-ruled" aria-hidden="true"></i> Linked purchase order
+              <div class="pay-po-link-head">
+                @php
+                    $__prBillIdInitial = $o('bill_id');
+                    $__prBillLink = old('po_link_mode') === 'bill' || ($__prBillIdInitial !== null && $__prBillIdInitial !== '' && (string) $__prBillIdInitial !== '0');
+                    $ptOldForPoUi = $o('payment_type');
+                    if ($ptOldForPoUi === 'settlement') {
+                        $__prBillLink = true;
+                    } elseif ($ptOldForPoUi === 'advance') {
+                        $__prBillLink = false;
+                    }
+                @endphp
+                <div class="pr-pay-form-section-title pay-po-link-title">
+                  <i class="bi bi-file-earmark-ruled" aria-hidden="true"></i>
+                  <span id="pay-link-section-title">{{ $__prBillLink ? 'Linked vendor bill' : 'Linked purchase order' }}</span>
+                </div>
+                <p class="pay-po-link-lead text-muted" id="pay-po-link-lead">
+                  @if ($__prBillLink)
+                    Enter the <strong>bill</strong> number or reference, tap <strong>Load</strong> (or press Enter) to fill bill details, then attach the supporting file below.
+                  @else
+                    Enter the <strong>PO number</strong>, tap <strong>Load</strong> (or press Enter) to fill PO totals, then attach the <strong>purchase order</strong> file.
+                  @endif
+                </p>
+                <div class="pay-po-mode-wrap" id="pay-link-mode-wrap">
+                  <span class="pay-po-mode-label">Link using <span class="text-danger">*</span></span>
+                  <div class="pay-po-mode-seg" role="group" aria-label="Link by PO or bill">
+                    <input type="radio" class="btn-check" name="po_link_mode" id="pay_link_mode_po" value="po" {{ $__prBillLink ? '' : 'checked' }} autocomplete="off">
+                    <label class="btn" for="pay_link_mode_po">Purchase order (PO)</label>
+                    <input type="radio" class="btn-check" name="po_link_mode" id="pay_link_mode_bill" value="bill" {{ $__prBillLink ? 'checked' : '' }} autocomplete="off">
+                    <label class="btn" for="pay_link_mode_bill">Vendor bill</label>
                   </div>
-                  <p class="lead text-muted">Enter the <strong>generated PO number</strong>, tap <strong>Load</strong> to see totals, then upload the <strong>PO</strong> file. Required for Advance, Part Payment, and Settlement.</p>
+                  @error('po_link_mode')
+                    <div class="text-danger small mt-2">{{ $message }}</div>
+                  @enderror
                 </div>
               </div>
-              <div class="row align-items-stretch g-3">
+              <div class="row align-items-end g-3 mt-2 {{ $__prBillLink ? '' : 'd-none' }}" id="pay-row-bill-link">
                 <div class="col-md-5">
+                  <label class="form-label" for="pay_bill_ref">Bill number / reference <span class="text-danger">*</span></label>
+                  <div class="input-group">
+                    <input type="text" class="form-control rounded-3 @error('bill_id') is-invalid @enderror" id="pay_bill_ref" value="{{ $editBillRef }}" placeholder="e.g. generated bill no. or bill #" autocomplete="off">
+                    <button type="button" class="btn btn-outline-primary rounded-3" id="pay_bill_load" title="Load bill from server">
+                      <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Load
+                    </button>
+                  </div>
+                  <input type="hidden" name="bill_id" id="pay_bill_id" value="{{ $o('bill_id') }}">
+                  @error('bill_id')
+                    <div class="text-danger small mt-1">{{ $message }}</div>
+                  @enderror
+                </div>
+                <div class="col-md-7" id="pay-bill-detail-wrap">
+                  <div id="pay-bill-detail-panel" class="d-none" aria-live="polite">
+                    <div class="row-line"><span class="lbl">Bill ref</span><span class="val" id="pay_bill_panel_ref">—</span></div>
+                    <div class="row-line"><span class="lbl">Location</span><span class="val pay-bill-panel-meta" id="pay_bill_panel_loc">—</span></div>
+                    <div class="row-line"><span class="lbl">Vendor</span><span class="val pay-bill-panel-meta" id="pay_bill_panel_vendor">—</span></div>
+                    <div class="row-line"><span class="lbl">Total Amount</span><span class="val" id="pay_bill_panel_total">0.00</span></div>
+                    <div class="row-line"><span class="lbl">Already Paid (Total)</span><span class="val fw-semibold" id="pay_bill_previously_paid_total">0.00</span></div>
+                    <div id="pay-bill-past-payments-container"></div>
+                    <div id="pay-bill-pr-requests-section" class="mt-1 d-none">
+                      <div class="row-line"><span class="lbl">Payment requests (pending + approved)</span><span class="val fw-semibold" id="pay_bill_pr_requests_total">0.00</span></div>
+                      <div id="pay-bill-pr-requests-container"></div>
+                    </div>
+                    <div class="row-line d-none"><span class="lbl">Previously paid (last approved request)</span><span class="val" id="pay_bill_last_approved">0.00</span></div>
+                    <div class="row-line d-none"><span class="lbl">Total paid so far (approved requests)</span><span class="val" id="pay_bill_sum_approved">0.00</span></div>
+                    <div class="row-line d-none" id="pay-bill-outside-paid-row"><span class="lbl">Paid outside requests (Bill Made / bank)</span><span class="val" id="pay_bill_outside_paid">0.00</span></div>
+                    <div class="row-line"><span class="lbl">Balance</span><span class="val fw-semibold text-danger" id="pay_bill_panel_balance">0.00</span></div>
+                    <p class="small text-muted mb-0 mt-1 d-none" id="pay-bill-balance-hint">After Bill Made or bank payments, this can differ from approved payment requests alone.</p>
+
+                  </div>
+                </div>
+              </div>
+              <div class="row align-items-end g-3 mt-2 {{ $__prBillLink ? 'd-none' : '' }}" id="pay-row-po-link-wrap">
+                <div class="col-md-5" id="pay-row-po-link">
                   <label class="form-label" for="pay_po_id">PO number (purchase_gen_order) <span class="text-danger">*</span></label>
                   <div class="input-group">
-                    <input type="text" class="form-control rounded-3 @error('purchase_gen_order') is-invalid @enderror" name="purchase_gen_order" id="pay_po_id" value="{{ old('purchase_gen_order') }}" placeholder="e.g. PO-00082" autocomplete="off">
+                    <input type="text" class="form-control rounded-3 @error('purchase_gen_order') is-invalid @enderror" name="purchase_gen_order" id="pay_po_id" value="{{ old('purchase_gen_order', $editPoGen) }}" placeholder="e.g. PO-00082" autocomplete="off">
                     <button type="button" class="btn btn-primary rounded-3" id="pay_po_load" title="Load PO from server">
                       <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Load
                     </button>
@@ -249,16 +364,26 @@
                   @enderror
                 </div>
                 <div class="col-md-7" id="pay-po-balance-wrap">
-                  <div id="pay-po-balance-panel" class="d-none">
+                  <div id="pay-po-balance-panel" class="d-none pay-po-linked-as-bill" aria-live="polite">
                     <div class="row-line"><span class="lbl">PO ref</span><span class="val" id="pay_po_ref">—</span></div>
-                    <div class="row-line"><span class="lbl">PO total</span><span class="val" id="pay_po_total">0.00</span></div>
-                    <div class="row-line"><span class="lbl">Paid (other requests)</span><span class="val" id="pay_po_paid">0.00</span></div>
-                    <div class="row-line"><span class="lbl">Remaining before this</span><span class="val" id="pay_po_rem">0.00</span></div>
+                    <div class="row-line"><span class="lbl">Location</span><span class="val pay-bill-panel-meta" id="pay_po_panel_loc">—</span></div>
+                    <div class="row-line"><span class="lbl">Vendor</span><span class="val pay-bill-panel-meta" id="pay_po_panel_vendor">—</span></div>
+                    <div class="row-line"><span class="lbl">Total Amount</span><span class="val" id="pay_po_total">0.00</span></div>
+                    <div class="row-line d-none"><span class="lbl">Previously paid (last approved)</span><span class="val" id="pay_po_last_approved">0.00</span></div>
+                    <div class="row-line"><span class="lbl">Already Paid (Total)</span><span class="val fw-semibold" id="pay_po_sum_approved">0.00</span></div>
+                    <div id="pay-po-past-payments-container"></div>
+                    <div class="row-line"><span class="lbl">Balance</span><span class="val fw-semibold text-danger" id="pay_po_rem">0.00</span></div>
                   </div>
                 </div>
               </div>
               <div class="mt-3 pr-pay-attachment-zone">
-                <label class="form-label">PO attachment (PDF, image, or document) <span class="text-danger">*</span></label>
+                <label class="form-label" id="pay-po-attach-label" for="pay_po_file">
+                  @if ($__prBillLink)
+                    Vendor bill attachment (PDF, image, or document) <span class="text-danger">*</span>
+                  @else
+                    PO attachment (PDF, image, or document) <span class="text-danger">*</span>
+                  @endif
+                </label>
                 <div class="pr-pay-upload-box" id="pay-po-upload-box">
                   <div class="pr-pay-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
                   <div class="pr-pay-upload-text">Drag & drop or <span>browse files</span></div>
@@ -277,7 +402,21 @@
                     <i class="bi bi-eye" aria-hidden="true"></i> View
                   </button>
                 </div>
-                <p class="small text-muted mt-2 mb-0">Attach a clear copy of the purchase order for approvers.</p>
+                @if($isEdit && $existingPoUrl)
+                  <div class="pr-pay-existing-file mt-2" id="pay-po-existing-file">
+                    <i class="bi bi-paperclip" aria-hidden="true"></i>
+                    <span class="me-1">Currently attached:</span>
+                    <a href="{{ $existingPoUrl }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $existingPoName }}</a>
+                    <span class="text-muted small ms-2">Pick a new file above to replace it.</span>
+                  </div>
+                @endif
+                <p class="small text-muted mt-2 mb-0" id="pay-po-attach-help">
+                  @if ($__prBillLink)
+                    Attach a clear copy of the vendor bill for approvers.
+                  @else
+                    Attach a clear copy of the purchase order for approvers.
+                  @endif
+                </p>
               </div>
             </div>
 
@@ -305,6 +444,14 @@
                     <i class="bi bi-eye" aria-hidden="true"></i> View
                   </button>
                 </div>
+                @if($isEdit && $existingDocUrl)
+                  <div class="pr-pay-existing-file mt-2" id="pay-doc-existing-file">
+                    <i class="bi bi-paperclip" aria-hidden="true"></i>
+                    <span class="me-1">Currently attached:</span>
+                    <a href="{{ $existingDocUrl }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $existingDocName }}</a>
+                    <span class="text-muted small ms-2">Pick a new file above to replace it.</span>
+                  </div>
+                @endif
               </div>
 
               <div class="mt-4 pt-3 border-top border-secondary border-opacity-25" id="pay-bank-fields">
@@ -315,21 +462,21 @@
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label" for="pay_bank_account">Bank account number <span class="text-danger pay-bank-req">*</span></label>
-                    <input type="text" name="bank_account_number" id="pay_bank_account" class="form-control @error('bank_account_number') is-invalid @enderror" maxlength="64" value="{{ old('bank_account_number') }}" autocomplete="off" placeholder="Account number">
+                    <input type="text" name="bank_account_number" id="pay_bank_account" class="form-control @error('bank_account_number') is-invalid @enderror" maxlength="64" value="{{ $o('bank_account_number') }}" autocomplete="off" placeholder="Account number">
                     @error('bank_account_number')
                       <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
                   </div>
                   <div class="col-md-6">
                     <label class="form-label" for="pay_bank_ifsc">IFSC code <span class="text-danger pay-bank-req">*</span></label>
-                    <input type="text" name="bank_ifsc_code" id="pay_bank_ifsc" class="form-control text-uppercase @error('bank_ifsc_code') is-invalid @enderror" maxlength="11" value="{{ old('bank_ifsc_code') }}" autocomplete="off" placeholder="e.g. HDFC0001234">
+                    <input type="text" name="bank_ifsc_code" id="pay_bank_ifsc" class="form-control text-uppercase @error('bank_ifsc_code') is-invalid @enderror" maxlength="11" value="{{ $o('bank_ifsc_code') }}" autocomplete="off" placeholder="e.g. HDFC0001234">
                     @error('bank_ifsc_code')
                       <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
                   </div>
                   <div class="col-12">
                     <label class="form-label" for="pay_bank_branch">Branch details <span class="text-danger pay-bank-req">*</span></label>
-                    <textarea name="bank_branch_details" id="pay_bank_branch" class="form-control @error('bank_branch_details') is-invalid @enderror" rows="2" maxlength="5000" placeholder="Bank branch name and address">{{ old('bank_branch_details') }}</textarea>
+                    <textarea name="bank_branch_details" id="pay_bank_branch" class="form-control @error('bank_branch_details') is-invalid @enderror" rows="2" maxlength="5000" placeholder="Bank branch name and address">{{ $o('bank_branch_details') }}</textarea>
                     @error('bank_branch_details')
                       <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
@@ -354,6 +501,14 @@
                         <i class="bi bi-eye" aria-hidden="true"></i> View
                       </button>
                     </div>
+                    @if($isEdit && $existingBankUrl)
+                      <div class="pr-pay-existing-file mt-2" id="pay-bank-existing-file">
+                        <i class="bi bi-paperclip" aria-hidden="true"></i>
+                        <span class="me-1">Currently attached:</span>
+                        <a href="{{ $existingBankUrl }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $existingBankName }}</a>
+                        <span class="text-muted small ms-2">Pick a new file above to replace it.</span>
+                      </div>
+                    @endif
                     @error('bank_document')
                       <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
@@ -366,14 +521,14 @@
               <div class="pr-pay-form-section-title">
                 <i class="bi bi-chat-dots" aria-hidden="true"></i> Remarks
               </div>
-              <textarea name="remarks" class="form-control rounded-3" rows="3" maxlength="10000" placeholder="Optional context for finance (invoice ref., patient id, project code…)">{{ old('remarks') }}</textarea>
+              <textarea name="remarks" class="form-control rounded-3" rows="3" maxlength="10000" placeholder="Optional context for finance (invoice ref., patient id, project code…)">{{ $o('remarks') }}</textarea>
             </div>
 
             <div class="pay-form-footer pr-pay-form-footer--enhanced">
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <a href="{{ route('superadmin.payment-requests.index') }}" class="btn btn-outline-secondary rounded-3 border-0 bg-light">Cancel</a>
+                <a href="{{ $isEdit ? route('superadmin.payment-requests.show', $pr) : route('superadmin.payment-requests.index') }}" class="btn btn-outline-secondary rounded-3 border-0 bg-light">Cancel</a>
                 <button type="submit" class="btn btn-pr-submit px-4 py-2 rounded-3 fw-bold shadow">
-                  <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Submit payment request
+                  <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> {{ $isEdit ? 'Save changes' : 'Submit payment request' }}
                 </button>
               </div>
             </div>
@@ -391,7 +546,7 @@
         </div>
         <div class="pay-hint-card" style="margin-bottom:0;">
           <h3><i class="bi bi-question-circle" aria-hidden="true"></i> PO number</h3>
-          <p class="mb-0 small">For Advance, Part, and Settlement, use the <strong>generated</strong> PO number (<code>purchase_gen_order</code>).</p>
+          <p class="mb-0 small"><strong>Advance:</strong> PO number → Load → PO file. <strong>Part payment:</strong> PO <em>or</em> bill → Load → attachment. <strong>Settlement:</strong> bill number → Load → bill file.</p>
         </div>
       </aside>
     </div>
@@ -439,6 +594,12 @@
   if (!root) return;
   var branchFetchUrl = @json($branchFetchUrl);
   var lookupUrl = @json($lookupUrl);
+  var lookupBillUrl = @json($lookupBillUrl);
+  /** Edit mode: existing attachments satisfy "required file" rules; submit may omit a new file. */
+  var isPayReqEditMode = root.getAttribute('data-pr-edit-mode') === '1';
+  var hasExistingPoFile = !!document.getElementById('pay-po-existing-file');
+  var hasExistingDocFile = !!document.getElementById('pay-doc-existing-file');
+  var hasExistingBankFile = !!document.getElementById('pay-bank-existing-file');
   var csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   var strip = root.querySelector('#payLocationStrip');
   var typeSel = document.getElementById('pay_type');
@@ -457,6 +618,8 @@
   var payPreviewBarBank = document.getElementById('pay-bank-preview-bar');
   var payPreviewModalEl = document.getElementById('payUploadPreviewModal');
   var payPreviewBlob = null;
+  /** Set true after bill Load when API reports a linked PO (drives attachment hint copy). */
+  var payBillLookupHasPo = false;
 
   function revokePayPreview() {
     if (payPreviewBlob) {
@@ -520,6 +683,96 @@
     }
   }
 
+  function hidePayBillPanel() {
+    var panel = document.getElementById('pay-bill-detail-panel');
+    if (panel) panel.classList.add('d-none');
+    var poRows = document.getElementById('pay-bill-po-detail-rows');
+    if (poRows) poRows.classList.add('d-none');
+    payBillLookupHasPo = false;
+    syncPayPoBillLinkCopy();
+  }
+  function applyPayBillPanel(d) {
+    if (!d) return;
+    var panel = document.getElementById('pay-bill-detail-panel');
+    if (!panel) return;
+    var fmt = function(n) {
+      var x = Number(n != null && n !== '' && !isNaN(Number(n)) ? n : 0);
+      return (isNaN(x) ? 0 : x).toFixed(2);
+    };
+    var refEl = document.getElementById('pay_bill_panel_ref');
+    var ref = (d.bill_gen_number || d.bill_number || '').toString().trim();
+    if (refEl) refEl.textContent = ref || '—';
+    var locParts = [];
+    if (String(d.company_name || '').trim()) locParts.push(String(d.company_name).trim());
+    if (String(d.zone_name || '').trim()) locParts.push(String(d.zone_name).trim());
+    if (String(d.branch_name || '').trim()) locParts.push(String(d.branch_name).trim());
+    var locEl = document.getElementById('pay_bill_panel_loc');
+    if (locEl) locEl.textContent = locParts.length ? locParts.join(' — ') : '—';
+    var venEl = document.getElementById('pay_bill_panel_vendor');
+    if (venEl) venEl.textContent = String(d.vendor_name || '').trim() || '—';
+    var totEl = document.getElementById('pay_bill_panel_total');
+    if (totEl) totEl.textContent = fmt(d.bill_grand_total);
+    var ppt = d.bill_previously_paid_total != null && d.bill_previously_paid_total !== ''
+      ? d.bill_previously_paid_total
+      : (d.bill_paid_derived != null ? d.bill_paid_derived : 0);
+    var prevTotEl = document.getElementById('pay_bill_previously_paid_total');
+    if (prevTotEl) {
+      prevTotEl.textContent = fmt(ppt);
+    }
+
+    var pastPaymentsContainer = document.getElementById('pay-bill-past-payments-container');
+    appendLinkedPastPaymentRows(pastPaymentsContainer, d.bill_past_payments || []);
+
+    var prHist = d.bill_payment_request_history || [];
+    var prTotal = Number(d.bill_sum_pending_and_approved_requests != null && d.bill_sum_pending_and_approved_requests !== '' ? d.bill_sum_pending_and_approved_requests : 0);
+    var prSection = document.getElementById('pay-bill-pr-requests-section');
+    var prTotEl = document.getElementById('pay_bill_pr_requests_total');
+    var prRowsEl = document.getElementById('pay-bill-pr-requests-container');
+    if (prSection && prTotEl && prRowsEl) {
+      if (!isNaN(prTotal) && (prTotal > 0.005 || (prHist && prHist.length))) {
+        prTotEl.textContent = fmt(prTotal);
+        appendLinkedPastPaymentRows(prRowsEl, prHist);
+        prSection.classList.remove('d-none');
+      } else {
+        prRowsEl.innerHTML = '';
+        prTotEl.textContent = fmt(0);
+        prSection.classList.add('d-none');
+      }
+    }
+
+    var outRow = document.getElementById('pay-bill-outside-paid-row');
+    var outEl = document.getElementById('pay_bill_outside_paid');
+    var outPaid = Number(d.bill_paid_outside_requests != null && d.bill_paid_outside_requests !== '' ? d.bill_paid_outside_requests : 0);
+    var pptNum = Number(ppt || 0);
+    if (outRow && outEl) {
+      if (!isNaN(outPaid) && outPaid > 0.005 && Math.abs(outPaid - pptNum) > 0.005) {
+        outEl.textContent = fmt(outPaid);
+        outRow.classList.remove('d-none');
+      } else {
+        outRow.classList.add('d-none');
+      }
+    }
+
+    var balEl = document.getElementById('pay_bill_panel_balance');
+    var remPay = d.bill_remaining_payable;
+    var finalRemPay = remPay != null && remPay !== '' ? remPay : d.bill_balance;
+    if (balEl) balEl.textContent = fmt(finalRemPay);
+
+    var amountEl = document.getElementById('pay_amount');
+    if (amountEl && (!amountEl.value || amountEl.value === '' || amountEl.value === '0' || amountEl.value === '0.00')) {
+        amountEl.value = Number(finalRemPay).toFixed(2);
+    }
+
+    var bla = document.getElementById('pay_bill_last_approved');
+    if (bla) bla.textContent = fmt(d.bill_last_approved_payment != null ? d.bill_last_approved_payment : 0);
+    var bsa = document.getElementById('pay_bill_sum_approved');
+    if (bsa) bsa.textContent = fmt(d.bill_sum_approved_requests != null ? d.bill_sum_approved_requests : 0);
+
+    payBillLookupHasPo = !!(d.has_po && (d.purchase_gen_order || d.po_total != null));
+    syncPayPoBillLinkCopy();
+    panel.classList.remove('d-none');
+  }
+
   if (payPreviewModalEl) {
     payPreviewModalEl.addEventListener('hidden.bs.modal', function() {
       var iframe = document.getElementById('payPreviewIframe');
@@ -541,15 +794,15 @@
     if (poBlock) { poBlock.classList.toggle('d-none', !p); }
     if (docBlock) { docBlock.classList.toggle('d-none', !d); }
     if (payPoFile) {
-      payPoFile.required = p;
+      payPoFile.required = p && !(isPayReqEditMode && hasExistingPoFile);
       if (!p && typeChanged) { payPoFile.value = ''; payPoFile.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     if (payDocFile) {
-      payDocFile.required = d;
+      payDocFile.required = d && !(isPayReqEditMode && hasExistingDocFile);
       if (!d && typeChanged) { payDocFile.value = ''; payDocFile.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     if (payBankFile) {
-      payBankFile.required = d;
+      payBankFile.required = d && !(isPayReqEditMode && hasExistingBankFile);
       if (!d && typeChanged) { payBankFile.value = ''; payBankFile.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     if (payBankAccount) {
@@ -570,12 +823,141 @@
     if (!p && typeChanged) {
       var poid = document.getElementById('pay_po_id');
       if (poid) poid.value = '';
+      var billHid = document.getElementById('pay_bill_id');
+      var billRef = document.getElementById('pay_bill_ref');
+      if (billHid) billHid.value = '';
+      if (billRef) billRef.value = '';
+      hidePayBillPanel();
+      var rpo = document.getElementById('pay_link_mode_po');
+      if (rpo) rpo.checked = true;
+    }
+    if (p) {
+      syncPoLinkedSubtypeUi(t, typeChanged);
     }
     lastPayTypeForUi = t;
   }
   if (typeSel) {
     typeSel.addEventListener('change', syncTypeUi);
     syncTypeUi();
+  }
+
+  function getPayLinkMode() {
+    var el = root.querySelector('input[name="po_link_mode"]:checked');
+    return el ? el.value : 'po';
+  }
+  function syncPayPoBillLinkCopy() {
+    if (!poBlock || poBlock.classList.contains('d-none')) return;
+    var m = getPayLinkMode();
+    var titleEl = document.getElementById('pay-link-section-title');
+    var leadEl = document.getElementById('pay-po-link-lead');
+    var attLbl = document.getElementById('pay-po-attach-label');
+    var attHelp = document.getElementById('pay-po-attach-help');
+    if (!titleEl || !leadEl || !attLbl || !attHelp) return;
+    if (m === 'bill') {
+      titleEl.textContent = 'Linked vendor bill';
+      leadEl.innerHTML = 'Enter the <strong>bill</strong> number or reference, tap <strong>Load</strong> (or press Enter) to fill bill details, then attach the supporting file below.';
+      if (payBillLookupHasPo) {
+        attLbl.innerHTML = 'Vendor bill &amp; PO attachment (PDF, image, or document) <span class="text-danger">*</span>';
+        attHelp.textContent = 'Upload the vendor bill and a clear copy of the linked purchase order for approvers (one combined file or multiple pages in a single PDF is fine).';
+      } else {
+        attLbl.innerHTML = 'Vendor bill attachment (PDF, image, or document) <span class="text-danger">*</span>';
+        attHelp.textContent = 'Attach a clear copy of the vendor bill for approvers.';
+      }
+    } else {
+      titleEl.textContent = 'Linked purchase order';
+      leadEl.innerHTML = 'Enter the <strong>PO number</strong>, tap <strong>Load</strong> (or press Enter) to fill PO totals, then attach the <strong>purchase order</strong> file.';
+      attLbl.innerHTML = 'PO attachment (PDF, image, or document) <span class="text-danger">*</span>';
+      attHelp.textContent = 'Attach a clear copy of the purchase order for approvers.';
+    }
+  }
+  function syncPayLinkMode() {
+    var m = getPayLinkMode();
+    var billRow = document.getElementById('pay-row-bill-link');
+    var poWrap = document.getElementById('pay-row-po-link-wrap');
+    if (billRow) {
+      billRow.classList.toggle('d-none', m !== 'bill');
+    }
+    if (poWrap) {
+      poWrap.classList.toggle('d-none', m === 'bill');
+    }
+  }
+  /** Advance = PO only; Part = PO or bill; Settlement = bill only. */
+  function syncPoLinkedSubtypeUi(t, typeChanged) {
+    var modeWrap = document.getElementById('pay-link-mode-wrap');
+    var rpo = document.getElementById('pay_link_mode_po');
+    var rbill = document.getElementById('pay_link_mode_bill');
+    var titleEl = document.getElementById('pay-link-section-title');
+    var leadEl = document.getElementById('pay-po-link-lead');
+    var attLbl = document.getElementById('pay-po-attach-label');
+    var attHelp = document.getElementById('pay-po-attach-help');
+
+    if (t === 'advance') {
+      if (modeWrap) modeWrap.classList.add('d-none');
+      if (rbill) rbill.checked = false;
+      if (rpo) rpo.checked = true;
+      if (typeChanged) {
+        var bh = document.getElementById('pay_bill_id');
+        var br = document.getElementById('pay_bill_ref');
+        if (bh) bh.value = '';
+        if (br) br.value = '';
+        hidePayBillPanel();
+      }
+      syncPayLinkMode();
+      if (titleEl) titleEl.textContent = 'Linked purchase order';
+      if (leadEl) {
+        leadEl.innerHTML = 'Enter the <strong>PO number</strong>, tap <strong>Load</strong> (or press Enter) to fill PO totals, then attach the <strong>purchase order</strong> file.';
+      }
+      if (attLbl) attLbl.innerHTML = 'PO attachment (PDF, image, or document) <span class="text-danger">*</span>';
+      if (attHelp) attHelp.textContent = 'Attach a clear copy of the purchase order for approvers.';
+      return;
+    }
+    if (t === 'settlement') {
+      if (modeWrap) modeWrap.classList.add('d-none');
+      if (rpo) rpo.checked = false;
+      if (rbill) rbill.checked = true;
+      if (typeChanged) {
+        var poid = document.getElementById('pay_po_id');
+        if (poid) poid.value = '';
+        var pan = document.getElementById('pay-po-balance-panel');
+        if (pan) pan.classList.add('d-none');
+        var hint = document.getElementById('pay-po-lookup-hint');
+        if (hint) hint.textContent = '';
+      }
+      syncPayLinkMode();
+      syncPayPoBillLinkCopy();
+      return;
+    }
+    if (t === 'part_payment') {
+      if (modeWrap) modeWrap.classList.remove('d-none');
+      syncPayLinkMode();
+      syncPayPoBillLinkCopy();
+    }
+  }
+  root.querySelectorAll('input[name="po_link_mode"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      var m = getPayLinkMode();
+      if (m === 'po') {
+        var bh = document.getElementById('pay_bill_id');
+        var br = document.getElementById('pay_bill_ref');
+        if (bh) bh.value = '';
+        if (br) br.value = '';
+        hidePayBillPanel();
+      } else {
+        var poid = document.getElementById('pay_po_id');
+        if (poid) poid.value = '';
+        var pan = document.getElementById('pay-po-balance-panel');
+        if (pan) pan.classList.add('d-none');
+        hidePayBillPanel();
+      }
+      syncPayLinkMode();
+      syncPayPoBillLinkCopy();
+    });
+  });
+  if (typeSel && PO.indexOf(typeSel.value || '') !== -1) {
+    syncPoLinkedSubtypeUi(typeSel.value, false);
+  } else {
+    syncPayLinkMode();
+    syncPayPoBillLinkCopy();
   }
 
   var PAY_PR_MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -691,21 +1073,105 @@
     }
     var p = PO.indexOf(t) !== -1;
     var d = DOC.indexOf(t) !== -1;
-    if (p) {
-      var poIdEl = document.getElementById('pay_po_id');
-      var poNum = poIdEl ? String(poIdEl.value || '').trim() : '';
-      if (!poNum) {
-        problems.push({ a: poIdEl, msg: 'Please enter the PO number (purchase_gen_order).', u: null });
+    function payParseNumLoose(txt) {
+      if (txt == null) return NaN;
+      var s = String(txt).replace(/[,\s₹]/g, '').trim();
+      if (!s) return NaN;
+      var n = parseFloat(s, 10);
+      return isNaN(n) ? NaN : n;
+    }
+    if (p && !isNaN(amt) && amt >= 0.01) {
+      var poBreachMsg = '';
+      var poPanel = document.getElementById('pay-po-balance-panel');
+      var poPanelVisible = poPanel && !poPanel.classList.contains('d-none');
+      if (poPanelVisible) {
+        var remEl = document.getElementById('pay_po_rem');
+        var remNum = payParseNumLoose(remEl ? remEl.textContent : '');
+        var poAdjEl = document.getElementById('pay_po_merged_self_adjust');
+        var poAdj = payParseNumLoose(poAdjEl ? poAdjEl.value : '0');
+        if (!isNaN(remNum)) {
+          var maxPo = remNum + (isNaN(poAdj) ? 0 : poAdj);
+          if (amt - maxPo > 0.021) {
+            poBreachMsg = 'Purchase order: remaining headroom is ₹' + maxPo.toFixed(2) + '.';
+          }
+        }
       }
-      if (!payPoFile || !payPoFile.files || !payPoFile.files.length) {
-        problems.push({ a: null, msg: 'Please attach the PO document (PDF, image, or Word).', u: document.getElementById('pay-po-upload-box') });
-      } else if (payPoFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
-        problems.push({ a: null, msg: 'PO attachment must be 10 MB or smaller.', u: document.getElementById('pay-po-upload-box') });
+      var billBreachMsg = '';
+      var billPanel = document.getElementById('pay-bill-detail-panel');
+      var billPanelVisible = billPanel && !billPanel.classList.contains('d-none');
+      var billHidChk = document.getElementById('pay_bill_id');
+      if (billHidChk && String(billHidChk.value || '').trim() && billPanelVisible) {
+        var balEl = document.getElementById('pay_bill_panel_balance');
+        var balNum = payParseNumLoose(balEl ? balEl.textContent : '');
+        var billAdjEl = document.getElementById('pay_bill_headroom_self_adjust');
+        var billAdj = payParseNumLoose(billAdjEl ? billAdjEl.value : '0');
+        if (!isNaN(balNum)) {
+          var maxBill = balNum + (isNaN(billAdj) ? 0 : billAdj);
+          if (amt - maxBill > 0.021) {
+            billBreachMsg = 'Vendor bill: balance available for this request is ₹' + maxBill.toFixed(2) + '.';
+          }
+        }
+      }
+      if (poBreachMsg || billBreachMsg) {
+        var parts = [];
+        if (poBreachMsg) parts.push(poBreachMsg);
+        if (billBreachMsg) parts.push(billBreachMsg);
+        problems.push({
+          a: amtEl,
+          msg: 'This amount (₹' + amt.toFixed(2) + ') is too high. ' + parts.join(' '),
+          u: null
+        });
+      }
+    }
+    if (p) {
+      var poLinkedAttBillMode = false;
+      if (t === 'advance') {
+        var poIdAdv = document.getElementById('pay_po_id');
+        var poNumAdv = poIdAdv ? String(poIdAdv.value || '').trim() : '';
+        if (!poNumAdv) {
+          problems.push({ a: poIdAdv, msg: 'Please enter the PO number, then Load (or press Enter).', u: null });
+        }
+        poLinkedAttBillMode = false;
+      } else if (t === 'settlement') {
+        var billHidSt = document.getElementById('pay_bill_id');
+        if (!billHidSt || !String(billHidSt.value || '').trim()) {
+          problems.push({ a: document.getElementById('pay_bill_ref'), msg: 'Enter the bill number, then Load (or press Enter).', u: null });
+        }
+        poLinkedAttBillMode = true;
+      } else {
+        var linkMode = getPayLinkMode();
+        poLinkedAttBillMode = linkMode === 'bill';
+        if (linkMode === 'bill') {
+          var billHidEl = document.getElementById('pay_bill_id');
+          if (!billHidEl || !String(billHidEl.value || '').trim()) {
+            problems.push({ a: document.getElementById('pay_bill_ref'), msg: 'Enter the bill number and tap Load (or press Enter).', u: null });
+          }
+        } else {
+          var poIdEl = document.getElementById('pay_po_id');
+          var poNum = poIdEl ? String(poIdEl.value || '').trim() : '';
+          if (!poNum) {
+            problems.push({ a: poIdEl, msg: 'Please enter the PO number (purchase_gen_order), then Load (or press Enter).', u: null });
+          }
+        }
+      }
+      var poFileMissing = !payPoFile || !payPoFile.files || !payPoFile.files.length;
+      var poFilePresent = !poFileMissing;
+      if (poFileMissing && !(isPayReqEditMode && hasExistingPoFile)) {
+        var attNeed = poLinkedAttBillMode
+          ? (payBillLookupHasPo
+            ? 'Please attach the vendor bill and linked PO documentation (PDF, image, or Word).'
+            : 'Please attach the vendor bill (PDF, image, or Word).')
+          : 'Please attach the PO document (PDF, image, or Word).';
+        problems.push({ a: null, msg: attNeed, u: document.getElementById('pay-po-upload-box') });
+      } else if (poFilePresent && payPoFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
+        problems.push({ a: null, msg: 'Attachment must be 10 MB or smaller.', u: document.getElementById('pay-po-upload-box') });
       }
     } else if (d) {
-      if (!payDocFile || !payDocFile.files || !payDocFile.files.length) {
+      var docFileMissing = !payDocFile || !payDocFile.files || !payDocFile.files.length;
+      var docFilePresent = !docFileMissing;
+      if (docFileMissing && !(isPayReqEditMode && hasExistingDocFile)) {
         problems.push({ a: null, msg: 'Please attach a supporting document.', u: document.getElementById('pay-doc-upload-box') });
-      } else if (payDocFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
+      } else if (docFilePresent && payDocFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
         problems.push({ a: null, msg: 'Supporting document must be 10 MB or smaller.', u: document.getElementById('pay-doc-upload-box') });
       }
       var acct = payBankAccount ? String(payBankAccount.value || '').trim() : '';
@@ -720,9 +1186,11 @@
       if (!br) {
         problems.push({ a: payBankBranch, msg: 'Please enter bank branch details.', u: null });
       }
-      if (!payBankFile || !payBankFile.files || !payBankFile.files.length) {
+      var bankFileMissing = !payBankFile || !payBankFile.files || !payBankFile.files.length;
+      var bankFilePresent = !bankFileMissing;
+      if (bankFileMissing && !(isPayReqEditMode && hasExistingBankFile)) {
         problems.push({ a: null, msg: 'Please attach the bank document (cheque / statement / passbook).', u: document.getElementById('pay-bank-upload-box') });
-      } else if (payBankFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
+      } else if (bankFilePresent && payBankFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
         problems.push({ a: null, msg: 'Bank document must be 10 MB or smaller.', u: document.getElementById('pay-bank-upload-box') });
       }
     }
@@ -741,6 +1209,8 @@
       payment_type: 'pay_type_search',
       amount: 'pay_amount',
       purchase_gen_order: 'pay_po_id',
+      bill_id: 'pay_bill_ref',
+      po_link_mode: 'pay-link-mode-wrap',
       bank_account_number: 'pay_bank_account',
       bank_ifsc_code: 'pay_bank_ifsc',
       bank_branch_details: 'pay_bank_branch'
@@ -813,23 +1283,47 @@
         credentials: 'same-origin',
         redirect: 'manual'
       }).then(function(r) {
-        if (r.status === 302 || r.status === 301 || r.status === 303) {
+        if (r.status === 419) {
+          if (window.toastr) toastr.error('Your session has expired. Refresh the page and try again.');
+          return null;
+        }
+        if (r.status === 413) {
+          if (window.toastr) {
+            toastr.error('Upload is too large for the server (HTTP 413). Use files under 10 MB each or raise PHP/nginx upload limits.');
+          }
+          return null;
+        }
+        if (r.status >= 301 && r.status <= 308 && r.status !== 304) {
           var loc = r.headers.get('Location');
           if (loc) {
-            window.location.href = loc;
+            try {
+              window.location.replace(new URL(loc.trim(), window.location.origin).href);
+            } catch (e2) {
+              window.location.replace(loc);
+            }
           } else {
             window.location.reload();
           }
           return null;
         }
-        if (r.status === 419) {
-          if (window.toastr) toastr.error('Your session has expired. Refresh the page and try again.');
-          return null;
-        }
         var ct = (r.headers.get('Content-Type') || '').toLowerCase();
-        if (ct.indexOf('application/json') !== -1) {
-          return r.json().then(function(body) {
+        var looksJson = ct.indexOf('json') !== -1;
+        if (looksJson || (r.ok && (r.status === 200 || r.status === 201))) {
+          return (looksJson ? r.json() : r.clone().json()).then(function(body) {
             return { r: r, body: body };
+          }).catch(function() {
+            return r.text().then(function(text) {
+              return { r: r, body: text };
+            });
+          });
+        }
+        if (r.status === 422) {
+          return r.text().then(function(text) {
+            try {
+              return { r: r, body: JSON.parse(text) };
+            } catch (e3) {
+              return { r: r, body: text };
+            }
           });
         }
         return r.text().then(function(text) {
@@ -839,14 +1333,19 @@
         if (!x) {
           return;
         }
-        if (x.r.ok && x.r.status === 200) {
-          if (window.toastr) toastr.success('Saved.');
-          window.location.reload();
+        var body = x.body;
+        if (typeof body === 'string') {
+          try {
+            body = JSON.parse(body.replace(/^\uFEFF/, '').trim());
+          } catch (e) { /* keep string */ }
+        }
+        if (x.r.ok && body && typeof body === 'object' && body.redirect) {
+          window.location.replace(String(body.redirect));
           return;
         }
-        if (x.r.status === 422 && x.body && typeof x.body === 'object') {
+        if (x.r.status === 422 && body && typeof body === 'object') {
           payClearFieldMessages(root);
-          var srvErrs = x.body.errors || {};
+          var srvErrs = body.errors || {};
           var keys = Object.keys(srvErrs);
           if (keys.length) {
             var applied = payApplyServerValidationErrors(srvErrs);
@@ -856,15 +1355,15 @@
             if (applied.mapped && window.toastr) {
               toastr.error('Please correct the errors highlighted on the form.');
             }
-          } else if (x.body.message && window.toastr) {
-            toastr.error(String(x.body.message));
+          } else if (body.message && window.toastr) {
+            toastr.error(String(body.message));
           } else if (window.toastr) {
             toastr.error('Validation failed. Please check your input.');
           }
           return;
         }
         if (window.toastr) {
-          toastr.error('Could not submit the form. Please try again or refresh the page.');
+          toastr.error('Could not submit the form (HTTP ' + (x.r.status || '?') + ').');
         }
       }).catch(function() {
         if (window.toastr) toastr.error('Network error. Check your connection and try again.');
@@ -1013,6 +1512,138 @@
       if (done) done();
     });
   }
+
+  function payEscapeHtml(str) {
+    if (str == null) return '';
+    var d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+  }
+
+  function payFmtLinkedAmount(n) {
+    var x = Number(n != null && n !== '' && !isNaN(Number(n)) ? n : 0);
+    return (isNaN(x) ? 0 : x).toFixed(2);
+  }
+
+  /** Same row layout as vendor bill past payments (date-wise lines under “Already Paid (Total)”). */
+  function appendLinkedPastPaymentRows(containerEl, rows) {
+    if (!containerEl) return;
+    containerEl.innerHTML = '';
+    if (!rows || !rows.length) return;
+    rows.forEach(function(pay) {
+      var dateStr = pay.date ? pay.date : '';
+      var left = (pay.caption != null && String(pay.caption).trim() !== '')
+        ? String(pay.caption).trim()
+        : ('Paid on ' + (dateStr || 'Unknown date'));
+      var div = document.createElement('div');
+      div.className = 'row-line ps-4 bg-primary bg-opacity-10 border-0';
+      div.style.minHeight = '36px';
+      div.innerHTML = '<span class="lbl text-muted" style="font-size:0.85rem;"><i class="ti ti-corner-down-right opacity-50 me-2"></i>'
+        + payEscapeHtml(left) + '</span><span class="val text-muted fw-medium" style="font-size:0.85rem;">₹ ' + payFmtLinkedAmount(pay.amount) + '</span>';
+      containerEl.appendChild(div);
+    });
+  }
+
+  function renderPoPastPayments(containerId, rows) {
+    var el = document.getElementById(containerId);
+    appendLinkedPastPaymentRows(el, rows || []);
+  }
+
+  function applyPayPoPanel(d, poRefFallback) {
+    var panel = document.getElementById('pay-po-balance-panel');
+    if (!panel || !d) return;
+    if (d.po_total == null || d.po_total === undefined || isNaN(Number(d.po_total))) {
+      renderPoPastPayments('pay-po-past-payments-container', []);
+      panel.classList.add('d-none');
+      return;
+    }
+    panel.classList.remove('d-none');
+    var ref = d.purchase_gen_order || d.order_number || poRefFallback || '—';
+    var refEl = document.getElementById('pay_po_ref');
+    if (refEl) refEl.textContent = String(ref);
+    var locParts = [];
+    var co = d.po_company_name != null && d.po_company_name !== '' ? d.po_company_name : d.company_name;
+    var zn = d.po_zone_name != null && d.po_zone_name !== '' ? d.po_zone_name : d.zone_name;
+    var br = d.po_branch_name != null && d.po_branch_name !== '' ? d.po_branch_name : d.branch_name;
+    if (String(co || '').trim()) locParts.push(String(co).trim());
+    if (String(zn || '').trim()) locParts.push(String(zn).trim());
+    if (String(br || '').trim()) locParts.push(String(br).trim());
+    var locEl = document.getElementById('pay_po_panel_loc');
+    if (locEl) locEl.textContent = locParts.length ? locParts.join(' — ') : '—';
+    var venPo = d.po_vendor_name != null && String(d.po_vendor_name).trim() !== '' ? String(d.po_vendor_name).trim() : String(d.vendor_name || '').trim();
+    var venEl = document.getElementById('pay_po_panel_vendor');
+    if (venEl) venEl.textContent = venPo || '—';
+    var tot = document.getElementById('pay_po_total');
+    if (tot) tot.textContent = Number(d.po_total).toFixed(2);
+    var lastA = document.getElementById('pay_po_last_approved');
+    if (lastA) {
+      var la = d.last_approved_payment_amount != null ? d.last_approved_payment_amount : 0;
+      lastA.textContent = Number(la).toFixed(2);
+    }
+    var sumA = document.getElementById('pay_po_sum_approved');
+    if (sumA) {
+      var histPaid = d.po_history_paid_total;
+      var saTotal = histPaid != null && histPaid !== ''
+        ? histPaid
+        : (d.amount_paid_before != null && d.amount_paid_before !== '' ? d.amount_paid_before : (d.amount_paid_approved_only != null ? d.amount_paid_approved_only : 0));
+      sumA.textContent = Number(saTotal).toFixed(2);
+    }
+    var rem = document.getElementById('pay_po_rem');
+    var remHist = d.po_history_remaining;
+    var remVal = remHist != null && remHist !== ''
+      ? Number(remHist)
+      : Number(d.remaining_before_new != null ? d.remaining_before_new : 0);
+    if (rem) rem.textContent = remVal.toFixed(2);
+
+    renderPoPastPayments('pay-po-past-payments-container', d.po_past_payments || []);
+
+    var amountEl = document.getElementById('pay_amount');
+    if (amountEl && (!amountEl.value || amountEl.value === '' || amountEl.value === '0' || amountEl.value === '0.00')) {
+        amountEl.value = remVal.toFixed(2);
+    }
+  }
+
+  function payApplyBillLocationFromLookup(b) {
+    var st = document.getElementById('payLocationStrip');
+    if (!st) return;
+    var cHid = st.querySelector('.company_id');
+    var cInp = document.getElementById('pay_dd_company');
+    if (b.company_id && cHid) {
+      cHid.value = String(b.company_id);
+      if (cInp) cInp.value = b.company_name || '';
+    }
+    var zHid = st.querySelector('.zone_id');
+    var zInp = document.getElementById('pay_dd_zone');
+    if (b.zone_id && zHid) {
+      zHid.value = String(b.zone_id);
+      if (zInp) zInp.value = b.zone_name || '';
+    }
+    if (b.zone_id) {
+      loadBranchesForZone(b.zone_id, function() {
+        var bHid = st.querySelector('.branch_id');
+        var bInp = st.querySelector('.branch-search-input');
+        var bp = st.querySelector('.branch-list');
+        if (!b.branch_id || !bHid) return;
+        bHid.value = String(b.branch_id);
+        var found = null;
+        if (bp) {
+          bp.querySelectorAll('div[data-id]').forEach(function(el) {
+            if (String(el.getAttribute('data-id')) === String(b.branch_id)) found = el;
+          });
+        }
+        if (bInp) {
+          if (found) bInp.value = found.getAttribute('data-value') || found.textContent.trim();
+          else if (b.branch_name) bInp.value = b.branch_name;
+        }
+      });
+    } else {
+      var bHid2 = st.querySelector('.branch_id');
+      var bInp2 = st.querySelector('.branch-search-input');
+      if (b.branch_id && bHid2) bHid2.value = String(b.branch_id);
+      if (bInp2 && b.branch_name) bInp2.value = b.branch_name;
+    }
+  }
+
   root.addEventListener('click', function(e) { if (!e.target.closest('.pr-dd-wrap')) closeAllPanels(); });
   root.querySelectorAll('.pr-dd-input').forEach(function(inp) {
     inp.addEventListener('click', function(ev) {
@@ -1127,7 +1758,6 @@
     });
   }
 
-  var pl = document.getElementById('pay-po-balance-panel');
   var lBtn = document.getElementById('pay_po_load');
   var poid = document.getElementById('pay_po_id');
   if (lBtn && poid) {
@@ -1152,20 +1782,89 @@
           } else if (d.vendor_name && vendorName && !String(vendorName.value || '').trim()) {
             vendorName.value = d.vendor_name;
           }
-          if (pl) {
-            pl.classList.remove('d-none');
-            var ref = d.purchase_gen_order || d.order_number || v;
-            document.getElementById('pay_po_ref').textContent = String(ref);
-            document.getElementById('pay_po_total').textContent = Number(d.po_total).toFixed(2);
-            document.getElementById('pay_po_paid').textContent = Number(d.amount_paid_before).toFixed(2);
-            document.getElementById('pay_po_rem').textContent = Number(d.remaining_before_new).toFixed(2);
-          }
+          applyPayPoPanel(d, v);
         })
         .catch(function(err) {
           if (h) h.textContent = (err && err.message) ? String(err.message) : 'Could not load PO. Check the number.';
           if (window.toastr) toastr.error((err && err.message) ? String(err.message) : 'PO lookup failed.');
         });
     });
+    poid.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      lBtn.click();
+    });
+  }
+
+  var billLoadBtn = document.getElementById('pay_bill_load');
+  var billRefInp = document.getElementById('pay_bill_ref');
+  var billHidInp = document.getElementById('pay_bill_id');
+  if (billLoadBtn && billRefInp) {
+    billLoadBtn.addEventListener('click', function() {
+      var raw = billRefInp.value.trim();
+      if (!raw) {
+        if (window.toastr) toastr.error('Enter a bill number or reference first.');
+        return;
+      }
+      var uu = new URL(lookupBillUrl, window.location.origin);
+      uu.searchParams.set('bill_ref', raw);
+      fetch(uu.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(function(r) { return r.json().then(function(d) { return { r: r, d: d }; }); })
+        .then(function(x) {
+          if (!x.r.ok || !x.d.ok) {
+            var msg = (x.d && x.d.message) || 'Lookup failed';
+            throw new Error(msg);
+          }
+          var d = x.d;
+          if (billHidInp) billHidInp.value = String(d.bill_id || '');
+          payApplyBillLocationFromLookup(d);
+          if (d.vendor_id && vendorHid) {
+            vendorHid.value = String(d.vendor_id);
+            if (vendorName) vendorName.value = d.vendor_name || ('Vendor #' + d.vendor_id);
+          }
+          var poid = document.getElementById('pay_po_id');
+          if (d.has_po && d.purchase_gen_order && poid) {
+            poid.value = String(d.purchase_gen_order);
+            if (getPayLinkMode() === 'po') {
+              applyPayPoPanel(d, d.purchase_gen_order);
+            } else {
+              var pan = document.getElementById('pay-po-balance-panel');
+              if (pan) pan.classList.add('d-none');
+            }
+          } else {
+            if (poid) poid.value = '';
+            var pan2 = document.getElementById('pay-po-balance-panel');
+            if (pan2) pan2.classList.add('d-none');
+          }
+          applyPayBillPanel(d);
+          if (window.toastr) toastr.success('Bill loaded.');
+        })
+        .catch(function(err) {
+          if (billHidInp) billHidInp.value = '';
+          hidePayBillPanel();
+          if (window.toastr) toastr.error((err && err.message) ? String(err.message) : 'Bill lookup failed.');
+        });
+    });
+    billRefInp.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      billLoadBtn.click();
+    });
+  }
+
+  /** Edit mode: re-load PO / bill totals & history into the side panels using the values already stored on the request. */
+  if (isPayReqEditMode) {
+    var typeOnLoad = (typeSel && typeSel.value) || '';
+    if (PO.indexOf(typeOnLoad) !== -1) {
+      var initialBillRef = billRefInp ? String(billRefInp.value || '').trim() : '';
+      var initialPoRef = poid ? String(poid.value || '').trim() : '';
+      var initialMode = getPayLinkMode();
+      if (initialMode === 'bill' && initialBillRef && billLoadBtn) {
+        try { billLoadBtn.click(); } catch (e) { /* ignore */ }
+      } else if (initialMode === 'po' && initialPoRef && lBtn) {
+        try { lBtn.click(); } catch (e) { /* ignore */ }
+      }
+    }
   }
 })();
 </script>
