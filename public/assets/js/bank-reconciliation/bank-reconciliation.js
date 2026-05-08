@@ -4605,6 +4605,180 @@ $(document).ready(function() {
         return 'bi-file-earmark br-att-icon-generic';
     }
 
+    function resetBankMatchAttachmentsViewerChrome() {
+        var $t = $('#bankMatchAttachmentsViewerTitle');
+        var $s = $('#bankMatchAttachmentsViewerSubtitle');
+        var $fn = $('#bankMatchAttachmentsViewerFootnote');
+        if ($t.length) {
+            $t.text('Match Attachments');
+        }
+        if ($s.length) {
+            $s.text('Uploaded files for this transaction');
+        }
+        if ($fn.length) {
+            $fn.html(
+                '<strong>Tip:</strong> Images and PDFs preview here. Spreadsheet / Word links use <strong>Open</strong> or <strong>Save</strong> in a new tab.'
+            );
+        }
+    }
+
+    /** Single file card markup for the attachments gallery. */
+    function brAttBuildMediaCardHtml(f) {
+        var url = bankReconResolveAttachmentUrl(f);
+        var name = (f && f.name) ? String(f.name) : 'File';
+        var tag = (f && f.tag) ? String(f.tag).trim() : '';
+        var ext = name.split('.').pop().toLowerCase();
+        var iconClass = brAttFileIconClass(ext);
+        var tagChip = tag ? '<span class="br-att-tag-chip br-att-chip-glow">' + escapeAttr(tag) + '</span>' : '';
+        var wideClass = ext === 'pdf' ? ' br-att-media-card--wide' : '';
+        var preview = '';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].indexOf(ext) !== -1) {
+            preview =
+                '<div class="br-att-preview-box">' +
+                '<img src="' +
+                escapeAttr(url) +
+                '" alt="" loading="lazy" decoding="async" class="br-att-preview-img">' +
+                '</div>';
+        } else if (ext === 'pdf') {
+            preview =
+                '<div class="br-att-preview-box br-att-preview-pdf">' +
+                '<embed src="' +
+                escapeAttr(url) +
+                '" type="application/pdf" width="100%" height="480" class="d-block"></embed>' +
+                '</div>';
+        } else {
+            preview =
+                '<div class="br-att-preview-box br-att-preview-unavail">' +
+                '<i class="bi bi-file-earmark-arrow-down br-att-unavail-icon"></i>' +
+                '<div class="br-att-unavail-text">No inline preview</div>' +
+                '<div class="br-att-unavail-sub">Use <strong>Open</strong> or <strong>Save</strong> below.</div>' +
+                '</div>';
+        }
+        return (
+            '<article class="br-att-item br-att-media-card' +
+                wideClass +
+                '" role="listitem">' +
+                '<div class="br-att-item-header br-att-premium-band">' +
+                '<div class="br-att-file-meta-bridge">' +
+                '<span class="br-att-file-icon br-att-premium-file-ico"><i class="bi ' +
+                iconClass +
+                '"></i></span>' +
+                '<div class="br-att-file-info">' +
+                '<div class="br-att-file-name">' +
+                escapeAttr(name) +
+                '</div>' +
+                (tagChip ? '<div class="br-att-file-tag">' + tagChip + '</div>' : '') +
+                '</div></div>' +
+                '<div class="br-att-action-group">' +
+                '<a href="' +
+                escapeAttr(url) +
+                '" target="_blank" rel="noopener noreferrer" class="br-att-open-btn-bridge">' +
+                '<i class="bi bi-box-arrow-up-right"></i>Open' +
+                '</a>' +
+                '<a href="' +
+                escapeAttr(url) +
+                '" download="' +
+                escapeAttr(name) +
+                '" target="_blank" rel="noopener noreferrer" class="br-att-save-btn-bridge">' +
+                '<i class="bi bi-download"></i>Save' +
+                '</a>' +
+                '</div></div>' +
+                '<div class="br-att-preview-shell br-att-zoom-surface">' +
+                preview +
+                '</div></article>'
+        );
+    }
+
+    /**
+     * @param {Array<{path?: string, url?: string, name?: string, tag?: string}>} files
+     * @param {{dateSections?: Array<{label:string, dateYmd?: string, files: Array}>}} [opts]
+     */
+    function renderBankMatchAttachmentsViewerModalBody(files, opts) {
+        opts = opts || {};
+        var $body = $('#bankMatchAttachmentsViewerBody');
+        var $footnote = $('#bankMatchAttachmentsViewerFootnote');
+        $body.empty();
+
+        function restoreDefaultFootnote() {
+            if ($footnote.length) {
+                $footnote.html(
+                    '<strong>Tip:</strong> Images and PDFs preview here. Spreadsheet / Word links use <strong>Open</strong> or <strong>Save</strong> in a new tab.'
+                );
+            }
+        }
+
+        function setGroupedFootnote() {
+            if ($footnote.length) {
+                $footnote.html(
+                    '<strong>Tip:</strong> Groups follow your <strong>collection dates</strong> (same as branch financial <strong>report date</strong>). Use <strong>Open</strong> or <strong>Save</strong> on each card.'
+                );
+            }
+        }
+
+        if (opts.dateSections && opts.dateSections.length) {
+            setGroupedFootnote();
+            var html = opts.dateSections
+                .map(function (sec) {
+                    var label = sec.label ? String(sec.label) : String(sec.dateYmd || '');
+                    var fileList = sec.files || [];
+                    var count = fileList.length;
+
+                    var head =
+                        '<header class="br-att-date-block-head">' +
+                        '<div class="br-att-date-block-title">' +
+                        '<span class="br-att-date-block-cal" aria-hidden="true"><i class="bi bi-calendar3"></i></span>' +
+                        '<div>' +
+                        '<div class="br-att-date-block-kicker">Branch financial · report date</div>' +
+                        '<div class="br-att-date-block-label">' +
+                        escapeAttr(label || '—') +
+                        '</div>' +
+                        '</div></div>' +
+                        '<span class="br-att-date-block-meta">' +
+                        count +
+                        ' file' +
+                        (count === 1 ? '' : 's') +
+                        '</span>' +
+                        '</header>';
+
+                    var inner = fileList.length
+                        ? '<div class="br-att-gallery-grid" role="list">' +
+                          fileList.map(brAttBuildMediaCardHtml).join('') +
+                          '</div>'
+                        : '<div class="br-att-date-empty">' +
+                          '<span class="br-att-date-empty-ico"><i class="bi bi-folder-x"></i></span>' +
+                          '<span class="br-att-date-empty-txt">No files for this date</span>' +
+                          '</div>';
+
+                    return (
+                        '<section class="br-att-date-block"' +
+                        (sec.dateYmd ? ' data-report-date="' + escapeAttr(String(sec.dateYmd)) + '"' : '') +
+                        ' aria-label="' +
+                        escapeAttr('Report date ' + (label || sec.dateYmd || '')) +
+                        '">' +
+                        head +
+                        inner +
+                        '</section>'
+                    );
+                })
+                .join('');
+
+            $body.html('<div class="br-att-date-wise-wrap">' + html + '</div>');
+            return;
+        }
+
+        restoreDefaultFootnote();
+        if (!files || !files.length) {
+            $body.html(
+                '<div class="br-att-empty-bridge">' +
+                    '<div class="br-att-empty-icon-big"><i class="bi bi-folder2-open"></i></div>' +
+                    '<div class="br-att-empty-msg">No attachments to show</div>' +
+                    '</div>'
+            );
+            return;
+        }
+        $body.html('<div class="br-att-gallery-grid" role="list">' + files.map(brAttBuildMediaCardHtml).join('') + '</div>');
+    }
+
     $(document).on('click', '.br-income-slot-att', function (e) {
         e.stopPropagation();
     });
@@ -4614,59 +4788,13 @@ $(document).ready(function() {
         e.stopPropagation();
         var sid = $(this).data('stmt-id');
         var files = (window.bankReconMatchFiles && window.bankReconMatchFiles[sid]) ? window.bankReconMatchFiles[sid] : [];
-        var $body = $('#bankMatchAttachmentsViewerBody');
-        $body.empty();
-        if (!files.length) {
-            $body.html(
-                '<div class="br-att-empty">' +
-                '<i class="bi bi-folder2-open br-att-empty-icon"></i>' +
-                '<div class="br-att-empty-text">No attachments uploaded</div>' +
-                '</div>'
-            );
-        } else {
-            files.forEach(function (f, idx) {
-                var url = bankReconResolveAttachmentUrl(f);
-                var name = (f && f.name) ? String(f.name) : 'File';
-                var tag = (f && f.tag) ? String(f.tag).trim() : '';
-                var ext = name.split('.').pop().toLowerCase();
-                var iconClass = brAttFileIconClass(ext);
-                var tagChip = tag
-                    ? '<span class="br-att-tag-chip">' + escapeAttr(tag) + '</span>'
-                    : '';
-                var preview = '';
-                if (['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(ext) !== -1) {
-                    preview = '<div class="br-att-preview-box">' +
-                        '<img src="' + escapeAttr(url) + '" alt="" class="br-att-preview-img">' +
-                        '</div>';
-                } else if (ext === 'pdf') {
-                    preview = '<div class="br-att-preview-box br-att-preview-pdf">' +
-                        '<embed src="' + escapeAttr(url) + '" type="application/pdf" width="100%" height="460px" class="d-block"></embed>' +
-                        '</div>';
-                } else {
-                    preview = '<div class="br-att-preview-box br-att-preview-unavail">' +
-                        '<i class="bi bi-download br-att-unavail-icon"></i>' +
-                        '<div class="br-att-unavail-text">Preview not available</div>' +
-                        '<div class="br-att-unavail-sub">Use the Open button to download this file</div>' +
-                        '</div>';
-                }
-                $body.append(
-                    '<div class="br-att-item' + (idx > 0 ? ' br-att-item-sep' : '') + '">' +
-                    '<div class="br-att-item-header">' +
-                    '<div class="br-att-file-meta">' +
-                    '<span class="br-att-file-icon"><i class="bi ' + iconClass + '"></i></span>' +
-                    '<div class="br-att-file-info">' +
-                    '<div class="br-att-file-name">' + escapeAttr(name) + '</div>' +
-                    (tagChip ? '<div class="br-att-file-tag">' + tagChip + '</div>' : '') +
-                    '</div>' +
-                    '</div>' +
-                    '<a href="' + escapeAttr(url) + '" target="_blank" rel="noopener" class="br-att-open-btn"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>' +
-                    '</div>' +
-                    preview +
-                    '</div>'
-                );
-            });
-        }
+        resetBankMatchAttachmentsViewerChrome();
+        renderBankMatchAttachmentsViewerModalBody(files);
         bankReconShowModal(document.getElementById('bankMatchAttachmentsViewerModal'));
+    });
+
+    $('#bankMatchAttachmentsViewerModal').on('hidden.bs.modal', function () {
+        resetBankMatchAttachmentsViewerChrome();
     });
 
     function doMatchWithBill(billId, billAmount, $btn) {
@@ -5554,6 +5682,233 @@ $(document).ready(function() {
 
     var incomeTagSelectedModes = new Set();
     var incomeTagFp = null; // flatpickr instance for income tag date
+    var incomeTagBranchFinancialFlatFiles = [];
+    /** @type {Record<string, Array<object>>|null} Map Y-m-d → API file rows */
+    var incomeTagBranchFinancialFilesByDate = null;
+    var incomeTagBfXhr = null;
+    var incomeTagBfTimer = null;
+
+    function incomeTagBfRowToViewerBySection(x) {
+        var p = x && x.path ? String(x.path).trim() : '';
+        var nm = x && x.name ? String(x.name).trim() : '';
+        if (!nm && p) {
+            var segs2 = p.split(/[/\\]/);
+            nm = segs2[segs2.length - 1] || p;
+        }
+        return {
+            path: p,
+            name: nm || 'File',
+            tag: x && x.tag ? String(x.tag).trim() : '',
+        };
+    }
+
+    function patchIncomeTagBranchFinancialControls(opts) {
+        opts = opts || {};
+        var $btn = $('#incomeTagBranchFinancialBtn');
+        var $badge = $('#incomeTagBranchFinancialCount');
+
+        if (opts.count != null && $badge.length) {
+            var s = String(Math.max(0, parseInt(opts.count, 10) || 0));
+            $badge.text(s).attr('data-count', s);
+        }
+
+        if ($btn.length && typeof opts.launchEnabled === 'boolean') {
+            var en = opts.launchEnabled;
+            $btn.prop('disabled', !en).attr('aria-disabled', en ? 'false' : 'true');
+        }
+    }
+
+    function scheduleIncomeTagBranchFinancialFetch() {
+        if (typeof routes === 'undefined' || !routes.incomeTagBranchFinancialFiles) {
+            return;
+        }
+        var $mbr = $('#matchTransactionModal');
+        if (!$mbr.length || !$mbr.hasClass('show')) {
+            return;
+        }
+        if (incomeTagBfTimer) {
+            clearTimeout(incomeTagBfTimer);
+        }
+        incomeTagBfTimer = setTimeout(function () {
+            incomeTagBfTimer = null;
+            fetchIncomeTagBranchFinancialFiles();
+        }, 350);
+    }
+
+    function fetchIncomeTagBranchFinancialFiles() {
+        if (typeof routes === 'undefined' || !routes.incomeTagBranchFinancialFiles) {
+            return;
+        }
+        var $mbrFetch = $('#matchTransactionModal');
+        if (!$mbrFetch.length || !$mbrFetch.hasClass('show')) {
+            return;
+        }
+        if (incomeTagBfXhr && incomeTagBfXhr.abort) {
+            try {
+                incomeTagBfXhr.abort();
+            } catch (eAb) {
+                /* ignore */
+            }
+        }
+
+        incomeTagBranchFinancialFlatFiles = [];
+        incomeTagBranchFinancialFilesByDate = null;
+        var $btn = $('#incomeTagBranchFinancialBtn');
+        var $st = $('#incomeTagBranchFinancialStatus');
+
+        if (!$btn.length) {
+            return;
+        }
+
+        patchIncomeTagBranchFinancialControls({ count: 0, launchEnabled: false });
+
+        var zoneId = $('#incomeTagZone').val();
+        var branchId = $('#incomeTagBranch').val();
+        var dates = getIncomeTagSelectedYmdSorted();
+
+        if (!zoneId || !branchId || !dates.length) {
+            if ($st.length) {
+                $st.html('Select <strong>zone</strong>, <strong>branch</strong>, and <strong>collection date(s)</strong> — files load automatically, then tap the card to view.');
+            }
+            return;
+        }
+
+        if ($st.length) {
+            $st.html('<span class="text-muted br-income-bfr-pulse">Loading branch financial files…</span>');
+        }
+
+        incomeTagBfXhr = $.ajax({
+            url: routes.incomeTagBranchFinancialFiles,
+            type: 'GET',
+            dataType: 'json',
+            data: { zone_id: zoneId, branch_id: branchId, dates: dates },
+        })
+            .done(function (res) {
+                incomeTagBfXhr = null;
+                incomeTagBranchFinancialFlatFiles = res && res.success && res.files ? res.files : [];
+                incomeTagBranchFinancialFilesByDate =
+                    res && res.success && res.files_by_date && typeof res.files_by_date === 'object'
+                        ? res.files_by_date
+                        : null;
+                var n = incomeTagBranchFinancialFlatFiles.length;
+                if (!res || !res.success) {
+                    incomeTagBranchFinancialFlatFiles = [];
+                    incomeTagBranchFinancialFilesByDate = null;
+                    patchIncomeTagBranchFinancialControls({ count: 0, launchEnabled: false });
+                    if ($st.length) {
+                        $st.text((res && res.message) ? res.message : 'Could not load branch financial files.');
+                    }
+                    return;
+                }
+                patchIncomeTagBranchFinancialControls({ count: n, launchEnabled: n > 0 });
+
+                function buildBucketsFromFlat() {
+                    var map = {};
+                    var ymds = getIncomeTagSelectedYmdSorted();
+                    ymds.forEach(function (d) {
+                        map[d] = [];
+                    });
+                    incomeTagBranchFinancialFlatFiles.forEach(function (fx) {
+                        var k = (fx.report_date || '').toString().trim().substring(0, 10);
+                        if (map[k]) {
+                            map[k].push(fx);
+                        }
+                    });
+                    return map;
+                }
+
+                if (!incomeTagBranchFinancialFilesByDate) {
+                    incomeTagBranchFinancialFilesByDate = buildBucketsFromFlat();
+                }
+
+                var orderedYmds = getIncomeTagSelectedYmdSorted();
+                if (n === 0) {
+                    if ($st.length) {
+                        $st.text('No branch financial upload for this branch and date(s).');
+                    }
+                } else if ($st.length) {
+                    if (orderedYmds.length <= 1) {
+                        $st.html(
+                            '<strong>' +
+                                String(n) +
+                                '</strong> file(s) — <strong>tap the card</strong> for previews.'
+                        );
+                    } else {
+                        var perDateBits = orderedYmds.map(function (ymd) {
+                            var fc = incomeTagBranchFinancialFilesByDate[ymd];
+                            fc = fc && fc.length ? fc.length : 0;
+                            var label = moment(ymd, 'YYYY-MM-DD').format('DD/MM/YYYY');
+
+                            return label + ': <strong>' + String(fc) + '</strong>';
+                        });
+
+                        $st.html(
+                            '<strong>' +
+                                String(n) +
+                                '</strong> file(s) over <strong>' +
+                                String(orderedYmds.length) +
+                                '</strong> dates — ' +
+                                perDateBits.join(' · ') +
+                                '. <strong>Tap the card</strong>— gallery is grouped by date.'
+                        );
+                    }
+                }
+            })
+            .fail(function (xhr, statusText) {
+                incomeTagBfXhr = null;
+                if (statusText === 'abort') {
+                    return;
+                }
+                incomeTagBranchFinancialFlatFiles = [];
+                incomeTagBranchFinancialFilesByDate = null;
+                patchIncomeTagBranchFinancialControls({ count: 0, launchEnabled: false });
+                var msg = 'Could not load branch financial files.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                if ($st.length) {
+                    $st.text(msg);
+                }
+            });
+    }
+
+    $(document).on('click', '#incomeTagBranchFinancialBtn', function () {
+        if (!incomeTagBranchFinancialFlatFiles.length) {
+            return;
+        }
+        var branch =
+            ($('#incomeTagBranchName').val() ||
+                $('#incomeTagBranch option:selected').data('name') ||
+                '')
+                .toString()
+                .trim();
+        var orderedYmd = getIncomeTagSelectedYmdSorted();
+        var dateStr = orderedYmd
+            .map(function (ymd) {
+                return moment(ymd, 'YYYY-MM-DD').format('DD/MM/YYYY');
+            })
+            .join(', ');
+        $('#bankMatchAttachmentsViewerTitle').text('Branch financial uploads');
+        $('#bankMatchAttachmentsViewerSubtitle').text(
+            (branch ? branch + ' · ' : '') + 'Grouped by report date: ' + (dateStr || '—')
+        );
+
+        var byDate = incomeTagBranchFinancialFilesByDate || {};
+        var dateSections = orderedYmd.map(function (ymd) {
+            var raw = Object.prototype.hasOwnProperty.call(byDate, ymd) ? byDate[ymd] : [];
+            if (!raw || !raw.length) {
+                raw = [];
+            }
+            return {
+                dateYmd: ymd,
+                label: moment(ymd, 'YYYY-MM-DD').format('DD/MM/YYYY'),
+                files: raw.map(incomeTagBfRowToViewerBySection),
+            };
+        });
+
+        renderBankMatchAttachmentsViewerModalBody(null, { dateSections: dateSections });
+        bankReconShowModal(document.getElementById('bankMatchAttachmentsViewerModal'));
+    });
 
     function resetIncomeTagDateToToday() {
         if (incomeTagFp) {
@@ -5665,6 +6020,22 @@ $(document).ready(function() {
         $('#incomeTagDateSplitWrap').hide().empty();
         $('.income-tag-mode-btn').removeClass('selected');
         unlockIncomeTagSelects();
+        if (incomeTagBfTimer) {
+            clearTimeout(incomeTagBfTimer);
+            incomeTagBfTimer = null;
+        }
+        if (incomeTagBfXhr && incomeTagBfXhr.abort) {
+            try {
+                incomeTagBfXhr.abort();
+            } catch (eAb2) {
+                /* ignore */
+            }
+        }
+        incomeTagBfXhr = null;
+        incomeTagBranchFinancialFlatFiles = [];
+        incomeTagBranchFinancialFilesByDate = null;
+        patchIncomeTagBranchFinancialControls({ count: 0, launchEnabled: false });
+        $('#incomeTagBranchFinancialStatus').text('');
         updateIncomeTagSummary();
         resetMatchModalTabsVisibility();
         destroyRadiantPickupSelect2();
@@ -5876,6 +6247,8 @@ $(document).ready(function() {
         if (modes)      parts.push('Mode: ' + modes);
 
         $('#incomeTagFilterSummary').text(parts.length ? parts.join(' | ') : 'No filters applied yet');
+
+        scheduleIncomeTagBranchFinancialFetch();
     }
 
     // ---- Apply Income Tag ----

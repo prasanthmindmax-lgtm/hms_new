@@ -146,10 +146,10 @@
 <script>
 $(document).ready(function() {
     // Explicitly set the base path with /public
-    var basePath = '/hms_new/public';
+    var basePath = '/hms/public';
     
     // Configuration
-    // var POLL_INTERVAL = 3600000; 
+    var POLL_INTERVAL = 3600000; 
     var UNREAD_URL    = basePath + '/notifications/unread';
     var READ_URL      = basePath + '/notifications/{id}/read';
     var READ_ALL_URL  = basePath + '/notifications/read-all';

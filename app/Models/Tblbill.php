@@ -42,6 +42,7 @@ class Tblbill extends Authenticatable
         'discount_type',
         'discount_percent',
         'discount_tax',
+        'Tax_in_ex',
         'discount_amount',
         'adjustment_value',
         'tds_tax_id',

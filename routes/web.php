@@ -29,7 +29,8 @@ use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\PaymentRequestController;
-use App\Http\Controllers\UserActivityController;
+use App\Http\Controllers\UserActivityController;  
+use App\Http\Controllers\GstR1WorkingController;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
 // ─── Checkin Report Module ───────────────────────────────────────────────────
@@ -739,6 +740,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         // Income Tag supporting dropdowns
         Route::get('/income-tag/zones', [BankStatementController::class, 'incomeTagZones'])->name('income-tag.zones');
         Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');
+        Route::get('/income-tag/branch-financial-files', [BankStatementController::class, 'incomeTagBranchFinancialFiles'])->name('income-tag.branch-financial-files');
         Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
         Route::get('/radiant-cash-pickups-for-date', [BankStatementController::class, 'radiantCashPickupsForTransactionDate'])->name('radiant-cash-pickups-for-date');
         Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
@@ -756,6 +758,31 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/match-attachment-types', [BankStatementController::class, 'storeMatchAttachmentType'])->name('match-attachment-types.store');
         Route::post('/match-attachment-types/{id}', [BankStatementController::class, 'updateMatchAttachmentType'])->name('match-attachment-types.update');
         Route::delete('/match-attachment-types/{id}', [BankStatementController::class, 'destroyMatchAttachmentType'])->name('match-attachment-types.destroy');
+    });
+
+    
+    Route::prefix('/gst-r1')->name('gst_r1.')->group(function () {
+    
+        // Main page
+        Route::get('/',                  [GstR1WorkingController::class, 'index'])     ->name('index');
+    
+        // AJAX list (pagination, search, filter)
+        Route::get('/list',              [GstR1WorkingController::class, 'list'])      ->name('list');
+    
+        // Single record (for edit modal)
+        Route::get('/{id}',              [GstR1WorkingController::class, 'show'])      ->name('show');
+    
+        // CRUD
+        Route::post('/',                 [GstR1WorkingController::class, 'store'])     ->name('store');
+        Route::put('/{id}',              [GstR1WorkingController::class, 'update'])    ->name('update');
+        Route::delete('/{id}',           [GstR1WorkingController::class, 'destroy'])   ->name('destroy');
+    
+        // Import
+        Route::post('/import/excel',     [GstR1WorkingController::class, 'import'])    ->name('import');
+    
+        // Export
+        Route::get('/export/xlsx',       [GstR1WorkingController::class, 'exportXlsx'])->name('export.xlsx');
+        Route::get('/export/csv',        [GstR1WorkingController::class, 'exportCsv']) ->name('export.csv');
     });
 
     //income new stats

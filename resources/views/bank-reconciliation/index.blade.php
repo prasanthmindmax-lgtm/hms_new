@@ -320,6 +320,436 @@
         .bank-recon-qf-row--6 .bank-recon-qf-menu { min-width: 100% !important; max-width: 100% !important; }
         /* SweetAlert2 above Match Transaction drawer (JS also lowers modal z-index while Swal is open) */
         .swal2-container { z-index: 2147483647 !important; }
+
+        /* ── Income tag: branch financial “launch gallery” (interactive tap target) ── */
+        .br-income-bfr-card {
+            position: relative;
+            border-radius: 14px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.55), rgba(99, 102, 241, 0.35), rgba(14, 165, 233, 0.2));
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
+        }
+        .br-income-bfr-card::before {
+            content: '';
+            position: absolute;
+            inset: 1px;
+            border-radius: 13px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .br-income-bfr-card-inner {
+            position: relative;
+            z-index: 1;
+            padding: 10px 10px 8px;
+        }
+        button.br-income-bfr-launch-btn {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: left;
+            padding: 10px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        button.br-income-bfr-launch-btn:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 28px rgba(14, 165, 233, 0.18);
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.07), rgba(99, 102, 241, 0.05));
+        }
+        button.br-income-bfr-launch-btn:not(:disabled):active {
+            transform: translateY(0);
+            box-shadow: 0 6px 16px rgba(14, 165, 233, 0.12);
+        }
+        button.br-income-bfr-launch-btn:focus-visible {
+            outline: 2px solid rgba(14, 165, 233, 0.7);
+            outline-offset: 2px;
+        }
+        button.br-income-bfr-launch-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.62;
+            filter: grayscale(0.12);
+        }
+        .br-income-bfr-launch-row {
+            display: flex;
+            align-items: stretch;
+            gap: 12px;
+        }
+        .br-income-bfr-launch-ico-wrap {
+            flex-shrink: 0;
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, #0ea5e9, #0284c7);
+            color: #fff;
+            font-size: 1.35rem;
+            box-shadow: 0 8px 20px rgba(2, 132, 199, 0.35);
+        }
+        button.br-income-bfr-launch-btn:disabled .br-income-bfr-launch-ico-wrap {
+            background: linear-gradient(145deg, #94a3b8, #64748b);
+            box-shadow: none;
+        }
+        .br-income-bfr-launch-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 2px;
+        }
+        .br-income-bfr-launch-title {
+            font-size: 0.94rem;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+        button.br-income-bfr-launch-btn:disabled .br-income-bfr-launch-title {
+            color: #64748b;
+        }
+        .br-income-bfr-launch-sub {
+            font-size: 0.75rem;
+            color: #64748b;
+            line-height: 1.35;
+        }
+        .br-income-bfr-launch-tail {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .br-income-bfr-count {
+            min-width: 2.05rem;
+            height: 2.05rem;
+            padding: 0 10px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: #fff;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+        button.br-income-bfr-launch-btn:disabled .br-income-bfr-count {
+            background: #cbd5e1;
+            color: #475569;
+            box-shadow: none;
+        }
+        .br-income-bfr-count[data-count="0"] {
+            opacity: 0.9;
+        }
+        .br-income-bfr-chevron {
+            color: #0ea5e9;
+            font-size: 1.25rem;
+            opacity: 0.85;
+            transition: transform 0.2s ease;
+        }
+        button.br-income-bfr-launch-btn:not(:disabled):hover .br-income-bfr-chevron {
+            transform: translateX(3px);
+        }
+        button.br-income-bfr-launch-btn:disabled .br-income-bfr-chevron {
+            color: #94a3b8;
+            transform: none;
+        }
+        .br-income-bfr-status {
+            margin: 8px 4px 0;
+            padding: 6px 8px;
+            font-size: 0.76rem;
+            color: #64748b;
+            line-height: 1.4;
+            min-height: 1.75rem;
+        }
+        .br-income-bfr-status strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+        @keyframes brIncomeBfrShimmer {
+            0%, 100% { opacity: 0.55; }
+            50% { opacity: 1; }
+        }
+        .br-income-bfr-pulse {
+            animation: brIncomeBfrShimmer 1.15s ease-in-out infinite;
+        }
+
+        /* ── Attachment viewer modal (gallery) ── */
+        #bankMatchAttachmentsViewerModal .modal-dialog {
+            max-width: min(960px, 100vw - 1.25rem);
+        }
+        #bankMatchAttachmentsViewerModal.modal .modal-dialog {
+            transition: transform 0.25s ease-out;
+        }
+        .br-att-modal-content.br-att-premium-shell {
+            border: none;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 24px 56px rgba(15, 23, 42, 0.2);
+        }
+        .br-att-premium-meta .br-att-head-gear {
+            width: 42px !important;
+            height: 42px !important;
+            flex-shrink: 0;
+            border-radius: 12px !important;
+            font-size: 1.08rem !important;
+            margin: 0 !important;
+        }
+        .br-att-modal-header.br-att-premium-head {
+            background: linear-gradient(125deg, #0f172a 0%, #1e293b 45%, #0c4a6e 110%);
+            color: #fff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 1rem 1.15rem;
+        }
+        .br-att-modal-header.br-att-premium-head .btn-close-white {
+            filter: invert(1) grayscale(100%);
+            opacity: 0.75;
+        }
+        .br-att-modal-body.br-att-premium-body {
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            padding: 1rem 1rem 1.15rem;
+        }
+        .br-att-modal-footnote {
+            border-top: 1px dashed #e2e8f0;
+            padding-top: 0.85rem !important;
+            margin-top: 0.85rem !important;
+            margin-bottom: 0 !important;
+        }
+        .br-att-premium-meta .br-att-modal-subtitle {
+            color: rgba(255, 255, 255, 0.75) !important;
+            font-size: 0.8rem;
+            margin-top: 2px;
+        }
+        .br-att-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+            gap: 14px;
+        }
+        @media (min-width: 900px) {
+            .br-att-gallery-grid { gap: 16px; }
+        }
+        /* Date-wise branch financial grouping inside viewer */
+        .br-att-date-wise-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 1.1rem;
+        }
+        .br-att-date-block {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+        }
+        .br-att-date-block-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #f1f5f9;
+            background: linear-gradient(95deg, rgba(14, 165, 233, 0.12), rgba(248, 250, 252, 1));
+        }
+        .br-att-date-block-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .br-att-date-block-cal {
+            flex-shrink: 0;
+            color: #0369a1;
+            font-size: 1.2rem;
+        }
+        .br-att-date-block-kicker {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.055em;
+            text-transform: uppercase;
+            color: #64748b;
+            line-height: 1.2;
+            margin-bottom: 2px;
+        }
+        .br-att-date-block-label {
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+        .br-att-date-block-meta {
+            flex-shrink: 0;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #fff;
+            padding: 0.35rem 0.72rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            white-space: nowrap;
+        }
+        .br-att-date-block > .br-att-gallery-grid {
+            padding: 12px;
+            background: linear-gradient(180deg, #f8fafc, #fafafa);
+            border-radius: 0 0 12px 12px;
+        }
+        .br-att-date-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 1.65rem 1rem;
+            color: #64748b;
+            background: linear-gradient(180deg, #f8fafc, #fff);
+            font-size: 0.845rem;
+        }
+        .br-att-date-empty-ico {
+            font-size: 1.35rem;
+            color: #cbd5e1;
+        }
+        .br-att-date-empty-txt {
+            font-weight: 600;
+            color: #475569;
+        }
+        .br-att-media-card {
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+        .br-att-media-card:hover {
+            border-color: #bae6fd;
+            box-shadow: 0 10px 28px rgba(14, 165, 233, 0.14);
+            transform: translateY(-2px);
+        }
+        .br-att-media-card--wide {
+            grid-column: 1 / -1;
+        }
+        .br-att-media-card .br-att-item-header.br-att-premium-band {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 12px;
+            margin: 0;
+            border: none;
+            background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+            flex-wrap: wrap;
+        }
+        .br-att-file-meta-bridge {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            flex: 1;
+            min-width: 140px;
+        }
+        .br-att-file-icon.br-att-premium-file-ico {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+        }
+        .br-att-premium-band .br-att-file-info .br-att-file-name {
+            font-weight: 600;
+            font-size: 0.825rem;
+            color: #0f172a;
+            word-break: break-word;
+        }
+        .br-att-tag-chip.br-att-chip-glow {
+            display: inline-block;
+            padding: 2px 8px;
+            margin-top: 4px;
+            border-radius: 999px;
+            font-size: 0.69rem;
+            font-weight: 600;
+            color: #0369a1;
+            background: linear-gradient(180deg, rgba(14, 165, 233, 0.15), rgba(99, 102, 241, 0.1));
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+        .br-att-action-group {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        a.br-att-open-btn-bridge,
+        a.br-att-save-btn-bridge {
+            border-radius: 10px !important;
+            padding: 0.38rem 0.72rem !important;
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+            text-decoration: none !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.28rem;
+        }
+        a.br-att-open-btn-bridge {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7) !important;
+            color: #fff !important;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+            border: none !important;
+        }
+        a.br-att-open-btn-bridge:hover {
+            color: #fff !important;
+            filter: brightness(1.05);
+        }
+        a.br-att-save-btn-bridge {
+            background: #fff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #475569 !important;
+        }
+        a.br-att-save-btn-bridge:hover {
+            border-color: #94a3b8 !important;
+            color: #0f172a !important;
+        }
+        .br-att-preview-shell.br-att-zoom-surface {
+            padding: 0 12px 12px;
+        }
+        .br-att-preview-shell .br-att-preview-box {
+            border-radius: 10px !important;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .br-att-preview-shell .br-att-preview-img {
+            display: block;
+            width: 100%;
+            max-height: min(340px, 46vh);
+            object-fit: contain;
+            cursor: zoom-in;
+            background: #0f172a;
+        }
+        .br-att-preview-shell .br-att-preview-pdf embed {
+            border-radius: 10px !important;
+            border: none;
+            background: #f1f5f9;
+        }
+        .br-att-preview-shell .br-att-preview-unavail {
+            min-height: 160px !important;
+        }
+        .br-att-empty-bridge {
+            text-align: center;
+            padding: 2.5rem 1.25rem;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px dashed #cbd5e1;
+        }
+        .br-att-empty-bridge .br-att-empty-icon-big {
+            font-size: 2.75rem;
+            color: #cbd5e1;
+            margin-bottom: 0.65rem;
+        }
+        .br-att-empty-bridge .br-att-empty-msg {
+            color: #64748b;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body style="overflow-x: hidden;">
@@ -1768,6 +2198,41 @@
                                     <small class="text-muted" style="font-size:10px;">Card &amp; UPI share the same bank entry. NEFT and Others are tracked separately.</small>
                                 </div>
 
+                                {{-- Branch financial uploads from daily report (same zone / branch / collection date — preview on demand) --}}
+                                <div class="mb-3 br-income-tag-bfr-block" id="incomeTagBranchFinancialBlock">
+                                    <label class="income-tag-label">
+                                        <span class="income-tag-label-dot" style="background:#0ea5e9;"></span>BRANCH FINANCIAL REPORT FILES
+                                        <span class="text-muted fw-normal ms-1" style="font-size:10px;text-transform:none;">(from uploads)</span>
+                                    </label>
+                                    <div class="br-income-bfr-card">
+                                        <div class="br-income-bfr-card-inner">
+                                            <button type="button"
+                                                class="br-income-bfr-launch-btn"
+                                                id="incomeTagBranchFinancialBtn"
+                                                disabled
+                                                aria-disabled="true"
+                                                title="Pick zone, branch, collection date(s), wait for files to load, then tap to preview">
+                                                <div class="br-income-bfr-launch-row">
+                                                    <span class="br-income-bfr-launch-ico-wrap" aria-hidden="true">
+                                                        <i class="bi bi-layers-fill"></i>
+                                                    </span>
+                                                    <span class="br-income-bfr-launch-main">
+                                                        <span class="br-income-bfr-launch-title">Open uploaded file gallery</span>
+                                                        <span class="br-income-bfr-launch-sub">
+                                                            Branch financial attachments for your selected dates — tap here for fullscreen-style previews &amp; open / save.
+                                                        </span>
+                                                    </span>
+                                                    <span class="br-income-bfr-launch-tail">
+                                                        <span class="br-income-bfr-count" id="incomeTagBranchFinancialCount" data-count="0">0</span>
+                                                        <span class="br-income-bfr-chevron" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+                                                    </span>
+                                                </div>
+                                            </button>
+                                            <div class="br-income-bfr-status" id="incomeTagBranchFinancialStatus" aria-live="polite"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {{-- Income tag supporting documents (types: Income or Both in Bank Accounts → Attachment types) --}}
                                 <div class="mb-3 br-income-tag-att-block">
                                     <label class="income-tag-label">
@@ -2004,21 +2469,24 @@
     </div>
 
     {{-- View match attachments (public URLs — image/PDF preview + open in new tab) --}}
-    <div class="modal fade" id="bankMatchAttachmentsViewerModal" tabindex="-1">
+    <div class="modal fade" id="bankMatchAttachmentsViewerModal" tabindex="-1" aria-labelledby="bankMatchAttachmentsViewerTitle">
         <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-            <div class="modal-content br-att-modal-content">
-                <div class="modal-header br-att-modal-header">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="br-att-modal-icon"><i class="bi bi-paperclip"></i></div>
-                        <div>
-                            <h5 class="modal-title mb-0">Match Attachments</h5>
-                            <div class="br-att-modal-subtitle">Uploaded files for this transaction</div>
+            <div class="modal-content br-att-modal-content br-att-premium-shell">
+                <div class="modal-header br-att-modal-header br-att-premium-head">
+                    <div class="d-flex align-items-center gap-3 br-att-premium-meta">
+                        <div class="br-att-modal-icon br-income-bfr-launch-ico-wrap br-att-head-gear"><i class="bi bi-columns-gap"></i></div>
+                        <div class="flex-grow-1 min-w-0">
+                            <h5 class="modal-title mb-0 text-white text-truncate" id="bankMatchAttachmentsViewerTitle">Match Attachments</h5>
+                            <div class="br-att-modal-subtitle" id="bankMatchAttachmentsViewerSubtitle">Uploaded files for this transaction</div>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body br-att-modal-body">
+                <div class="modal-body br-att-modal-body br-att-premium-body">
                     <div id="bankMatchAttachmentsViewerBody" class="bank-match-att-viewer-body"></div>
+                    <p class="small text-muted br-att-modal-footnote mb-0" id="bankMatchAttachmentsViewerFootnote">
+                        <strong>Tip:</strong> Images and PDFs preview here. Spreadsheet / Word links use <strong>Open</strong> or <strong>Save</strong> in a new tab.
+                    </p>
                 </div>
             </div>
         </div>
@@ -2174,6 +2642,7 @@
             incomeUnmatch: "{{ route('bank-reconciliation.income-unmatch', ':id') }}",
             incomeTagZones: "{{ route('bank-reconciliation.income-tag.zones') }}",
             incomeTagBranches: "{{ route('bank-reconciliation.income-tag.branches') }}",
+            incomeTagBranchFinancialFiles: "{{ route('bank-reconciliation.income-tag.branch-financial-files') }}",
             incomeTagResolve: "{{ route('bank-reconciliation.income-tag.resolve-description') }}",
             radiantMatchAgainst: "{{ route('bank-reconciliation.radiant-match-against') }}",
             radiantCashPickupsForDate: "{{ route('bank-reconciliation.radiant-cash-pickups-for-date') }}",

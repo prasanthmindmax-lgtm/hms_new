@@ -136,6 +136,17 @@
 }
 .qd-filter-row:last-child { margin-bottom: 0; }
 
+/* Creator filter – teal accent */
+.creator-section .form-control {
+    border-color: #06b6d4 !important;
+}
+.creator-section .form-control:focus {
+    border-color: #0891b2 !important;
+    box-shadow: 0 0 0 2px rgba(6,182,212,.15) !important;
+}
+.creator-section label { color: #0891b2 !important; }
+.creator-section label i { color: #06b6d4 !important; }
+
 .qd-filter-group {
     display: flex;
     flex-direction: column;

@@ -4136,6 +4136,150 @@ class BankStatementController extends Controller
     }
 
     /**
+     * Branch financial report attachments for income-tag context (zone + branch + collection date(s)).
+     * Files are stored under public/branch_financial_files as JSON columns on branch_financial_reports.
+     */
+    public function incomeTagBranchFinancialFiles(Request $request)
+    {
+        if (! Schema::hasTable('branch_financial_reports')) {
+            return response()->json(['success' => false, 'message' => 'Branch financial reports are not available.', 'files' => []], 503);
+        }
+
+        $zoneId = (int) $request->input('zone_id', 0);
+        $branchId = (int) $request->input('branch_id', 0);
+        $datesRaw = $request->input('dates', []);
+
+        if ($zoneId <= 0 || $branchId <= 0) {
+            return response()->json(['success' => false, 'message' => 'Zone and branch are required.', 'files' => []], 422);
+        }
+
+        if (is_string($datesRaw)) {
+            $datesRaw = array_filter(array_map('trim', explode(',', $datesRaw)));
+        }
+        if (! is_array($datesRaw) || count($datesRaw) === 0) {
+            return response()->json(['success' => false, 'message' => 'At least one collection date is required.', 'files' => []], 422);
+        }
+
+        $dates = [];
+        foreach ($datesRaw as $d) {
+            $ds = is_string($d) ? trim($d) : '';
+            if ($ds === '') {
+                continue;
+            }
+            try {
+                $dates[] = Carbon::parse($ds)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return response()->json(['success' => false, 'message' => 'Invalid date: '.$ds, 'files' => []], 422);
+            }
+        }
+
+        $dates = array_values(array_unique($dates));
+        if (count($dates) === 0) {
+            return response()->json(['success' => false, 'message' => 'At least one valid collection date is required.', 'files' => []], 422);
+        }
+
+        $groupDefs = [
+            'radiant_collection' => ['column' => 'radiant_collection_files', 'label' => 'Radiant collection'],
+            'radiant_ledger_book' => ['column' => 'radiant_ledger_book_files', 'label' => 'Radiant ledger book'],
+            'deposit' => ['column' => 'deposit_files', 'label' => 'Deposit'],
+            'actual_card' => ['column' => 'actual_card_files', 'label' => 'Card / POS'],
+            'upi' => ['column' => 'upi_files', 'label' => 'UPI'],
+            'bank_deposit' => ['column' => 'bank_deposit_files', 'label' => 'Bank deposit'],
+            'cashier_info' => ['column' => 'cashier_info_files', 'label' => 'Cashier info'],
+            'additional_amounts' => ['column' => 'additional_amounts_files', 'label' => 'Additional amounts'],
+            'ledger' => ['column' => 'ledger_files', 'label' => 'Ledger'],
+        ];
+
+        foreach ($groupDefs as $key => $def) {
+            if (! Schema::hasColumn('branch_financial_reports', $def['column'])) {
+                unset($groupDefs[$key]);
+            }
+        }
+
+        $reportsQuery = DB::table('branch_financial_reports')
+            ->where('zone_id', $zoneId)
+            ->where('branch_id', $branchId)
+            ->whereIn(DB::raw('DATE(report_date)'), $dates)
+            ->orderBy('report_date');
+
+        $reportRows = $reportsQuery->get();
+
+        $flatFiles = [];
+        $reportSummaries = [];
+
+        foreach ($reportRows as $row) {
+            $reportDateStr = isset($row->report_date)
+                ? (string) Carbon::parse($row->report_date)->format('Y-m-d')
+                : '';
+
+            $groupsOut = [];
+
+            foreach ($groupDefs as $gKey => $def) {
+                $col = $def['column'];
+                $label = $def['label'];
+                $raw = $row->$col ?? null;
+                $paths = [];
+                if ($raw !== null && $raw !== '') {
+                    $decoded = is_string($raw) ? json_decode($raw, true) : [];
+                    $paths = is_array($decoded) ? $decoded : [];
+                }
+
+                $entryPaths = [];
+
+                foreach ($paths as $p) {
+                    $pathStr = '';
+                    if (is_string($p)) {
+                        $pathStr = trim($p);
+                    } elseif (is_array($p) && isset($p['path'])) {
+                        $pathStr = trim((string) $p['path']);
+                    }
+                    if ($pathStr === '') {
+                        continue;
+                    }
+                    $entryPaths[] = $pathStr;
+                    $basename = basename(str_replace('\\', '/', $pathStr));
+                    $flatFiles[] = [
+                        'path' => $pathStr,
+                        'name' => $basename,
+                        'tag' => $label,
+                        'group' => $gKey,
+                        'report_date' => $reportDateStr,
+                    ];
+                }
+
+                $groupsOut[$gKey] = ['label' => $label, 'paths' => $entryPaths];
+            }
+
+            $reportSummaries[] = [
+                'id' => isset($row->id) ? (int) $row->id : null,
+                'report_date' => $reportDateStr,
+                'groups' => $groupsOut,
+            ];
+        }
+
+        // One bucket per requested collection date (stable order = picker order) for income-tag UI
+        $filesByDate = [];
+        foreach ($dates as $d) {
+            $filesByDate[$d] = [];
+        }
+        foreach ($flatFiles as $f) {
+            $rd = $f['report_date'] ?? '';
+            if ($rd !== '' && array_key_exists($rd, $filesByDate)) {
+                $filesByDate[$rd][] = $f;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'files' => $flatFiles,
+            'files_by_date' => $filesByDate,
+            'dates_requested' => $dates,
+            'reports' => $reportSummaries,
+            'total_files' => count($flatFiles),
+        ]);
+    }
+
+    /**
      * Parse a bank statement description and resolve to branch / zone / mode.
      *
      * Patterns handled:

@@ -378,7 +378,14 @@
                   <div class="invoice-totals-box">
                     <!-- Subtotal -->
                     <div class="sub-total-section">
-                      <div class="label">Sub Total</div>
+                      <div class="label">Sub Total
+                        <span id="taxModeBadge"
+                              class="badge bg-warning"
+                              style="cursor:pointer; font-size:11px; padding:4px 8px; margin-left:6px;"
+                              title="Click to toggle: rates include GST (inclusive) vs exclude GST (exclusive)">
+                          TAX EXCLUSIVE
+                        </span>
+                      </div>
                       <div class="value sub-total-amount">0.00</div>
                     </div>
 
@@ -1226,6 +1233,19 @@
       const $tdsSection = $('.tax-row');
       const $adjustmentSection = $('.adjustment-row');
       let isAfterTax = false;
+      let taxMode = 'exclusive';
+
+      $(document).on('click', '#taxModeBadge', function () {
+        if (taxMode === 'exclusive') {
+          taxMode = 'inclusive';
+          $('#taxModeBadge').removeClass('bg-warning').addClass('bg-success').text('TAX INCLUSIVE');
+        } else {
+          taxMode = 'exclusive';
+          $('#taxModeBadge').removeClass('bg-success').addClass('bg-warning').text('TAX EXCLUSIVE');
+        }
+        gstcalculate();
+        calculateFinalTotals();
+      });
 
       $(document).on('click', '.discount-toggle', function() {
         if (!isAfterTax) {
@@ -1344,7 +1364,15 @@
             amount -= discountAmount;
         }
 
-        const gst_amount = (amount * gst_percent) / 100;
+        let gst_amount = 0;
+        if (gst_percent > 0) {
+            if (taxMode === 'inclusive') {
+                const divisor = 1 + (gst_percent / 100);
+                gst_amount = amount - (amount / divisor);
+            } else {
+                gst_amount = (amount * gst_percent) / 100;
+            }
+        }
 
         // STEP 4 — GST Split (only when GST % is actually selected)
         if (gst_percent > 0 && gst_type === 'GST') {
@@ -1454,8 +1482,16 @@ function calculateTotalGST() {
             rowAmount -= discountAmount;
         }
 
-        // GST calculation
-        let gstAmount = (rowAmount * gstPercent) / 100;
+        // GST calculation (exclusive vs inclusive line amounts)
+        let gstAmount = 0;
+        if (gstPercent > 0) {
+            if (taxMode === 'inclusive') {
+                const divisor = 1 + (gstPercent / 100);
+                gstAmount = rowAmount - (rowAmount / divisor);
+            } else {
+                gstAmount = (rowAmount * gstPercent) / 100;
+            }
+        }
 
         totalGST += gstAmount; // accumulate GST for all rows
     });
@@ -1528,11 +1564,12 @@ function calculateFinalTotals() {
     console.log("pfAmt",pfAmt);
     console.log("otherAmt",otherAmt);
 
+    const gstPortion = taxMode === 'inclusive' ? 0 : total_gst;
     const grandTotal = subTotal
                     - taxtdsAmount
                     + taxtcsAmount
                     + adjustment
-                    + total_gst
+                    + gstPortion
                     + exportamount
                     + loadingAmount
                     - esiAmt
@@ -1612,6 +1649,9 @@ function calculateFinalTotals() {
      setTimeout(function () {
        if (header.discount_tax === 'Apply After Tax') {
          $('.discount-toggle').trigger('click');
+       }
+       if (String(header.Tax_in_ex || '').toUpperCase().indexOf('INCLUSIVE') >= 0 && typeof taxMode !== 'undefined' && taxMode === 'exclusive') {
+         $('#taxModeBadge').trigger('click');
        }
        $('.adjustment-reason').val(header.adjustment_reason);
        $('.export_name').val(header.export_name);
@@ -3850,6 +3890,7 @@ function calculateFinalTotals() {
                     formData.append('adjustment_amount', $('.adjustment-amount').text());
                     formData.append('tax_amount', $('.tax-amount').text());
                     formData.append('discount_toggle', $('.discount-toggle').text());
+                    formData.append('taxModeBadge', ($('#taxModeBadge').text() || 'TAX EXCLUSIVE').trim());
                     formData.append('grand_total_amount', $('.grand-total-amount').text());
 
                     $.ajax({
@@ -4153,6 +4194,9 @@ function calculateFinalTotals() {
                             $('.tax-tcs-search-input').val(qh.tax_name);
                             $('.selected-tcs-tax').val(qh.tax_rate).trigger('change');
                             $('.tcs-tax-id').val(qh.tcs_tax_id);
+                          }
+                          if (String(qh.Tax_in_ex || '').toUpperCase().indexOf('INCLUSIVE') >= 0 && typeof taxMode !== 'undefined' && taxMode === 'exclusive') {
+                            $('#taxModeBadge').trigger('click');
                           }
                           if (typeof checkRequiredFields === 'function') checkRequiredFields();
                         }

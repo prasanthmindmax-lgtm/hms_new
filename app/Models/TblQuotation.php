@@ -39,6 +39,7 @@ class TblQuotation extends Authenticatable
         'discount_type',
         'discount_amount',
         'discount_tax',
+        'Tax_in_ex',
         'adjustment_value',
         'adjustment_reason',
         'tds_tax_id',

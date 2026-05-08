@@ -98,6 +98,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -1686,6 +1687,10 @@ public function statementprint(Request $request, $id)
                 $q->whereIn('account_id', $ids);
             });
         }
+        if ($request->filled('created_by_id')) {
+            $ids = explode(',', $request->created_by_id);
+            $query->whereIn('user_id', $ids);
+        }
         if ($request->filled('universal_search')) {
             $search = $request->universal_search;
             $query->where(function($q) use ($search) {
@@ -1737,6 +1742,8 @@ public function statementprint(Request $request, $id)
 
         $billlist = $query->paginate($perPage)->appends($request->all());
         $allBills = Tblbill::orderBy('id','desc')->where('delete_status',0)->get();
+        $creatorIds = Tblbill::where('delete_status', 0)->whereNotNull('user_id')->distinct()->pluck('user_id');
+        $creators = usermanagementdetails::whereIn('id', $creatorIds)->orderBy('user_fullname')->get(['id','user_fullname']);
 
         // Overall stats (unfiltered)
         $stats = [
@@ -1778,6 +1785,7 @@ public function statementprint(Request $request, $id)
             'Tblvendor'    => $Tblvendor,
             'Tblaccount'   => $Tblaccount,
             'Tblcategory'  => $Tblcategory,
+            'creators'     => $creators,
         ]);
     }
 
@@ -2185,6 +2193,9 @@ public function statementprint(Request $request, $id)
             'bill_pr_link_mode' => $request->filled('payment_request_id') ? 'payment_request' : null,
             'payment_request_id' => $request->filled('payment_request_id') ? (int) $request->input('payment_request_id') : null,
         ];
+        if (Schema::hasColumn('bill_tbl', 'Tax_in_ex')) {
+            $data['Tax_in_ex'] = $request->input('taxModeBadge', 'TAX EXCLUSIVE');
+        }
         // dd($data);
         if (!$isUpdate) {
             $data['updated_at'] = $now;
@@ -3172,6 +3183,10 @@ public function getpurchaseorder(Request $request)
                 $q->whereIn('account_id', $ids);
             });
         }
+        if ($request->filled('created_by_id')) {
+            $ids = explode(',', $request->created_by_id);
+            $query->whereIn('user_id', $ids);
+        }
         if ($request->filled('universal_search')) {
             $search = $request->universal_search;
             $query->where(function($q) use ($search) {
@@ -3213,6 +3228,8 @@ public function getpurchaseorder(Request $request)
 
         $purchaselist = $query->paginate($perPage)->appends($request->all());
          $allpurchase = TblPurchaseorder::orderBy('id','desc')->where('delete_status',0)->get();
+        $creatorIds = TblPurchaseorder::where('delete_status', 0)->whereNotNull('user_id')->distinct()->pluck('user_id');
+        $creators = usermanagementdetails::whereIn('id', $creatorIds)->orderBy('user_fullname')->get(['id','user_fullname']);
 
         // Overall stats (unfiltered)
         $stats = [
@@ -3244,6 +3261,7 @@ public function getpurchaseorder(Request $request)
             'Tblcompany'    => $Tblcompany,
             'Tblvendor'     => $Tblvendor,
             'Tblaccount'    => $Tblaccount,
+            'creators'      => $creators,
         ]);
     }
     //  public function getpurchasecreate(Request $request)
@@ -4761,6 +4779,10 @@ public function getquotation(Request $request)
                 $q->whereIn('account_id', $ids);
             });
         }
+    if ($request->filled('created_by_id')) {
+        $ids = explode(',', $request->created_by_id);
+        $query->whereIn('user_id', $ids);
+    }
     if ($request->filled('universal_search')) {
         $search = $request->universal_search;
         $query->where(function($q) use ($search) {
@@ -4792,6 +4814,8 @@ public function getquotation(Request $request)
 
     $quotationlist = $query->paginate($perPage)->appends($request->all());
     $limit_access  = $admin->access_limits;
+    $creatorIds = TblQuotation::where('delete_status', 0)->whereNotNull('user_id')->distinct()->pluck('user_id');
+    $creators = usermanagementdetails::whereIn('id', $creatorIds)->orderBy('user_fullname')->get(['id','user_fullname']);
     if ($request->ajax()) {
         $html = view('vendor.partials.table.quotation_rows', compact('quotationlist','perPage','limit_access'))->render();
         return response()->json(['html' => $html, 'stats' => $filteredStats]);
@@ -4820,7 +4844,8 @@ public function getquotation(Request $request)
         'allquotation'  => $allquotation,
         'stats'         => $stats,
         'perPage'       => $perPage,
-        'Tblaccount'    => $Tblaccount
+        'Tblaccount'    => $Tblaccount,
+        'creators'      => $creators,
     ]);
 }
 
@@ -4954,6 +4979,9 @@ public function getquotation(Request $request)
             'note' => $request->note,
             'created_at' => $now,
         ];
+        if (Schema::hasColumn('quotation_order_tbl', 'Tax_in_ex')) {
+            $data['Tax_in_ex'] = $request->input('taxModeBadge', 'TAX EXCLUSIVE');
+        }
         // dd($data);
         if (!$isUpdate) {
             $data['updated_at'] = $now;

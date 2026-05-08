@@ -265,7 +265,7 @@
                         </div>
                     </div>
 
-                    {{-- Row 2: Branch, Vendor, Nature, Status --}}
+                    {{-- Row 2: Branch, Vendor, Category, Nature --}}
                     <div class="qd-filter-row" style="margin-top:10px;">
                         <div class="qd-filter-group tax-dropdown-wrapper branch-section">
                             <label>Branch</label>
@@ -305,7 +305,7 @@
                                     <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
                                 </div>
-                                <div class="dropdown-list multiselect  category-list"></div>
+                                <div class="dropdown-list multiselect category-list"></div>
                             </div>
                         </div>
 
@@ -322,7 +322,10 @@
                                 <div class="dropdown-list multiselect account-list"></div>
                             </div>
                         </div>
+                    </div>
 
+                    {{-- Row 3: Status, Created By --}}
+                    <div class="qd-filter-row" style="margin-top:10px;">
                         <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
                             <label>Status</label>
                             <input type="text" class="form-control status-search-input dropdown-search-input" placeholder="Select Status" readonly>
@@ -340,6 +343,20 @@
                                     <div data-value="Paid" data-id="4">Paid</div>
                                     <div data-value="Partially Payed" data-id="5">Partially Payed</div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="qd-filter-group tax-dropdown-wrapper creator-section">
+                            <label><i class="bi bi-person-fill me-1"></i>Created By</label>
+                            <input type="text" class="form-control creator-search-input dropdown-search-input" placeholder="Select User" readonly>
+                            <input type="hidden" name="created_by_id" class="created_by_id">
+                            <div class="dropdown-menu tax-dropdown">
+                                <div class="inner-search-container"><input type="text" class="inner-search" placeholder="Search User..."></div>
+                                <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                                </div>
+                                <div class="dropdown-list multiselect creator-list"></div>
                             </div>
                         </div>
                     </div>
@@ -2210,6 +2227,7 @@ $(document).ready(function () {
     const Tblvendor = @json($Tblvendor);
     const Tblcategory = @json($Tblcategory);
     const Tblaccount = @json($Tblaccount);
+    const creators = @json($creators);
      (Array.isArray(TblZonesModel) ? TblZonesModel : (TblZonesModel.data || [])).forEach(locations => {
                         const item = $(`
                           <div data-id="${locations.id}">${locations.name} </div>
@@ -2234,6 +2252,10 @@ $(document).ready(function () {
                         `);
                         $('.account-list').append(item);
                     });
+      creators.forEach(function(u) {
+          const item = $(`<div data-value="${u.user_fullname}" data-id="${u.id}">${u.user_fullname}</div>`);
+          $('.creator-list').append(item);
+      });
       Tblcategory.forEach(Tblcategory => {
                         const item = $(`
                             <div data-value="${Tblcategory.name}" data-id="${Tblcategory.id}">${Tblcategory.name}</div>
@@ -2512,7 +2534,9 @@ $(document).ready(function () {
               status_name: '',
               status_id: '',
               state_id: '',
-            state_name: '',
+              state_name: '',
+              created_by_id: '',
+              created_by_name: '',
               universal_search: '',
           };
           if (savedFilters) {
@@ -2572,6 +2596,11 @@ $(document).ready(function () {
                           ${filters.state_name}
                       </span>`;
                   }
+              if (filters.created_by_id) {
+                  summaryHtml += `<span class="filter-badge remove-icon" data-type="creator">
+                      ${filters.created_by_name}
+                  </span>`;
+              }
                if (summaryHtml) {
                 summaryHtml += `<span class="filter-badge filter-clear" id="clear-all">
                     Clear all
@@ -2597,6 +2626,7 @@ $(document).ready(function () {
                     status_name: filters.status_name,
                     category_id: filters.category_id,
                     state_name: filters.state_name,
+                    created_by_id: filters.created_by_id,
                     universal_search: filters.universal_search
                 };
               $.ajax({
@@ -2628,6 +2658,7 @@ $(document).ready(function () {
                     $('.nature-search-input').val(filters.nature_name);
                     $('.status-search-input').val(filters.status_name);
                     $('.state-search-input').val(filters.state_name);
+                    $('.creator-search-input').val(filters.created_by_name);
                     $('.universal_search').val(filters.universal_search);
 
                     if (filters.date_from && filters.date_to) {
@@ -2751,6 +2782,8 @@ $(document).ready(function () {
                       filters.status_id = selectedIds; filters.status_name = selectedText;
                   } else if (selectorHidden === '.state_id') {
                       filters.state_id = selectedIds; filters.state_name = selectedText;
+                  } else if (selectorHidden === '.created_by_id') {
+                      filters.created_by_id = selectedIds; filters.created_by_name = selectedText;
                   }
                   loadBill();
               });
@@ -2763,6 +2796,7 @@ $(document).ready(function () {
           setupMultiSelect('.nature-search-input', '.nature_id');
           setupMultiSelect('.status-search-input', '.status_id');
           setupMultiSelect('.state-search-input', '.state_id');
+          setupMultiSelect('.creator-search-input', '.created_by_id');
           $('.universal_search').on('keyup', function () {
             filters.universal_search=  $('.universal_search').val();
             loadBill();
@@ -2836,7 +2870,13 @@ $(document).ready(function () {
                 $('.state_id').val('');
                 $('.state-search-input').val('');
                 $('.state-list div').removeClass('selected');
-            }
+              } else if (type === 'creator') {
+                  filters.created_by_id = '';
+                  filters.created_by_name = '';
+                  $('.created_by_id').val('');
+                  $('.creator-search-input').val('');
+                  $('.creator-list div').removeClass('selected');
+              }
               loadBill();
           });
 
@@ -2861,10 +2901,12 @@ $(document).ready(function () {
                   status_id: '',
                   state_id: '',
                   state_name: '',
+                  created_by_id: '',
+                  created_by_name: '',
                   universal_search: '',
               };
-              $('.zone-search-input, .branch-search-input, .company-search-input, .vendor-search-input,.category-search-input,.nature-search-input,.status-search-input,.state-search-input').val('');
-              $('.zone_id, .branch_id, .company_id, .vendor_id,.nature_id,.status_id,.state_id').val('');
+              $('.zone-search-input, .branch-search-input, .company-search-input, .vendor-search-input,.category-search-input,.nature-search-input,.status-search-input,.state-search-input,.creator-search-input').val('');
+              $('.zone_id, .branch_id, .company_id, .vendor_id,.nature_id,.status_id,.state_id,.created_by_id').val('');
               $('.data_values').val('');
               $('.dropdown-list div').removeClass('selected');
               loadBill();
