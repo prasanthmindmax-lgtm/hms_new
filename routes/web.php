@@ -10,6 +10,8 @@ use App\Http\Controllers\BillingStatsController;
 use App\Http\Controllers\BranchFinancialController;
 use App\Http\Controllers\EmailMasterController;
 use App\Http\Controllers\FinancialReportController;
+use App\Http\Controllers\GrnController;
+use App\Http\Controllers\HrmsEmployeeController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\IncomeReconciliationController;
 use App\Http\Controllers\LocationMasterController;
@@ -932,6 +934,19 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('superadmin/payment-requests/{paymentRequest}/approve', [PaymentRequestController::class, 'approve'])->name('superadmin.payment-requests.approve');
     Route::post('superadmin/payment-requests/{paymentRequest}/reject', [PaymentRequestController::class, 'reject'])->name('superadmin.payment-requests.reject');
     Route::get('superadmin/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('superadmin.payment-requests.show');
+
+    // HRMS API Data
+    Route::get('hrms/employees', [HrmsEmployeeController::class, 'index'])->name('hrms.employees');
+
+    Route::get('grn', [GrnController::class, 'index'])->name('grn.index');
+    Route::get('grn/create', [GrnController::class, 'create'])->name('grn.create');
+    Route::post('grn', [GrnController::class, 'store'])->name('grn.store');
+    Route::get('grn/{grnRecord}/edit', [GrnController::class, 'edit'])->name('grn.edit');
+    Route::get('grn/{grnRecord}', [GrnController::class, 'show'])->name('grn.show');
+    Route::put('grn/{grnRecord}', [GrnController::class, 'update'])->name('grn.update');
+    Route::patch('grn/{grnRecord}', [GrnController::class, 'update']);
+    Route::post('grn/{grnRecord}/approve', [GrnController::class, 'approve'])->name('grn.approve');
+    Route::post('grn/{grnRecord}/reject', [GrnController::class, 'reject'])->name('grn.reject');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
