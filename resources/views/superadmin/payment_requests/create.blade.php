@@ -424,6 +424,34 @@
               <div class="pr-pay-form-section-title">
                 <i class="bi bi-paperclip" aria-hidden="true"></i> Supporting document
               </div>
+              <div class="pay-form-card" id="pay-doc-form-template" data-pay-form-template
+                   role="region" aria-label="Payment approval form download">
+                <div class="pay-form-card__head">
+                  <span class="pay-form-card__icon" aria-hidden="true">
+                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                  </span>
+                  <div class="pay-form-card__title-wrap">
+                    <span class="pay-form-card__eyebrow">
+                      <i class="bi bi-shield-check" aria-hidden="true"></i> Required step
+                    </span>
+                    <h6 class="pay-form-card__title">Payment approval form</h6>
+                    <p class="pay-form-card__sub">
+                      Download this file, fill out the form, add the signature, and then upload the signed document below.
+                    </p>
+                  </div>
+                  <div class="pay-form-card__cta">
+                    <a class="pay-form-card__btn"
+                       href="{{ asset('public/forms/payment-approval-form.pdf') }}"
+                       download="Payment Approval Form.pdf"
+                       target="_blank" rel="noopener noreferrer"
+                       title="Download the payment approval form PDF">
+                      <i class="bi bi-download" aria-hidden="true"></i>
+                      Download form
+                    </a>
+                  </div>
+                </div>
+              </div>
+
               <div class="pr-pay-attachment-zone">
                 <label class="form-label">Document <span class="text-danger">*</span></label>
                 <div class="pr-pay-upload-box" id="pay-doc-upload-box">
@@ -785,14 +813,21 @@
     });
   }
 
+  var FORM_TEMPLATE_TYPES = ['refund', 'patient_refund', 'instant_payment', 'miscellaneous'];
+  var payDocFormTemplate = document.getElementById('pay-doc-form-template');
+
   var lastPayTypeForUi = null;
   function syncTypeUi() {
     var t = (typeSel && typeSel.value) || '';
     var p = PO.indexOf(t) !== -1;
     var d = DOC.indexOf(t) !== -1;
+    var needsFormTemplate = FORM_TEMPLATE_TYPES.indexOf(t) !== -1;
     var typeChanged = lastPayTypeForUi !== null && lastPayTypeForUi !== t;
     if (poBlock) { poBlock.classList.toggle('d-none', !p); }
     if (docBlock) { docBlock.classList.toggle('d-none', !d); }
+    if (payDocFormTemplate) {
+      payDocFormTemplate.classList.toggle('is-visible', needsFormTemplate);
+    }
     if (payPoFile) {
       payPoFile.required = p && !(isPayReqEditMode && hasExistingPoFile);
       if (!p && typeChanged) { payPoFile.value = ''; payPoFile.dispatchEvent(new Event('change', { bubbles: true })); }
