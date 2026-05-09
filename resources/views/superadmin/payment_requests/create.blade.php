@@ -623,6 +623,7 @@
   var branchFetchUrl = @json($branchFetchUrl);
   var lookupUrl = @json($lookupUrl);
   var lookupBillUrl = @json($lookupBillUrl);
+  var vendorBillOpenRoute = @json(route('superadmin.getbill'));
   /** Edit mode: existing attachments satisfy "required file" rules; submit may omit a new file. */
   var isPayReqEditMode = root.getAttribute('data-pr-edit-mode') === '1';
   var hasExistingPoFile = !!document.getElementById('pay-po-existing-file');
@@ -716,6 +717,8 @@
     if (panel) panel.classList.add('d-none');
     var poRows = document.getElementById('pay-bill-po-detail-rows');
     if (poRows) poRows.classList.add('d-none');
+    var refEl = document.getElementById('pay_bill_panel_ref');
+    if (refEl) refEl.textContent = '—';
     payBillLookupHasPo = false;
     syncPayPoBillLinkCopy();
   }
@@ -729,7 +732,24 @@
     };
     var refEl = document.getElementById('pay_bill_panel_ref');
     var ref = (d.bill_gen_number || d.bill_number || '').toString().trim();
-    if (refEl) refEl.textContent = ref || '—';
+    var bid = d.bill_id != null && d.bill_id !== '' ? parseInt(d.bill_id, 10) : 0;
+    if (refEl) {
+      refEl.textContent = '';
+      if (bid > 0 && vendorBillOpenRoute) {
+        var sep = vendorBillOpenRoute.indexOf('?') >= 0 ? '&' : '?';
+        var href = vendorBillOpenRoute + sep + 'id=' + encodeURIComponent(String(bid));
+        var label = ref || ('Bill #' + bid);
+        var a = document.createElement('a');
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.className = 'fw-semibold text-decoration-none';
+        a.textContent = label;
+        refEl.appendChild(a);
+      } else {
+        refEl.textContent = ref || '—';
+      }
+    }
     var locParts = [];
     if (String(d.company_name || '').trim()) locParts.push(String(d.company_name).trim());
     if (String(d.zone_name || '').trim()) locParts.push(String(d.zone_name).trim());

@@ -230,233 +230,73 @@
       @php
         $billDisburse = $r->billDisbursementState();
         $linkBills = $r->linkedBills;
-        $billSumGrand = $linkBills->sum(static fn ($b) => (float) ($b->grand_total_amount ?? 0));
-        $billSumBalance = $linkBills->sum(static fn ($b) => max(0.0, (float) ($b->balance_amount ?? 0)));
-        $billSumPaid = max(0.0, $billSumGrand - $billSumBalance);
         $billPanelSrc = $bill_settlement_source ?? null;
-        $billPanelViaLinked = ! empty($bill_settlement_via_linked_bill);
-        $billPanelRedundant = ! empty($bill_panel_redundant_with_po);
         $showBillSettlement = ! empty($show_bill_settlement) && $show_bill_settlement && $billPanelSrc;
-        $renderBillInnerPanel = $showBillSettlement && ! $billPanelRedundant;
         $billHeadRef = $billPanelSrc
             ? ($billPanelSrc->bill_gen_number ?: $billPanelSrc->bill_number ?: ('#'.$billPanelSrc->id))
             : '';
+        $billRowsForLinks = collect();
+        foreach ($linkBills as $__b) {
+          $billRowsForLinks->push($__b);
+        }
+        if ($billPanelSrc && ! $billRowsForLinks->contains(fn ($b) => (int) $b->id === (int) $billPanelSrc->id)) {
+          $billRowsForLinks->prepend($billPanelSrc);
+        }
+        $billRowsForLinks = $billRowsForLinks->unique('id')->values();
       @endphp
       <section class="pr-show-section pr-show-section--bill{{ $showBillSettlement ? ' pr-show-section--bill-settled' : '' }}" aria-labelledby="pr-show-bill-pay-heading">
         <h2 id="pr-show-bill-pay-heading" class="pr-show-section-head">
           <span class="pr-show-section-head-ic pr-show-section-head-ic--bill" aria-hidden="true"><i class="bi bi-wallet2"></i></span>
-          <span class="pr-show-section-head-text">
-            Vendor bill payment
-            @if($showBillSettlement && $billHeadRef !== '')
-              <span class="text-body-secondary fw-normal text-uppercase" style="font-size:0.68rem;letter-spacing:0.04em;"> · {{ $billHeadRef }}</span>
-            @endif
-          </span>
+          <span class="pr-show-section-head-text">Vendor bill payment</span>
         </h2>
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-          <span class="pr-show-bill-pay-badge pr-show-bill-pay-badge--{{ $billDisburse }}">
-            {{ \App\Models\PaymentRequest::billDisbursementLabel($billDisburse) }}
-          </span>
-        </div>
-        @if($showBillSettlement && $billPanelRedundant)
-          <p class="small text-body-secondary mb-2 px-1">
-            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-            This bill ({{ $billHeadRef }}) is on the same purchase order — see <strong>PO settlement</strong> below for the combined totals, payment history, and payment requests.
-          </p>
-        @endif
 
-        @if($renderBillInnerPanel)
+        @if($billRowsForLinks->isEmpty())
+          <p class="small text-muted mb-0 px-1">No vendor bill has been linked to this payment request yet.</p>
+        @else
           @php
-            $__billTotal = (float) $bill_total_snap;
-            $__billPaid = (float) ($bill_previously_paid_total ?? 0);
-            $__billBalance = (float) ($bill_remaining_after ?? max(0.0, $__billTotal - $__billPaid));
-            $__billPastRows = $bill_past_payments ?? [];
-            $__billPrRows = $bill_pr_request_rows ?? [];
-            $__billPrTot = (float) ($bill_pr_requests_total ?? 0);
-            $__billPastTot = round(array_sum(array_column($__billPastRows, 'amount')), 2);
+            $__billGrns = ($showBillSettlement && $billPanelSrc) ? ($bill_grn_summaries ?? []) : [];
+            $__billDashTwo = $showBillSettlement && $billPanelSrc;
           @endphp
-          <div class="pr-show-po-panel pr-show-bill-panel pr-pay-overview-panel mb-3" id="pr-show-bill-settlement-panel">
-            @if($st === \App\Models\PaymentRequest::STATUS_REJECTED)
-              <p class="small text-danger mb-2">
-                <i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>
-                This request was <strong>rejected</strong>. Figures are from submission; rejected lines do not reduce the live bill balance.
-              </p>
-            @endif
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pr-show-po-title-row">
-              <div class="pr-show-po-settlement-title">
-                Bill settlement
-                @if($billPanelViaLinked)
-                  <span class="badge rounded-pill text-bg-light text-dark ms-1" style="font-size:0.62rem;font-weight:700;letter-spacing:0.04em;">Bill raised against this PR</span>
+          <div class="pr-show-bill-strip{{ $__billDashTwo ? ' pr-show-bill-strip--split' : '' }}" role="region" aria-label="Bill and GRN">
+            <div class="pr-show-bill-strip__seg pr-show-bill-strip__seg--bill">
+              <div class="pr-show-bill-strip__seg-caption">{{ $billRowsForLinks->count() > 1 ? 'Bill references' : 'Bill reference' }}</div>
+              <div class="pr-show-bill-strip__bill-meta">
+                <span class="pr-show-bill-strip__status pr-show-bill-strip__status--{{ $billDisburse }}">
+                  {{ \App\Models\PaymentRequest::billDisbursementLabel($billDisburse) }}
+                </span>
+                <div class="pr-show-bill-strip__refs">
+                  @foreach($billRowsForLinks as $__billLink)
+                    @php
+                      $__br = $__billLink->bill_gen_number ?: $__billLink->bill_number ?: ('#'.$__billLink->id);
+                    @endphp
+                    <a href="{{ route('superadmin.getbill', ['id' => $__billLink->id]) }}" target="_blank" rel="noopener noreferrer" class="pr-show-bill-strip__link">{{ $__br }}</a>@if(! $loop->last)<span class="pr-show-bill-strip__dot" aria-hidden="true"></span>@endif
+                  @endforeach
+                </div>
+              </div>
+            </div>
+
+            @if($__billDashTwo)
+              <div class="pr-show-bill-strip__rule" aria-hidden="true"></div>
+              <div class="pr-show-bill-strip__seg pr-show-bill-strip__seg--grn">
+                <div class="pr-show-bill-strip__seg-caption">Goods receipt</div>
+                @if(count($__billGrns) > 0)
+                  <ul class="pr-show-bill-strip__grn-list list-unstyled mb-0">
+                    @foreach($__billGrns as $__grn)
+                      <li class="pr-show-bill-strip__grn-li">
+                        <a href="{{ $__grn['open_url'] }}" target="_blank" rel="noopener noreferrer" class="pr-show-bill-strip__link pr-show-bill-strip__link--grn">{{ $__grn['grn_number'] }}</a>
+                        @php
+                          $__gsl = strtolower(trim((string) ($__grn['status_label'] ?? '')));
+                          $__gsm = $__gsl === 'approved' || $__gsl === 'rejected' ? $__gsl : 'pending';
+                        @endphp
+                        <span class="pr-show-bill-strip__pill pr-show-bill-strip__pill--{{ $__gsm }}">{{ $__grn['status_label'] ?? '—' }}</span>
+                      </li>
+                    @endforeach
+                  </ul>
+                @else
+                  <p class="pr-show-bill-strip__empty mb-0">No GRN</p>
                 @endif
               </div>
-              <div class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
-                <a href="{{ route('superadmin.getbillcreate', ['id' => $billPanelSrc->id]) }}" class="pr-show-po-ref pr-show-po-ref--link pr-show-po-ref--bill text-decoration-none" target="_blank" rel="noopener noreferrer">
-                  <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open bill
-                </a>
-                <button type="button"
-                  class="pr-show-po-ref pr-show-po-ref--link pr-show-po-ref--bill"
-                  data-pr-file-preview-url="{{ route('superadmin.getbillprint', ['id' => $billPanelSrc->id]) }}"
-                  data-pr-file-preview-title="Bill PDF — {{ $billHeadRef }}">
-                  <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Bill PDF
-                </button>
-              </div>
-            </div>
-
-            <div class="pr-pay-stat-grid mb-3">
-              <div class="pr-pay-stat-tile pr-pay-stat-tile--total">
-                <span class="pr-pay-stat-label"><i class="bi bi-receipt me-1" aria-hidden="true"></i>Bill total</span>
-                <span class="pr-pay-stat-value">₹{{ number_format($__billTotal, 2) }}</span>
-                <span class="pr-pay-stat-hint">At submission</span>
-              </div>
-              <div class="pr-pay-stat-tile pr-pay-stat-tile--paid">
-                <span class="pr-pay-stat-label"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Paid so far</span>
-                <span class="pr-pay-stat-value">₹{{ number_format($__billPaid, 2) }}</span>
-                <span class="pr-pay-stat-hint">On file for this bill</span>
-              </div>
-              <div class="pr-pay-stat-tile pr-pay-stat-tile--balance">
-                <span class="pr-pay-stat-label"><i class="bi bi-wallet2 me-1" aria-hidden="true"></i>Balance</span>
-                <span class="pr-pay-stat-value">₹{{ number_format(max(0.0, $__billBalance), 2) }}</span>
-                <span class="pr-pay-stat-hint">Still on bill</span>
-              </div>
-            </div>
-
-            <div class="row g-3 pr-pay-overview-row">
-              <div class="col-12 col-xl-7">
-                <div class="pr-pay-history-card h-100">
-                  <header class="pr-pay-card-head">
-                    <span class="pr-pay-card-head-ic"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
-                    <span class="pr-pay-card-head-title">Payment history</span>
-                    <span class="pr-pay-card-head-meta">
-                      {{ count($__billPastRows) }} entr{{ count($__billPastRows) === 1 ? 'y' : 'ies' }} · ₹{{ number_format($__billPastTot, 2) }}
-                    </span>
-                  </header>
-                  @if(count($__billPastRows) > 0)
-                    <ul class="pr-pay-history-list">
-                      @foreach($__billPastRows as $__row)
-                        <li class="pr-pay-history-item">
-                          <span class="pr-pay-history-date">
-                            <i class="bi bi-calendar3" aria-hidden="true"></i> {{ $__row['date'] ?? '—' }}
-                          </span>
-                          <span class="pr-pay-history-caption">{{ $__row['caption'] ?? 'Bill / NEFT payment' }}</span>
-                          <span class="pr-pay-history-amt">₹{{ number_format((float) ($__row['amount'] ?? 0), 2) }}</span>
-                        </li>
-                      @endforeach
-                    </ul>
-                  @else
-                    <div class="pr-pay-card-empty">
-                      <i class="bi bi-inbox" aria-hidden="true"></i>
-                      <span>No bill / bank payments recorded against this bill yet.</span>
-                    </div>
-                  @endif
-                </div>
-              </div>
-              <div class="col-12 col-xl-5">
-                <div class="pr-pay-pr-card h-100">
-                  <header class="pr-pay-card-head">
-                    <span class="pr-pay-card-head-ic pr-pay-card-head-ic--alt"><i class="bi bi-cash-stack" aria-hidden="true"></i></span>
-                    <span class="pr-pay-card-head-title">Payment requests</span>
-                    <span class="pr-pay-card-head-meta">
-                      {{ count($__billPrRows) }} · ₹{{ number_format($__billPrTot, 2) }}
-                    </span>
-                  </header>
-                  @if(count($__billPrRows) > 0)
-                    <ul class="pr-pay-pr-list">
-                      @foreach($__billPrRows as $__row)
-                        @php
-                          $__rowStatus = (string) ($__row['status'] ?? '');
-                          $__rowStatusLabel = $__row['status_label'] ?? ucfirst($__rowStatus ?: 'Pending');
-                          $__rowType = trim((string) ($__row['type_label'] ?? ''));
-                          $__rowRef = trim((string) ($__row['ref'] ?? ''));
-                          $__rowCaption = trim(implode(' · ', array_filter([$__rowType, $__rowRef])));
-                          $__rowAnchor = (string) ($__row['anchor'] ?? '');
-                          $__rowAnchorLabel = trim((string) ($__row['anchor_label'] ?? ''));
-                        @endphp
-                        <li class="pr-pay-pr-item">
-                          <div class="pr-pay-pr-item-main">
-                            <div class="pr-pay-pr-line">
-                              <span class="pr-pay-pr-date">
-                                <i class="bi bi-calendar3" aria-hidden="true"></i> {{ $__row['date'] ?? '—' }}
-                              </span>
-                              @if($__rowStatus !== '')
-                                <span class="pr-pay-pr-status pr-pay-pr-status--{{ $__rowStatus }}">{{ $__rowStatusLabel }}</span>
-                              @endif
-                              @if($__rowAnchor !== '' && $__rowAnchorLabel !== '')
-                                <span class="pr-pay-pr-anchor pr-pay-pr-anchor--{{ $__rowAnchor }}" title="{{ $__rowAnchorLabel }}">
-                                  <i class="bi {{ $__rowAnchor === 'bill' ? 'bi-receipt' : 'bi-file-earmark-text' }}" aria-hidden="true"></i>
-                                  <span>{{ $__rowAnchorLabel }}</span>
-                                </span>
-                              @endif
-                              @if($__rowCaption !== '')
-                                <span class="pr-pay-pr-caption">{{ $__rowCaption }}</span>
-                              @endif
-                            </div>
-                          </div>
-                          <span class="pr-pay-pr-amt">₹{{ number_format((float) ($__row['amount'] ?? 0), 2) }}</span>
-                        </li>
-                      @endforeach
-                    </ul>
-                  @else
-                    <div class="pr-pay-card-empty">
-                      <i class="bi bi-inbox" aria-hidden="true"></i>
-                      <span>No payment requests against this bill yet.</span>
-                    </div>
-                  @endif
-                </div>
-              </div>
-            </div>
-
-            @if($r->payment_type === \App\Models\PaymentRequest::TYPE_PART_PAYMENT)
-              <p class="mb-0 mt-2 small text-body-secondary"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Part payment: the limit includes every request on this bill.</p>
             @endif
-          </div>
-        @elseif($linkBills->isEmpty())
-          <p class="small text-muted mb-0 px-1">No vendor bill has been linked to this payment request yet.</p>
-        @endif
-        @if($linkBills->isNotEmpty())
-          <div class="row g-2 mb-2 small text-body-secondary px-1">
-            <div class="col-auto">Bill total</div>
-            <div class="col-auto fw-semibold text-body">₹{{ number_format($billSumGrand, 2) }}</div>
-            <div class="col-auto">·</div>
-            <div class="col-auto">Paid toward bill(s)</div>
-            <div class="col-auto fw-semibold text-body">₹{{ number_format($billSumPaid, 2) }}</div>
-            <div class="col-auto">·</div>
-            <div class="col-auto">Balance due</div>
-            <div class="col-auto fw-semibold text-body">₹{{ number_format($billSumBalance, 2) }}</div>
-          </div>
-          <div class="table-responsive rounded-3 border" style="border-color: #e2e8f0 !important;">
-            <table class="table table-sm align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th scope="col">Bill</th>
-                  <th scope="col" class="text-end">Total</th>
-                  <th scope="col" class="text-end">Balance</th>
-                  <th scope="col" class="text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @foreach($linkBills as $bill)
-                  <tr>
-                    <td>
-                      <a href="{{ route('superadmin.getbillcreate', ['id' => $bill->id]) }}" class="fw-semibold text-decoration-none" target="_blank" rel="noopener noreferrer">
-                        {{ $bill->bill_gen_number ?: $bill->bill_number ?: ('#'.$bill->id) }}
-                      </a>
-                    </td>
-                    <td class="text-end text-nowrap">₹{{ number_format((float) ($bill->grand_total_amount ?? 0), 2) }}</td>
-                    <td class="text-end text-nowrap">₹{{ number_format(max(0, (float) ($bill->balance_amount ?? 0)), 2) }}</td>
-                    <td class="text-end text-nowrap">
-                      <div class="d-inline-flex flex-wrap align-items-center justify-content-end gap-1">
-                        <button type="button"
-                          class="btn btn-sm btn-outline-danger"
-                          data-pr-file-preview-url="{{ route('superadmin.getbillprint', ['id' => $bill->id]) }}"
-                          data-pr-file-preview-title="Bill PDF — {{ $bill->bill_gen_number ?: $bill->bill_number ?: ('#'.$bill->id) }}">
-                          <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
-                          <span class="d-none d-sm-inline">Open PDF</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                @endforeach
-              </tbody>
-            </table>
           </div>
         @endif
       </section>
@@ -576,8 +416,6 @@
                           $__rowType = trim((string) ($__row['type_label'] ?? ''));
                           $__rowRef = trim((string) ($__row['ref'] ?? ''));
                           $__rowCaption = trim(implode(' · ', array_filter([$__rowType, $__rowRef])));
-                          $__rowAnchor = (string) ($__row['anchor'] ?? '');
-                          $__rowAnchorLabel = trim((string) ($__row['anchor_label'] ?? ''));
                         @endphp
                         <li class="pr-pay-pr-item">
                           <div class="pr-pay-pr-item-main">
@@ -588,11 +426,27 @@
                               @if($__rowStatus !== '')
                                 <span class="pr-pay-pr-status pr-pay-pr-status--{{ $__rowStatus }}">{{ $__rowStatusLabel }}</span>
                               @endif
+                              @php
+                                $__rowAnchor = (string) ($__row['anchor'] ?? '');
+                                $__rowAnchorLabel = trim((string) ($__row['anchor_label'] ?? ''));
+                                $__anchorUrl = trim((string) ($__row['anchor_url'] ?? ''));
+                              @endphp
                               @if($__rowAnchor !== '' && $__rowAnchorLabel !== '')
-                                <span class="pr-pay-pr-anchor pr-pay-pr-anchor--{{ $__rowAnchor }}" title="{{ $__rowAnchorLabel }}">
-                                  <i class="bi {{ $__rowAnchor === 'bill' ? 'bi-receipt' : 'bi-file-earmark-text' }}" aria-hidden="true"></i>
-                                  <span>{{ $__rowAnchorLabel }}</span>
-                                </span>
+                                @if($__anchorUrl !== '')
+                                  <a href="{{ $__anchorUrl }}"
+                                     class="pr-pay-pr-anchor pr-pay-pr-anchor--{{ $__rowAnchor }} pr-pay-pr-anchor--link text-decoration-none"
+                                     title="Open {{ $__rowAnchor === 'bill' ? 'bill' : 'purchase order' }}"
+                                     target="_blank"
+                                     rel="noopener noreferrer">
+                                    <i class="bi {{ $__rowAnchor === 'bill' ? 'bi-receipt' : 'bi-file-earmark-text' }}" aria-hidden="true"></i>
+                                    <span>{{ $__rowAnchorLabel }}</span>
+                                  </a>
+                                @else
+                                  <span class="pr-pay-pr-anchor pr-pay-pr-anchor--{{ $__rowAnchor }}" title="{{ $__rowAnchorLabel }}">
+                                    <i class="bi {{ $__rowAnchor === 'bill' ? 'bi-receipt' : 'bi-file-earmark-text' }}" aria-hidden="true"></i>
+                                    <span>{{ $__rowAnchorLabel }}</span>
+                                  </span>
+                                @endif
                               @endif
                               @if($__rowCaption !== '')
                                 <span class="pr-pay-pr-caption">{{ $__rowCaption }}</span>
@@ -622,20 +476,21 @@
 
       @if($po && (! $isPo || $r->po_total_snapshot === null))
         <p class="small text-muted mt-2 mb-0 px-1">Linked PO:
+          <a href="{{ route('superadmin.getpurchaseorder', ['id' => $po->id]) }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $po->purchase_gen_order ?? $po->order_number ?? $po->purchase_order_number ?? 'ID '.$po->id }}</a>
           <button type="button"
-            class="fw-semibold text-body text-decoration-none pr-show-po-inline-link btn btn-link p-0 align-baseline border-0"
+            class="btn btn-link btn-sm p-0 align-baseline text-muted text-decoration-none border-0"
+            aria-label="Open PO PDF"
             data-pr-file-preview-url="{{ route('superadmin.getpurchaseprint', ['id' => $po->id]) }}"
             data-pr-file-preview-title="PO PDF — {{ $po->purchase_gen_order ?? $po->order_number ?? $po->purchase_order_number ?? 'ID '.$po->id }}">
-            {{ $po->purchase_gen_order ?? $po->order_number ?? $po->purchase_order_number ?? 'ID '.$po->id }}
+            PDF
           </button>
-          <span class="text-muted">(PDF)</span>
         </p>
       @endif
 
       @if($r->bill_id && $r->sourceBill && (int) ($r->sourceBill->delete_status ?? 0) === 0 && empty($show_bill_settlement))
         <p class="small text-muted mt-2 mb-0 px-1">
           Raised against bill:
-          <a href="{{ route('superadmin.getbillcreate', ['id' => $r->sourceBill->id]) }}" class="fw-semibold text-decoration-none" target="_blank" rel="noopener noreferrer">
+          <a href="{{ route('superadmin.getbill', ['id' => $r->sourceBill->id]) }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">
             {{ $r->sourceBill->bill_gen_number ?: $r->sourceBill->bill_number ?: ('#'.$r->sourceBill->id) }}
           </a>
         </p>

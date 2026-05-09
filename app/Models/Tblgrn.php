@@ -20,6 +20,7 @@ class Tblgrn extends Authenticatable
         'vendor_id',
         'quotation_id',
         'purchase_id',
+        'bill_id',
         'vendor_name',
         'zone_id',
         'zone_name',

@@ -8,6 +8,7 @@ use App\Models\Tblbill;
 use App\Models\Tblbillpay;
 use App\Models\TblLocationModel;
 use App\Models\TblPurchaseorder;
+use App\Models\Tblgrn;
 use App\Models\TblVendorHistory;
 use App\Models\Tblcompany;
 use App\Models\Tblvendor;
@@ -241,7 +242,7 @@ class PaymentRequestController extends Controller
 
         return $out;
     }
-    
+
     private function paymentRequestHistoryForPurchaseOrderNonBillBacked(int $poId): array
     {
         return PaymentRequest::query()
@@ -399,11 +400,6 @@ class PaymentRequestController extends Controller
         ];
     }
 
-    /**
-     * Payment requests raised against this bill (pending + approved), for the create form “Bill against” panel.
-     *
-     * @return array<int, array{date: string, amount: float, caption: string}>
-     */
     private function paymentRequestHistoryForBill(int $billId): array
     {
         $billRefRow = Tblbill::query()
@@ -419,7 +415,7 @@ class PaymentRequestController extends Controller
             ->orderByRaw('COALESCE(reviewed_at, created_at) ASC')
             ->orderBy('id')
             ->get(['id', 'amount', 'status', 'created_at', 'reviewed_at', 'request_no', 'payment_type'])
-            ->map(function (PaymentRequest $pr) use ($billRefLabel): array {
+            ->map(function (PaymentRequest $pr) use ($billRefLabel, $billId): array {
                 $at = $pr->status === PaymentRequest::STATUS_APPROVED && $pr->reviewed_at !== null
                     ? $pr->reviewed_at
                     : $pr->created_at;
@@ -443,6 +439,7 @@ class PaymentRequestController extends Controller
                     'ref' => $ref,
                     'anchor' => 'bill',
                     'anchor_label' => $billRefLabel !== '' ? 'Against '.$billRefLabel : 'Against bill',
+                    'anchor_url' => $billId > 0 ? route('superadmin.getbill', ['id' => $billId]) : '',
                 ];
             })
             ->values()
@@ -452,7 +449,7 @@ class PaymentRequestController extends Controller
     /**
      * All payment requests on this PO (pending + approved), for show-page breakdown (same idea as bill PR list).
      *
-     * @return array<int, array{date: string, amount: float, caption: string}>
+     * @return array<int, array<string, mixed>>
      */
     private function paymentRequestHistoryForPurchaseOrderAll(int $poId): array
     {
@@ -467,7 +464,7 @@ class PaymentRequestController extends Controller
             ->orderBy('id')
             ->get(['id', 'amount', 'status', 'created_at', 'reviewed_at', 'request_no', 'payment_type', 'bill_id', 'purchase_order_id']);
 
-        return $rows->map(function (PaymentRequest $pr): array {
+        return $rows->map(function (PaymentRequest $pr) use ($poId): array {
             $at = $pr->status === PaymentRequest::STATUS_APPROVED && $pr->reviewed_at !== null
                 ? $pr->reviewed_at
                 : $pr->created_at;
@@ -483,10 +480,12 @@ class PaymentRequestController extends Controller
 
             $anchor = 'po';
             $anchorLabel = 'Against PO';
+            $billPk = 0;
             if ($pr->sourceBill && (int) ($pr->sourceBill->delete_status ?? 0) === 0) {
                 $anchor = 'bill';
                 $billRef = trim((string) ($pr->sourceBill->bill_gen_number ?: $pr->sourceBill->bill_number ?: ''));
                 $anchorLabel = $billRef !== '' ? 'Against '.$billRef : 'Against bill';
+                $billPk = (int) $pr->sourceBill->id;
             } else {
                 $linked = $pr->linkedBills->first(static function ($b) {
                     return (int) ($b->delete_status ?? 0) === 0;
@@ -495,7 +494,15 @@ class PaymentRequestController extends Controller
                     $anchor = 'bill';
                     $billRef = trim((string) ($linked->bill_gen_number ?: $linked->bill_number ?: ''));
                     $anchorLabel = $billRef !== '' ? 'Bill raised: '.$billRef : 'Bill raised against this PR';
+                    $billPk = (int) $linked->id;
                 }
+            }
+
+            $anchorUrl = '';
+            if ($anchor === 'bill' && $billPk > 0) {
+                $anchorUrl = route('superadmin.getbill', ['id' => $billPk]);
+            } elseif ($anchor === 'po' && $poId > 0) {
+                $anchorUrl = route('superadmin.getpurchaseorder', ['id' => $poId]);
             }
 
             return [
@@ -508,6 +515,7 @@ class PaymentRequestController extends Controller
                 'ref' => $ref,
                 'anchor' => $anchor,
                 'anchor_label' => $anchorLabel,
+                'anchor_url' => $anchorUrl,
             ];
         })
             ->values()
@@ -528,20 +536,7 @@ class PaymentRequestController extends Controller
         }, $this->billPayLinesHistoryForPurchaseOrder($poId)));
     }
 
-    /**
-     * Live bill figures: reconciles grand_total − partially_payment with balance_amount when they drift,
-     * and exposes headroom for new / pending payment requests (Bill Made + approved PRs live in partially_payment).
-     *
-     * @return array{
-     *     grand: float,
-     *     balance_db: float,
-     *     partial: float,
-     *     reconciled_remaining: float,
-     *     pending_pr: float,
-     *     payable: float,
-     *     paid_outside_requests: float
-     * }
-     */
+
     private function billFinancialSnapshot(Tblbill $bill): array
     {
         $eps = 0.02;
@@ -1609,6 +1604,8 @@ class PaymentRequestController extends Controller
             }
         }
 
+        $billGrnSummaries = [];
+
         if ($billSettlementSource) {
             $showBillSettlement = true;
             $billId = (int) $billSettlementSource->id;
@@ -1640,6 +1637,8 @@ class PaymentRequestController extends Controller
             $billPastPayments = $this->billPayLinesHistoryForBill($billId);
             $billPrRequestRows = $this->paymentRequestHistoryForBill($billId);
             $billPrRequestsTotal = round(array_sum(array_column($billPrRequestRows, 'amount')), 2);
+
+            $billGrnSummaries = $this->vendorGrnSummariesForBill($billId);
         }
 
         return view('superadmin.payment_requests.show', [
@@ -1670,7 +1669,48 @@ class PaymentRequestController extends Controller
                 && $paymentRequest->purchase_order_id
                 && (int) ($billSettlementSource->purchase_id ?? 0) === (int) $paymentRequest->purchase_order_id
             ),
+            'bill_grn_summaries' => $billGrnSummaries,
         ]);
+    }
+
+    private function vendorGrnSummariesForBill(int $billId): array
+    {
+        if ($billId <= 0) {
+            return [];
+        }
+
+        return Tblgrn::query()
+            ->where('bill_id', $billId)
+            ->orderByDesc('id')
+            ->get([
+                'id',
+                'grn_number',
+                'order_number',
+                'bill_date',
+                'approval_status',
+                'reject_status',
+                'vendor_name',
+                'created_at',
+            ])
+            ->map(function (Tblgrn $g): array {
+                $approved = (int) ($g->approval_status ?? 0) === 1;
+                $rejected = isset($g->reject_status) && (int) $g->reject_status === 1;
+                $statusLabel = $approved ? 'Approved' : ($rejected ? 'Rejected' : 'Pending');
+
+                return [
+                    'id' => (int) $g->id,
+                    'grn_number' => trim((string) ($g->grn_number ?? '')) ?: 'GRN #'.$g->id,
+                    'order_number' => trim((string) ($g->order_number ?? '')),
+                    'bill_date' => trim((string) ($g->bill_date ?? '')),
+                    'status_label' => $statusLabel,
+                    'vendor_name' => trim((string) ($g->vendor_name ?? '')),
+                    'created_at' => filled($g->created_at ?? null)
+                        ? \Illuminate\Support\Carbon::parse($g->created_at)->format('d M Y · h:i A')
+                        : null,
+                    'open_url' => route('superadmin.getgrndashboard', ['id' => (int) $g->id]),
+                ];
+            })
+            ->all();
     }
 
     /**
