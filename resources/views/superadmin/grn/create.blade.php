@@ -628,7 +628,7 @@
                   <i class="bi bi-eye me-1"></i>Preview new file
                 </button>
                 @if($isEdit && $r->invoice_copy_path)
-                  <button type="button" class="btn btn-outline-primary grn-preview-existing" data-url="{{ asset($r->invoice_copy_path) }}" data-kind="pdf" data-title="Current invoice PDF">
+                  <button type="button" class="btn btn-outline-primary grn-preview-existing" data-url="{{ asset('public/' . $r->invoice_copy_path) }}" data-kind="pdf" data-title="Current invoice PDF">
                     <i class="bi bi-cloud-arrow-down me-1"></i>Preview saved
                   </button>
                 @endif
@@ -668,7 +668,7 @@
                   <i class="bi bi-eye me-1"></i>Preview new video
                 </button>
                 @if($isEdit && $r->gps_video_path)
-                  <button type="button" class="btn btn-outline-primary grn-preview-existing" data-url="{{ asset($r->gps_video_path) }}" data-kind="video" data-title="Current GPS video">
+                  <button type="button" class="btn btn-outline-primary grn-preview-existing" data-url="{{ asset('public/' . $r->gps_video_path) }}" data-kind="video" data-title="Current GPS video">
                     <i class="bi bi-cloud-arrow-down me-1"></i>Preview saved
                   </button>
                 @endif

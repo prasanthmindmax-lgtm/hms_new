@@ -1516,7 +1516,7 @@
                               <button type="button"
                                 class="grnpr-attach-btn grnpr-attach-btn--pdf grnpr-preview-btn"
                                 data-grnpr-preview-type="pdf"
-                                data-grnpr-preview-url="{{ asset($r->invoice_copy_path) }}"
+                                data-grnpr-preview-url="{{ asset('public/' . $r->invoice_copy_path) }}"
                                 data-grnpr-preview-title="Invoice — {{ e($r->grn_number) }}"
                                 title="Preview invoice PDF">
                                 <i class="bi bi-filetype-pdf"></i>PDF
@@ -1526,7 +1526,7 @@
                               <button type="button"
                                 class="grnpr-attach-btn grnpr-attach-btn--vid grnpr-preview-btn"
                                 data-grnpr-preview-type="video"
-                                data-grnpr-preview-url="{{ asset($r->gps_video_path) }}"
+                                data-grnpr-preview-url="{{ asset('public/' . $r->gps_video_path) }}"
                                 data-grnpr-preview-title="GPS video — {{ e($r->grn_number) }}"
                                 title="Preview GPS video">
                                 <i class="bi bi-play-btn"></i>GPS
@@ -1589,8 +1589,8 @@
                               'reject_reason'  => $r->rejection_reason ?? null,
                               'edit_url'       => $canEditRow ? route('grn.edit', $r) : null,
                               'show_url'       => route('grn.show', $r),
-                              'pdf_url'        => $r->invoice_copy_path ? asset($r->invoice_copy_path) : null,
-                              'video_url'      => ($r->gps_video_uploaded && $r->gps_video_path) ? asset($r->gps_video_path) : null,
+                              'pdf_url'        => $r->invoice_copy_path ? asset('public/' . $r->invoice_copy_path) : null,
+                              'video_url'      => ($r->gps_video_uploaded && $r->gps_video_path) ? asset('public/' . $r->gps_video_path) : null,
                               'video_flagged_unavailable' => ($r->gps_video_uploaded && ! $r->gps_video_path),
                           ];
                           $hasEdit       = (bool) $canEditRow;
