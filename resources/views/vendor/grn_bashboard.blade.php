@@ -247,7 +247,7 @@
       {{-- ── Table ── --}}
       <div class="qd-table-wrap">
         <div id="grn-body">
-          @include('vendor.partials.table.grn_rows', ['grnlist' => $grnlist, 'perPage' => $perPage])
+          @include('vendor.partials.table.grn_rows', ['grnlist' => $grnlist, 'perPage' => $perPage, 'qcUserMap' => $qcUserMap ?? []])
         </div>
       </div>
 
@@ -866,6 +866,40 @@ $(document).ready(function () {
 
 });
 </script>
+
+@if(request()->filled('id'))
+<script>
+$(document).ready(function () {
+    var grnId = String({{ (int) request()->query('id') }});
+    if (!grnId || grnId === '0') return;
+    var perPage = {{ (int) $grnlist->perPage() }};
+    var currentPage = {{ (int) $grnlist->currentPage() }};
+
+    var $row = $('.customer-row[data-id="' + grnId + '"]');
+    if ($row.length) {
+        $row.trigger('click');
+        return;
+    }
+
+    var grnIndex = null;
+    @foreach (($allGrn ?? collect()) as $i => $__grnDeep)
+        if (String({{ (int) $__grnDeep->id }}) === grnId) {
+            grnIndex = {{ (int) $i + 1 }};
+        }
+    @endforeach
+
+    if (grnIndex === null) return;
+
+    var targetPage = Math.ceil(grnIndex / perPage);
+    if (currentPage !== targetPage) {
+        var newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('page', targetPage);
+        newUrl.searchParams.set('id', grnId);
+        window.location.href = newUrl.toString();
+    }
+});
+</script>
+@endif
 
 <script>
 // Override cb so "All Dates" preset clears the filter

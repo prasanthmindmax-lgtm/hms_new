@@ -7,6 +7,7 @@
         <th>INVOICE DATE</th>
         <th>ZONE / BRANCH</th>
         <th>GRN NO #</th>
+        <th>BILL GENERATE No.</th>
         <th>REFERENCE NO</th>
         <th>VENDOR</th>
         <th>QC Checked By</th>
@@ -43,6 +44,7 @@
             data-vendor-address='@json($grn->TblBilling)'
             data-vendor='@json($grn->Tblvendor)'
             data-grn_all='@json($grn)'
+            data-bill-number="{{ $grn->bill_id }}"
             data-bill-date="{{ $grn->bill_date }}"
             data-due-date="{{ $grn->due_date }}"
             data-approval_status="{{ $grn->approval_status }}"
@@ -77,18 +79,31 @@
             <a class="print-pop-btn qdt-link" href="#">{{ $grn->grn_number ?? '—' }}</a>
           </td>
 
+          <td class="qdt-mono">{{ $grn->billRecord?->bill_gen_number ? trim((string) $grn->billRecord->bill_gen_number) : '—' }}</td>
+
           <td class="qdt-mono">{{ $grn->order_number ?? '—' }}</td>
 
           <td class="qdt-vendor-link">{{ $grn->vendor_name ?? '—' }}</td>
 
-          <td><span class="qdt-qc-user">{{ $grn->QcCheckedBy->user_fullname ?? '-'}}</span></td>
+          @php
+            $qcMap        = $qcUserMap ?? [];
+            $qcRel        = $grn->QcCheckedBy;
+            $qcKey        = (string) ($grn->qc_checked_by ?? '');
+            $qcDisplay    = '-';
+            if ($qcRel && trim((string) ($qcRel->user_fullname ?? '')) !== '') {
+                $qcDisplay = $qcRel->user_fullname;
+            } elseif ($qcKey !== '' && isset($qcMap[$qcKey]['name']) && $qcMap[$qcKey]['name'] !== '') {
+                $qcDisplay = $qcMap[$qcKey]['name'];
+            }
+          @endphp
+          <td><span class="qdt-qc-user" title="{{ $qcDisplay }}">{{ $qcDisplay }}</span></td>
 
           <td><span class="{{ $statusBadge }}">{{ $statusText }}</span></td>
 
         </tr>
       @empty
         <tr>
-          <td colspan="8" class="text-center py-4 text-muted">
+          <td colspan="10" class="text-center py-4 text-muted">
             <i class="bi bi-inbox" style="font-size:2rem; display:block; margin-bottom:8px;"></i>
             No GRN records found
           </td>

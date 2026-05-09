@@ -224,26 +224,22 @@
                     </div>
                 <label for="qc_checked_by_display" class="col-md-2 ">QC Checked By <span class="text-danger" id="qc_checked_by_required_mark" title="Required when QC Status is Checked">*</span></label>
                 <div class="col-md-4">
-                    @php
-                        $grnQcUserLabel = function ($u) {
-                            $n = trim((string) (data_get($u, 'user_fullname', '') ?? '')) ?: 'User';
-                            $e = data_get($u, 'username');
-                            $eid = ($e !== null && (string) $e !== '') ? (string) $e : (string) (data_get($u, 'id', '') ?? '');
-
-                            return $n . ' - ' . $eid;
-                        };
-                    @endphp
                       <div class="tax-dropdown-wrapper user-section" style="width:343px">
-                          <input type="text" class="form-control user-search-input" name="qc_user" id="qc_checked_by_display" autocomplete="off" autocorrect="off" placeholder="Select a user" readonly>
-                          <input type="hidden" name="qc_checked_by" class="qc_checked_by" id="qc_checked_by" value="">
+                          <input type="text" class="form-control user-search-input" name="qc_user" id="qc_checked_by_display"
+                                 autocomplete="off" autocorrect="off" placeholder="Select a user" readonly
+                                 value="{{ $grnedit_qc_display ?? '' }}">
+                          <input type="hidden" name="qc_checked_by" class="qc_checked_by" id="qc_checked_by"
+                                 value="{{ $grnedit_qc_id ?? '' }}">
+
                           <div class="dropdown-menu tax-dropdown grn-qc-dropdown">
-                            <div class="inner-search-container">
-                              <input type="text" class="user-inner-search" placeholder="Search...">
+                            <div class="inner-search-container d-flex align-items-center">
+                              <input type="text" class="user-inner-search flex-grow-1" placeholder="Search User...">
+                              <button type="button" class="btn btn-link btn-sm grn-qc-refresh ms-1 p-0" title="Refresh employee list">
+                                <i class="bi bi-arrow-clockwise"></i>
+                              </button>
                             </div>
-                            <div class="user-list">
-                                @foreach($users as $user)
-                                    <div data-id="{{ (int) $user->id }}">{{ $grnQcUserLabel($user) }}</div>
-                                @endforeach
+                            <div class="user-list" data-grn-qc-list="1">
+                              <div class="grn-qc-status text-muted small px-2 py-2" data-grn-qc-status="loading">Loading employees…</div>
                             </div>
                           </div>
                           <span class="error_qc" style="color:red"></span>
@@ -973,7 +969,74 @@
                     });
                   });
 
-                  // QC checked by
+                 window.GRN_HRMS_USERS = window.GRN_HRMS_USERS || [];
+
+                  function grnEsc(s) {
+                    return String(s == null ? '' : s)
+                      .replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;');
+                  }
+
+                  function renderQcUserList($list, rows) {
+                    if (!$list || !$list.length) return;
+                    $list.empty();
+                    if (!rows || !rows.length) {
+                      $list.append('<div class="grn-qc-status text-muted small px-2 py-2" data-grn-qc-status="empty">No employees found.</div>');
+                      return;
+                    }
+                    var html = rows.map(function (r) {
+                      var name  = grnEsc(r.name);
+                      var empid = grnEsc(r.emp_id);
+                      var label = empid ? (name + ' - ' + empid) : name;
+                      var idAttr = empid !== '' ? empid : grnEsc(r.id);
+                      return '<div data-id="' + idAttr + '" data-name="' + name + '" data-emp-id="' + empid + '">' + label + '</div>';
+                    }).join('');
+                    $list.html(html);
+                  }
+
+                  // Re-render every QC list on the page (template + clones).
+                  function paintAllQcLists() {
+                    $('.user-list[data-grn-qc-list="1"]').each(function () {
+                      renderQcUserList($(this), window.GRN_HRMS_USERS);
+                    });
+                  }
+
+                  function loadHrmsQcUsers(forceRefresh) {
+                    $('.user-list[data-grn-qc-list="1"]').each(function () {
+                      $(this).html('<div class="grn-qc-status text-muted small px-2 py-2" data-grn-qc-status="loading">Loading employees…</div>');
+                    });
+                    return $.ajax({
+                      url: "{{ route('hrms.employees') }}",
+                      method: 'GET',
+                      data: forceRefresh ? { refresh: 1 } : {},
+                      dataType: 'json',
+                      cache: false
+                    }).done(function (resp) {
+                      var rows = (resp && resp.ok && Array.isArray(resp.data)) ? resp.data : [];
+                      window.GRN_HRMS_USERS = rows;
+                      paintAllQcLists();
+                      // Notify late-running prefills (edit screen) that data is ready.
+                      $(document).trigger('grn:hrms-users-loaded', [rows]);
+                    }).fail(function () {
+                      window.GRN_HRMS_USERS = [];
+                      $('.user-list[data-grn-qc-list="1"]').each(function () {
+                        $(this).html('<div class="grn-qc-status text-danger small px-2 py-2" data-grn-qc-status="error">Unable to load employees. <a href="#" class="grn-qc-retry">Retry</a></div>');
+                      });
+                    });
+                  }
+
+                  // Initial load.
+                  loadHrmsQcUsers(false);
+
+                  // Manual refresh from the in-dropdown button or the inline retry link.
+                  $(document).on('click', '.grn-qc-refresh, .grn-qc-retry', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadHrmsQcUsers(true);
+                  });
+
                   $(document).on('click', '.user-section .user-search-input', function (e) {
                       e.stopPropagation();
                       $(this).val('');
@@ -987,6 +1050,7 @@
                           $('body').append($dropdown);
                           $input.data('dropdown', $dropdown);
                       }
+                      renderQcUserList($dropdown.find('.user-list[data-grn-qc-list="1"]'), window.GRN_HRMS_USERS);
 
                       $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper.user-section'));
                       $dropdown.data('row', $input.closest('tr'));
@@ -1002,6 +1066,9 @@
                       $(this).removeAttr('readonly');
                   });
                   $(document).on('click', '.grn-qc-dropdown .user-list div', function () {
+                      if ($(this).attr('data-grn-qc-status')) {
+                          return;
+                      }
                       const selectedText = $(this).text().trim();
                       const selectedid = $(this).data('id');
                       const idStr = (selectedid === undefined || selectedid === null) ? '' : String(selectedid);
@@ -1011,7 +1078,7 @@
                       const row = $dropdown.data('row');
 
                       if (!wrapper || !row) {
-                          console.warn("Wrapper or row not found — GST selection failed.");
+                          console.warn("Wrapper or row not found — QC selection failed.");
                           $dropdown.hide();
                           return;
                       }
@@ -1027,11 +1094,30 @@
                     if ($dropdown) {
                       const list = $dropdown.find('.user-list div');
                       list.each(function () {
+                        if ($(this).attr('data-grn-qc-status')) {
+                          $(this).show();
+                          return;
+                        }
                         const itemText = $(this).text().toLowerCase();
                         const idPart = String($(this).data('id') == null || $(this).data('id') === undefined ? '' : $(this).data('id')).toLowerCase();
                         $(this).toggle(itemText.includes(searchText) || idPart.includes(searchText));
                       });
                     }
+                  });
+
+                  // Search inside the cloned dropdown's own input.
+                  $(document).on('keyup', '.grn-qc-dropdown .user-inner-search', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const $list = $(this).closest('.grn-qc-dropdown').find('.user-list div');
+                    $list.each(function () {
+                      if ($(this).attr('data-grn-qc-status')) {
+                        $(this).show();
+                        return;
+                      }
+                      const itemText = $(this).text().toLowerCase();
+                      const idPart = String($(this).data('id') == null || $(this).data('id') === undefined ? '' : $(this).data('id')).toLowerCase();
+                      $(this).toggle(itemText.includes(searchText) || idPart.includes(searchText));
+                    });
                   });
                   $(document).on('keyup', '.grn-qc-dropdown .user-inner-search', function () {
                     const searchText = $(this).val().toLowerCase();
@@ -1487,26 +1573,39 @@ $(document).ready(function () {
                           id = String(qc);
                         }
                         $('#qc_checked_by').val(id);
-                        var $row = id
-                          ? $('#qc_checked_by').closest('.tax-dropdown-wrapper').find('.user-list [data-id="' + id + '"]')
-                          : $();
-                        if ($row.length) {
-                          $('.user-search-input#qc_checked_by_display').val($row.text().trim());
-                          return;
+
+                        function labelFromHrms() {
+                          if (!id || !Array.isArray(window.GRN_HRMS_USERS)) return '';
+                          for (var i = 0; i < window.GRN_HRMS_USERS.length; i++) {
+                            var r = window.GRN_HRMS_USERS[i];
+                            if (String(r.emp_id || r.id || '') === id) {
+                              return r.emp_id ? (r.name + ' - ' + r.emp_id) : r.name;
+                            }
+                          }
+                          return '';
                         }
-                        var rel = h.q_c_checked_by || h.qcCheckedBy || h.QcCheckedBy;
-                        if (rel && typeof rel === 'object' && (rel.user_fullname != null || rel.id != null)) {
+
+                        function labelFromRelation() {
+                          var rel = (qc && typeof qc === 'object' && (qc.user_fullname != null || qc.id != null)) ? qc : null;
+                          if (!rel) return '';
                           var n = String((rel.user_fullname || '').trim() || 'User');
-                          var e = rel.employee_id;
-                          var eid = (e != null && String(e) !== '') ? String(e) : String(rel.id != null ? rel.id : id);
-                          $('#qc_checked_by_display').val(n + ' - ' + eid);
-                          return;
+                          var e = (rel.username != null && String(rel.username) !== '') ? rel.username : rel.email;
+                          var tail = (e != null && String(e) !== '') ? String(e) : String(rel.id != null ? rel.id : id);
+                          return tail ? (n + ' - ' + tail) : n;
                         }
-                        if (id) {
-                          $('#qc_checked_by_display').val('User #' + id);
-                        } else {
-                          $('#qc_checked_by_display').val('');
+
+                        function paint() {
+                          var label = labelFromHrms() || labelFromRelation() || '';
+                          var current = String($('#qc_checked_by_display').val() || '').trim();
+                          if (label) {
+                            $('#qc_checked_by_display').val(label);
+                          } else if (current === '' && id) {
+                            $('#qc_checked_by_display').val('User #' + id);
+                          }
                         }
+
+                        paint();
+                        $(document).on('grn:hrms-users-loaded', paint);
                       })();
                       $('#qc_ststus').val(h.qc_ststus);
                       if (window.GRN && typeof window.GRN.syncQcCheckedByRequiredUi === 'function') {

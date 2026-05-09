@@ -51,6 +51,7 @@ use App\Models\Tblcustomer;
 use App\Models\TblDeliveryAddress;
 use App\Models\Tblgrn;
 use App\Models\TblgrnLines;
+use App\Services\HrmsEmployeeService;
 use App\Models\Tblgsttax;
 use App\Models\TblLocationModel;
 use App\Models\Tblnaturepayment;
@@ -543,6 +544,7 @@ public function getvendorcreate()
     ];
     if (!$isUpdate) {
         $data['updated_at'] = $now;
+        $data['active_status'] = 1;
     }
 
     // dd($data);
@@ -2818,7 +2820,7 @@ public function importbillMadeExcel(Request $request)
         $locations = TblLocationModel::all();
         $Tbltdstax = Tbltdstax::all();
         $Tbltcstax = Tbltcstax::all();
-        $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts','bankdetails'])->get();
+        $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts','bankdetails'])->where('active_status', 0)->get();
         $customer = Tblcustomer::with(['billingAddress', 'shippingAddress', 'contacts'])->get();
         $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
@@ -3328,7 +3330,7 @@ public function getpurchaseorder(Request $request)
         $TblDeliveryAddress = TblDeliveryAddress::orderBy('id', 'desc')->get();
         $Tbltdssection = Tbltdssection::orderBy('id', 'asc')->paginate(10);
         $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
-        $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails'])->get();
+        $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails'])->where('active_status', 0)->get();
         $customer = Tblcustomer::with(['billingAddress', 'shippingAddress', 'contacts'])->get();
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
        $TblQuotation = TblQuotation::with(['BillLines','Tblvendor','TblBilling'])->where('approval_status', 1)->where('po_status', 0)->where('delete_status',0)->orderBy('id','desc')->paginate(10);
@@ -3713,7 +3715,7 @@ public function getpurchaseorder(Request $request)
 
         $query = PaymentRequest::query()
             ->where('status', PaymentRequest::STATUS_APPROVED);
-            
+
         if ($q !== '') {
             $like = '%'.addcslashes($q, '%_\\').'%';
             $query->where('request_no', 'like', $like);
@@ -4889,7 +4891,7 @@ public function getquotation(Request $request)
         $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
         $Tbltdssection = Tbltdssection::orderBy('id', 'asc')->paginate(10);
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
-        $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails','tdstax'])->get();
+        $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails','tdstax'])->where('active_status', 0)->get();
         // dd($vendor);
         $customer = Tblcustomer::with(['billingAddress', 'shippingAddress', 'contacts'])->get();
         $commonData = [
@@ -5418,7 +5420,7 @@ public function getgrndashboard(Request $request)
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
         $Tblvendor = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
 
-        $query = Tblgrn::with(['BillLines','Tblvendor','TblBilling'])->orderBy('id', 'desc');
+        $query = Tblgrn::with(['BillLines', 'Tblvendor', 'TblBilling', 'billRecord'])->orderBy('id', 'desc');
 
         // Apply filter
         if ($request->filled('date_from') && $request->filled('date_to')) {
@@ -5476,7 +5478,11 @@ public function getgrndashboard(Request $request)
                 ->orWhere('payment_terms', 'like', "%{$search}%")
                 ->orWhere('qc_ststus', 'like', "%{$search}%")
                 ->orWhere('subject', 'like', "%{$search}%")
-                ->orWhere('due_date', 'like', "%{$search}%");
+                ->orWhere('due_date', 'like', "%{$search}%")
+                ->orWhereHas('billRecord', function ($bq) use ($search) {
+                    $bq->where('bill_gen_number', 'like', "%{$search}%")
+                        ->orWhere('bill_number', 'like', "%{$search}%");
+                });
             });
         }
         // Stats calculated from filtered query BEFORE stat_filter is applied
@@ -5499,22 +5505,32 @@ public function getgrndashboard(Request $request)
             }
         }
 
-        $grnlist = $query->paginate($perPage)->appends($request->all());
+        $grnlist = $query->with('QcCheckedBy:id,user_fullname,username,email')
+            ->paginate($perPage)
+            ->appends($request->all());
+
+        $qcUserMap = collect(app(HrmsEmployeeService::class)->all())
+            ->keyBy(fn ($r) => (string) ($r['emp_id'] ?? $r['id'] ?? ''))
+            ->all();
 
         if ($request->ajax()) {
-            $html = view('vendor.partials.table.grn_rows', compact('grnlist','perPage'))->render();
+            $html = view('vendor.partials.table.grn_rows', compact('grnlist','perPage','qcUserMap'))->render();
             return response()->json(['html' => $html, 'stats' => $stats]);
         }
+
+        $allGrn = Tblgrn::query()->orderByDesc('id')->get(['id']);
 
         return view('vendor.grn_bashboard', [
             'admin'         => $admin,
             'locations'     => $locations,
             'grnlist'       => $grnlist,
+            'allGrn'        => $allGrn,
             'perPage'       => $perPage,
             'TblZonesModel' => $TblZonesModel,
             'Tblcompany'    => $Tblcompany,
             'Tblvendor'     => $Tblvendor,
             'stats'         => $stats,
+            'qcUserMap'     => $qcUserMap,
         ]);
     }
 // public function getgrnconvert(Request $request)
@@ -5626,7 +5642,7 @@ public function getgrncreate()
     $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
     $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
     $Tbldepartment = Department::orderBy('id', 'asc')->get();
-    $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails'])->get();
+    $vendor = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails'])->where('active_status', 0)->get();
     $customer = Tblcustomer::with(['billingAddress', 'shippingAddress', 'contacts'])->get();
     $TblQuotation = TblQuotation::with(['BillLines','Tblvendor','TblBilling'])
         ->where('approval_status', 1)->where('po_status', 0)->where('delete_status',0)
@@ -5654,6 +5670,33 @@ public function getgrncreate()
         }
     }
 
+    $grnedit_qc_id      = '';
+    $grnedit_qc_display = '';
+    if (!empty($grnedit) && isset($grnedit[0])) {
+        $g = $grnedit[0];
+        $grnedit_qc_id = trim((string) ($g->qc_checked_by ?? ''));
+        if ($grnedit_qc_id !== '') {
+            $rel = $g->QcCheckedBy;
+            if ($rel) {
+                $name = trim((string) ($rel->user_fullname ?? '')) ?: 'User';
+                $tail = trim((string) ($rel->username ?? ''))
+                    ?: trim((string) ($rel->email ?? ''))
+                    ?: (string) ($rel->id ?? '');
+                $grnedit_qc_display = $tail !== '' ? ($name . ' - ' . $tail) : $name;
+            } else {
+                $hit = collect(app(HrmsEmployeeService::class)->all())
+                    ->first(fn ($r) => (string) ($r['emp_id'] ?? $r['id'] ?? '') === $grnedit_qc_id);
+                if ($hit) {
+                    $grnedit_qc_display = !empty($hit['emp_id'])
+                        ? ($hit['name'] . ' - ' . $hit['emp_id'])
+                        : $hit['name'];
+                } else {
+                    $grnedit_qc_display = 'User #' . $grnedit_qc_id;
+                }
+            }
+        }
+    }
+
     // dd($grnedit);
     return view('vendor.grn_create', [
         'admin' => $admin,
@@ -5673,6 +5716,8 @@ public function getgrncreate()
         'Tbldepartment' => $Tbldepartment,
         'gsttax' => $gsttax,
         'users' => $users,
+        'grnedit_qc_id'      => $grnedit_qc_id,
+        'grnedit_qc_display' => $grnedit_qc_display,
     ]);
 }
 public function savegrn(Request $request)
@@ -5696,7 +5741,7 @@ public function savegrn(Request $request)
         }
         if ($request->input('qc_ststus') === 'Checked') {
             $request->validate([
-                'qc_checked_by' => 'required|integer|exists:users,id',
+                'qc_checked_by' => 'required|string|max:64',
             ], [
                 'qc_checked_by.required' => 'QC Checked By is required when QC Status is Checked.',
             ]);

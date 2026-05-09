@@ -57,6 +57,11 @@ class Tblgrn extends Authenticatable
         return $this->belongsTo(TblBilling::class, 'vendor_id');
     }
 
+    public function billRecord()
+    {
+        return $this->belongsTo(Tblbill::class, 'bill_id');
+    }
+
     public function TblCompany()
     {
         return $this->belongsTo(Tblcompany::class, 'company_id');
