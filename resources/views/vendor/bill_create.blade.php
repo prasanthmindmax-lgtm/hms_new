@@ -3972,6 +3972,34 @@ function calculateFinalTotals() {
                 $(document).on('input change', '#payment_request_number_input, #payment_request_id', function () {
                     checkRequiredFields();
                 });
+
+                (function billCreatePrefillPaymentRequestFromQuery() {
+                    const params = new URLSearchParams(window.location.search);
+                    const prId = (params.get('payment_request_id') || '').trim();
+                    const prNo = (params.get('payment_request_no') || params.get('request_no') || '').trim();
+                    if (prId !== '') {
+                        loadPaymentRequestPurchaseById(prId);
+                        return;
+                    }
+                    if (prNo !== '') {
+                        $('#payment_request_number_input').val(prNo);
+                        $.ajax({
+                            url: '{{ route("superadmin.billPaymentRequestForBill") }}',
+                            data: { number: prNo },
+                            dataType: 'json',
+                            success: function (resp) {
+                                applyPaymentRequestBillResponse(resp);
+                            },
+                            error: function (xhr) {
+                                const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Could not load payment request.';
+                                toastr.warning(msg);
+                                updatePaymentRequestMeta();
+                                syncBillVendorFieldLock();
+                            }
+                        });
+                    }
+                })();
+
                 updatePaymentRequestMeta();
                 syncBillVendorFieldLock();
             });

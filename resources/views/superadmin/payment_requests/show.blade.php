@@ -32,6 +32,13 @@
   $st = (string) ($r->status ?? \App\Models\PaymentRequest::STATUS_PENDING);
   $pending = $r->isPendingReview();
   $canApproveReject = $pending && (int) (($admin->access_limits ?? 0)) === 1;
+  $payPrBackListFrom = (string) request()->query('from', '');
+  $payPrBackListUrl = $payPrBackListFrom === 'approved-payments'
+    ? route('superadmin.approved-payments.index')
+    : route('superadmin.payment-requests.index');
+  $payPrBackListLabel = $payPrBackListFrom === 'approved-payments'
+    ? 'Back to list'
+    : 'Back to list';
 @endphp
 <div class="pr-pay-module w-100 mb-4">
   <div class="qd-card tk-tickets-page pr-show-surface">
@@ -42,7 +49,7 @@
         </h1>
       </div>
       <div class="tk-hero-actions flex-wrap pr-show-hero-actions">
-        <a href="{{ route('superadmin.payment-requests.index') }}" class="tk-btn-export text-decoration-none"><i class="bi bi-arrow-left-short" aria-hidden="true"></i> Back to list</a>
+        <a href="{{ $payPrBackListUrl }}" class="tk-btn-export text-decoration-none"><i class="bi bi-arrow-left-short" aria-hidden="true"></i> {{ $payPrBackListLabel }}</a>
         @if($canApproveReject)
           <button type="button" class="pr-show-btn-approve" data-bs-toggle="modal" data-bs-target="#payReqApproveModal" title="Approve for processing">
             <i class="bi bi-check2-circle" aria-hidden="true"></i> Approve
