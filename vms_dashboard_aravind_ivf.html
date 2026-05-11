@@ -1,0 +1,634 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --nav:#0f2d4a;--nav-text:rgba(255,255,255,0.65);--nav-active:#1a7f64;
+  --accent:#1a7f64;--accent2:#16a37e;--warn:#d97706;--danger:#dc2626;
+  --bg:var(--color-background-tertiary);--card:var(--color-background-primary);
+  --border:var(--color-border-tertiary);--text:var(--color-text-primary);
+  --muted:var(--color-text-secondary);
+}
+body{font-family:var(--font-sans)}
+.shell{display:flex;height:680px;background:var(--bg);border-radius:var(--border-radius-lg);overflow:hidden;border:0.5px solid var(--border)}
+
+/* Sidebar */
+.sidebar{width:200px;background:var(--nav);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{padding:16px 14px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.sidebar-logo .hosp{font-size:12px;font-weight:500;color:#fff;line-height:1.3}
+.sidebar-logo .sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:2px}
+.sidebar-branch{margin:8px 10px;background:rgba(255,255,255,0.07);border-radius:6px;padding:6px 10px;font-size:10px;color:rgba(255,255,255,0.5)}
+.sidebar-branch span{color:rgba(255,255,255,0.9);font-size:11px;font-weight:500}
+nav{flex:1;overflow-y:auto;padding:6px 0}
+nav::-webkit-scrollbar{width:3px}
+nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+.nav-section{font-size:9px;letter-spacing:0.08em;color:rgba(255,255,255,0.3);padding:10px 14px 4px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12px;color:var(--nav-text);cursor:pointer;transition:background 0.15s;border-left:2px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:#fff}
+.nav-item.active{background:rgba(26,127,100,0.25);color:#fff;border-left-color:var(--accent2)}
+.nav-item i{font-size:15px;width:16px}
+.nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:9px;padding:1px 5px;border-radius:10px;font-weight:500}
+.nav-badge.warn{background:var(--warn)}
+
+/* Main area */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+
+/* Topbar */
+.topbar{background:var(--card);border-bottom:0.5px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-title{font-size:14px;font-weight:500;color:var(--text)}
+.topbar-title span{color:var(--muted);font-weight:400}
+.topbar-search{flex:1;max-width:240px;position:relative}
+.topbar-search input{width:100%;height:30px;border-radius:6px;border:0.5px solid var(--border);background:var(--bg);padding:0 10px 0 30px;font-size:12px;color:var(--text);outline:none}
+.topbar-search i{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)}
+.topbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.icon-btn{width:30px;height:30px;border-radius:6px;border:0.5px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);position:relative}
+.icon-btn:hover{background:var(--bg)}
+.icon-btn .dot{position:absolute;top:5px;right:6px;width:6px;height:6px;background:var(--danger);border-radius:50%;border:1.5px solid var(--card)}
+.avatar{width:30px;height:30px;border-radius:50%;background:#1a7f64;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;cursor:pointer}
+
+/* Content */
+.content{flex:1;overflow-y:auto;padding:16px}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:0.5px solid var(--border)}
+.tab{padding:6px 14px;font-size:12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+
+/* KPI cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:0.5px solid var(--border);border-radius:var(--border-radius-md);padding:12px 14px;position:relative;overflow:hidden}
+.kpi-accent{position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent)}
+.kpi.warn .kpi-accent{background:var(--warn)}
+.kpi.danger .kpi-accent{background:var(--danger)}
+.kpi.blue .kpi-accent{background:#2563eb}
+.kpi.purple .kpi-accent{background:#7c3aed}
+.kpi-label{font-size:10px;color:var(--muted);margin-bottom:4px}
+.kpi-value{font-size:22px;font-weight:500;color:var(--text);line-height:1}
+.kpi-sub{font-size:10px;color:var(--muted);margin-top:4px}
+.kpi-sub.up{color:#16a34a}
+.kpi-sub.dn{color:var(--danger)}
+.kpi-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:22px;opacity:0.1;color:var(--text)}
+
+/* Sections */
+.section-row{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;margin-bottom:12px}
+.section-row.three{grid-template-columns:1fr 1fr 1fr}
+.card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--border-radius-md);padding:14px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-size:12px;font-weight:500;color:var(--text)}
+.card-pill{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg);color:var(--muted)}
+
+/* Approval cards */
+.approval-list{display:flex;flex-direction:column;gap:8px}
+.approval-card{background:var(--bg);border-radius:var(--border-radius-md);padding:10px 12px;border:0.5px solid var(--border)}
+.approval-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.approval-avatar{width:32px;height:32px;border-radius:50%;background:#1a7f64;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:500;flex-shrink:0}
+.approval-avatar.ph{background:#7c3aed}
+.approval-avatar.np{background:#2563eb}
+.approval-name{font-size:12px;font-weight:500;color:var(--text);line-height:1.2}
+.approval-co{font-size:10px;color:var(--muted)}
+.approval-badge{margin-left:auto;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:500}
+.approval-badge.pharma{background:#dcfce7;color:#166534}
+.approval-badge.non{background:#dbeafe;color:#1e40af}
+.approval-meta{display:flex;gap:12px;margin-bottom:8px}
+.approval-meta-item{font-size:10px;color:var(--muted)}
+.approval-meta-item span{color:var(--text);font-weight:500}
+.approval-actions{display:flex;gap:6px}
+.btn-sm{font-size:10px;padding:4px 10px;border-radius:5px;border:0.5px solid;cursor:pointer;font-weight:500}
+.btn-approve{background:#dcfce7;color:#166534;border-color:#86efac}
+.btn-reject{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+.btn-hold{background:var(--bg);color:var(--muted);border-color:var(--border)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);padding:6px 14px;font-size:11px;border-radius:6px;cursor:pointer;font-weight:500}
+
+/* Active visitors */
+.active-list{display:flex;flex-direction:column;gap:6px}
+.active-row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:6px;border:0.5px solid var(--border)}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.green{background:#16a34a}
+.status-dot.orange{background:#d97706}
+.status-dot.red{background:#dc2626}
+.active-name{font-size:11px;font-weight:500;color:var(--text);line-height:1.2}
+.active-dept{font-size:10px;color:var(--muted)}
+.active-time{font-size:10px;color:var(--muted);text-align:right}
+.active-dur{font-size:11px;font-weight:500;color:var(--text);text-align:right}
+
+/* Chart area */
+.chart-wrap{position:relative;width:100%;height:160px}
+
+/* Quick actions */
+.qa-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.qa-btn{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--border-radius-md);padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:border-color 0.15s}
+.qa-btn:hover{border-color:var(--accent2)}
+.qa-btn i{font-size:20px;color:var(--accent)}
+.qa-btn.danger i{color:var(--danger)}
+.qa-label{font-size:10px;font-weight:500;color:var(--text);text-align:center}
+
+/* Visitor reg form preview */
+.form-preview{display:flex;flex-direction:column;gap:8px}
+.form-group{display:flex;flex-direction:column;gap:3px}
+.form-label{font-size:10px;color:var(--muted)}
+.form-input{height:28px;border-radius:5px;border:0.5px solid var(--border);background:var(--bg);padding:0 8px;font-size:11px;color:var(--text);outline:none}
+.form-input:focus{border-color:var(--accent2)}
+.form-select{height:28px;border-radius:5px;border:0.5px solid var(--border);background:var(--bg);padding:0 8px;font-size:11px;color:var(--text);width:100%}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-step{display:flex;gap:4px;margin-bottom:12px}
+.step-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:background 0.2s}
+.step-dot.done{background:var(--accent)}
+.step-dot.active{background:var(--accent2);box-shadow:0 0 0 3px rgba(26,163,126,0.2)}
+.step-label{font-size:10px;color:var(--muted);margin-left:4px}
+
+/* Page tabs */
+.page{display:none}
+.page.active{display:block}
+</style>
+
+<h2 class="sr-only">Visitor Management System dashboard for Dr. Aravind's IVF & Pregnancy Centre — interactive UI preview</h2>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div style="width:32px;height:32px;background:#1a7f64;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
+        <i class="ti ti-building-hospital" style="font-size:18px;color:#fff" aria-hidden="true"></i>
+      </div>
+      <div class="hosp">Dr. Aravind's IVF &amp; Pregnancy Centre</div>
+      <div class="sub">Visitor Management System</div>
+    </div>
+    <div class="sidebar-branch">Branch: <span>Main Hospital</span></div>
+    <nav>
+      <div class="nav-section">Main</div>
+      <div class="nav-item active" onclick="setPage('dashboard',this)"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard</div>
+      <div class="nav-item" onclick="setPage('register',this)"><i class="ti ti-user-plus" aria-hidden="true"></i> New Visitor</div>
+      <div class="nav-item" onclick="setPage('approvals',this)"><i class="ti ti-checklist" aria-hidden="true"></i> Approvals <span class="nav-badge warn">12</span></div>
+      <div class="nav-item" onclick="setPage('active',this)"><i class="ti ti-users" aria-hidden="true"></i> Active Visitors</div>
+      <div class="nav-item" onclick="setPage('history',this)"><i class="ti ti-history" aria-hidden="true"></i> Visitor History</div>
+      <div class="nav-section">Vendors</div>
+      <div class="nav-item" onclick="setPage('pharma',this)"><i class="ti ti-pill" aria-hidden="true"></i> Pharma Vendors</div>
+      <div class="nav-item" onclick="setPage('nonpharma',this)"><i class="ti ti-briefcase" aria-hidden="true"></i> Non-Pharma</div>
+      <div class="nav-item" onclick="setPage('blacklist',this)"><i class="ti ti-ban" aria-hidden="true"></i> Blacklisted <span class="nav-badge">2</span></div>
+      <div class="nav-section">Management</div>
+      <div class="nav-item" onclick="setPage('reports',this)"><i class="ti ti-chart-bar" aria-hidden="true"></i> Reports</div>
+      <div class="nav-item" onclick="setPage('qr',this)"><i class="ti ti-qrcode" aria-hidden="true"></i> QR Management</div>
+      <div class="nav-item" onclick="setPage('settings',this)"><i class="ti ti-settings" aria-hidden="true"></i> Settings</div>
+    </nav>
+    <div style="padding:12px 14px;border-top:1px solid rgba(255,255,255,0.08)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:28px;height:28px;border-radius:50%;background:#1a7f64;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:500">RE</div>
+        <div>
+          <div style="font-size:11px;color:#fff;font-weight:500">Receptionist</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.4)">Main Branch</div>
+        </div>
+        <i class="ti ti-logout" style="margin-left:auto;font-size:14px;color:rgba(255,255,255,0.3);cursor:pointer" aria-hidden="true"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard <span>/ Overview</span></div>
+      <div class="topbar-search">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        <input type="text" placeholder="Search visitors, companies…">
+      </div>
+      <div class="topbar-actions">
+        <div class="icon-btn"><i class="ti ti-bell" aria-hidden="true"></i><div class="dot"></div></div>
+        <div class="icon-btn"><i class="ti ti-refresh" aria-hidden="true"></i></div>
+        <div class="avatar">AD</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div id="page-dashboard" class="page active">
+        <div class="tabs">
+          <div class="tab active">Today's Overview</div>
+          <div class="tab">Weekly</div>
+          <div class="tab">Monthly</div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Total Visitors Today</div>
+            <div class="kpi-value">126</div>
+            <div class="kpi-sub up">↑ 8% vs yesterday</div>
+            <i class="ti ti-users kpi-icon" aria-hidden="true"></i>
+          </div>
+          <div class="kpi blue">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Active Inside</div>
+            <div class="kpi-value">23</div>
+            <div class="kpi-sub">Live now</div>
+            <i class="ti ti-activity kpi-icon" aria-hidden="true"></i>
+          </div>
+          <div class="kpi warn">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Pending Approvals</div>
+            <div class="kpi-value">12</div>
+            <div class="kpi-sub dn">3 overdue</div>
+            <i class="ti ti-clock kpi-icon" aria-hidden="true"></i>
+          </div>
+          <div class="kpi purple">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Pharma Visitors</div>
+            <div class="kpi-value">58</div>
+            <div class="kpi-sub up">↑ 12% this week</div>
+            <i class="ti ti-pill kpi-icon" aria-hidden="true"></i>
+          </div>
+          <div class="kpi">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Non-Pharma Visitors</div>
+            <div class="kpi-value">68</div>
+            <div class="kpi-sub up">↑ 4%</div>
+            <i class="ti ti-briefcase kpi-icon" aria-hidden="true"></i>
+          </div>
+          <div class="kpi danger">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Blacklist Alerts</div>
+            <div class="kpi-value">2</div>
+            <div class="kpi-sub dn">Immediate action needed</div>
+            <i class="ti ti-alert-triangle kpi-icon" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="section-row">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Hour-wise visitor trend</div>
+              <div class="card-pill">Today</div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="hourChart" role="img" aria-label="Bar chart showing visitor counts by hour from 8AM to 5PM">Hourly data available below.</canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Visitor type split</div>
+              <div class="card-pill">Today</div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="typeChart" role="img" aria-label="Doughnut chart showing pharma vs non-pharma visitor split">Pharma 58, Non-pharma 68.</canvas>
+            </div>
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:8px;font-size:10px;color:var(--muted)">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#1a7f64"></span>Pharma 46%</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#2563eb"></span>Non-pharma 54%</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-row three">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Quick actions</div></div>
+            <div class="qa-grid">
+              <div class="qa-btn" onclick="setPageByName('register')"><i class="ti ti-user-plus" aria-hidden="true"></i><div class="qa-label">Register Visitor</div></div>
+              <div class="qa-btn"><i class="ti ti-qrcode" aria-hidden="true"></i><div class="qa-label">Scan QR</div></div>
+              <div class="qa-btn"><i class="ti ti-printer" aria-hidden="true"></i><div class="qa-label">Print Pass</div></div>
+              <div class="qa-btn"><i class="ti ti-logout" aria-hidden="true"></i><div class="qa-label">Check-Out</div></div>
+              <div class="qa-btn"><i class="ti ti-phone-call" aria-hidden="true"></i><div class="qa-label">Call Employee</div></div>
+              <div class="qa-btn danger" onclick="alert('Emergency alert sent to security team!')"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div class="qa-label">Emergency</div></div>
+            </div>
+          </div>
+          <div class="card" style="grid-column:span 2">
+            <div class="card-header"><div class="card-title">Active visitors</div><div class="card-pill">23 inside</div></div>
+            <div class="active-list">
+              <div class="active-row"><div class="status-dot green"></div><div><div class="active-name">Ravi Kumar</div><div class="active-dept">Pharma · Cipla Ltd</div></div><div class="active-time">Entry 10:24 AM</div><div class="active-dur">28 min</div></div>
+              <div class="active-row"><div class="status-dot orange"></div><div><div class="active-name">Priya Sharma</div><div class="active-dept">Non-Pharma · Lab Services</div></div><div class="active-time">Entry 9:55 AM</div><div class="active-dur">57 min</div></div>
+              <div class="active-row"><div class="status-dot red"></div><div><div class="active-name">Mohan Doss</div><div class="active-dept">Pharma · Sun Pharma</div></div><div class="active-time">Entry 9:10 AM</div><div class="active-dur">1h 42m ⚠</div></div>
+              <div class="active-row"><div class="status-dot green"></div><div><div class="active-name">Anitha R.</div><div class="active-dept">Patient Relative</div></div><div class="active-time">Entry 10:40 AM</div><div class="active-dur">12 min</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="page-register" class="page">
+        <div class="card" style="max-width:600px">
+          <div class="card-header">
+            <div class="card-title">New visitor registration</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="form-step">
+                <div class="step-dot done"></div>
+                <div class="step-dot active"></div>
+                <div class="step-dot"></div>
+              </div>
+              <span class="step-label">Step 2 of 3</span>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:500;color:var(--accent);margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border)">B. Visit Details</div>
+          <div class="form-preview">
+            <div class="form-row">
+              <div class="form-group">
+                <div class="form-label">Visitor type *</div>
+                <select class="form-select">
+                  <option>Pharma Vendor</option>
+                  <option>Non-Pharma Vendor</option>
+                  <option>Patient Relative</option>
+                  <option>Job Applicant</option>
+                  <option>Government Official</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div class="form-label">Company name</div>
+                <input class="form-input" type="text" placeholder="Sun Pharma Ltd.">
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="form-label">Purpose of visit *</div>
+              <select class="form-select">
+                <option>Product Detailing</option>
+                <option>Sample Delivery</option>
+                <option>Equipment Service</option>
+                <option>Patient Relative</option>
+                <option>Interview</option>
+                <option>Vendor Meeting</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <div class="form-label">Person to meet *</div>
+                <select class="form-select">
+                  <option>Dr. Aravind (IVF Specialist)</option>
+                  <option>Dr. Priya (Gynaecologist)</option>
+                  <option>Admin Manager</option>
+                  <option>Purchase Dept.</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div class="form-label">Appointment time</div>
+                <input class="form-input" type="time" value="11:00">
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="form-label">Equipment / samples carried</div>
+              <input class="form-input" type="text" placeholder="e.g. Tablet samples, Brochures">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+              <input type="checkbox" id="decl" style="width:14px;height:14px">
+              <label for="decl" style="font-size:10px;color:var(--muted)">I declare all information is true and agree to hospital security guidelines</label>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn-sm btn-hold">← Back</button>
+              <button class="btn-primary" style="flex:1" onclick="alert('OTP sent to visitor's mobile. Awaiting verification.')">Send OTP &amp; Continue →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- APPROVALS -->
+      <div id="page-approvals" class="page">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--muted)">12 pending approvals — <span style="color:var(--danger)">3 overdue</span></div>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <select class="form-select" style="height:28px;width:auto;font-size:11px"><option>All types</option><option>Pharma</option><option>Non-Pharma</option></select>
+          </div>
+        </div>
+        <div class="approval-list">
+          <div class="approval-card">
+            <div class="approval-top">
+              <div class="approval-avatar">RK</div>
+              <div><div class="approval-name">Ravi Kumar</div><div class="approval-co">Cipla Ltd · Pharma Rep</div></div>
+              <span class="approval-badge pharma">Pharma</span>
+            </div>
+            <div class="approval-meta">
+              <div class="approval-meta-item">Doctor: <span>Dr. Aravind</span></div>
+              <div class="approval-meta-item">Purpose: <span>Product Detailing</span></div>
+              <div class="approval-meta-item">Appt: <span>11:00 AM</span></div>
+              <div class="approval-meta-item">Visits: <span style="color:#16a34a">4 prior</span></div>
+            </div>
+            <div class="approval-actions">
+              <button class="btn-sm btn-approve">✓ Approve</button>
+              <button class="btn-sm btn-reject">✕ Reject</button>
+              <button class="btn-sm btn-hold">Hold</button>
+              <button class="btn-sm btn-hold">Escalate</button>
+            </div>
+          </div>
+          <div class="approval-card">
+            <div class="approval-top">
+              <div class="approval-avatar ph">MS</div>
+              <div><div class="approval-name">Megha Suresh</div><div class="approval-co">Abbott India · Area Manager</div></div>
+              <span class="approval-badge pharma">Pharma</span>
+            </div>
+            <div class="approval-meta">
+              <div class="approval-meta-item">Doctor: <span>Dr. Priya</span></div>
+              <div class="approval-meta-item">Purpose: <span>Sample Delivery</span></div>
+              <div class="approval-meta-item">Appt: <span>10:30 AM ⚠</span></div>
+              <div class="approval-meta-item">Visits: <span style="color:#d97706">12 this month</span></div>
+            </div>
+            <div class="approval-actions">
+              <button class="btn-sm btn-approve">✓ Approve</button>
+              <button class="btn-sm btn-reject">✕ Reject</button>
+              <button class="btn-sm btn-hold">Hold</button>
+              <button class="btn-sm btn-hold">Escalate</button>
+            </div>
+          </div>
+          <div class="approval-card">
+            <div class="approval-top">
+              <div class="approval-avatar np">VT</div>
+              <div><div class="approval-name">Vijay Techno Services</div><div class="approval-co">Equipment Maintenance</div></div>
+              <span class="approval-badge non">Non-Pharma</span>
+            </div>
+            <div class="approval-meta">
+              <div class="approval-meta-item">Contact: <span>Purchase Dept.</span></div>
+              <div class="approval-meta-item">Purpose: <span>Equipment Service</span></div>
+              <div class="approval-meta-item">Appt: <span>12:00 PM</span></div>
+              <div class="approval-meta-item">Visits: <span>1 prior</span></div>
+            </div>
+            <div class="approval-actions">
+              <button class="btn-sm btn-approve">✓ Approve</button>
+              <button class="btn-sm btn-reject">✕ Reject</button>
+              <button class="btn-sm btn-hold">Hold</button>
+              <button class="btn-sm btn-hold">Escalate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIVE -->
+      <div id="page-active" class="page">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div style="display:flex;gap:12px;font-size:11px">
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a"></span>Within limit</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#d97706"></span>Nearing limit</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626"></span>Overstay</span>
+          </div>
+          <div style="margin-left:auto;font-size:11px;color:var(--muted)">Live — 23 inside</div>
+        </div>
+        <div class="active-list">
+          <div class="active-row" style="grid-template-columns:auto 1fr auto auto auto"><div class="status-dot green"></div><div><div class="active-name">Ravi Kumar · Cipla Ltd</div><div class="active-dept">Pharma · Floor 2 / Dr. Aravind's OPD</div></div><div class="active-time">In: 10:24 AM</div><div class="active-dur" style="color:#16a34a">28 min</div><button class="btn-sm btn-hold" style="font-size:9px">Check-out</button></div>
+          <div class="active-row" style="grid-template-columns:auto 1fr auto auto auto"><div class="status-dot orange"></div><div><div class="active-name">Priya Sharma · Lab Services</div><div class="active-dept">Non-Pharma · Ground / Lab</div></div><div class="active-time">In: 9:55 AM</div><div class="active-dur" style="color:#d97706">57 min</div><button class="btn-sm btn-hold" style="font-size:9px">Check-out</button></div>
+          <div class="active-row" style="grid-template-columns:auto 1fr auto auto auto"><div class="status-dot red"></div><div><div class="active-name">Mohan Doss · Sun Pharma</div><div class="active-dept">Pharma · Floor 1 / Dr. Priya's OPD</div></div><div class="active-time">In: 9:10 AM</div><div class="active-dur" style="color:#dc2626">1h 42m ⚠ OVERSTAY</div><button class="btn-sm btn-reject" style="font-size:9px">Alert Security</button></div>
+          <div class="active-row" style="grid-template-columns:auto 1fr auto auto auto"><div class="status-dot green"></div><div><div class="active-name">Anitha R.</div><div class="active-dept">Patient Relative · Floor 3 / Ward</div></div><div class="active-time">In: 10:40 AM</div><div class="active-dur" style="color:#16a34a">12 min</div><button class="btn-sm btn-hold" style="font-size:9px">Check-out</button></div>
+          <div class="active-row" style="grid-template-columns:auto 1fr auto auto auto"><div class="status-dot green"></div><div><div class="active-name">Karthik Raj · Biocon Ltd</div><div class="active-dept">Pharma · Floor 2 / Waiting</div></div><div class="active-time">In: 10:50 AM</div><div class="active-dur" style="color:#16a34a">2 min</div><button class="btn-sm btn-hold" style="font-size:9px">Check-out</button></div>
+        </div>
+      </div>
+
+      <!-- BLACKLIST -->
+      <div id="page-blacklist" class="page">
+        <div style="background:#fee2e2;border:0.5px solid #fca5a5;border-radius:var(--border-radius-md);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+          <i class="ti ti-alert-triangle" style="font-size:16px;color:#dc2626" aria-hidden="true"></i>
+          <span style="font-size:12px;font-weight:500;color:#991b1b">2 blacklisted visitors have attempted entry. Security escalation active.</span>
+        </div>
+        <div class="approval-list">
+          <div class="approval-card" style="border-color:#fca5a5">
+            <div class="approval-top">
+              <div class="approval-avatar" style="background:#dc2626">SD</div>
+              <div><div class="approval-name">Suresh D.</div><div class="approval-co">XYZ Medicals · Former Rep</div></div>
+              <span class="approval-badge" style="background:#fee2e2;color:#991b1b">Blacklisted</span>
+            </div>
+            <div class="approval-meta">
+              <div class="approval-meta-item">Reason: <span style="color:#dc2626">Misconduct / Harassment</span></div>
+              <div class="approval-meta-item">Blacklisted on: <span>12 Mar 2025</span></div>
+              <div class="approval-meta-item">Incidents: <span>3</span></div>
+            </div>
+            <div class="approval-actions">
+              <button class="btn-sm btn-reject">Deny Entry</button>
+              <button class="btn-sm btn-hold">View Incidents</button>
+              <button class="btn-sm btn-hold">Call Security</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div id="page-reports" class="page">
+        <div class="section-row">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Monthly pharma visits by company</div><div class="card-pill">May 2025</div></div>
+            <div class="chart-wrap">
+              <canvas id="pharmaChart" role="img" aria-label="Horizontal bar chart of pharma visits by company">Top companies listed.</canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Doctor-wise visits</div></div>
+            <div class="chart-wrap">
+              <canvas id="doctorChart" role="img" aria-label="Bar chart of visits per doctor">Dr. Aravind highest.</canvas>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Key metrics — compliance &amp; analytics</div></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+            <div style="text-align:center;padding:10px;background:var(--bg);border-radius:var(--border-radius-md)"><div style="font-size:10px;color:var(--muted)">Top pharma company</div><div style="font-size:13px;font-weight:500;color:var(--text);margin-top:4px">Cipla Ltd</div><div style="font-size:10px;color:var(--muted)">18 visits this month</div></div>
+            <div style="text-align:center;padding:10px;background:var(--bg);border-radius:var(--border-radius-md)"><div style="font-size:10px;color:var(--muted)">Most visited doctor</div><div style="font-size:13px;font-weight:500;color:var(--text);margin-top:4px">Dr. Aravind</div><div style="font-size:10px;color:var(--muted)">42 pharma visits</div></div>
+            <div style="text-align:center;padding:10px;background:var(--bg);border-radius:var(--border-radius-md)"><div style="font-size:10px;color:var(--muted)">Avg visit duration</div><div style="font-size:13px;font-weight:500;color:var(--text);margin-top:4px">34 min</div><div style="font-size:10px;color:#d97706">+6 min vs limit</div></div>
+            <div style="text-align:center;padding:10px;background:var(--bg);border-radius:var(--border-radius-md)"><div style="font-size:10px;color:var(--muted)">Repeat vendors</div><div style="font-size:13px;font-weight:500;color:var(--text);margin-top:4px">67%</div><div style="font-size:10px;color:#16a34a">Known visitors</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- other pages -->
+      <div id="page-history" class="page"><div class="card"><div class="card-title" style="margin-bottom:10px">Visitor history</div><div style="font-size:12px;color:var(--muted)">Filter and export past visitor records by date, type, or department.</div></div></div>
+      <div id="page-pharma" class="page"><div class="card"><div class="card-title" style="margin-bottom:10px">Pharma vendor management</div><div style="font-size:12px;color:var(--muted)">Track visit frequency, ethics compliance, and doctor meeting schedules for pharma reps.</div></div></div>
+      <div id="page-nonpharma" class="page"><div class="card"><div class="card-title" style="margin-bottom:10px">Non-pharma vendor management</div><div style="font-size:12px;color:var(--muted)">Service vendors, equipment maintenance, and supply visits.</div></div></div>
+      <div id="page-qr" class="page"><div class="card"><div class="card-title" style="margin-bottom:10px">QR code management</div><div style="font-size:12px;color:var(--muted)">Generate, print, and invalidate QR passes. Track scan history at entry and exit points.</div></div></div>
+      <div id="page-settings" class="page"><div class="card"><div class="card-title" style="margin-bottom:10px">System settings</div><div style="font-size:12px;color:var(--muted)">Configure branches, roles, approval workflows, time limits, and notification preferences.</div></div></div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+const textColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+
+function setPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if(el) el.classList.add('active');
+  const titles = {dashboard:'Dashboard / Overview',register:'New Visitor / Registration',approvals:'Approvals / Pending',active:'Active Visitors / Live',history:'Visitor History',pharma:'Pharma Vendors',nonpharma:'Non-Pharma Vendors',blacklist:'Blacklisted Visitors',reports:'Reports & Analytics',qr:'QR Management',settings:'Settings'};
+  document.getElementById('topbar-title').innerHTML = (titles[name]||name).replace(' / ','<span> / ') + (titles[name]&&titles[name].includes('/')?'</span>':'');
+}
+function setPageByName(name) {
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(el => {
+    if(el.textContent.toLowerCase().includes(name==='register'?'new visitor':name)) setPage(name, el);
+  });
+}
+
+new Chart(document.getElementById('hourChart'), {
+  type: 'bar',
+  data: {
+    labels: ['8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm'],
+    datasets: [{
+      label: 'Visitors',
+      data: [8,22,35,28,14,18,24,19,10,5],
+      backgroundColor: '#1a7f6490',
+      borderColor: '#1a7f64',
+      borderWidth: 1,
+      borderRadius: 3
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true }
+    }
+  }
+});
+
+new Chart(document.getElementById('typeChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Pharma','Non-Pharma','Patient Relative','Others'],
+    datasets: [{
+      data: [58,45,18,5],
+      backgroundColor: ['#1a7f64','#2563eb','#7c3aed','#d97706'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: { legend: { display: false } }
+  }
+});
+
+new Chart(document.getElementById('pharmaChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Cipla','Sun Pharma','Abbott','Biocon','Dr. Reddy\'s'],
+    datasets: [{
+      label: 'Visits',
+      data: [18,14,11,9,7],
+      backgroundColor: '#2563eb90',
+      borderColor: '#2563eb',
+      borderWidth: 1,
+      borderRadius: 3
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('doctorChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Dr. Aravind','Dr. Priya','Dr. Ramesh','Dr. Meena'],
+    datasets: [{
+      label: 'Visits',
+      data: [42,28,19,11],
+      backgroundColor: '#7c3aed90',
+      borderColor: '#7c3aed',
+      borderWidth: 1,
+      borderRadius: 3
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, beginAtZero: true }
+    }
+  }
+});
+</script>

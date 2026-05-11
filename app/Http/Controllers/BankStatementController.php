@@ -2381,336 +2381,692 @@ class BankStatementController extends Controller
      * Match bank statement with bill.
      * Creates a bill_pay (bill made) record like VendorController::savebillmade, so the payment appears in Bill Made.
      */
-    public function matchBill(Request $request)
-    {
-        $request->validate([
-            'bank_statement_id' => 'required|integer',
-            'bill_id' => 'required|integer',
-            'matched_amount' => 'required|numeric',
-            'match_type' => 'required|in:full,partial',
-            'nature_account_ids' => 'required|array|min:1',
-            'nature_account_ids.*' => 'integer',
-            'attachments' => 'required|array|min:1',
-            'attachments.*' => 'file|max:15360',
-            'attachment_tags' => 'nullable|array',
-            'attachment_tags.*' => 'nullable|string|max:255',
-            'attachment_type_ids' => 'nullable|array',
-            'attachment_type_ids.*' => 'nullable|integer',
-        ], [
-            'nature_account_ids.required' => 'Nature of payment is required — select at least one chart account.',
-            'nature_account_ids.min' => 'Nature of payment is required — select at least one chart account.',
-            'attachments.required' => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
-            'attachments.min' => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
-        ]);
-        DB::beginTransaction();
-        try {
-            $statementId = $request->bank_statement_id;
-            $billId = $request->bill_id;
-            $matchedAmount = (float) $request->matched_amount;
-            $matchType = $request->match_type;
-            $userId = Auth::id();
+    // public function matchBill(Request $request)
+    // {
+    //     $request->validate([
+    //         'bank_statement_id' => 'required|integer',
+    //         'bill_id' => 'required|integer',
+    //         'matched_amount' => 'required|numeric',
+    //         'match_type' => 'required|in:full,partial',
+    //         'nature_account_ids' => 'required|array|min:1',
+    //         'nature_account_ids.*' => 'integer',
+    //         'attachments' => 'required|array|min:1',
+    //         'attachments.*' => 'file|max:15360',
+    //         'attachment_tags' => 'nullable|array',
+    //         'attachment_tags.*' => 'nullable|string|max:255',
+    //         'attachment_type_ids' => 'nullable|array',
+    //         'attachment_type_ids.*' => 'nullable|integer',
+    //     ], [
+    //         'nature_account_ids.required' => 'Nature of payment is required — select at least one chart account.',
+    //         'nature_account_ids.min' => 'Nature of payment is required — select at least one chart account.',
+    //         'attachments.required' => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
+    //         'attachments.min' => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
+    //     ]);
+    //     DB::beginTransaction();
+    //     try {
+    //         $statementId = $request->bank_statement_id;
+    //         $billId = $request->bill_id;
+    //         $matchedAmount = (float) $request->matched_amount;
+    //         $matchType = $request->match_type;
+    //         $userId = Auth::id();
             
-            $statement = DB::table('bank_statements')->where('id', $statementId)->first();
-            $bill = DB::table('bill_tbl')->where('id', $billId)->first();
+    //         $statement = DB::table('bank_statements')->where('id', $statementId)->first();
+    //         $bill = DB::table('bill_tbl')->where('id', $billId)->first();
             
-            if (!$statement || !$bill) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Statement or bill not found'
-                ], 404);
-            }
+    //         if (!$statement || !$bill) {
+    //             DB::rollBack();
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Statement or bill not found'
+    //             ], 404);
+    //         }
             
-            $newBalance = $bill->balance_amount - $matchedAmount;
-            $newBalance = max(0, $newBalance);
-            $paymentDate = $statement->transaction_date
-                            ? Carbon::createFromFormat('d/M/Y', $statement->transaction_date)->format('Y-m-d')
-                            : now()->toDateString();
+    //         $newBalance = $bill->balance_amount - $matchedAmount;
+    //         $newBalance = max(0, $newBalance);
+    //         $paymentDate = $statement->transaction_date
+    //                         ? Carbon::createFromFormat('d/M/Y', $statement->transaction_date)->format('Y-m-d')
+    //                         : now()->toDateString();
         
 
-            // bank_statement_status: paid (full), partially (partial), pending (other)
-            $bankStatementStatus = $matchType === 'full' ? 'Paid' : ($matchType === 'partial' ? 'Partially' : 'Pending');
+    //         // bank_statement_status: paid (full), partially (partial), pending (other)
+    //         $bankStatementStatus = $matchType === 'full' ? 'Paid' : ($matchType === 'partial' ? 'partially_paid' : 'Pending');
 
-            // 1) Update bank statement
-            $stmtUp = [
-                'match_status' => $matchType === 'full' ? 'matched' : 'partially_matched',
-                'matched_bill_id' => $billId,
-                'matched_amount' => $matchedAmount,
-                'matched_date' => now(),
-                'matched_by' => $userId,
-                'notes' => $request->notes,
-                'updated_at' => now(),
-            ];
-            if (Schema::hasColumn('bank_statements', 'category')) {
-                $stmtUp['category'] = 'category';
-            }
-            DB::table('bank_statements')
-                ->where('id', $statementId)
-                ->update($stmtUp);
+    //         // 1) Update bank statement
+    //         $stmtUp = [
+    //             'match_status' => $matchType === 'full' ? 'matched' : 'partially_matched',
+    //             'matched_bill_id' => $billId,
+    //             'matched_amount' => $matchedAmount,
+    //             'matched_date' => now(),
+    //             'matched_by' => $userId,
+    //             'notes' => $request->notes,
+    //             'updated_at' => now(),
+    //         ];
+    //         if (Schema::hasColumn('bank_statements', 'category')) {
+    //             $stmtUp['category'] = 'category';
+    //         }
+    //         DB::table('bank_statements')
+    //             ->where('id', $statementId)
+    //             ->update($stmtUp);
 
-            // Check if this bill_id already has an active (delete_status=0) bill made (bill_pay) record
-            // from Bank Reconciliation – update it instead of creating a duplicate
-            $existingLine = DB::table('bill_pay_lines_tbl as l')
-                ->join('bill_pay_tbl as p', 'p.id', '=', 'l.bill_pay_id')
-                ->where('l.bill_id', $billId)
-                ->where('p.paid_through', 'Bank Reconciliation')
-                ->where('p.delete_status', 0)           // skip soft-deleted bill_pay records
-                ->select('l.bill_pay_id', 'l.id as line_id', 'l.amount as old_amount')
-                ->first();
+    //         // Check if this bill_id already has an active (delete_status=0) bill made (bill_pay) record
+    //         // from Bank Reconciliation – update it instead of creating a duplicate
+    //         $existingLine = DB::table('bill_pay_lines_tbl as l')
+    //             ->join('bill_pay_tbl as p', 'p.id', '=', 'l.bill_pay_id')
+    //             ->where('l.bill_id', $billId)
+    //             ->where('p.paid_through', 'Bank Reconciliation')
+    //             ->where('p.delete_status', 0)           // skip soft-deleted bill_pay records
+    //             ->select('l.bill_pay_id', 'l.id as line_id', 'l.amount as old_amount')
+    //             ->first();
 
-            $existingBillPay = $existingLine
-                ? DB::table('bill_pay_tbl')->where('id', $existingLine->bill_pay_id)->first()
-                : null;
+    //         $existingBillPay = $existingLine
+    //             ? DB::table('bill_pay_tbl')->where('id', $existingLine->bill_pay_id)->first()
+    //             : null;
 
-            if ($existingBillPay) {
-                // UPDATE existing bill_pay (bill made) for this bill_id – same bill, just update amounts and link to this statement
-                $billPayId = $existingBillPay->id;
-                $oldMatchedAmount = (float) ($existingLine->old_amount ?? 0);
+    //         if ($existingBillPay) {
+    //             // UPDATE existing bill_pay (bill made) for this bill_id – same bill, just update amounts and link to this statement
+    //             $billPayId = $existingBillPay->id;
+    //             $oldMatchedAmount = (float) ($existingLine->old_amount ?? 0);
 
-                // Bill balance: was reduced by oldMatchedAmount; now we apply new matchedAmount
-                $newBalanceFromUpdate = $bill->balance_amount + $oldMatchedAmount - $matchedAmount;
-                $newBalanceFromUpdate = max(0, $newBalanceFromUpdate);
+    //             // Bill balance: was reduced by oldMatchedAmount; now we apply new matchedAmount
+    //             $newBalanceFromUpdate = $bill->balance_amount + $oldMatchedAmount - $matchedAmount;
+    //             $newBalanceFromUpdate = max(0, $newBalanceFromUpdate);
 
-                $billPayUpdate = [
-                    'user_id' => $userId,
-                    'vendor_id' => $bill->vendor_id,
-                    'vendor_name' => $bill->vendor_name ?? '',
-                    'zone_id' => $bill->zone_id ?? null,
-                    'zone_name' => $bill->zone_name ?? '',
-                    'branch_id' => $bill->branch_id ?? null,
-                    'branch_name' => $bill->branch_name ?? '',
-                    'company_name' => $bill->company_name ?? '',
-                    'company_id' => $bill->company_id ?? null,
-                    'payment_date' => $paymentDate,
-                    'payment_mode' => 'Bank Transfer',
-                    'paid_through' => 'Bank Reconciliation',
-                    'payment' => 'NEFT',
-                    'reference' => $statement->reference_number ?? ('Bank Stmt #' . $statementId),
-                    'remark' => 'Bank Reconciliation',
-                    'save_status' => 'Bank Paid',
-                    'amount_paid' => $matchedAmount,
-                    'amount_used' => $matchedAmount,
-                    'amount_refunded' => 0,
-                    'amount_excess' => 0,
-                    'note' => 'Matched from Bank Statement #'.$statement->reference_number . ' - ' . $statement->description,
-                    'updated_at' => now(),
-                ];
-                if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_id')) {
-                    $billPayUpdate['bank_statement_id'] = $statementId;
-                }
-                if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_status')) {
-                    $billPayUpdate['bank_statement_status'] = $bankStatementStatus;
-                }
-                DB::table('bill_pay_tbl')->where('id', $billPayId)->update($billPayUpdate);
+    //             $billPayUpdate = [
+    //                 'user_id' => $userId,
+    //                 'vendor_id' => $bill->vendor_id,
+    //                 'vendor_name' => $bill->vendor_name ?? '',
+    //                 'zone_id' => $bill->zone_id ?? null,
+    //                 'zone_name' => $bill->zone_name ?? '',
+    //                 'branch_id' => $bill->branch_id ?? null,
+    //                 'branch_name' => $bill->branch_name ?? '',
+    //                 'company_name' => $bill->company_name ?? '',
+    //                 'company_id' => $bill->company_id ?? null,
+    //                 'payment_date' => $paymentDate,
+    //                 'payment_mode' => 'Bank Transfer',
+    //                 'paid_through' => 'Bank Reconciliation',
+    //                 'payment' => 'NEFT',
+    //                 'reference' => $statement->reference_number ?? ('Bank Stmt #' . $statementId),
+    //                 'remark' => 'Bank Reconciliation',
+    //                 'save_status' => 'Bank Paid',
+    //                 'amount_paid' => $matchedAmount,
+    //                 'amount_used' => $matchedAmount,
+    //                 'amount_refunded' => 0,
+    //                 'amount_excess' => 0,
+    //                 'note' => 'Matched from Bank Statement #'.$statement->reference_number . ' - ' . $statement->description,
+    //                 'updated_at' => now(),
+    //             ];
+    //             if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_id')) {
+    //                 $billPayUpdate['bank_statement_id'] = $statementId;
+    //             }
+    //             if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_status')) {
+    //                 $billPayUpdate['bank_statement_status'] = $bankStatementStatus;
+    //             }
+    //             DB::table('bill_pay_tbl')->where('id', $billPayId)->update($billPayUpdate);
 
-                DB::table('bill_pay_lines_tbl')
-                    ->where('bill_pay_id', $billPayId)
-                    ->where('bill_id', $billId)
-                    ->update([
-                        'bill_date' => $bill->bill_date ?? null,
-                        'due_date' => $bill->due_date ?? null,
-                        'bill_number' => $bill->bill_number ?? '',
-                        'grand_total_amount' => $bill->grand_total_amount ?? 0,
-                        'balance_amount' => $newBalanceFromUpdate,
-                        'payment_date' => $paymentDate,
-                        'amount' => $matchedAmount,
-                    ]);
+    //             DB::table('bill_pay_lines_tbl')
+    //                 ->where('bill_pay_id', $billPayId)
+    //                 ->where('bill_id', $billId)
+    //                 ->update([
+    //                     'bill_date' => $bill->bill_date ?? null,
+    //                     'due_date' => $bill->due_date ?? null,
+    //                     'bill_number' => $bill->bill_number ?? '',
+    //                     'grand_total_amount' => $bill->grand_total_amount ?? 0,
+    //                     'balance_amount' => $newBalanceFromUpdate,
+    //                     'payment_date' => $paymentDate,
+    //                     'amount' => $matchedAmount,
+    //                 ]);
 
-                // Create or update NEFT record for this bill_pay (Bank Reconciliation)
-                $existingLineForNeft = DB::table('bill_pay_lines_tbl')
-                    ->where('bill_pay_id', $billPayId)
-                    ->where('bill_id', $billId)
-                    ->first();
-                $this->createOrUpdateNeftForBillPay(
-                    $billPayId,
-                    $existingLineForNeft->id ?? null,
-                    $bill,
-                    $statement,
-                    $matchedAmount,
-                    $userId,
-                    $paymentDate,
-                    true
-                );
+    //             // Create or update NEFT record for this bill_pay (Bank Reconciliation)
+    //             $existingLineForNeft = DB::table('bill_pay_lines_tbl')
+    //                 ->where('bill_pay_id', $billPayId)
+    //                 ->where('bill_id', $billId)
+    //                 ->first();
+    //             $this->createOrUpdateNeftForBillPay(
+    //                 $billPayId,
+    //                 $existingLineForNeft->id ?? null,
+    //                 $bill,
+    //                 $statement,
+    //                 $matchedAmount,
+    //                 $userId,
+    //                 $paymentDate,
+    //                 true
+    //             );
 
-                $existingMatch = DB::table('bank_bill_matches')
-                    ->where('bank_statement_id', $statementId)
-                    ->where('status', 'active')
-                    ->first();
-                if ($existingMatch) {
-                    DB::table('bank_bill_matches')->where('id', $existingMatch->id)->update([
-                        'bill_id' => $billId,
-                        'matched_amount' => $matchedAmount,
-                        'match_type' => $matchType,
-                        'matched_by' => $userId,
-                        'matched_at' => now(),
-                        'notes' => $request->notes,
-                    ]);
-                } else {
-                    $matchInsert = [
-                        'bank_statement_id' => $statementId,
-                        'bill_id' => $billId,
-                        'matched_amount' => $matchedAmount,
-                        'match_type' => $matchType,
-                        'matched_by' => $userId,
-                        'matched_at' => now(),
-                        'notes' => $request->notes,
-                        'status' => 'active',
-                        'created_at' => now(),
-                    ];
-                    if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
-                        $matchInsert['bill_pay_id'] = $billPayId;
-                    }
-                    DB::table('bank_bill_matches')->insert($matchInsert);
-                }
+    //             $existingMatch = DB::table('bank_bill_matches')
+    //                 ->where('bank_statement_id', $statementId)
+    //                 ->where('status', 'active')
+    //                 ->first();
+    //             if ($existingMatch) {
+    //                 DB::table('bank_bill_matches')->where('id', $existingMatch->id)->update([
+    //                     'bill_id' => $billId,
+    //                     'matched_amount' => $matchedAmount,
+    //                     'match_type' => $matchType,
+    //                     'matched_by' => $userId,
+    //                     'matched_at' => now(),
+    //                     'notes' => $request->notes,
+    //                 ]);
+    //             } else {
+    //                 $matchInsert = [
+    //                     'bank_statement_id' => $statementId,
+    //                     'bill_id' => $billId,
+    //                     'matched_amount' => $matchedAmount,
+    //                     'match_type' => $matchType,
+    //                     'matched_by' => $userId,
+    //                     'matched_at' => now(),
+    //                     'notes' => $request->notes,
+    //                     'status' => 'active',
+    //                     'created_at' => now(),
+    //                 ];
+    //                 if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
+    //                     $matchInsert['bill_pay_id'] = $billPayId;
+    //                 }
+    //                 DB::table('bank_bill_matches')->insert($matchInsert);
+    //             }
 
-                $billUpdate = [
-                    'balance_amount' => $newBalanceFromUpdate,
-                    'bill_status' => $newBalanceFromUpdate <= 0 ? 'paid' : 'partially_paid',
-                    'updated_at' => now(),
-                ];
-                if (Schema::hasColumn('bill_tbl', 'bill_made_status') && $newBalanceFromUpdate <= 0) {
-                    $billUpdate['bill_made_status'] = 1;
-                } elseif (Schema::hasColumn('bill_tbl', 'bill_made_status')) {
-                    $billUpdate['bill_made_status'] = 0;
-                }
-                if (Schema::hasColumn('bill_tbl', 'partially_payment')) {
-                    $billUpdate['partially_payment'] = ($bill->partially_payment ?? 0) - $oldMatchedAmount + $matchedAmount;
-                }
-                DB::table('bill_tbl')->where('id', $billId)->update($billUpdate);
-            } else {
-                // INSERT new bill_pay (bill made) record
-                $lastBillPay = DB::table('bill_pay_tbl')->orderBy('id', 'desc')->first();
-                $nextNumber = 1;
-                if ($lastBillPay && !empty($lastBillPay->payment_gen_order)) {
-                    $lastNumber = (int) preg_replace('/^PAYMENT\-/i', '', $lastBillPay->payment_gen_order);
-                    if ($lastNumber > 0) {
-                        $nextNumber = $lastNumber + 1;
-                    }
-                }
-                $paymentGenOrder = 'PAYMENT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+    //             $billUpdate = [
+    //                 'balance_amount' => $newBalanceFromUpdate,
+    //                 'bill_status' => $newBalanceFromUpdate <= 0 ? 'paid' : 'partially_paid',
+    //                 'updated_at' => now(),
+    //             ];
+    //             if (Schema::hasColumn('bill_tbl', 'bill_made_status') && $newBalanceFromUpdate <= 0) {
+    //                 $billUpdate['bill_made_status'] = 1;
+    //             } elseif (Schema::hasColumn('bill_tbl', 'bill_made_status')) {
+    //                 $billUpdate['bill_made_status'] = 0;
+    //             }
+    //             if (Schema::hasColumn('bill_tbl', 'partially_payment')) {
+    //                 $billUpdate['partially_payment'] = ($bill->partially_payment ?? 0) - $oldMatchedAmount + $matchedAmount;
+    //             }
+    //             DB::table('bill_tbl')->where('id', $billId)->update($billUpdate);
+    //         } else {
+    //             // INSERT new bill_pay (bill made) record
+    //             $lastBillPay = DB::table('bill_pay_tbl')->orderBy('id', 'desc')->first();
+    //             $nextNumber = 1;
+    //             if ($lastBillPay && !empty($lastBillPay->payment_gen_order)) {
+    //                 $lastNumber = (int) preg_replace('/^PAYMENT\-/i', '', $lastBillPay->payment_gen_order);
+    //                 if ($lastNumber > 0) {
+    //                     $nextNumber = $lastNumber + 1;
+    //                 }
+    //             }
+    //             $paymentGenOrder = 'PAYMENT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
-                $billPayData = [
-                    'user_id' => $userId,
-                    'vendor_id' => $bill->vendor_id,
-                    'vendor_name' => $bill->vendor_name ?? '',
-                    'zone_id' => $bill->zone_id ?? null,
-                    'zone_name' => $bill->zone_name ?? '',
-                    'branch_id' => $bill->branch_id ?? null,
-                    'branch_name' => $bill->branch_name ?? '',
-                    'company_name' => $bill->company_name ?? '',
-                    'company_id' => $bill->company_id ?? null,
-                    'payment_gen_order' => $paymentGenOrder,
-                    'payment_made' => $paymentGenOrder,
-                    'payment_date' => $paymentDate,
-                    'payment_mode' => 'Bank Transfer',
-                    'paid_through' => 'Bank Reconciliation',
-                    'payment' => 'NEFT',
-                    'reference' => $statement->reference_number ?? ('Bank Stmt #' . $statementId),
-                    'remark' => 'Bank Reconciliation',
-                    'save_status' => 'Bank Reconciliation Paid',
-                    'amount_paid' => $matchedAmount,
-                    'amount_used' => $matchedAmount,
-                    'amount_refunded' => 0,
-                    'amount_excess' => 0,
-                    'note' => 'Matched from Bank Statement #'.$statement->reference_number . ' - ' . $statement->description,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-                if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_id')) {
-                    $billPayData['bank_statement_id'] = $statementId;
-                }
-                if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_status')) {
-                    $billPayData['bank_statement_status'] = $bankStatementStatus;
-                }
-                $billPayId = DB::table('bill_pay_tbl')->insertGetId($billPayData);
+    //             $billPayData = [
+    //                 'user_id' => $userId,
+    //                 'vendor_id' => $bill->vendor_id,
+    //                 'vendor_name' => $bill->vendor_name ?? '',
+    //                 'zone_id' => $bill->zone_id ?? null,
+    //                 'zone_name' => $bill->zone_name ?? '',
+    //                 'branch_id' => $bill->branch_id ?? null,
+    //                 'branch_name' => $bill->branch_name ?? '',
+    //                 'company_name' => $bill->company_name ?? '',
+    //                 'company_id' => $bill->company_id ?? null,
+    //                 'payment_gen_order' => $paymentGenOrder,
+    //                 'payment_made' => $paymentGenOrder,
+    //                 'payment_date' => $paymentDate,
+    //                 'payment_mode' => 'Bank Transfer',
+    //                 'paid_through' => 'Bank Reconciliation',
+    //                 'payment' => 'NEFT',
+    //                 'reference' => $statement->reference_number ?? ('Bank Stmt #' . $statementId),
+    //                 'remark' => 'Bank Reconciliation',
+    //                 'save_status' => 'Bank Reconciliation Paid',
+    //                 'amount_paid' => $matchedAmount,
+    //                 'amount_used' => $matchedAmount,
+    //                 'amount_refunded' => 0,
+    //                 'amount_excess' => 0,
+    //                 'note' => 'Matched from Bank Statement #'.$statement->reference_number . ' - ' . $statement->description,
+    //                 'created_at' => now(),
+    //                 'updated_at' => now(),
+    //             ];
+    //             if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_id')) {
+    //                 $billPayData['bank_statement_id'] = $statementId;
+    //             }
+    //             if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_status')) {
+    //                 $billPayData['bank_statement_status'] = $bankStatementStatus;
+    //             }
+    //             $billPayId = DB::table('bill_pay_tbl')->insertGetId($billPayData);
 
-                $lineData = [
-                    'bill_pay_id' => $billPayId,
-                    'bill_id' => $billId,
-                    'bill_date' => $bill->bill_date ?? null,
-                    'due_date' => $bill->due_date ?? null,
-                    'bill_number' => $bill->bill_number ?? '',
-                    'grand_total_amount' => $bill->grand_total_amount ?? 0,
-                    'balance_amount' => $newBalance,
-                    'payment_date' => $paymentDate,
-                    'amount' => $matchedAmount,
-                    'created_at' => now(),
-                ];
-                $billPayLineId = DB::table('bill_pay_lines_tbl')->insertGetId($lineData);
+    //             $lineData = [
+    //                 'bill_pay_id' => $billPayId,
+    //                 'bill_id' => $billId,
+    //                 'bill_date' => $bill->bill_date ?? null,
+    //                 'due_date' => $bill->due_date ?? null,
+    //                 'bill_number' => $bill->bill_number ?? '',
+    //                 'grand_total_amount' => $bill->grand_total_amount ?? 0,
+    //                 'balance_amount' => $newBalance,
+    //                 'payment_date' => $paymentDate,
+    //                 'amount' => $matchedAmount,
+    //                 'created_at' => now(),
+    //             ];
+    //             $billPayLineId = DB::table('bill_pay_lines_tbl')->insertGetId($lineData);
 
-                // Insert NEFT record (like VendorController saveneft) for Bank Reconciliation
-                $this->createOrUpdateNeftForBillPay(
-                    $billPayId,
-                    $billPayLineId,
-                    $bill,
-                    $statement,
-                    $matchedAmount,
-                    $userId,
-                    $paymentDate,
-                    false
-                );
+    //             // Insert NEFT record (like VendorController saveneft) for Bank Reconciliation
+    //             $this->createOrUpdateNeftForBillPay(
+    //                 $billPayId,
+    //                 $billPayLineId,
+    //                 $bill,
+    //                 $statement,
+    //                 $matchedAmount,
+    //                 $userId,
+    //                 $paymentDate,
+    //                 false
+    //             );
 
-                $matchInsert = [
-                    'bank_statement_id' => $statementId,
-                    'bill_id' => $billId,
-                    'matched_amount' => $matchedAmount,
-                    'match_type' => $matchType,
-                    'matched_by' => $userId,
-                    'matched_at' => now(),
-                    'notes' => $request->notes,
-                    'status' => 'active',
-                    'created_at' => now(),
-                ];
-                if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
-                    $matchInsert['bill_pay_id'] = $billPayId;
-                }
-                DB::table('bank_bill_matches')->insert($matchInsert);
+    //             $matchInsert = [
+    //                 'bank_statement_id' => $statementId,
+    //                 'bill_id' => $billId,
+    //                 'matched_amount' => $matchedAmount,
+    //                 'match_type' => $matchType,
+    //                 'matched_by' => $userId,
+    //                 'matched_at' => now(),
+    //                 'notes' => $request->notes,
+    //                 'status' => 'active',
+    //                 'created_at' => now(),
+    //             ];
+    //             if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
+    //                 $matchInsert['bill_pay_id'] = $billPayId;
+    //             }
+    //             DB::table('bank_bill_matches')->insert($matchInsert);
 
-                // Update current bill balance and status (insert path only)
-                $billUpdate = [
-                    'balance_amount' => $newBalance,
-                    'bill_status' => $newBalance <= 0 ? 'paid' : 'partially_paid',
-                    'updated_at' => now(),
-                ];
-                if (Schema::hasColumn('bill_tbl', 'bill_made_status') && $newBalance <= 0) {
-                    $billUpdate['bill_made_status'] = 1;
-                }
-                if (Schema::hasColumn('bill_tbl', 'partially_payment')) {
-                    $billUpdate['partially_payment'] = ($bill->partially_payment ?? 0) + $matchedAmount;
-                }
-                DB::table('bill_tbl')->where('id', $billId)->update($billUpdate);
-            }
+    //             // Update current bill balance and status (insert path only)
+    //             $billUpdate = [
+    //                 'balance_amount' => $newBalance,
+    //                 'bill_status' => $newBalance <= 0 ? 'paid' : 'partially_paid',
+    //                 'updated_at' => now(),
+    //             ];
+    //             if (Schema::hasColumn('bill_tbl', 'bill_made_status') && $newBalance <= 0) {
+    //                 $billUpdate['bill_made_status'] = 1;
+    //             }
+    //             if (Schema::hasColumn('bill_tbl', 'partially_payment')) {
+    //                 $billUpdate['partially_payment'] = ($bill->partially_payment ?? 0) + $matchedAmount;
+    //             }
+    //             DB::table('bill_tbl')->where('id', $billId)->update($billUpdate);
+    //         }
 
-            $finalMatch = DB::table('bank_bill_matches')
-                ->where('bank_statement_id', $statementId)
-                ->where('status', 'active')
-                ->orderByDesc('id')
-                ->first();
-            if ($finalMatch) {
-                $this->applyBankReconMatchNatureAndAttachments($request, $billId, (int) $statementId);
-            }
+    //         $finalMatch = DB::table('bank_bill_matches')
+    //             ->where('bank_statement_id', $statementId)
+    //             ->where('status', 'active')
+    //             ->orderByDesc('id')
+    //             ->first();
+    //         if ($finalMatch) {
+    //             $this->applyBankReconMatchNatureAndAttachments($request, $billId, (int) $statementId);
+    //         }
 
-            DB::commit();
+    //         DB::commit();
 
-            $this->logBankReconUserHistory('match_bill', (int) $statementId, [
-                'bill_id'         => (int) $billId,
-                'matched_amount'  => $matchedAmount,
-                'match_type'      => $matchType,
-            ]);
+    //         $this->logBankReconUserHistory('match_bill', (int) $statementId, [
+    //             'bill_id'         => (int) $billId,
+    //             'matched_amount'  => $matchedAmount,
+    //             'match_type'      => $matchType,
+    //         ]);
             
-            return response()->json([
-                'success' => true,
-                'message' => 'Bill matched successfully and payment recorded in Bill Made'
-            ]);
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Bill matched successfully and payment recorded in Bill Made'
+    //         ]);
             
-        } catch (\Exception $e) {
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error matching bill: ' . $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+    public function matchBill(Request $request)
+{
+    $request->validate([
+        'bank_statement_id'    => 'required|integer',
+        'bill_id'              => 'required|integer',
+        'matched_amount'       => 'required|numeric',
+        'match_type'           => 'required|in:full,partial',
+        'nature_account_ids'   => 'required|array|min:1',
+        'nature_account_ids.*' => 'integer',
+        'attachments'          => 'required|array|min:1',
+        'attachments.*'        => 'file|max:15360',
+        'attachment_tags'      => 'nullable|array',
+        'attachment_tags.*'    => 'nullable|string|max:255',
+        'attachment_type_ids'  => 'nullable|array',
+        'attachment_type_ids.*'=> 'nullable|integer',
+    ], [
+        'nature_account_ids.required' => 'Nature of payment is required — select at least one chart account.',
+        'nature_account_ids.min'      => 'Nature of payment is required — select at least one chart account.',
+        'attachments.required'        => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
+        'attachments.min'             => 'At least one attachment is required — upload a file on the Attachments tab (e.g. PO, bill copy).',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $statementId   = $request->bank_statement_id;
+        $billId        = $request->bill_id;
+        $matchedAmount = (float) $request->matched_amount;
+        $matchType     = $request->match_type;
+        $userId        = Auth::id();
+
+        // ✅ Always fetch fresh inside transaction with row lock
+        $statement = DB::table('bank_statements')
+                        ->where('id', $statementId)
+                        ->lockForUpdate()
+                        ->first();
+
+        $bill = DB::table('bill_tbl')
+                    ->where('id', $billId)
+                    ->lockForUpdate()
+                    ->first();
+
+        if (!$statement || !$bill) {
             DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => 'Error matching bill: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Statement or bill not found',
+            ], 404);
         }
+
+        $paymentDate = $statement->transaction_date
+            ? Carbon::createFromFormat('d/M/Y', $statement->transaction_date)->format('Y-m-d')
+            : now()->toDateString();
+
+        $bankStatementStatus = $matchType === 'full'
+            ? 'Paid'
+            : ($matchType === 'partial' ? 'partially_paid' : 'Pending');
+
+        // ── 1) Update bank_statements ─────────────────────────────────────
+        $stmtUp = [
+            'match_status'    => $matchType === 'full' ? 'matched' : 'partially_matched',
+            'matched_bill_id' => $billId,
+            'matched_amount'  => $matchedAmount,
+            'matched_date'    => now(),
+            'matched_by'      => $userId,
+            'notes'           => $request->notes,
+            'updated_at'      => now(),
+        ];
+        if (Schema::hasColumn('bank_statements', 'category')) {
+            $stmtUp['category'] = 'category';
+        }
+        DB::table('bank_statements')->where('id', $statementId)->update($stmtUp);
+
+        // ── 2) Look up ALL previous payments for this bill from Bank Reconciliation
+        //       so we can compute the true cumulative total paid so far
+        // ✅ KEY FIX: sum ALL existing line amounts for this bill, not just one line
+        $previousTotalPaid = (float) DB::table('bill_pay_lines_tbl as l')
+            ->join('bill_pay_tbl as p', 'p.id', '=', 'l.bill_pay_id')
+            ->where('l.bill_id', $billId)
+            ->where('p.paid_through', 'Bank Reconciliation')
+            ->where('p.delete_status', 0)
+            ->sum('l.amount');
+
+        // ✅ True cumulative total after this new payment
+        $cumulativeTotalPaid = $previousTotalPaid + $matchedAmount;
+
+        // ✅ New balance = original bill total minus ALL payments ever made
+        $originalBillAmount = (float) ($bill->grand_total_amount ?? 0);
+        $newBalance         = max(0, $originalBillAmount - $cumulativeTotalPaid);
+
+        // ── 3) Find existing bill_pay header for this bill (Bank Reconciliation) ──
+        // ✅ We find the bill_pay HEADER to update totals, but always INSERT a new LINE
+        $existingBillPay = DB::table('bill_pay_tbl as p')
+            ->join('bill_pay_lines_tbl as l', 'p.id', '=', 'l.bill_pay_id')
+            ->where('l.bill_id', $billId)
+            ->where('p.paid_through', 'Bank Reconciliation')
+            ->where('p.delete_status', 0)
+            ->select('p.*')
+            ->orderByDesc('p.id')
+            ->first();
+
+        // ════════════════════════════════════════════════════════════════════
+        // PATH A — bill_pay header EXISTS → update header totals + INSERT new line
+        // ════════════════════════════════════════════════════════════════════
+        if ($existingBillPay) {
+
+            $billPayId = $existingBillPay->id;
+
+            // ✅ FIX: amount_paid on header = full cumulative total (shown on PDF)
+            $billPayUpdate = [
+                'user_id'         => $userId,
+                'vendor_id'       => $bill->vendor_id,
+                'vendor_name'     => $bill->vendor_name     ?? '',
+                'zone_id'         => $bill->zone_id         ?? null,
+                'zone_name'       => $bill->zone_name       ?? '',
+                'branch_id'       => $bill->branch_id       ?? null,
+                'branch_name'     => $bill->branch_name     ?? '',
+                'company_name'    => $bill->company_name    ?? '',
+                'company_id'      => $bill->company_id      ?? null,
+                'payment_date'    => $paymentDate,
+                'payment_mode'    => 'Bank Transfer',
+                'paid_through'    => 'Bank Reconciliation',
+                'payment'         => 'NEFT',
+                'reference'       => $statement->reference_number ?? ('Bank Stmt #' . $statementId),
+                'remark'          => 'Bank Reconciliation',
+                'save_status'     => $newBalance <= 0 ? 'Bank Paid' : 'Bank Partial Paid',
+                // ✅ Cumulative total on header so PDF always shows full amount paid
+                'amount_paid'     => $cumulativeTotalPaid,
+                'amount_used'     => $cumulativeTotalPaid,
+                'amount_refunded' => 0,
+                'amount_excess'   => 0,
+                'note'            => 'Matched from Bank Statement #' . ($statement->reference_number ?? $statementId)
+                                     . ' - ' . ($statement->description ?? ''),
+                'updated_at'      => now(),
+            ];
+            if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_id')) {
+                $billPayUpdate['bank_statement_id'] = $statementId;
+            }
+            if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_status')) {
+                $billPayUpdate['bank_statement_status'] = $bankStatementStatus;
+            }
+            DB::table('bill_pay_tbl')->where('id', $billPayId)->update($billPayUpdate);
+
+            // ✅ FIX: Always INSERT a new line for each payment (never update old line)
+            //         so all individual payments are preserved and visible on PDF
+            $newLineId = DB::table('bill_pay_lines_tbl')->insertGetId([
+                'bill_pay_id'        => $billPayId,
+                'bill_id'            => $billId,
+                'bill_date'          => $bill->bill_date         ?? null,
+                'due_date'           => $bill->due_date          ?? null,
+                'bill_number'        => $bill->bill_number       ?? '',
+                'grand_total_amount' => $originalBillAmount,
+                'balance_amount'     => $newBalance,
+                'payment_date'       => $paymentDate,
+                'amount'             => $matchedAmount,   // ✅ this line's own amount only
+                'created_at'         => now(),
+                'updated_at'         => now(),
+            ]);
+
+            // NEFT for this specific new payment line
+            $this->createOrUpdateNeftForBillPay(
+                $billPayId,
+                $newLineId,
+                $bill,
+                $statement,
+                $matchedAmount,
+                $userId,
+                $paymentDate,
+                false   // always insert new NEFT entry per payment
+            );
+
+            // bank_bill_matches — insert a new row per statement match
+            $matchInsert = [
+                'bank_statement_id' => $statementId,
+                'bill_id'           => $billId,
+                'matched_amount'    => $matchedAmount,
+                'match_type'        => $matchType,
+                'matched_by'        => $userId,
+                'matched_at'        => now(),
+                'notes'             => $request->notes,
+                'status'            => 'active',
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ];
+            if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
+                $matchInsert['bill_pay_id'] = $billPayId;
+            }
+
+            // Update existing match row for this statement if present, else insert
+            $existingMatch = DB::table('bank_bill_matches')
+                ->where('bank_statement_id', $statementId)
+                ->where('status', 'active')
+                ->first();
+
+            if ($existingMatch) {
+                DB::table('bank_bill_matches')
+                    ->where('id', $existingMatch->id)
+                    ->update([
+                        'bill_id'        => $billId,
+                        'matched_amount' => $matchedAmount,
+                        'match_type'     => $matchType,
+                        'matched_by'     => $userId,
+                        'matched_at'     => now(),
+                        'notes'          => $request->notes,
+                        'updated_at'     => now(),
+                    ]);
+            } else {
+                DB::table('bank_bill_matches')->insert($matchInsert);
+            }
+
+        // ════════════════════════════════════════════════════════════════════
+        // PATH B — First ever payment for this bill → INSERT header + first line
+        // ════════════════════════════════════════════════════════════════════
+        } else {
+
+            // Race-safe payment number generation
+            $lastBillPay = DB::table('bill_pay_tbl')
+                                ->lockForUpdate()
+                                ->orderBy('id', 'desc')
+                                ->first();
+            $nextNumber = 1;
+            if ($lastBillPay && !empty($lastBillPay->payment_gen_order)) {
+                $last = (int) preg_replace('/^PAYMENT\-/i', '', $lastBillPay->payment_gen_order);
+                if ($last > 0) $nextNumber = $last + 1;
+            }
+            $paymentGenOrder = 'PAYMENT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+            $billPayData = [
+                'user_id'          => $userId,
+                'vendor_id'        => $bill->vendor_id,
+                'vendor_name'      => $bill->vendor_name     ?? '',
+                'zone_id'          => $bill->zone_id         ?? null,
+                'zone_name'        => $bill->zone_name       ?? '',
+                'branch_id'        => $bill->branch_id       ?? null,
+                'branch_name'      => $bill->branch_name     ?? '',
+                'company_name'     => $bill->company_name    ?? '',
+                'company_id'       => $bill->company_id      ?? null,
+                'payment_gen_order'=> $paymentGenOrder,
+                'payment_made'     => $paymentGenOrder,
+                'payment_date'     => $paymentDate,
+                'payment_mode'     => 'Bank Transfer',
+                'paid_through'     => 'Bank Reconciliation',
+                'payment'          => 'NEFT',
+                'reference'        => $statement->reference_number ?? ('Bank Stmt #' . $statementId),
+                'remark'           => 'Bank Reconciliation',
+                'save_status'      => $newBalance <= 0 ? 'Bank Reconciliation Paid' : 'Bank Reconciliation Partial',
+                // ✅ First payment: cumulative = this payment only
+                'amount_paid'      => $matchedAmount,
+                'amount_used'      => $matchedAmount,
+                'amount_refunded'  => 0,
+                'amount_excess'    => 0,
+                'note'             => 'Matched from Bank Statement #' . ($statement->reference_number ?? $statementId)
+                                      . ' - ' . ($statement->description ?? ''),
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ];
+            if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_id')) {
+                $billPayData['bank_statement_id'] = $statementId;
+            }
+            if (Schema::hasColumn('bill_pay_tbl', 'bank_statement_status')) {
+                $billPayData['bank_statement_status'] = $bankStatementStatus;
+            }
+            $billPayId = DB::table('bill_pay_tbl')->insertGetId($billPayData);
+
+            $firstLineId = DB::table('bill_pay_lines_tbl')->insertGetId([
+                'bill_pay_id'        => $billPayId,
+                'bill_id'            => $billId,
+                'bill_date'          => $bill->bill_date         ?? null,
+                'due_date'           => $bill->due_date          ?? null,
+                'bill_number'        => $bill->bill_number       ?? '',
+                'grand_total_amount' => $originalBillAmount,
+                'balance_amount'     => $newBalance,
+                'payment_date'       => $paymentDate,
+                'amount'             => $matchedAmount,
+                'created_at'         => now(),
+                'updated_at'         => now(),
+            ]);
+
+            $this->createOrUpdateNeftForBillPay(
+                $billPayId,
+                $firstLineId,
+                $bill,
+                $statement,
+                $matchedAmount,
+                $userId,
+                $paymentDate,
+                false
+            );
+
+            $matchInsert = [
+                'bank_statement_id' => $statementId,
+                'bill_id'           => $billId,
+                'matched_amount'    => $matchedAmount,
+                'match_type'        => $matchType,
+                'matched_by'        => $userId,
+                'matched_at'        => now(),
+                'notes'             => $request->notes,
+                'status'            => 'active',
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ];
+            if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
+                $matchInsert['bill_pay_id'] = $billPayId;
+            }
+            DB::table('bank_bill_matches')->insert($matchInsert);
+        }
+
+        // ── 4) Update bill balance — always uses cumulative calculation ───────
+        $billUpdate = [
+            'balance_amount' => $newBalance,
+            'bill_status'    => $newBalance <= 0 ? 'paid' : 'partially_paid',
+            'updated_at'     => now(),
+        ];
+        if (Schema::hasColumn('bill_tbl', 'bill_made_status')) {
+            $billUpdate['bill_made_status'] = $newBalance <= 0 ? 1 : 0;
+        }
+        // ✅ FIX: partially_payment = true cumulative total, not incremental addition
+        if (Schema::hasColumn('bill_tbl', 'partially_payment')) {
+            $billUpdate['partially_payment'] = $cumulativeTotalPaid;
+        }
+        DB::table('bill_tbl')->where('id', $billId)->update($billUpdate);
+
+        // ── 5) Nature accounts + attachments ─────────────────────────────────
+        $finalMatch = DB::table('bank_bill_matches')
+            ->where('bank_statement_id', $statementId)
+            ->where('status', 'active')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($finalMatch) {
+            $this->applyBankReconMatchNatureAndAttachments($request, $billId, (int) $statementId);
+        }
+
+        DB::commit();
+
+        $this->logBankReconUserHistory('match_bill', (int) $statementId, [
+            'bill_id'               => (int) $billId,
+            'matched_amount'        => $matchedAmount,
+            'cumulative_total_paid' => $cumulativeTotalPaid,
+            'new_balance'           => $newBalance,
+            'match_type'            => $matchType,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bill matched successfully and payment recorded in Bill Made',
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'success' => false,
+            'message' => 'Error matching bill: ' . $e->getMessage(),
+        ], 500);
     }
+}
 
     /**
      * Save nature-of-payment (chart account) ids/names on bill_tbl + bank_statements (attachments JSON on bank_statements).
