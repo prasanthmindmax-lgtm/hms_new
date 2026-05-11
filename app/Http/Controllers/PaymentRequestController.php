@@ -56,6 +56,103 @@ class PaymentRequestController extends Controller
         }
     }
 
+    private function applyPaymentRequestListFilters(Builder $query, Request $request, string $dateColumn, bool $applyStatusFilter): void
+    {
+        if ($request->filled('date_from')) {
+            try {
+                $query->whereDate($dateColumn, '>=', Carbon::parse($request->date_from)->startOfDay());
+            } catch (\Throwable $e) {
+            }
+        }
+        if ($request->filled('date_to')) {
+            try {
+                $query->whereDate($dateColumn, '<=', Carbon::parse($request->date_to)->endOfDay());
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $companyIds = array_values(array_filter(array_map('intval', (array) $request->input('company_id', []))));
+        if ($companyIds !== []) {
+            $query->whereIn('company_id', $companyIds);
+        }
+
+        $zoneIds = array_values(array_filter(array_map('intval', (array) $request->input('zone_id', []))));
+        if ($zoneIds !== []) {
+            $query->whereIn('zone_id', $zoneIds);
+        }
+
+        $branchIds = array_values(array_filter(array_map('intval', (array) $request->input('branch_id', []))));
+        if ($branchIds !== []) {
+            $query->whereIn('branch_id', $branchIds);
+        }
+
+        $paymentTypes = array_values(array_filter((array) $request->input('payment_type', [])));
+        if ($paymentTypes !== []) {
+            $paymentTypes = array_values(array_intersect($paymentTypes, PaymentRequest::TYPES));
+            if ($paymentTypes !== []) {
+                $query->whereIn('payment_type', $paymentTypes);
+            }
+        }
+
+        if ($applyStatusFilter) {
+            $statuses = array_values(array_filter((array) $request->input('status', [])));
+            if ($statuses !== []) {
+                $statuses = array_values(array_intersect($statuses, PaymentRequest::STATUSES));
+                if ($statuses !== []) {
+                    $query->whereIn('status', $statuses);
+                }
+            }
+        }
+
+        $vendorIds = array_values(array_filter(array_map('intval', (array) $request->input('vendor_id', []))));
+        if ($vendorIds !== []) {
+            $query->whereIn('vendor_id', $vendorIds);
+        }
+
+        if ($request->filled('universal_search')) {
+            $term = Str::limit(trim((string) $request->input('universal_search', '')), 200, '');
+            if ($term !== '') {
+                $like = '%'.addcslashes($term, '%_\\').'%';
+                $query->where(function (Builder $q) use ($like) {
+                    $q->where('request_no', 'like', $like)
+                        ->orWhere('remarks', 'like', $like)
+                        ->orWhere('rejection_reason', 'like', $like)
+                        ->orWhere('bank_account_number', 'like', $like)
+                        ->orWhere('bank_ifsc_code', 'like', $like)
+                        ->orWhere('bank_branch_details', 'like', $like)
+                        ->orWhere('payment_type', 'like', $like)
+                        ->orWhere('status', 'like', $like)
+                        ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', [$like])
+                        ->orWhereHas('creator', static function (Builder $sub) use ($like) {
+                            $sub->where('user_fullname', 'like', $like);
+                        })
+                        ->orWhereHas('reviewer', static function (Builder $sub) use ($like) {
+                            $sub->where('user_fullname', 'like', $like);
+                        })
+                        ->orWhereHas('zone', static function (Builder $sub) use ($like) {
+                            $sub->where('name', 'like', $like);
+                        })
+                        ->orWhereHas('branch', static function (Builder $sub) use ($like) {
+                            $sub->where('name', 'like', $like);
+                        })
+                        ->orWhereHas('company', static function (Builder $sub) use ($like) {
+                            $sub->where('company_name', 'like', $like);
+                        })
+                        ->orWhereHas('sourceVendor', static function (Builder $sub) use ($like) {
+                            $sub->where('display_name', 'like', $like);
+                        })
+                        ->orWhereHas('legacyPurchaseOrder', static function (Builder $sub) use ($like) {
+                            $sub->where('purchase_gen_order', 'like', $like);
+                        })
+                        ->orWhereHas('linkedBills', static function (Builder $sub) use ($like) {
+                            $sub->where('bill_number', 'like', $like)
+                                ->orWhere('bill_gen_number', 'like', $like);
+                        });
+                });
+            }
+        }
+    }
+
     private function nextRequestNumber(): string
     {
         $y = date('Y');
@@ -588,92 +685,7 @@ class PaymentRequestController extends Controller
             ]);
 
         $this->scopePaymentRequestsForUser($query, $u);
-
-        if ($request->filled('date_from')) {
-            try {
-                $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
-            } catch (\Throwable $e) {
-            }
-        }
-        if ($request->filled('date_to')) {
-            try {
-                $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
-            } catch (\Throwable $e) {
-            }
-        }
-
-        $companyIds = array_values(array_filter(array_map('intval', (array) $request->input('company_id', []))));
-        if ($companyIds !== []) {
-            $query->whereIn('company_id', $companyIds);
-        }
-
-        $zoneIds = array_values(array_filter(array_map('intval', (array) $request->input('zone_id', []))));
-        if ($zoneIds !== []) {
-            $query->whereIn('zone_id', $zoneIds);
-        }
-
-        $branchIds = array_values(array_filter(array_map('intval', (array) $request->input('branch_id', []))));
-        if ($branchIds !== []) {
-            $query->whereIn('branch_id', $branchIds);
-        }
-
-        $paymentTypes = array_values(array_filter((array) $request->input('payment_type', [])));
-        if ($paymentTypes !== []) {
-            $paymentTypes = array_values(array_intersect($paymentTypes, PaymentRequest::TYPES));
-            if ($paymentTypes !== []) {
-                $query->whereIn('payment_type', $paymentTypes);
-            }
-        }
-
-        $statuses = array_values(array_filter((array) $request->input('status', [])));
-        if ($statuses !== []) {
-            $statuses = array_values(array_intersect($statuses, PaymentRequest::STATUSES));
-            if ($statuses !== []) {
-                $query->whereIn('status', $statuses);
-            }
-        }
-
-        $vendorIds = array_values(array_filter(array_map('intval', (array) $request->input('vendor_id', []))));
-        if ($vendorIds !== []) {
-            $query->whereIn('vendor_id', $vendorIds);
-        }
-
-        if ($request->filled('universal_search')) {
-            $term = Str::limit(trim((string) $request->input('universal_search', '')), 200, '');
-            if ($term !== '') {
-                $like = '%'.addcslashes($term, '%_\\').'%';
-                $query->where(function (Builder $q) use ($like) {
-                    $q->where('request_no', 'like', $like)
-                        ->orWhere('remarks', 'like', $like)
-                        ->orWhere('rejection_reason', 'like', $like)
-                        ->orWhere('bank_account_number', 'like', $like)
-                        ->orWhere('bank_ifsc_code', 'like', $like)
-                        ->orWhere('bank_branch_details', 'like', $like)
-                        ->orWhere('payment_type', 'like', $like)
-                        ->orWhere('status', 'like', $like)
-                        ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', [$like])
-                        ->orWhereHas('creator', static function (Builder $sub) use ($like) {
-                            $sub->where('user_fullname', 'like', $like);
-                        })
-                        ->orWhereHas('zone', static function (Builder $sub) use ($like) {
-                            $sub->where('name', 'like', $like);
-                        })
-                        ->orWhereHas('branch', static function (Builder $sub) use ($like) {
-                            $sub->where('name', 'like', $like);
-                        })
-                        ->orWhereHas('company', static function (Builder $sub) use ($like) {
-                            $sub->where('company_name', 'like', $like);
-                        })
-                        ->orWhereHas('legacyPurchaseOrder', static function (Builder $sub) use ($like) {
-                            $sub->where('purchase_gen_order', 'like', $like);
-                        })
-                        ->orWhereHas('linkedBills', static function (Builder $sub) use ($like) {
-                            $sub->where('bill_number', 'like', $like)
-                                ->orWhere('bill_gen_number', 'like', $like);
-                        });
-                });
-            }
-        }
+        $this->applyPaymentRequestListFilters($query, $request, 'created_at', true);
 
         $statsBase = clone $query;
         $startMonth = now()->startOfMonth();
@@ -705,6 +717,75 @@ class PaymentRequestController extends Controller
             'vendors' => $vendors,
             'paymentTypeLabels' => PaymentRequest::TYPE_LABELS,
             'statusLabels' => PaymentRequest::STATUS_LABELS,
+            'paymentRequestListScopedToSelf' => ! $this->isPaymentRequestSuperAdmin($u),
+        ]);
+    }
+
+    /**
+     * Approved payment requests only (status = approved). New approvals appear here automatically.
+     * Date range filters apply to {@see PaymentRequest::$reviewed_at}.
+     */
+    public function approvedIndex(Request $request): View
+    {
+        $u = $this->userRow();
+        $loc = $this->locationDropdownData();
+        $vendors = Tblvendor::query()
+            ->where('active_status', 0)
+            ->orderBy('display_name')
+            ->orderBy('company_name')
+            ->get(['id', 'display_name', 'company_name', 'vendor_id']);
+
+        $query = PaymentRequest::query()
+            ->where('status', PaymentRequest::STATUS_APPROVED)
+            ->with([
+                'branch:id,name',
+                'company:id,company_name',
+                'zone:id,name',
+                'creator:id,user_fullname',
+                'reviewer:id,user_fullname',
+                'sourceVendor:id,display_name,company_name,vendor_id',
+                'linkedBills:id,payment_request_id,grand_total_amount,balance_amount,bill_gen_number,bill_number,delete_status',
+            ]);
+
+        $this->scopePaymentRequestsForUser($query, $u);
+        $this->applyPaymentRequestListFilters($query, $request, 'reviewed_at', false);
+
+        $statsBase = clone $query;
+        $startMonth = now()->startOfMonth();
+
+        $stats = [
+            'total' => (int) (clone $statsBase)->count(),
+            'sum_amount' => (float) (clone $statsBase)->sum('amount'),
+            'this_month' => (int) (clone $statsBase)
+                ->whereNotNull('reviewed_at')
+                ->where('reviewed_at', '>=', $startMonth)
+                ->count(),
+            'po_linked' => (int) (clone $statsBase)->whereNotNull('purchase_order_id')->count(),
+        ];
+
+        $perPageChoices = [10, 15, 25, 50, 100];
+        $perPage = (int) $request->query('per_page', 10);
+        if (! in_array($perPage, $perPageChoices, true)) {
+            $perPage = 10;
+        }
+
+        $rows = (clone $query)
+            ->orderByDesc('reviewed_at')
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('superadmin.payment_requests.approved_index', [
+            'admin' => $u,
+            'rows' => $rows,
+            'pr_per_page' => $perPage,
+            'pr_per_page_choices' => $perPageChoices,
+            'stats' => $stats,
+            'companies' => $loc['companies'],
+            'zones' => $loc['zones'],
+            'branches' => $loc['branches'],
+            'vendors' => $vendors,
+            'paymentTypeLabels' => PaymentRequest::TYPE_LABELS,
             'paymentRequestListScopedToSelf' => ! $this->isPaymentRequestSuperAdmin($u),
         ]);
     }
