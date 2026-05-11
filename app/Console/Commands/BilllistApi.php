@@ -166,7 +166,6 @@ class BilllistApi extends Command
             'location47' => 'Bengaluru - Dasarahalli',
             'location48' => 'Chengalpattu',
             'location49' => 'Chennai - Vadapalani',
-            'location50' => 'Pennagaram',
             'location51' => 'Thirupathur',
             'location52' => 'Sivakasi',
             'location53' => 'Dharmapuri',

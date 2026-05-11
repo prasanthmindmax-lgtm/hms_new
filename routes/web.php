@@ -39,6 +39,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\CheckinReportController;
 use App\Http\Controllers\RegistrationReportController;
 use App\Http\Controllers\ArtBankController;
+use App\Http\Controllers\VmsController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -1115,6 +1116,37 @@ Route::middleware(['auth', 'role_id:1', 'log.activity'])->group(function () {
     Route::get('report/art-bank/{donor_id}',      [ArtBankController::class, 'artBankDetail'])
         ->name('report.art_bank_detail');
 
+});
+
+// ─── VMS: Public routes (no auth) ────────────────────────────────────────────
+Route::prefix('vms')->name('vms.')->group(function () {
+    Route::get('/register/{uuid}',  [VmsController::class, 'showRegister'])->name('register');
+    Route::post('/register/{uuid}', [VmsController::class, 'storeRegister'])->name('register.store');
+    Route::get('/thank-you',        fn() => view('vms.thankyou'))->name('thankyou');
+});
+
+// ─── VMS: Admin routes (auth required) ────────────────────────────────────────
+Route::prefix('vms')->name('vms.')->middleware(['auth', 'role_id:1', 'log.activity'])->group(function () {
+    Route::get('/dashboard',              [VmsController::class, 'dashboard'])->name('dashboard');
+    Route::get('/approvals',              [VmsController::class, 'approvals'])->name('approvals');
+    Route::post('/approvals/{id}/approve',[VmsController::class, 'approve'])->name('approve');
+    Route::post('/approvals/{id}/reject', [VmsController::class, 'reject'])->name('reject');
+    Route::get('/active',                 [VmsController::class, 'active'])->name('active');
+    Route::post('/visitors/{id}/checkout',[VmsController::class, 'checkout'])->name('checkout');
+    Route::get('/history',                [VmsController::class, 'history'])->name('history');
+    Route::get('/pharma',                 [VmsController::class, 'pharma'])->name('pharma');
+    Route::get('/non-pharma',             [VmsController::class, 'nonPharma'])->name('non-pharma');
+    Route::get('/blacklist',              [VmsController::class, 'blacklist'])->name('blacklist');
+    Route::post('/blacklist',             [VmsController::class, 'storeBlacklist'])->name('blacklist.store');
+    Route::post('/blacklist/{id}/remove', [VmsController::class, 'removeBlacklist'])->name('blacklist.remove');
+    Route::get('/qr',                     [VmsController::class, 'qrManagement'])->name('qr');
+    Route::post('/qr',                    [VmsController::class, 'createQr'])->name('qr.create');
+    Route::post('/qr/{id}/toggle',        [VmsController::class, 'toggleQr'])->name('qr.toggle');
+    Route::delete('/qr/{id}',             [VmsController::class, 'deleteQr'])->name('qr.delete');
+    Route::get('/reports',                [VmsController::class, 'reports'])->name('reports');
+    Route::get('/settings',               [VmsController::class, 'settings_view'])->name('settings');
+    Route::post('/settings',              [VmsController::class, 'saveSettings'])->name('settings.save');
+    Route::get('/ajax/stats',             [VmsController::class, 'ajaxStats'])->name('ajax.stats');
 });
 
 require __DIR__.'/auth.php';
