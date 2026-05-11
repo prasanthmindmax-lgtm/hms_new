@@ -5582,6 +5582,7 @@ public function getgrnconvert(Request $request)
     if ($q !== '') {
         $billQuery->where(function ($w) use ($q) {
             $w->where('bill_number', 'like', "%{$q}%")
+                ->orWhere('bill_gen_number', 'like', "%{$q}%")
                 ->orWhere('order_number', 'like', "%{$q}%")
                 ->orWhere('vendor_name', 'like', "%{$q}%")
                 ->orWhere('company_name', 'like', "%{$q}%")

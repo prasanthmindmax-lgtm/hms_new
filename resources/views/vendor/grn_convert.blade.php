@@ -51,7 +51,7 @@
                     <div class="grn-convert-search-pill">
                       <i class="bi bi-search" aria-hidden="true"></i>
                       <input type="search" class="form-control" id="grn-convert-search" name="q"
-                        placeholder="Search Bill No, Vendor Name, Reference Number…"
+                        placeholder="Search Bill No, Bill Generate No, Vendor Name, Reference Number…"
                         value="{{ e($q ?? request('q', '')) }}"
                         autocomplete="off">
                     </div>
@@ -156,6 +156,7 @@
                           <th style="width: 30px;"><span class="filter-icon">⚙️</span></th>
                           <th>DATE</th>
                           <th>BILL #</th>
+                          <th>BILL GENERATE NO</th>
                           <th>REFERENCE NUMBER</th>
                           <th>VENDOR NAME</th>
                           <th>DUE DATE</th>
@@ -167,6 +168,7 @@
                           @foreach ($billlist as $bill)
                               <tr class="customer-row" data-type="bill" data-id="{{ $bill->id }}"
                                   data-bill-number="{{ $bill->bill_number }}"
+                                  data-bill-gen-number="{{ $bill->bill_gen_number }}"
                                   data-order-number="{{ $bill->order_number }}"
                                   data-vendor-name="{{ $bill->vendor_name }}"
                                   data-vendor-address='@json($bill->TblBilling)'
@@ -184,6 +186,7 @@
                                   <td><input  type="checkbox" /></td>
                                   <td><a href="#"  class="customer-link">{{ $bill->bill_date }}</a></td>
                                   <td>{{ $bill->bill_number }}</td>
+                                  <td>{{ $bill->bill_gen_number ?? '-' }}</td>
                                   <td>{{ $bill->order_number }}</td>
                                   <td>{{ $bill->vendor_name }}</td>
                                   <td>{{ $bill->due_date }}</td>
