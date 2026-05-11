@@ -29,6 +29,10 @@ class PaymentRequest extends Model
 
     public const TYPE_MISCELLANEOUS = 'miscellaneous';
 
+    public const TYPE_RENT = 'rent';
+
+    public const TYPE_ELECTRICITY = 'electricity';
+
     public const TYPES = [
         self::TYPE_ADVANCE,
         self::TYPE_PART_PAYMENT,
@@ -39,6 +43,8 @@ class PaymentRequest extends Model
         self::TYPE_PATIENT_REFUND,
         self::TYPE_INSTANT_PAYMENT,
         self::TYPE_MISCELLANEOUS,
+        self::TYPE_RENT,
+        self::TYPE_ELECTRICITY,
     ];
 
     /** @var array<string, string> */
@@ -52,6 +58,8 @@ class PaymentRequest extends Model
         self::TYPE_PATIENT_REFUND => 'Patient Refund Payment',
         self::TYPE_INSTANT_PAYMENT => 'Instant Payment',
         self::TYPE_MISCELLANEOUS => 'Miscellaneous Payment',
+        self::TYPE_RENT => 'Rent Payment',
+        self::TYPE_ELECTRICITY => 'Electricity Payment',
     ];
 
     public const PAYOUT_ONLY_TYPES = [
@@ -61,6 +69,8 @@ class PaymentRequest extends Model
         self::TYPE_PATIENT_REFUND,
         self::TYPE_INSTANT_PAYMENT,
         self::TYPE_MISCELLANEOUS,
+        self::TYPE_RENT,
+        self::TYPE_ELECTRICITY,
     ];
 
     public const PO_LINKED_TYPES = [

@@ -248,7 +248,9 @@
                           'refund' => 'Ref Payment',
                           'patient_refund' => 'Patient Refund',
                           'instant_payment' => 'Insta Payment',
-                          'miscellaneous' => 'Miscellaneous Payment'
+                          'miscellaneous' => 'Miscellaneous Payment',
+                          'rent' => 'Rent Payment',
+                          'electricity' => 'Electricity Payment',
                       ];
                       $ptDisp = $ptOld && isset($ptLabels[$ptOld]) ? $ptLabels[$ptOld] : '';
                     @endphp
