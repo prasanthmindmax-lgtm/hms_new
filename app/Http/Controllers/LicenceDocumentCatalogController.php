@@ -48,15 +48,18 @@ class LicenceDocumentCatalogController extends Controller
             $validator = Validator::make($request->all(), [
                 'label' => 'required|string|max:500',
                 'is_active' => 'required|in:0,1',
+                'renewal_date_required' => 'required|in:0,1',
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
             }
 
+            $v = $validator->validated();
             $item->update([
-                'label' => $validator->validated()['label'],
-                'is_active' => (bool) (int) $validator->validated()['is_active'],
+                'label' => $v['label'],
+                'is_active' => (bool) (int) $v['is_active'],
+                'renewal_date_required' => (bool) (int) $v['renewal_date_required'],
             ]);
 
             $item->refresh();
@@ -72,6 +75,7 @@ class LicenceDocumentCatalogController extends Controller
             'level' => 'required|in:1,2',
             'label' => 'required|string|max:500',
             'is_active' => 'required|in:0,1',
+            'renewal_date_required' => 'required|in:0,1',
         ]);
 
         if ($validator->fails()) {
@@ -87,6 +91,7 @@ class LicenceDocumentCatalogController extends Controller
             'label' => $data['label'],
             'level' => $level,
             'is_active' => (bool) (int) $data['is_active'],
+            'renewal_date_required' => (bool) (int) $data['renewal_date_required'],
         ]);
 
         return response()->json([

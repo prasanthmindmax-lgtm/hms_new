@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
  * @property string $label
  * @property int $level
  * @property bool $is_active
+ * @property bool $renewal_date_required
  */
 class LicenceDocumentCatalog extends Model
 {
@@ -23,16 +24,18 @@ class LicenceDocumentCatalog extends Model
         'label',
         'level',
         'is_active',
+        'renewal_date_required',
     ];
 
     protected $casts = [
         'level' => 'integer',
         'is_active' => 'boolean',
+        'renewal_date_required' => 'boolean',
     ];
 
     public static function cacheKeyForLevel(int $level): string
     {
-        return 'licence_document_catalog.level.'.($level === 2 ? 2 : 1);
+        return 'licence_document_catalog.level.'.($level === 2 ? 2 : 1).'.v2';
     }
 
     public static function forgetCaches(): void
@@ -52,7 +55,7 @@ class LicenceDocumentCatalog extends Model
     }
 
     /**
-     * @return list<array{key: string, label: string}>
+     * @return list<array{key: string, label: string, renewal_date_required: bool}>
      */
     public static function catalogRowsForLevel(int $level): array
     {
@@ -67,6 +70,7 @@ class LicenceDocumentCatalog extends Model
                 ->map(static fn (self $r) => [
                     'key' => $r->document_key,
                     'label' => $r->label,
+                    'renewal_date_required' => (bool) $r->renewal_date_required,
                 ])
                 ->all();
         });
@@ -90,6 +94,22 @@ class LicenceDocumentCatalog extends Model
             ->first();
 
         return $row?->label;
+    }
+
+    public static function renewalDateRequiredForKey(int $level, string $key): bool
+    {
+        $lv = $level === 2 ? 2 : 1;
+        $row = self::query()
+            ->where('level', $lv)
+            ->where('document_key', $key)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $row) {
+            return true;
+        }
+
+        return (bool) $row->renewal_date_required;
     }
 
     public static function requiredCountForLevel(int $level): int

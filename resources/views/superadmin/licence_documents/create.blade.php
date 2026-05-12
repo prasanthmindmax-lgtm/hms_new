@@ -60,7 +60,7 @@
 
                 <div class="tk-dash-body" style="padding: 0 18px 22px;">
                     @php
-                        $onFileCount = collect($documentRows)->whereNotNull('file_path')->count();
+                        $completeCount = collect($documentRows)->whereNotIn('status', ['missing', 'renewal_required'])->count();
                     @endphp
                     <div class="ld-section mt-4">
                         <div class="ld-section-head ld-section-head--premium">
@@ -73,8 +73,7 @@
                                     <h2 class="ld-section-title">Level 1 documents</h2>
                                 @endif
                                 <p class="ld-section-sub">
-                                    <strong>{{ $onFileCount }}</strong> of <strong>{{ $docTotal }}</strong> on file
-                                    · <span class="ld-section-sub-muted">{{ $docTotal }} required for this branch</span>
+                                    <strong>{{ $completeCount }}</strong> of <strong>{{ $docTotal }}</strong> complete.
                                 </p>
                             </div>
                         </div>
@@ -85,7 +84,7 @@
                                         <th class="ld-col-num" scope="col"><span class="ld-th-inner">#</span></th>
                                         <th class="ld-col-doc" scope="col"><span class="ld-th-inner">Document</span></th>
                                         <th class="ld-col-file" scope="col"><span class="ld-th-inner">Current file</span></th>
-                                        <th class="ld-col-renew" scope="col"><span class="ld-th-inner">Renewal</span></th>
+                                        <th class="ld-col-renew" scope="col"><span class="ld-th-inner">Renewal / expiry</span></th>
                                         <th class="ld-col-actions" scope="col"><span class="ld-th-inner">Actions</span></th>
                                     </tr>
                                 </thead>
@@ -145,6 +144,7 @@
                                                         class="ld-icon-btn ld-icon-btn--upload ld-open-doc-modal"
                                                         data-mode="upload" data-document-key="{{ e($row['key']) }}"
                                                         data-renewal="{{ e($row['renewal_date'] ?? '') }}"
+                                                        data-renewal-required="{{ ($row['renewal_date_required'] ?? true) ? '1' : '0' }}"
                                                         data-label="{{ e($row['label']) }}"
                                                         title="Upload a document file" aria-label="Upload file">
                                                         <i class="bi bi-cloud-upload" aria-hidden="true"></i>
@@ -153,6 +153,7 @@
                                                         class="ld-icon-btn ld-icon-btn--update ld-open-doc-modal"
                                                         data-mode="update" data-document-key="{{ e($row['key']) }}"
                                                         data-renewal="{{ e($row['renewal_date'] ?? '') }}"
+                                                        data-renewal-required="{{ ($row['renewal_date_required'] ?? true) ? '1' : '0' }}"
                                                         data-label="{{ e($row['label']) }}"
                                                         title="Update file or renewal date" aria-label="Update file or date">
                                                         <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
@@ -187,7 +188,7 @@
             </div>
             <form id="ldDocumentEditForm" class="ld-lic-modal-form" method="post" novalidate
                 action="{{ route('superadmin.licence_documents.save') }}" enctype="multipart/form-data"
-                data-current-mode="upload">
+                data-current-mode="upload" data-renewal-required="1">
                 @csrf
                 <input type="hidden" name="branch_id" id="ld_modal_branch_id" value="{{ (int) $branch->id }}">
                 <input type="hidden" name="level" id="ld_modal_level" value="{{ (int) $assignedLevel }}">
@@ -196,7 +197,9 @@
                 <div class="ld-lic-field">
                     <label class="ld-lic-label" for="ld_modal_renewal">
                         <span class="ld-lic-label-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
-                        Renewal date <span class="ld-lic-req" aria-hidden="true">*</span>
+                        <span id="ld_modal_renewal_label_text">Renewal / expiry date</span>
+                        <span class="ld-lic-req" id="ld_modal_renewal_req_star" aria-hidden="true">*</span>
+                        <span class="ld-lic-opt-hint text-muted fw-normal" id="ld_modal_renewal_opt_hint" style="display:none;font-size:12px;">(optional)</span>
                     </label>
                     <input type="date" class="form-control ld-lic-input" name="renewal_date" id="ld_modal_renewal"
                         value="" autocomplete="off" aria-describedby="ld_modal_renewal_err">
@@ -308,6 +311,28 @@
                 }
             }
 
+            function ldApplyRenewalRequirement(isRequired) {
+                var star = document.getElementById('ld_modal_renewal_req_star');
+                var hint = document.getElementById('ld_modal_renewal_opt_hint');
+                var rin = document.getElementById('ld_modal_renewal');
+                if (star) {
+                    star.style.display = isRequired ? '' : 'none';
+                }
+                if (hint) {
+                    hint.style.display = isRequired ? 'none' : '';
+                }
+                if (rin) {
+                    if (isRequired) {
+                        rin.setAttribute('required', 'required');
+                    } else {
+                        rin.removeAttribute('required');
+                    }
+                }
+                if (ldEditForm) {
+                    ldEditForm.setAttribute('data-renewal-required', isRequired ? '1' : '0');
+                }
+            }
+
             function ldSetRenewalError(msg) {
                 var el = document.getElementById('ld_modal_renewal_err');
                 var rin = document.getElementById('ld_modal_renewal');
@@ -395,12 +420,16 @@
                         var renewal = btn.getAttribute('data-renewal') || '';
                         var label = btn.getAttribute('data-label') || 'Document';
 
+                        var renewalRequired = btn.getAttribute('data-renewal-required') === '1';
+
                         ldClearLicModalErrors();
 
                         document.getElementById('ld_modal_document_key').value = key;
                         document.getElementById('ld_modal_renewal').value = renewal;
                         var fileEl = document.getElementById('ld_modal_file');
                         if (fileEl) fileEl.value = '';
+
+                        ldApplyRenewalRequirement(renewalRequired);
 
                         if (ldEditForm) {
                             ldEditForm.setAttribute('data-current-mode', mode);
@@ -448,9 +477,10 @@
                     ldEditForm.addEventListener('submit', function(ev) {
                         ldClearLicModalErrors();
                         var mode = ldEditForm.getAttribute('data-current-mode') || 'upload';
+                        var renewReq = ldEditForm.getAttribute('data-renewal-required') === '1';
                         var renewalVal = rin && rin.value ? rin.value.trim() : '';
 
-                        if (!renewalVal) {
+                        if (renewReq && !renewalVal) {
                             ev.preventDefault();
                             ldSetRenewalError('Please select a renewal date.');
                             if (typeof toastr !== 'undefined') {
@@ -462,17 +492,19 @@
                             return;
                         }
 
-                        var t = renewalVal.split('-');
-                        if (t.length !== 3 || isNaN(Date.parse(renewalVal))) {
-                            ev.preventDefault();
-                            ldSetRenewalError('Please enter a valid renewal date.');
-                            if (typeof toastr !== 'undefined') {
-                                toastr.error('Please enter a valid renewal date.');
+                        if (renewalVal) {
+                            var t = renewalVal.split('-');
+                            if (t.length !== 3 || isNaN(Date.parse(renewalVal))) {
+                                ev.preventDefault();
+                                ldSetRenewalError('Please enter a valid renewal date.');
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.error('Please enter a valid renewal date.');
+                                }
+                                if (rin) {
+                                    rin.focus();
+                                }
+                                return;
                             }
-                            if (rin) {
-                                rin.focus();
-                            }
-                            return;
                         }
 
                         if (mode === 'upload') {

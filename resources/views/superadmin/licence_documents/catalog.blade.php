@@ -67,6 +67,7 @@
               <th>LEVEL</th>
               {{--  <th>DOCUMENT KEY</th>  --}}
               <th>DOCUMENT NAME</th>
+              <th>EXPIRY DATE</th>
               <th>STATUS</th>
               <th class="text-center">ACTION</th>
             </tr>
@@ -80,6 +81,13 @@
                 </td>
                 {{--  <td style="font-weight:600;color:#1f2937;"><code class="small">{{ $row->document_key }}</code></td>  --}}
                 <td style="font-weight:600;color:#1f2937;">{{ $row->label }}</td>
+                <td>
+                  @if($row->renewal_date_required)
+                    <span style="font-size:12px;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px;font-weight:500;">Required</span>
+                  @else
+                    <span style="font-size:12px;background:#f1f5f9;color:#475569;padding:3px 10px;border-radius:20px;font-weight:500;">Optional</span>
+                  @endif
+                </td>
                 <td>
                   @if($row->is_active)
                     <span style="font-size:12px;background:#ecfdf3;color:#15803d;padding:3px 10px;border-radius:20px;font-weight:500;">Active</span>
@@ -157,6 +165,13 @@
           <option value="0">Inactive</option>
         </select>
       </div>
+      <div class="sm-form-group">
+        <label>Renewal / expiry date <span style="color:red">*</span></label>
+        <select class="form-control" id="catalog_renewal_date_required">
+          <option value="1">Required</option>
+          <option value="0">Optional</option>
+        </select>
+      </div>
     </div>
     <div class="sm-modal-footer">
       <button type="button" class="sm-btn-cancel close-modal">Cancel</button>
@@ -203,6 +218,7 @@ $(document).ready(function () {
     $('#catalog_key_hint').empty();
     $('#catalog_label').val('');
     $('#catalog_is_active').val('1');
+    $('#catalog_renewal_date_required').val('1');
     openModal();
   });
 
@@ -214,6 +230,7 @@ $(document).ready(function () {
     $('#catalog_key_hint').html('Stored identifier: <code>' + $('<div/>').text(d.document_key).html() + '</code>');
     $('#catalog_label').val(d.label);
     $('#catalog_is_active').val(d.is_active ? '1' : '0');
+    $('#catalog_renewal_date_required').val((d.renewal_date_required === false || d.renewal_date_required === 0) ? '0' : '1');
     openModal();
   });
 
@@ -229,6 +246,7 @@ $(document).ready(function () {
     }
     fd.append('label', ($('#catalog_label').val() || '').trim());
     fd.append('is_active', $('#catalog_is_active').val());
+    fd.append('renewal_date_required', $('#catalog_renewal_date_required').val());
     $.ajax({
       url: '{{ route("superadmin.licence_documents.catalog.store") }}',
       type: 'POST',
