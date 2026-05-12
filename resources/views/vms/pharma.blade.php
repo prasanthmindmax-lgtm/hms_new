@@ -11,21 +11,15 @@
 
 <div class="row g-4 mb-4">
   <div class="col-lg-8">
-    {{-- Filter --}}
-    <form method="GET" class="vms-card mb-4">
-      <div class="d-flex gap-3 flex-wrap align-items-end">
-        <div>
-          <label class="form-label" style="font-size:11px;font-weight:600;color:var(--muted)">Search Company</label>
-          <input type="text" name="search" class="form-control form-control-sm" placeholder="Company name…" value="{{ request('search') }}" style="font-size:12px;width:200px">
-        </div>
-        <div>
-          <label class="form-label" style="font-size:11px;font-weight:600;color:var(--muted)">Date</label>
-          <input type="date" name="date" class="form-control form-control-sm" value="{{ request('date') }}" style="font-size:12px">
-        </div>
-        <button type="submit" class="vbtn vbtn-primary"><i class="ti ti-filter"></i> Filter</button>
-        <a href="{{ route('vms.pharma') }}" class="vbtn vbtn-hold">Reset</a>
-      </div>
-    </form>
+    @include('vms.partials.filter-bar', [
+      'showType'   => false,
+      'showSearch' => true,
+      'showDate'   => true,
+      'showStatus' => false,
+      'resetRoute' => 'vms.pharma',
+      'zones'      => $zones,
+      'locations'  => $locations,
+    ])
 
     <div class="vms-card">
       <div class="vms-card-header">

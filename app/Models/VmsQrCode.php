@@ -13,7 +13,7 @@ class VmsQrCode extends Model
     protected $table = 'vms_qr_codes';
 
     protected $fillable = [
-        'uuid', 'label', 'location', 'branch', 'is_active', 'scan_count', 'created_by',
+        'uuid', 'label', 'location', 'location_id', 'branch', 'branch_type', 'is_active', 'scan_count', 'created_by',
     ];
 
     protected static function boot()

@@ -16,7 +16,7 @@ class VmsVisitor extends Model
         'visitor_type', 'company_name', 'purpose', 'person_to_meet',
         'department', 'appointment_time', 'equipment_carried',
         'id_type', 'id_number', 'photo', 'declaration_agreed',
-        'badge_number', 'branch', 'status',
+        'badge_number', 'branch', 'branch_type', 'location_id', 'status',
         'entry_time', 'exit_time',
         'approved_by', 'approved_at', 'rejection_reason',
     ];

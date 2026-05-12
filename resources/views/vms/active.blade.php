@@ -18,17 +18,23 @@
 
 @section('content')
 
-<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-  <div class="legend">
-    <div class="leg-item"><span class="vdot green"></span>Within limit (&lt;{{ round($maxMinutes*0.8) }} min)</div>
-    <div class="leg-item"><span class="vdot orange"></span>Nearing limit</div>
-    <div class="leg-item"><span class="vdot red"></span>Overstay (&gt;{{ $maxMinutes }} min)</div>
-  </div>
-  <div style="font-size:13px;font-weight:600;color:var(--text)">
-    <i class="ti ti-live-view me-1" style="color:var(--accent)"></i>
-    {{ $visitors->count() }} visitors inside
-  </div>
+<div class="legend mb-3">
+  <div class="leg-item"><span class="vdot green"></span>Within limit (&lt;{{ round($maxMinutes*0.8) }} min)</div>
+  <div class="leg-item"><span class="vdot orange"></span>Nearing limit</div>
+  <div class="leg-item"><span class="vdot red"></span>Overstay (&gt;{{ $maxMinutes }} min)</div>
+  <span style="margin-left:auto;font-size:13px;font-weight:600;color:var(--text)">
+    <i class="ti ti-live-view me-1" style="color:var(--accent)"></i>{{ $visitors->count() }} visitors inside
+  </span>
 </div>
+@include('vms.partials.filter-bar', [
+  'showType'   => false,
+  'showSearch' => false,
+  'showDate'   => false,
+  'showStatus' => false,
+  'resetRoute' => 'vms.active',
+  'zones'      => $zones,
+  'locations'  => $locations,
+])
 
 @forelse($visitors as $v)
 @php

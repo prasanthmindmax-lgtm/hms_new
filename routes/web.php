@@ -610,7 +610,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('/ai/compare', [AiCompareController::class, 'run'])->name('ai.compare.run');
 
     // bank dashboard
-    Route::get('/bank_dashboard', [VendorController::class, 'index'])->name('superadmin.dashboard');
+    Route::get('/bank_dashboard', [VendorController::class, 'index'])->name('superadmin.bank_dashboard');
     Route::post('/dashboard/approve/{id}', [VendorController::class, 'approve'])->name('dashboard.approve');
     Route::get('/dashboard/export', [VendorController::class, 'export'])->name('dashboard.export');
     // tds summary
@@ -1147,6 +1147,9 @@ Route::prefix('vms')->name('vms.')->middleware(['auth', 'role_id:1', 'log.activi
     Route::get('/settings',               [VmsController::class, 'settings_view'])->name('settings');
     Route::post('/settings',              [VmsController::class, 'saveSettings'])->name('settings.save');
     Route::get('/ajax/stats',             [VmsController::class, 'ajaxStats'])->name('ajax.stats');
+    Route::get('/ajax/doctors',           [VmsController::class, 'ajaxDoctors'])->name('ajax.doctors');
+    Route::get('/ajax/designations',      [VmsController::class, 'ajaxDesignations'])->name('ajax.designations');
+    Route::get('/ajax/locations',         [VmsController::class, 'ajaxLocations'])->name('ajax.locations');
 });
 
 require __DIR__.'/auth.php';

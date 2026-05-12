@@ -7409,7 +7409,6 @@ private function CCName(){
     public function getEmployeeData()
     {
         $employeeData = $this->hrmUsers();
-
         if (isset($employeeData['error'])) {
             return response()->json(['error' => 'Failed to fetch employee data'], 500);
         }

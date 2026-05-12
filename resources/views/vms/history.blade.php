@@ -4,44 +4,15 @@
 
 @section('content')
 
-{{-- Filters --}}
-<form method="GET" class="vms-card mb-4">
-  <div class="row g-3 align-items-end">
-    <div class="col-md-3 col-sm-6">
-      <label class="form-label" style="font-size:11px;font-weight:600;color:var(--muted)">Search</label>
-      <input type="text" name="search" class="form-control form-control-sm" placeholder="Name, phone, company…" value="{{ request('search') }}" style="font-size:12px">
-    </div>
-    <div class="col-md-2 col-sm-6">
-      <label class="form-label" style="font-size:11px;font-weight:600;color:var(--muted)">Visitor Type</label>
-      <select name="type" class="form-select form-select-sm" style="font-size:12px">
-        <option value="">All Types</option>
-        <option value="pharma" {{ request('type')=='pharma'?'selected':'' }}>Pharma</option>
-        <option value="non_pharma" {{ request('type')=='non_pharma'?'selected':'' }}>Non-Pharma</option>
-        <option value="patient_relative" {{ request('type')=='patient_relative'?'selected':'' }}>Patient Relative</option>
-        <option value="job_applicant" {{ request('type')=='job_applicant'?'selected':'' }}>Job Applicant</option>
-        <option value="government" {{ request('type')=='government'?'selected':'' }}>Government</option>
-      </select>
-    </div>
-    <div class="col-md-2 col-sm-6">
-      <label class="form-label" style="font-size:11px;font-weight:600;color:var(--muted)">Status</label>
-      <select name="status" class="form-select form-select-sm" style="font-size:12px">
-        <option value="">All Status</option>
-        <option value="inside" {{ request('status')=='inside'?'selected':'' }}>Inside</option>
-        <option value="checked_out" {{ request('status')=='checked_out'?'selected':'' }}>Checked Out</option>
-        <option value="approved" {{ request('status')=='approved'?'selected':'' }}>Approved</option>
-        <option value="rejected" {{ request('status')=='rejected'?'selected':'' }}>Rejected</option>
-      </select>
-    </div>
-    <div class="col-md-2 col-sm-6">
-      <label class="form-label" style="font-size:11px;font-weight:600;color:var(--muted)">Date</label>
-      <input type="date" name="date" class="form-control form-control-sm" value="{{ request('date') }}" style="font-size:12px">
-    </div>
-    <div class="col-md-3 col-sm-12 d-flex gap-2">
-      <button type="submit" class="vbtn vbtn-primary flex-grow-1"><i class="ti ti-filter"></i> Filter</button>
-      <a href="{{ route('vms.history') }}" class="vbtn vbtn-hold">Reset</a>
-    </div>
-  </div>
-</form>
+@include('vms.partials.filter-bar', [
+  'showType'   => true,
+  'showSearch' => true,
+  'showDate'   => true,
+  'showStatus' => true,
+  'resetRoute' => 'vms.history',
+  'zones'      => $zones,
+  'locations'  => $locations,
+])
 
 <div class="vms-card">
   <div class="vms-card-header">

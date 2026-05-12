@@ -94,13 +94,43 @@
           <input type="text" id="qr_label" class="form-control" placeholder="e.g. Main Entrance Gate" style="font-size:12px">
           <div class="form-text" style="font-size:11px">A descriptive name for this QR code's location</div>
         </div>
-        <div class="mb-3">
+        <div class="mb-3" style="position:relative">
           <label class="form-label" style="font-size:12px;font-weight:600">Location</label>
-          <input type="text" id="qr_location" class="form-control" placeholder="e.g. Ground Floor Reception" style="font-size:12px">
+          <div class="input-group">
+            <input type="text" id="qr_location_search" class="form-control" placeholder="Click to select location…"
+                   style="font-size:12px" oninput="filterQrLocations(this.value)"
+                   onclick="showQrDrop()" autocomplete="off" readonly>
+            <span class="input-group-text" style="cursor:pointer" onclick="showQrDrop()">
+              <i class="ti ti-chevron-down" style="font-size:14px;color:var(--muted)"></i>
+            </span>
+          </div>
+          <div id="qrLocationDrop" style="display:none;border:1px solid #e2e8f0;border-radius:10px;max-height:200px;overflow-y:auto;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.12);margin-top:4px;position:absolute;z-index:9999;width:100%;left:0">
+            <div style="padding:8px 10px">
+              <input type="text" id="qr_loc_inner_search" placeholder="Type to search…"
+                     class="form-control form-control-sm" style="font-size:12px"
+                     oninput="filterQrLocations(this.value)">
+            </div>
+            @foreach($locations as $loc)
+            <div class="qr-loc-opt px-3 py-2" style="font-size:12px;cursor:pointer;border-top:1px solid #f1f5f9;transition:background 0.1s"
+                 onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''"
+                 onclick="selectQrLocation({{ $loc->id }}, '{{ addslashes($loc->name) }}')"
+                 data-name="{{ strtolower($loc->name) }}">
+              <i class="ti ti-map-pin me-1" style="font-size:13px;color:var(--accent)"></i>{{ $loc->name }}
+            </div>
+            @endforeach
+          </div>
+          <input type="hidden" id="qr_location_id">
+          <input type="hidden" id="qr_location_name">
         </div>
         <div class="mb-3">
-          <label class="form-label" style="font-size:12px;font-weight:600">Branch</label>
-          <input type="text" id="qr_branch" class="form-control" placeholder="e.g. Main Hospital" value="{{ $settings['default_branch'] ?? '' }}" style="font-size:12px">
+          <label class="form-label" style="font-size:12px;font-weight:600">Branch Type</label>
+          <select id="qr_branch_type" class="form-select" style="font-size:12px">
+            <option value="">Select branch type</option>
+            <option value="hospital">Hospital</option>
+            <option value="regional_office">Regional Office</option>
+            <option value="clinic">Clinic</option>
+            <option value="lab">Lab</option>
+          </select>
         </div>
         <div style="background:var(--bg);border-radius:10px;padding:14px;text-align:center">
           <div id="newQrPreview" style="display:flex;justify-content:center;margin-bottom:8px"></div>
@@ -130,11 +160,42 @@ new QRCode(document.getElementById('qr-{{ $qr->id }}'), {
 });
 @endforeach
 
+function showQrDrop() {
+  const drop = document.getElementById('qrLocationDrop');
+  drop.style.display = 'block';
+  document.getElementById('qr_loc_inner_search').focus();
+}
+
+function filterQrLocations(q) {
+  const term = q.toLowerCase();
+  document.querySelectorAll('.qr-loc-opt').forEach(el => {
+    el.style.display = el.dataset.name.includes(term) ? '' : 'none';
+  });
+}
+
+function selectQrLocation(id, name) {
+  $('#qr_location_id').val(id);
+  $('#qr_location_name').val(name);
+  $('#qr_location_search').val(name).removeAttr('readonly');
+  $('#qr_location_search').attr('placeholder', name);
+  $('#qrLocationDrop').hide();
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.mb-3 #qr_location_search')?.closest('.mb-3');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('qrLocationDrop').style.display = 'none';
+  }
+});
+
 function createQr() {
   const label = $('#qr_label').val().trim();
   if(!label) { showToast('Label is required', 'error'); return; }
   $.post('{{ route("vms.qr.create") }}', {
-    label, location: $('#qr_location').val(), branch: $('#qr_branch').val()
+    label,
+    location_name: $('#qr_location_name').val() || $('#qr_location_search').val(),
+    location_id:   $('#qr_location_id').val(),
+    branch_type:   $('#qr_branch_type').val(),
   }, function(res) {
     if(res.success){
       showToast('QR code created!', 'success');

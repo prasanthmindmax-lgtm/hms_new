@@ -19,21 +19,18 @@
 
 @section('content')
 
-<div class="filter-bar">
-  <div style="font-size:13px;color:var(--muted)">
-    <strong style="color:var(--text)">{{ $visitors->total() }}</strong> pending approval(s)
-  </div>
-  <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-    <select class="form-select form-select-sm" style="width:auto;font-size:12px" onchange="location.href='?type='+this.value">
-      <option value="">All types</option>
-      <option value="pharma" {{ request('type')=='pharma'?'selected':'' }}>Pharma</option>
-      <option value="non_pharma" {{ request('type')=='non_pharma'?'selected':'' }}>Non-Pharma</option>
-      <option value="patient_relative" {{ request('type')=='patient_relative'?'selected':'' }}>Patient Relative</option>
-      <option value="job_applicant" {{ request('type')=='job_applicant'?'selected':'' }}>Job Applicant</option>
-    </select>
-    <a href="{{ route('vms.approvals') }}" class="vbtn vbtn-hold">Reset</a>
-  </div>
+<div class="d-flex justify-content-between align-items-center mb-2" style="font-size:13px">
+  <span><strong style="color:var(--text)">{{ $visitors->total() }}</strong> <span style="color:var(--muted)">pending approval(s)</span></span>
 </div>
+@include('vms.partials.filter-bar', [
+  'showType'   => true,
+  'showSearch' => false,
+  'showDate'   => false,
+  'showStatus' => false,
+  'resetRoute' => 'vms.approvals',
+  'zones'      => $zones,
+  'locations'  => $locations,
+])
 
 @forelse($visitors as $v)
 @php

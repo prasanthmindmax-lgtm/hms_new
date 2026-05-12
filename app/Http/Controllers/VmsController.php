@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\VmsVisitor;
 use App\Models\VmsQrCode;
 use App\Models\VmsBlacklist;
+use App\Models\TblLocationModel;
+use App\Models\TblZonesModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class VmsController extends Controller
@@ -21,6 +24,104 @@ class VmsController extends Controller
     private function isBlacklisted(string $phone): bool
     {
         return VmsBlacklist::where('visitor_phone', $phone)->where('is_active', true)->exists();
+    }
+
+    private function fetchHrmEmployees(): array
+    {
+        try {
+            $response = Http::timeout(15)->withoutVerifying()->get(
+                'https://app.draravindsivf.com/hrms/employee_details_api.php',
+                ['api_key' => '3x@MpL3-K3Y-98fG_2025!']
+            );
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['data'] ?? [];
+            }
+        } catch (\Throwable $e) {}
+        return [];
+    }
+
+    /** Doctors: professional category employees */
+    private function getDoctors(): array
+    {
+        $employees = $this->fetchHrmEmployees();
+        $doctors = [];
+        foreach ($employees as $emp) {
+            if (isset($emp['category']) && strtolower($emp['category']) === 'professional') {
+                $doctors[] = [
+                    'id'          => $emp['employment_id'] ?? '',
+                    'name'        => $emp['fullname'] ?? '',
+                    'designation' => $emp['designation_name'] ?? '',
+                ];
+            }
+        }
+        // Fallback: if API has no category field, return all employees
+        if (empty($doctors) && !empty($employees)) {
+            foreach (array_slice($employees, 0, 50) as $emp) {
+                if (!empty($emp['fullname'])) {
+                    $doctors[] = [
+                        'id'          => $emp['employment_id'] ?? '',
+                        'name'        => $emp['fullname'] ?? '',
+                        'designation' => $emp['designation_name'] ?? '',
+                    ];
+                }
+            }
+        }
+        return $doctors;
+    }
+
+    /** Unique designations for "Department" dropdown */
+    private function getDesignations(): array
+    {
+        $employees = $this->fetchHrmEmployees();
+        $designations = [];
+        foreach ($employees as $emp) {
+            $d = trim($emp['designation_name'] ?? '');
+            if ($d && !in_array($d, $designations)) {
+                $designations[] = $d;
+            }
+        }
+        sort($designations);
+        return $designations;
+    }
+
+    private function getLocations()
+    {
+        return TblLocationModel::orderBy('name')->get(['id', 'name', 'zone_id']);
+    }
+
+    private function getZones()
+    {
+        return TblZonesModel::orderBy('name')->get(['id', 'name']);
+    }
+
+    /** Locations grouped by zone for filter use */
+    private function getLocationsGrouped()
+    {
+        return TblZonesModel::with(['locations' => function ($q) {
+            $q->orderBy('name')->select(['id', 'name', 'zone_id']);
+        }])->orderBy('name')->get(['id', 'name']);
+    }
+
+    // AJAX: doctors list
+    public function ajaxDoctors()
+    {
+        return response()->json(['doctors' => $this->getDoctors()]);
+    }
+
+    // AJAX: designations/departments
+    public function ajaxDesignations()
+    {
+        return response()->json(['designations' => $this->getDesignations()]);
+    }
+
+    // AJAX: locations
+    public function ajaxLocations(Request $request)
+    {
+        $q = $request->get('q','');
+        $locs = TblLocationModel::when($q, fn($qb) => $qb->where('name','like',"%$q%"))
+            ->orderBy('name')->get(['id','name']);
+        return response()->json(['locations' => $locs]);
     }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -68,9 +169,13 @@ class VmsController extends Controller
     {
         $query = VmsVisitor::where('status', 'pending')->latest();
         if ($request->filled('type')) $query->where('visitor_type', $request->type);
-        $visitors = $query->paginate(20);
-        $settings = $this->settings();
-        return view('vms.approvals', compact('visitors', 'settings'));
+        if ($request->filled('location_ids')) $query->whereIn('location_id', $request->location_ids);
+        elseif ($request->filled('location_id')) $query->where('location_id', $request->location_id);
+        $visitors  = $query->paginate(20);
+        $settings  = $this->settings();
+        $locations = $this->getLocations();
+        $zones     = $this->getLocationsGrouped();
+        return view('vms.approvals', compact('visitors', 'settings', 'locations', 'zones'));
     }
 
     public function approve(Request $request, $id)
@@ -100,12 +205,15 @@ class VmsController extends Controller
 
     public function active(Request $request)
     {
-        $settings = $this->settings();
+        $settings   = $this->settings();
         $maxMinutes = (int)($settings['max_visit_duration'] ?? 60);
-        $visitors = VmsVisitor::where('status', 'inside')
-            ->orderBy('entry_time', 'asc')
-            ->get();
-        return view('vms.active', compact('visitors', 'settings', 'maxMinutes'));
+        $locations  = $this->getLocations();
+        $zones      = $this->getLocationsGrouped();
+        $query = VmsVisitor::where('status', 'inside')->orderBy('entry_time', 'asc');
+        if ($request->filled('location_ids')) $query->whereIn('location_id', $request->location_ids);
+        elseif ($request->filled('location_id')) $query->where('location_id', $request->location_id);
+        $visitors = $query->get();
+        return view('vms.active', compact('visitors', 'settings', 'maxMinutes', 'locations', 'zones'));
     }
 
     public function checkout(Request $request, $id)
@@ -131,13 +239,17 @@ class VmsController extends Controller
                   ->orWhere('company_name', 'like', '%'.$request->search.'%');
             });
 
-        if ($request->filled('type'))   $query->where('visitor_type', $request->type);
-        if ($request->filled('status')) $query->where('status', $request->status);
-        if ($request->filled('date'))   $query->whereDate('created_at', $request->date);
+        if ($request->filled('type'))        $query->where('visitor_type', $request->type);
+        if ($request->filled('status'))      $query->where('status', $request->status);
+        if ($request->filled('date'))        $query->whereDate('created_at', $request->date);
+        if ($request->filled('location_ids')) $query->whereIn('location_id', $request->location_ids);
+        elseif ($request->filled('location_id')) $query->where('location_id', $request->location_id);
 
-        $visitors = $query->paginate(25);
-        $settings = $this->settings();
-        return view('vms.history', compact('visitors', 'settings'));
+        $visitors  = $query->paginate(25);
+        $settings  = $this->settings();
+        $locations = $this->getLocations();
+        $zones     = $this->getLocationsGrouped();
+        return view('vms.history', compact('visitors', 'settings', 'locations', 'zones'));
     }
 
     // ─── PHARMA VENDORS ───────────────────────────────────────────────────────
@@ -145,8 +257,10 @@ class VmsController extends Controller
     public function pharma(Request $request)
     {
         $query = VmsVisitor::where('visitor_type', 'pharma')->latest();
-        if ($request->filled('search')) $query->where('company_name', 'like', '%'.$request->search.'%');
-        if ($request->filled('date'))   $query->whereDate('created_at', $request->date);
+        if ($request->filled('search'))      $query->where('company_name', 'like', '%'.$request->search.'%');
+        if ($request->filled('date'))        $query->whereDate('created_at', $request->date);
+        if ($request->filled('location_ids')) $query->whereIn('location_id', $request->location_ids);
+        elseif ($request->filled('location_id')) $query->where('location_id', $request->location_id);
         $visitors = $query->paginate(25);
 
         $topCompanies = VmsVisitor::where('visitor_type', 'pharma')
@@ -156,8 +270,10 @@ class VmsController extends Controller
             ->take(10)
             ->get();
 
-        $settings = $this->settings();
-        return view('vms.pharma', compact('visitors', 'topCompanies', 'settings'));
+        $settings  = $this->settings();
+        $locations = $this->getLocations();
+        $zones     = $this->getLocationsGrouped();
+        return view('vms.pharma', compact('visitors', 'topCompanies', 'settings', 'locations', 'zones'));
     }
 
     // ─── NON-PHARMA VENDORS ───────────────────────────────────────────────────
@@ -165,11 +281,15 @@ class VmsController extends Controller
     public function nonPharma(Request $request)
     {
         $query = VmsVisitor::where('visitor_type', 'non_pharma')->latest();
-        if ($request->filled('search')) $query->where('company_name', 'like', '%'.$request->search.'%');
-        if ($request->filled('date'))   $query->whereDate('created_at', $request->date);
-        $visitors = $query->paginate(25);
-        $settings = $this->settings();
-        return view('vms.non-pharma', compact('visitors', 'settings'));
+        if ($request->filled('search'))      $query->where('company_name', 'like', '%'.$request->search.'%');
+        if ($request->filled('date'))        $query->whereDate('created_at', $request->date);
+        if ($request->filled('location_ids')) $query->whereIn('location_id', $request->location_ids);
+        elseif ($request->filled('location_id')) $query->where('location_id', $request->location_id);
+        $visitors  = $query->paginate(25);
+        $settings  = $this->settings();
+        $locations = $this->getLocations();
+        $zones     = $this->getLocationsGrouped();
+        return view('vms.non-pharma', compact('visitors', 'settings', 'locations', 'zones'));
     }
 
     // ─── BLACKLIST ────────────────────────────────────────────────────────────
@@ -178,11 +298,17 @@ class VmsController extends Controller
     {
         $query = VmsBlacklist::latest();
         if ($request->filled('search'))
-            $query->where('visitor_name', 'like', '%'.$request->search.'%')
-                  ->orWhere('visitor_phone', 'like', '%'.$request->search.'%');
-        $blacklisted = $query->paginate(20);
+            $query->where(function($q) use ($request) {
+                $q->where('visitor_name', 'like', '%'.$request->search.'%')
+                  ->orWhere('visitor_phone', 'like', '%'.$request->search.'%')
+                  ->orWhere('company_name',  'like', '%'.$request->search.'%');
+            });
+        $blacklisted    = $query->paginate(20);
+        $activeVisitors = VmsVisitor::where('status', 'inside')
+            ->orderBy('visitor_name')
+            ->get(['id','visitor_name','visitor_phone','company_name','visitor_type','entry_time','person_to_meet']);
         $settings = $this->settings();
-        return view('vms.blacklist', compact('blacklisted', 'settings'));
+        return view('vms.blacklist', compact('blacklisted', 'activeVisitors', 'settings'));
     }
 
     public function storeBlacklist(Request $request)
@@ -202,7 +328,14 @@ class VmsController extends Controller
             'blacklisted_at' => now(),
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Added to blacklist.']);
+        // If blacklisted from an active visitor, also check them out immediately
+        if ($request->filled('visitor_id')) {
+            VmsVisitor::where('id', $request->visitor_id)
+                ->where('status', 'inside')
+                ->update(['status' => 'checked_out', 'exit_time' => now()]);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Added to blacklist and visitor checked out.']);
     }
 
     public function removeBlacklist($id)
@@ -215,9 +348,10 @@ class VmsController extends Controller
 
     public function qrManagement()
     {
-        $qrCodes = VmsQrCode::withCount('visitors')->latest()->get();
-        $settings = $this->settings();
-        return view('vms.qr-management', compact('qrCodes', 'settings'));
+        $qrCodes  = VmsQrCode::withCount('visitors')->latest()->get();
+        $settings  = $this->settings();
+        $locations = $this->getLocations();
+        return view('vms.qr-management', compact('qrCodes', 'settings', 'locations'));
     }
 
     public function createQr(Request $request)
@@ -229,10 +363,12 @@ class VmsController extends Controller
         ]);
 
         $qr = VmsQrCode::create([
-            'label'      => $request->label,
-            'location'   => $request->location,
-            'branch'     => $request->branch,
-            'created_by' => auth()->id(),
+            'label'       => $request->label,
+            'location'    => $request->location_name,
+            'location_id' => $request->location_id,
+            'branch'      => $request->branch_name,
+            'branch_type' => $request->branch_type,
+            'created_by'  => auth()->id(),
         ]);
 
         return response()->json(['success' => true, 'qr' => $qr, 'url' => $qr->register_url]);
@@ -330,10 +466,11 @@ class VmsController extends Controller
     {
         $qr = VmsQrCode::where('uuid', $uuid)->where('is_active', true)->firstOrFail();
         $qr->increment('scan_count');
-        $settings = $this->settings();
-        $doctors = array_filter(array_map('trim', explode("\n", $settings['doctors_list'] ?? '')));
-        $departments = array_filter(array_map('trim', explode("\n", $settings['departments_list'] ?? '')));
-        return view('vms.register', compact('qr', 'settings', 'doctors', 'departments'));
+        $settings  = $this->settings();
+        $doctors   = $this->getDoctors();
+        $departments = $this->getDesignations();
+        $locations = $this->getLocations();
+        return view('vms.register', compact('qr', 'settings', 'doctors', 'departments', 'locations'));
     }
 
     public function storeRegister(Request $request, string $uuid)
@@ -375,7 +512,9 @@ class VmsController extends Controller
             'id_number'         => $request->id_number,
             'photo'             => $photoPath,
             'declaration_agreed'=> $request->boolean('declaration'),
-            'branch'            => $qr->branch ?? ($settings['default_branch'] ?? 'Main Hospital'),
+            'branch'            => $request->branch_name ?? $qr->branch ?? ($settings['default_branch'] ?? 'Main Hospital'),
+            'branch_type'       => $request->branch_type,
+            'location_id'       => $request->location_id ?: $qr->location_id,
             'status'            => $status,
             'entry_time'        => ($status === 'inside') ? now() : null,
         ]);
