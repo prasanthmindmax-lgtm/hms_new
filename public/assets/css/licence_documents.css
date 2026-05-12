@@ -529,6 +529,9 @@ button.ld-file-link:hover {
 .ld-doc-row--missing:hover td {
   background: #fffafb;
 }
+.ld-doc-row--renewal_required:hover td {
+  background: #fffbeb;
+}
 .ld-doc-row--overdue:hover td {
   background: #fff7f7;
 }
@@ -584,6 +587,11 @@ button.ld-file-link:hover {
   background: #fef2f2;
   color: #b91c1c;
   border-color: #fecaca;
+}
+.ld-status-chip--renewal_required {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
 }
 .ld-status-chip--on_file {
   background: #f1f5f9;
@@ -711,6 +719,11 @@ button.ld-file-tile-name:hover {
   background: #f1f5f9;
   border-color: #e2e8f0;
   color: #475569;
+}
+.ld-renew-pill--renewal_required {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
 }
 .ld-renew-dash {
   color: #cbd5e1;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BranchLicenceDocument;
+use App\Models\LicenceDocumentCatalog;
 use App\Models\TblLocationModel;
 use App\Models\TblZonesModel;
 use Carbon\Carbon;
@@ -253,6 +254,47 @@ class LicenceDocumentController extends Controller
         return in_array($branchId, $allowed, true);
     }
 
+    private function licenceFulfilledSlotCounts(array $branchIds, array $branchExpectedLevel): array
+    {
+        if ($branchIds === []) {
+            return [];
+        }
+
+        $allDocs = BranchLicenceDocument::query()
+            ->whereIn('branch_id', $branchIds)
+            ->get(['branch_id', 'level', 'document_key', 'file_path', 'renewal_date']);
+
+        $catalogByLevel = [
+            1 => LicenceDocumentCatalog::catalogRowsForLevel(1),
+            2 => LicenceDocumentCatalog::catalogRowsForLevel(2),
+        ];
+
+        $counts = [];
+        foreach ($branchIds as $bid) {
+            $lev = $branchExpectedLevel[$bid] ?? 1;
+            $catalog = $catalogByLevel[$lev] ?? [];
+            $docs = $allDocs->where('branch_id', $bid)->where('level', $lev)->keyBy('document_key');
+
+            $n = 0;
+            foreach ($catalog as $slot) {
+                $key = $slot['key'];
+                $rec = $docs->get($key);
+                $hasFile = $rec && ! empty($rec->file_path);
+                if (! $hasFile) {
+                    continue;
+                }
+                $reqRenewal = $slot['renewal_date_required'] ?? true;
+                if ($reqRenewal && empty($rec->renewal_date)) {
+                    continue;
+                }
+                $n++;
+            }
+            $counts[$bid] = $n;
+        }
+
+        return $counts;
+    }
+
     public function index(Request $request): View
     {
         $admin = auth()->user();
@@ -267,22 +309,9 @@ class LicenceDocumentController extends Controller
             $branchExpectedLevel[(int) $loc->id] = $this->branchLicenceLevel(isset($loc->level) ? (int) $loc->level : null);
         }
 
-        $counts = [];
-        if ($branchIds !== []) {
-            $rows = BranchLicenceDocument::query()
-                ->whereIn('branch_id', $branchIds)
-                ->whereNotNull('file_path')
-                ->get(['branch_id', 'level']);
-
-            foreach ($rows as $r) {
-                $bid = (int) $r->branch_id;
-                $expected = $branchExpectedLevel[$bid] ?? 1;
-                if ((int) $r->level !== $expected) {
-                    continue;
-                }
-                $counts[$bid] = ($counts[$bid] ?? 0) + 1;
-            }
-        }
+        $counts = $branchIds !== []
+            ? $this->licenceFulfilledSlotCounts($branchIds, $branchExpectedLevel)
+            : [];
 
         $l1Total = BranchLicenceDocument::requiredDocumentCountForLevel(1);
         $l2Total = BranchLicenceDocument::requiredDocumentCountForLevel(2);
@@ -498,6 +527,7 @@ class LicenceDocumentController extends Controller
         $today = Carbon::today();
         foreach ($catalog as $row) {
             $key = $row['key'];
+            $renewalRequired = $row['renewal_date_required'] ?? true;
             $rec = $docs->get($key);
             $hasFile = $rec && ! empty($rec->file_path);
             $renewalCarbon = $rec && $rec->renewal_date ? $rec->renewal_date->copy()->startOfDay() : null;
@@ -505,6 +535,9 @@ class LicenceDocumentController extends Controller
             if (! $hasFile) {
                 $status = 'missing';
                 $statusLabel = 'Missing';
+            } elseif ($renewalRequired && ! $renewalCarbon) {
+                $status = 'renewal_required';
+                $statusLabel = 'Renewal date required';
             } elseif (! $renewalCarbon) {
                 $status = 'on_file';
                 $statusLabel = 'On file';
@@ -522,6 +555,7 @@ class LicenceDocumentController extends Controller
             $documentRows[] = [
                 'key' => $key,
                 'label' => $row['label'],
+                'renewal_date_required' => $renewalRequired,
                 'file_path' => $rec?->file_path,
                 'original_filename' => $rec?->original_filename,
                 'renewal_date' => $rec && $rec->renewal_date ? $rec->renewal_date->format('Y-m-d') : null,
@@ -591,13 +625,19 @@ class LicenceDocumentController extends Controller
             return back()->with('error', 'Please choose a file to upload.');
         }
 
+        $requiresRenewal = LicenceDocumentCatalog::renewalDateRequiredForKey($level, $documentKey);
+        $willHaveFile = $request->hasFile('file') || ($existing && ! empty($existing->file_path));
+        if ($requiresRenewal && $willHaveFile && empty($validated['renewal_date'])) {
+            return back()->with('error', 'A renewal date is required for this document type.');
+        }
+
         $dir = public_path('licence_documents');
         if (! File::isDirectory($dir)) {
             File::makeDirectory($dir, 0755, true);
         }
 
-        $filePath = $existing->file_path ?? null;
-        $originalName = $existing->original_filename ?? null;
+        $filePath = $existing?->file_path ?? null;
+        $originalName = $existing?->original_filename ?? null;
 
         if ($request->hasFile('file')) {
             $file = $request->file('file');
