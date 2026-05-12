@@ -20,6 +20,7 @@ use App\Http\Controllers\ManagementController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\MenuMasterController;
 use App\Http\Controllers\PettyCashController;
+use App\Http\Controllers\PharmacyAuditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadiantCashPickupController;
 use App\Http\Controllers\RadiantMismatchAlertController;
@@ -978,6 +979,16 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::patch('grn/{grnRecord}', [GrnController::class, 'update']);
     Route::post('grn/{grnRecord}/approve', [GrnController::class, 'approve'])->name('grn.approve');
     Route::post('grn/{grnRecord}/reject', [GrnController::class, 'reject'])->name('grn.reject');
+
+    Route::get('pharmacy-audits', [PharmacyAuditController::class, 'index'])->name('pharmacy-audits.index');
+    Route::get('pharmacy-audits/create', [PharmacyAuditController::class, 'create'])->name('pharmacy-audits.create');
+    Route::post('pharmacy-audits', [PharmacyAuditController::class, 'store'])->name('pharmacy-audits.store');
+    Route::get('pharmacy-audits/{pharmacyAudit}', [PharmacyAuditController::class, 'show'])->name('pharmacy-audits.show');
+    Route::get('pharmacy-audits/{pharmacyAudit}/edit', [PharmacyAuditController::class, 'edit'])->name('pharmacy-audits.edit');
+    Route::put('pharmacy-audits/{pharmacyAudit}', [PharmacyAuditController::class, 'update'])->name('pharmacy-audits.update');
+    Route::get('pharmacy-audits/import-template', [PharmacyAuditController::class, 'importTemplate'])->name('pharmacy-audits.import.template');
+    Route::post('pharmacy-audits/import', [PharmacyAuditController::class, 'import'])->name('pharmacy-audits.import');
+    Route::get('pharmacy-audits/export', [PharmacyAuditController::class, 'export'])->name('pharmacy-audits.export');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
