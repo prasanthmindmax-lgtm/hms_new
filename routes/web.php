@@ -1120,13 +1120,14 @@ Route::middleware(['auth', 'role_id:1', 'log.activity'])->group(function () {
 
 // ─── VMS: Public routes (no auth) ────────────────────────────────────────────
 Route::prefix('vms')->name('vms.')->group(function () {
-    Route::get('/register/{uuid}',  [VmsController::class, 'showRegister'])->name('register');
-    Route::post('/register/{uuid}', [VmsController::class, 'storeRegister'])->name('register.store');
-    Route::get('/thank-you',        fn() => view('vms.thankyou'))->name('thankyou');
+    Route::get('/register/{uuid}',    [VmsController::class, 'showRegister'])->name('register');
+    Route::post('/register/{uuid}',   [VmsController::class, 'storeRegister'])->name('register.store');
+    Route::get('/thank-you',          fn() => view('vms.thankyou'))->name('thankyou');
+    Route::post('/check-blacklist',   [VmsController::class, 'checkBlacklist'])->name('check.blacklist');
 });
 
-// ─── VMS: Admin routes (auth required) ────────────────────────────────────────
-Route::prefix('vms')->name('vms.')->middleware(['auth', 'role_id:1', 'log.activity'])->group(function () {
+// ─── VMS: Admin routes (requires VMS access via access master OR access_limits=1) ──────────────
+Route::prefix('vms')->name('vms.')->middleware(['auth', 'vms.access', 'log.activity'])->group(function () {
     Route::get('/dashboard',              [VmsController::class, 'dashboard'])->name('dashboard');
     Route::get('/approvals',              [VmsController::class, 'approvals'])->name('approvals');
     Route::post('/approvals/{id}/approve',[VmsController::class, 'approve'])->name('approve');
