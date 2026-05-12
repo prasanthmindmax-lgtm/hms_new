@@ -1,3 +1,8 @@
+<style>
+    .pc-header .header-user-profile .pc-head-link {
+        padding:12px 0 0 !important;
+    }
+</style>
 <header class="pc-header">
   <div class="header-wrapper">
     <!-- [Mobile Media Block] start -->
@@ -25,6 +30,52 @@
     <!-- [Mobile Media Block end] -->
     <div class="ms-auto">
     <ul class="list-unstyled">
+
+        {{-- ── App Switcher: only for superadmin (role_id = 1) ── --}}
+        @if(auth()->check() && auth()->user()->role_id == 1)
+        <li class="pc-h-item" style="position:relative;display:flex;align-items:center" id="appSwitcherWrap">
+          <a href="#" class="pc-head-link" id="appSwitcherBtn" title="Switch App"
+             onclick="event.preventDefault();toggleAppSwitcher()"
+             style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;transition:background 0.15s;padding:0">
+            <i class="ti ti-grid-dots" style="font-size:20px;line-height:1"></i>
+          </a>
+          <div id="appSwitcherPanel"
+               style="display:none;position:absolute;top:calc(100% + 8px);right:0;
+                      background:#fff;border:1px solid #e5e7eb;border-radius:16px;
+                      box-shadow:0 12px 40px rgba(0,0,0,0.14);padding:20px;
+                      min-width:220px;z-index:9999">
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px">Switch Application</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <a href="{{ route('superadmin.dashboard') }}"
+                 style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 10px;
+                        border:1.5px solid #e5e7eb;border-radius:12px;text-decoration:none;
+                        transition:all 0.15s;background:{{ request()->routeIs('superadmin.*') ? '#f0fdf4' : '#fff' }};
+                        {{ request()->routeIs('superadmin.*') ? 'border-color:#86efac' : '' }}"
+                 onmouseover="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1'"
+                 onmouseout="this.style.background='{{ request()->routeIs('superadmin.*') ? '#f0fdf4' : '#fff' }}';this.style.borderColor='{{ request()->routeIs('superadmin.*') ? '#86efac' : '#e5e7eb' }}'">
+                <div style="width:44px;height:44px;background:linear-gradient(135deg,#0f2d4a,#1e4976);border-radius:12px;display:flex;align-items:center;justify-content:center">
+                  <i class="ti ti-building-hospital" style="font-size:22px;color:#fff"></i>
+                </div>
+                <span style="font-size:12px;font-weight:700;color:#1e293b">HMS</span>
+                <span style="font-size:10px;color:#64748b;text-align:center">Hospital Management</span>
+              </a>
+              <a href="{{ route('vms.dashboard') }}"
+                 style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 10px;
+                        border:1.5px solid #e5e7eb;border-radius:12px;text-decoration:none;
+                        transition:all 0.15s;background:{{ request()->routeIs('vms.*') ? '#f0fdf4' : '#fff' }};
+                        {{ request()->routeIs('vms.*') ? 'border-color:#86efac' : '' }}"
+                 onmouseover="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1'"
+                 onmouseout="this.style.background='{{ request()->routeIs('vms.*') ? '#f0fdf4' : '#fff' }}';this.style.borderColor='{{ request()->routeIs('vms.*') ? '#86efac' : '#e5e7eb' }}'">
+                <div style="width:44px;height:44px;background:linear-gradient(135deg,#1a7f64,#16a37e);border-radius:12px;display:flex;align-items:center;justify-content:center">
+                  <i class="ti ti-qrcode" style="font-size:22px;color:#fff"></i>
+                </div>
+                <span style="font-size:12px;font-weight:700;color:#1e293b">VMS</span>
+                <span style="font-size:10px;color:#64748b;text-align:center">Visitor Management</span>
+              </a>
+            </div>
+          </div>
+        </li>
+        @endif
 
         <li class="dropdown pc-h-item header-user-profile">
         <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown"
@@ -83,3 +134,17 @@
     </div>
 </header>
 @include('partials.change_password_modal')
+
+<script>
+function toggleAppSwitcher() {
+  const p = document.getElementById('appSwitcherPanel');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('appSwitcherWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const panel = document.getElementById('appSwitcherPanel');
+    if (panel) panel.style.display = 'none';
+  }
+});
+</script>
