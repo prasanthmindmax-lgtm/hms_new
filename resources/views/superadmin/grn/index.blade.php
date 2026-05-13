@@ -1477,25 +1477,12 @@
                           <span class="grnpr-dash">—</span>
                         @endif
                       </td>
-
-                      {{-- Received by — display only the name. Strips any trailing
-                           employee-id artefact, including:
-                             • "Name (EMP-123)" / "Name [123]"  → bracketed form
-                             • "Name - 123" / "Name · 123"      → punctuated form
-                             • "Name 123" (plain space)         → space-separated
-                             • "Kalaiselvi10022"                → no separator at all
-                           The fallback always preserves the original value if the
-                           cleanup would otherwise blank it out (e.g. all-digit value). --}}
                       <td>
                         @php
                           $receiverName = trim((string) $r->received_by);
                           if ($receiverName !== '') {
-                              // 1) Bracket / dash / dot wrapped IDs.
                               $cleaned = preg_replace('/\s*(?:[\(\[]\s*|[-·]\s*)(?:EMP(?:LOYEE)?[-\s]?)?[A-Za-z0-9_-]+\s*[\)\]]?\s*$/iu', '', $receiverName);
                               if (is_string($cleaned)) { $receiverName = $cleaned; }
-                              // 2) Trailing 3+ digit employee-id glued to the name
-                              //    (with or without a separating space). The (?<=\D)
-                              //    lookbehind protects all-digit inputs.
                               $cleaned = preg_replace('/(?<=\D)\s*\d{3,}\s*$/u', '', $receiverName);
                               if (is_string($cleaned) && trim($cleaned) !== '') { $receiverName = $cleaned; }
                               $receiverName = trim($receiverName);

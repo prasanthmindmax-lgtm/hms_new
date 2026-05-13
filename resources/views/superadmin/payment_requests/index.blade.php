@@ -419,7 +419,7 @@
                     </div>
                   @endif
                   @if($r->branch)
-                    <div class="pay-pr-branch-txt">{{ $r->branch->name }}</div>
+                    <div class="pay-pr-branch-txt text-nowrap">{{ $r->branch->name }}</div>
                   @endif
                   @if(!$r->zone && !$r->branch)
                     <span class="pay-pr-dash">—</span>

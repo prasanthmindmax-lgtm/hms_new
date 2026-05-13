@@ -721,10 +721,6 @@ class PaymentRequestController extends Controller
         ]);
     }
 
-    /**
-     * Approved payment requests only (status = approved). New approvals appear here automatically.
-     * Date range filters apply to {@see PaymentRequest::$reviewed_at}.
-     */
     public function approvedIndex(Request $request): View
     {
         $u = $this->userRow();
@@ -747,7 +743,6 @@ class PaymentRequestController extends Controller
                 'linkedBills:id,payment_request_id,grand_total_amount,balance_amount,bill_gen_number,bill_number,delete_status',
             ]);
 
-        $this->scopePaymentRequestsForUser($query, $u);
         $this->applyPaymentRequestListFilters($query, $request, 'reviewed_at', false);
 
         $statsBase = clone $query;
@@ -786,7 +781,6 @@ class PaymentRequestController extends Controller
             'branches' => $loc['branches'],
             'vendors' => $vendors,
             'paymentTypeLabels' => PaymentRequest::TYPE_LABELS,
-            'paymentRequestListScopedToSelf' => ! $this->isPaymentRequestSuperAdmin($u),
         ]);
     }
 

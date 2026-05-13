@@ -2510,7 +2510,7 @@ button.pr-show-file-tile {
 }
 .tk-pr-index .pay-pr-table-card .pay-pr-thead.qdt-head th.pay-pr-th-action {
     width: auto;
-    min-width: 10.5rem;
+    min-width: 11.5rem;
     white-space: nowrap;
 }
 
@@ -2616,12 +2616,12 @@ button.pr-show-file-tile {
 
 .tk-pr-index .pay-pr-action-group {
     display: inline-flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
     gap: 0.45rem;
-    width: 100%;
-    max-width: 100%;
+    width: auto;
+    max-width: none;
 }
 
 .tk-pr-index .pay-pr-tbody .pay-pr-row.qdt-row {
@@ -2797,15 +2797,34 @@ button.pr-show-file-tile {
     font-size: 0.92em;
 }
 
+.tk-pr-index .pay-pr-td-vendor {
+    vertical-align: top;
+    max-width: none;
+}
+
 .tk-pr-index .pay-pr-td-vendor .pay-pr-vendor-name {
-    display: inline-block;
-    max-width: 14rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: bottom;
+    display: block;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
     font-weight: 500;
     color: #334155;
+    line-height: 1.45;
+    text-transform: none;
+}
+
+/* Approved payments needs a wider vendor column because of the extra table columns. */
+.tk-pr-index .pay-ap-data-table .pay-pr-th-vendor,
+.tk-pr-index .pay-ap-data-table .pay-pr-td-vendor {
+    min-width: 14rem;
+    width: 14rem;
+}
+
+.tk-pr-index .pay-pr-data-table.pay-ap-data-table.qdt-table {
+    min-width: 1560px;
 }
 
 .tk-pr-index .pay-pr-td-requester {

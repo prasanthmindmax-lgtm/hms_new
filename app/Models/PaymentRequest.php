@@ -186,6 +186,8 @@ class PaymentRequest extends Model
             self::TYPE_PATIENT_REFUND => 'text-bg-dark',
             self::TYPE_INSTANT_PAYMENT => 'text-bg-success',
             self::TYPE_MISCELLANEOUS => 'text-bg-light',
+            self::TYPE_RENT => 'text-bg-info',
+            self::TYPE_ELECTRICITY => 'text-bg-primary',
             default => 'text-bg-secondary',
         };
 
@@ -369,7 +371,7 @@ class PaymentRequest extends Model
     {
         return $this->belongsTo(usermanagementdetails::class, 'reviewed_by');
     }
-    
+
     public function getVendorDisplayNameAttribute(): string
     {
         if ($this->relationLoaded('sourceVendor') && $this->sourceVendor) {

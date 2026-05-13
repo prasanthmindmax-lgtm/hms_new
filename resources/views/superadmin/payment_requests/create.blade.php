@@ -488,7 +488,7 @@
                 <div class="pr-pay-form-section-title mb-2">
                   <i class="bi bi-bank" aria-hidden="true"></i> Payee bank details
                 </div>
-                <p class="text-muted small mb-3">Required for Petty Cash Advance, Reimbursement, Ref Payment, Patient Refund, Insta Payment, and Miscellaneous Payment.</p>
+                <p class="text-muted small mb-3">Required for Petty Cash Advance, Reimbursement, Ref Payment, Patient Refund, Insta Payment, Miscellaneous, Rent Payment, and Electricity Payment.</p>
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label" for="pay_bank_account">Bank account number <span class="text-danger pay-bank-req">*</span></label>
@@ -643,7 +643,7 @@
   var payBankIfsc = document.getElementById('pay_bank_ifsc');
   var payBankBranch = document.getElementById('pay_bank_branch');
   var PO = ['advance', 'part_payment', 'settlement'];
-  var DOC = ['petty_cash_advance', 'reimbursement', 'refund', 'patient_refund', 'instant_payment', 'miscellaneous'];
+  var DOC = ['petty_cash_advance', 'reimbursement', 'refund', 'patient_refund', 'instant_payment', 'miscellaneous', 'rent', 'electricity'];
   var payPreviewBarPo = document.getElementById('pay-po-preview-bar');
   var payPreviewBarDoc = document.getElementById('pay-doc-preview-bar');
   var payPreviewBarBank = document.getElementById('pay-bank-preview-bar');
@@ -835,7 +835,7 @@
     });
   }
 
-  var FORM_TEMPLATE_TYPES = ['refund', 'patient_refund', 'instant_payment', 'miscellaneous'];
+  var FORM_TEMPLATE_TYPES = ['refund', 'patient_refund', 'instant_payment', 'miscellaneous', 'rent', 'electricity'];
   var payDocFormTemplate = document.getElementById('pay-doc-form-template');
 
   var lastPayTypeForUi = null;

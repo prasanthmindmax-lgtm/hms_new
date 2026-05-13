@@ -204,13 +204,24 @@
   .gd-file-tools a i { font-size: 0.78rem; }
 
   .gd-embed {
-    background: #f3f4f6; min-height: 320px;
+    background: #f3f4f6;
+    min-height: 360px;
+    height: min(55vh, 520px);
+    position: relative;
   }
-  .gd-embed iframe, .gd-embed video {
-    width: 100%; height: 100%; min-height: 320px; max-height: 60vh;
-    border: 0; display: block;
+  .gd-embed iframe,
+  .gd-embed object,
+  .gd-embed video {
+    width: 100%;
+    height: 100%;
+    min-height: 360px;
+    border: 0;
+    display: block;
+    position: absolute;
+    inset: 0;
   }
   .gd-embed video { background: #0f172a; object-fit: contain; }
+  .gd-embed--pdf object { background: #e5e7eb; }
   .gd-file-foot {
     padding: 7px 13px; font-size: 0.72rem; color: #9ca3af;
     background: #fafbfc; border-top: 1px solid #eef0f4;
@@ -263,7 +274,7 @@
       @if($st === \App\Models\GrnRecord::STATUS_PENDING)
         <div class="gd-audit gd-audit--pending">
           <i class="bi bi-hourglass-split"></i>
-          <span><b>Pending audit.</b> This GRN is waiting for finance review.</span>
+          <span><b>Pending audit.</b> This GRN is waiting for review.</span>
         </div>
       @elseif(! $r->isPending() && $r->reviewed_by)
         @php
@@ -348,12 +359,12 @@
                 <div class="gd-file-h gd-file-h--pdf">
                   <span><i class="bi bi-filetype-pdf"></i> Invoice copy</span>
                   <div class="gd-file-tools">
-                    <a href="{{ asset($r->invoice_copy_path) }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open</a>
-                    <a href="{{ asset($r->invoice_copy_path) }}" download><i class="bi bi-download"></i> Save</a>
+                    <a href="{{ asset('public/' . $r->invoice_copy_path) }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open</a>
+                    <a href="{{ asset('public/' . $r->invoice_copy_path) }}" download><i class="bi bi-download"></i> Save</a>
                   </div>
                 </div>
                 <div class="gd-embed">
-                  <iframe src="{{ asset($r->invoice_copy_path) }}#toolbar=1&navpanes=0&view=FitH" title="Invoice PDF preview"></iframe>
+                  <iframe src="{{ asset('public/' . $r->invoice_copy_path) }}#toolbar=1&navpanes=0&view=FitH" title="Invoice PDF preview"></iframe>
                 </div>
                 <div class="gd-file-foot">PDF preview rendered in page.</div>
               </article>
@@ -364,15 +375,15 @@
                 <div class="gd-file-h gd-file-h--vid">
                   <span><i class="bi bi-camera-video"></i> GPS verification</span>
                   <div class="gd-file-tools">
-                    <a href="{{ asset($r->gps_video_path) }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open</a>
-                    <a href="{{ asset($r->gps_video_path) }}" download><i class="bi bi-download"></i> Save</a>
+                    <a href="{{ asset('public/' . $r->gps_video_path) }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open</a>
+                    <a href="{{ asset('public/' . $r->gps_video_path) }}" download><i class="bi bi-download"></i> Save</a>
                   </div>
                 </div>
                 <div class="gd-embed">
-                  <video controls playsinline preload="metadata" src="{{ asset($r->gps_video_path) }}">
+                  <video controls playsinline preload="metadata" src="{{ asset('public/' . $r->gps_video_path) }}">
                     Your browser cannot play this video inline.
-                    <a href="{{ asset($r->gps_video_path) }}" target="_blank" rel="noopener">Open file</a>.
-                  </video>
+                    <a href="{{ asset('public/' . $r->gps_video_path) }}" target="_blank" rel="noopener">Open file</a>.
+                  </video>  
                 </div>
                 <div class="gd-file-foot">Built-in video player.</div>
               </article>
