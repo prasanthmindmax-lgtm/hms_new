@@ -4783,6 +4783,304 @@ class BankStatementController extends Controller
     }
 
     /**
+     * Bank line amount used for income tagging (withdrawal or deposit, whichever is set).
+     */
+    private function bankStatementLineAmountForIncomeTag(object $stmt): float
+    {
+        $w = (float) ($stmt->withdrawal ?? 0);
+        $d = (float) ($stmt->deposit ?? 0);
+
+        return $w > 0 ? $w : $d;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveIncomeMatchedModesForStatement(object $stmt, ?object $reconRow = null): array
+    {
+        if (Schema::hasColumn('bank_statements', 'income_matched_modes')) {
+            $decoded = json_decode($stmt->income_matched_modes ?? '[]', true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                $out = [];
+                foreach ($decoded as $m) {
+                    if (is_string($m) && $m !== '') {
+                        $out[] = $m;
+                    }
+                }
+
+                return array_values(array_unique($out));
+            }
+        }
+
+        $sid = (int) ($stmt->id ?? 0);
+        if ($reconRow !== null && $sid > 0) {
+            if ((int) ($reconRow->cash_bank_id ?? 0) === $sid) {
+                return ['cash'];
+            }
+            if ((int) ($reconRow->card_upi_bank_id ?? 0) === $sid) {
+                return ['upi'];
+            }
+            if ((int) ($reconRow->neft_bank_id ?? 0) === $sid) {
+                return ['neft'];
+            }
+            if ((int) ($reconRow->other_bank_id ?? 0) === $sid) {
+                return ['other'];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Sum bank line amounts already tagged to this income row for the given mode (excluding one statement id).
+     */
+    private function sumTaggedBankAmountForIncomeReconMode(int $reconId, string $mode, int $excludeStatementId = 0, ?object $reconRowForLegacyResolve = null): float
+    {
+        if (! Schema::hasColumn('bank_statements', 'income_matched_modes')) {
+            return 0.0;
+        }
+
+        $q = DB::table('bank_statements')
+            ->where('income_reconciliation_id', $reconId)
+            ->where('income_match_status', 'income_matched');
+        if ($excludeStatementId > 0) {
+            $q->where('id', '!=', $excludeStatementId);
+        }
+
+        $sum = 0.0;
+        foreach ($q->orderBy('id')->get() as $row) {
+            $modes = $this->resolveIncomeMatchedModesForStatement($row, $reconRowForLegacyResolve);
+            if ($modes === []) {
+                continue;
+            }
+            if ($mode === 'card' || $mode === 'upi') {
+                if (! in_array('card', $modes, true) && ! in_array('upi', $modes, true)) {
+                    continue;
+                }
+            } elseif (! in_array($mode, $modes, true)) {
+                continue;
+            }
+            $sum += $this->bankStatementLineAmountForIncomeTag($row);
+        }
+
+        return $sum;
+    }
+
+    /**
+     * Recompute bank-side columns on income_reconciliation_table from all statements still linked to this row.
+     */
+    private function refreshIncomeReconciliationBankAmountsFromLinkedStatements(int $reconId): void
+    {
+        $recon = DB::table('income_reconciliation_table')->find($reconId);
+        if (! $recon) {
+            return;
+        }
+
+        $branch = (string) ($recon->location_name ?? '');
+        $zone = (string) ($recon->zone_name ?? '');
+        try {
+            $dateObj = Carbon::createFromFormat('d/m/Y', (string) $recon->date_range);
+        } catch (\Exception $e) {
+            try {
+                $dateObj = Carbon::parse((string) $recon->date_range);
+            } catch (\Exception $e2) {
+                return;
+            }
+        }
+
+        $mocData = $this->fetchMocDocForBranch($branch, $dateObj->format('Ymd'));
+        $curMocCash = (float) ($mocData['cash'] ?? 0);
+        $curMocCard = (float) ($mocData['card'] ?? 0);
+        $curMocUpi = (float) ($mocData['upi'] ?? 0);
+        $curMocNeft = (float) ($mocData['neft'] ?? 0);
+        $curMocOther = (float) ($mocData['other'] ?? 0);
+        $curMocOverall = array_sum($mocData);
+
+        $stmts = DB::table('bank_statements')
+            ->where('income_reconciliation_id', $reconId)
+            ->where('income_match_status', 'income_matched')
+            ->orderBy('id')
+            ->get();
+
+        $cashSum = 0.0;
+        $cardUpiSum = 0.0;
+        $neftSum = 0.0;
+        $otherSum = 0.0;
+        $lastCashId = null;
+        $lastCashRef = null;
+        $lastCashTxn = null;
+        $lastCardUpiId = null;
+        $lastCardUpiRef = null;
+        $lastCardUpiTxn = null;
+        $lastNeftId = null;
+        $lastNeftRef = null;
+        $lastNeftTxn = null;
+        $lastOtherId = null;
+        $lastOtherRef = null;
+        $lastOtherTxn = null;
+        $lastCashTxnDate = null;
+        $lastCardUpiTxnDate = null;
+        $lastNeftTxnDate = null;
+        $lastOtherTxnDate = null;
+
+        foreach ($stmts as $s) {
+            $amt = $this->bankStatementLineAmountForIncomeTag($s);
+            $modes = $this->resolveIncomeMatchedModesForStatement($s, $recon);
+            if ($modes === []) {
+                continue;
+            }
+
+            try {
+                $txnDate = Carbon::createFromFormat('d/M/Y', $s->transaction_date)->format('d/m/Y');
+            } catch (\Exception $e) {
+                try {
+                    $txnDate = Carbon::parse($s->transaction_date)->format('d/m/Y');
+                } catch (\Exception $e2) {
+                    $txnDate = (string) $s->transaction_date;
+                }
+            }
+            $refNo = $s->reference_number ?: $s->transaction_id;
+            $transcationNo = $s->transaction_id;
+
+            if (in_array('cash', $modes, true)) {
+                $cashSum += $amt;
+                $lastCashId = (int) $s->id;
+                $lastCashRef = $refNo;
+                $lastCashTxn = $transcationNo;
+                $lastCashTxnDate = $txnDate;
+            }
+            if (in_array('card', $modes, true) || in_array('upi', $modes, true)) {
+                $cardUpiSum += $amt;
+                $lastCardUpiId = (int) $s->id;
+                $lastCardUpiRef = $refNo;
+                $lastCardUpiTxn = $transcationNo;
+                $lastCardUpiTxnDate = $txnDate;
+            }
+            if (in_array('neft', $modes, true)) {
+                $neftSum += $amt;
+                $lastNeftId = (int) $s->id;
+                $lastNeftRef = $refNo;
+                $lastNeftTxn = $transcationNo;
+                $lastNeftTxnDate = $txnDate;
+            }
+            if (in_array('other', $modes, true)) {
+                $otherSum += $amt;
+                $lastOtherId = (int) $s->id;
+                $lastOtherRef = $refNo;
+                $lastOtherTxn = $transcationNo;
+                $lastOtherTxnDate = $txnDate;
+            }
+        }
+
+        $curCollect = $curMocCash ?: $cashSum;
+        $curDeposite = $cashSum;
+        $curMesCard = $curMocCard;
+        $curMesUpi = $curMocUpi;
+        $curBankUpi = $cardUpiSum;
+        $curBankNeft = $neftSum;
+        $curBankOth = $otherSum;
+
+        $updateData = [
+            'zone_name' => $zone,
+            'moc_cash_amt' => $curMocCash,
+            'moc_card_amt' => $curMocCard,
+            'moc_upi_amt' => $curMocUpi,
+            'moc_total_upi_card' => $curMocCard + $curMocUpi,
+            'moc_neft_amt' => $curMocNeft,
+            'moc_other_amt' => $curMocOther,
+            'moc_overall_total' => $curMocOverall,
+            'mespos_card' => $curMocCard,
+            'mespos_upi' => $curMocUpi,
+            'updated_at' => now(),
+        ];
+
+        if ($cashSum > 0) {
+            $updateData['cash_bank_id'] = $lastCashId;
+            $updateData['cash_bank_ref_no'] = $lastCashRef;
+            $updateData['date_collection'] = $lastCashTxnDate;
+            $updateData['collection_amount'] = $curCollect;
+            $updateData['date_deposited'] = $lastCashTxnDate;
+            $updateData['deposite_amount'] = $curDeposite;
+            $updateData['cash_utr_number'] = $lastCashTxn;
+        } else {
+            $updateData['cash_bank_id'] = null;
+            $updateData['cash_bank_ref_no'] = null;
+            $updateData['date_collection'] = null;
+            $updateData['collection_amount'] = 0;
+            $updateData['date_deposited'] = null;
+            $updateData['deposite_amount'] = 0;
+            $updateData['cash_utr_number'] = null;
+            $curCollect = 0.0;
+            $curDeposite = 0.0;
+        }
+
+        if ($cardUpiSum > 0) {
+            $updateData['card_upi_bank_id'] = $lastCardUpiId;
+            $updateData['card_upi_bank_ref_no'] = $lastCardUpiRef;
+            $updateData['date_settlement'] = $lastCardUpiTxnDate;
+            $updateData['bank_upi_card'] = $curBankUpi;
+            $updateData['bank_upi_card_utr'] = $lastCardUpiTxn;
+        } else {
+            $updateData['card_upi_bank_id'] = null;
+            $updateData['card_upi_bank_ref_no'] = null;
+            $updateData['bank_upi_card'] = 0;
+            $updateData['bank_upi_card_utr'] = null;
+            $curBankUpi = 0.0;
+        }
+
+        if ($neftSum > 0) {
+            $updateData['neft_bank_id'] = $lastNeftId;
+            $updateData['neft_bank_ref_no'] = $lastNeftRef;
+            if ($cardUpiSum <= 0) {
+                $updateData['date_settlement'] = $lastNeftTxnDate;
+            }
+            $updateData['bank_neft'] = $curBankNeft;
+            $updateData['bank_neft_utr'] = $lastNeftTxn;
+        } else {
+            $updateData['neft_bank_id'] = null;
+            $updateData['neft_bank_ref_no'] = null;
+            $updateData['bank_neft'] = 0;
+            $updateData['bank_neft_utr'] = null;
+            $curBankNeft = 0.0;
+        }
+
+        if ($otherSum > 0) {
+            $updateData['other_bank_id'] = $lastOtherId;
+            $updateData['other_bank_ref_no'] = $lastOtherRef;
+            if ($cardUpiSum <= 0 && $neftSum <= 0) {
+                $updateData['date_settlement'] = $lastOtherTxnDate;
+            }
+            $updateData['bank_others'] = $curBankOth;
+            $updateData['bank_other_utr'] = $lastOtherTxn;
+        } else {
+            $updateData['other_bank_id'] = null;
+            $updateData['other_bank_ref_no'] = null;
+            $updateData['bank_others'] = 0;
+            $updateData['bank_other_utr'] = null;
+            $curBankOth = 0.0;
+        }
+
+        if ($cardUpiSum <= 0 && $neftSum <= 0 && $otherSum <= 0) {
+            $updateData['date_settlement'] = null;
+        }
+
+        if (Schema::hasColumn('income_reconciliation_table', 'income_tag_mismatch_remark')) {
+            $updateData['income_tag_mismatch_remark'] = null;
+        }
+
+        $diffs = $this->calcIncomeDiffs(
+            $curMocCash, $curMocCard, $curMocUpi, $curMocNeft, $curMocOther, $curMocOverall,
+            $curCollect, $curDeposite,
+            $curMesCard, $curMesUpi,
+            $curBankUpi, $curBankNeft, $curBankOth
+        );
+
+        DB::table('income_reconciliation_table')
+            ->where('id', $reconId)
+            ->update(array_merge($updateData, $diffs));
+    }
+
+    /**
      * Apply income tag for one branch + collection date + mode with an explicit bank-side amount.
      * Updates or inserts income_reconciliation_table only (no bank_statements row).
      *
@@ -4833,68 +5131,140 @@ class BankStatementController extends Controller
             ->first();
             // dd($existing);
         if ($existing) {
+            $fresh = DB::table('income_reconciliation_table')->find($existing->id);
+            if ($fresh) {
+                $existing = $fresh;
+            }
             // Always refresh MOC DOC for this branch + collection date (same as insert path).
             // Otherwise an existing row with zero/stale MOC never gets API data when income-tagging.
             $mocData = $this->fetchMocDocForBranch($branch, $dateObj->format('Ymd'));
-            $curMocCash    = (float)($mocData['cash']  ?? 0);
-            $curMocCard    = (float)($mocData['card']  ?? 0);
-            $curMocUpi     = (float)($mocData['upi']   ?? 0);
-            $curMocNeft    = (float)($mocData['neft']  ?? 0);
-            $curMocOther   = (float)($mocData['other'] ?? 0);
+            $curMocCash = (float) ($mocData['cash'] ?? 0);
+            $curMocCard = (float) ($mocData['card'] ?? 0);
+            $curMocUpi = (float) ($mocData['upi'] ?? 0);
+            $curMocNeft = (float) ($mocData['neft'] ?? 0);
+            $curMocOther = (float) ($mocData['other'] ?? 0);
             $curMocOverall = array_sum($mocData);
 
-            $curCollect  = (float)($existing->collection_amount ?? 0);
-            $curDeposite = (float)($existing->deposite_amount   ?? 0);
-            $curMesCard  = $curMocCard;
-            $curMesUpi   = $curMocUpi;
-            $curBankUpi  = (float)($existing->bank_upi_card     ?? 0);
-            $curBankNeft = (float)($existing->bank_neft         ?? 0);
-            $curBankOth  = (float)($existing->bank_others       ?? 0);
+            $reconId = (int) $existing->id;
+            $stmtId = (int) $stmt->id;
+            $hasModesCol = Schema::hasColumn('bank_statements', 'income_matched_modes');
+
+            if ($hasModesCol) {
+                $cashTotalAll = $this->sumTaggedBankAmountForIncomeReconMode($reconId, 'cash', $stmtId, $existing) + ($mode === 'cash' ? $amount : 0.0);
+                $upiCardTotalAll = $this->sumTaggedBankAmountForIncomeReconMode($reconId, 'card', $stmtId, $existing)
+                    + (($mode === 'card' || $mode === 'upi') ? $amount : 0.0);
+                $neftTotalAll = $this->sumTaggedBankAmountForIncomeReconMode($reconId, 'neft', $stmtId, $existing) + ($mode === 'neft' ? $amount : 0.0);
+                $otherTotalAll = $this->sumTaggedBankAmountForIncomeReconMode($reconId, 'other', $stmtId, $existing) + ($mode === 'other' ? $amount : 0.0);
+            } else {
+                $cashTotalAll = (float) ($existing->deposite_amount ?? 0) + ($mode === 'cash' ? $amount : 0.0);
+                $upiCardTotalAll = (float) ($existing->bank_upi_card ?? 0) + (($mode === 'card' || $mode === 'upi') ? $amount : 0.0);
+                $neftTotalAll = (float) ($existing->bank_neft ?? 0) + ($mode === 'neft' ? $amount : 0.0);
+                $otherTotalAll = (float) ($existing->bank_others ?? 0) + ($mode === 'other' ? $amount : 0.0);
+            }
+
+            if ($mode !== 'cash') {
+                $cashTotalAll = (float) ($existing->deposite_amount ?? 0);
+            }
+            if ($mode !== 'card' && $mode !== 'upi') {
+                $upiCardTotalAll = (float) ($existing->bank_upi_card ?? 0);
+            }
+            if ($mode !== 'neft') {
+                $neftTotalAll = (float) ($existing->bank_neft ?? 0);
+            }
+            if ($mode !== 'other') {
+                $otherTotalAll = (float) ($existing->bank_others ?? 0);
+            }
+
+            $curDeposite = $cashTotalAll;
+            $curCollect = $curMocCash ?: $cashTotalAll;
+            $curMesCard = $curMocCard;
+            $curMesUpi = $curMocUpi;
+            $curBankUpi = $upiCardTotalAll;
+            $curBankNeft = $neftTotalAll;
+            $curBankOth = $otherTotalAll;
 
             $updateData = [
-                $bankIdCol   => $stmt->id,
-                $bankRefCol  => $refNo,
-                'zone_name'  => $zone,
-                'moc_cash_amt'       => $curMocCash,
-                'moc_card_amt'       => $curMocCard,
-                'moc_upi_amt'        => $curMocUpi,
+                'zone_name' => $zone,
+                'moc_cash_amt' => $curMocCash,
+                'moc_card_amt' => $curMocCard,
+                'moc_upi_amt' => $curMocUpi,
                 'moc_total_upi_card' => $curMocCard + $curMocUpi,
-                'moc_neft_amt'       => $curMocNeft,
-                'moc_other_amt'      => $curMocOther,
-                'moc_overall_total'  => $curMocOverall,
-                'mespos_card'        => $curMocCard,
-                'mespos_upi'         => $curMocUpi,
-                'updated_at'         => now(),
+                'moc_neft_amt' => $curMocNeft,
+                'moc_other_amt' => $curMocOther,
+                'moc_overall_total' => $curMocOverall,
+                'mespos_card' => $curMocCard,
+                'mespos_upi' => $curMocUpi,
+                'deposite_amount' => $curDeposite,
+                'bank_upi_card' => $curBankUpi,
+                'bank_neft' => $curBankNeft,
+                'bank_others' => $curBankOth,
+                'updated_at' => now(),
             ];
 
-            if ($mode === 'cash') {
-                $updateData['date_collection']   = $txnDate;
-                $updateData['collection_amount'] = $curMocCash ?: $amount;
-                $updateData['date_deposited']    = $txnDate;
-                $updateData['deposite_amount']   = $amount;
-                $updateData['cash_utr_number']   = $transcationNo;
-                $curDeposite = $amount;
-                $curCollect  = $updateData['collection_amount'];
-            } elseif ($mode === 'card' || $mode === 'upi') {
-                $updateData['date_settlement'] = $txnDate;
-                $updateData['mespos_card']     = $curMocCard;
-                $updateData['mespos_upi']      = $curMocUpi;
-                $updateData['bank_upi_card']   = $amount;
-                $updateData['bank_upi_card_utr']   = $transcationNo;
-                $updateData['moc_total_upi_card'] = $curMocCard + $curMocUpi;
-                $curMesCard = $curMocCard;
-                $curMesUpi  = $curMocUpi;
-                $curBankUpi = $amount;
-            } elseif ($mode === 'neft') {
-                $updateData['date_settlement'] = $txnDate;
-                $updateData['bank_neft']       = $amount;
-                $updateData['bank_neft_utr']   = $transcationNo;
-                $curBankNeft = $amount;
-            } elseif ($mode === 'other') {
-                $updateData['date_settlement'] = $txnDate;
-                $updateData['bank_others']     = $amount;
-                $updateData['bank_other_utr']   = $transcationNo;
-                $curBankOth = $amount;
+            if ($cashTotalAll > 0) {
+                $updateData['cash_bank_id'] = $mode === 'cash' ? $stmtId : (int) ($existing->cash_bank_id ?: $stmtId);
+                $updateData['cash_bank_ref_no'] = $mode === 'cash' ? $refNo : ($existing->cash_bank_ref_no ?? $refNo);
+                $updateData['date_collection'] = $mode === 'cash' ? $txnDate : ($existing->date_collection ?? $txnDate);
+                $updateData['collection_amount'] = $curCollect;
+                $updateData['date_deposited'] = $mode === 'cash' ? $txnDate : ($existing->date_deposited ?? $txnDate);
+                $updateData['cash_utr_number'] = $mode === 'cash' ? $transcationNo : ($existing->cash_utr_number ?? $transcationNo);
+            } else {
+                $updateData['cash_bank_id'] = null;
+                $updateData['cash_bank_ref_no'] = null;
+                $updateData['date_collection'] = null;
+                $updateData['collection_amount'] = 0;
+                $updateData['date_deposited'] = null;
+                $updateData['deposite_amount'] = 0;
+                $updateData['cash_utr_number'] = null;
+                $curCollect = 0.0;
+                $curDeposite = 0.0;
+            }
+
+            if ($upiCardTotalAll > 0) {
+                $updateData['card_upi_bank_id'] = ($mode === 'card' || $mode === 'upi') ? $stmtId : (int) ($existing->card_upi_bank_id ?: $stmtId);
+                $updateData['card_upi_bank_ref_no'] = ($mode === 'card' || $mode === 'upi') ? $refNo : ($existing->card_upi_bank_ref_no ?? $refNo);
+                $updateData['date_settlement'] = ($mode === 'card' || $mode === 'upi') ? $txnDate : ($existing->date_settlement ?? $txnDate);
+                $updateData['bank_upi_card_utr'] = ($mode === 'card' || $mode === 'upi') ? $transcationNo : ($existing->bank_upi_card_utr ?? $transcationNo);
+            } else {
+                $updateData['card_upi_bank_id'] = null;
+                $updateData['card_upi_bank_ref_no'] = null;
+                $updateData['bank_upi_card'] = 0;
+                $updateData['bank_upi_card_utr'] = null;
+                $curBankUpi = 0.0;
+            }
+
+            if ($neftTotalAll > 0) {
+                $updateData['neft_bank_id'] = $mode === 'neft' ? $stmtId : (int) ($existing->neft_bank_id ?: $stmtId);
+                $updateData['neft_bank_ref_no'] = $mode === 'neft' ? $refNo : ($existing->neft_bank_ref_no ?? $refNo);
+                if ($upiCardTotalAll <= 0) {
+                    $updateData['date_settlement'] = $mode === 'neft' ? $txnDate : ($existing->date_settlement ?? $txnDate);
+                }
+                $updateData['bank_neft_utr'] = $mode === 'neft' ? $transcationNo : ($existing->bank_neft_utr ?? $transcationNo);
+            } else {
+                $updateData['neft_bank_id'] = null;
+                $updateData['neft_bank_ref_no'] = null;
+                $updateData['bank_neft'] = 0;
+                $updateData['bank_neft_utr'] = null;
+                $curBankNeft = 0.0;
+            }
+
+            if ($otherTotalAll > 0) {
+                $updateData['other_bank_id'] = $mode === 'other' ? $stmtId : (int) ($existing->other_bank_id ?: $stmtId);
+                $updateData['other_bank_ref_no'] = $mode === 'other' ? $refNo : ($existing->other_bank_ref_no ?? $refNo);
+                if ($upiCardTotalAll <= 0 && $neftTotalAll <= 0) {
+                    $updateData['date_settlement'] = $mode === 'other' ? $txnDate : ($existing->date_settlement ?? $txnDate);
+                }
+                $updateData['bank_other_utr'] = $mode === 'other' ? $transcationNo : ($existing->bank_other_utr ?? $transcationNo);
+            } else {
+                $updateData['other_bank_id'] = null;
+                $updateData['other_bank_ref_no'] = null;
+                $updateData['bank_others'] = 0;
+                $updateData['bank_other_utr'] = null;
+                $curBankOth = 0.0;
+            }
+
+            if ($upiCardTotalAll <= 0 && $neftTotalAll <= 0 && $otherTotalAll <= 0) {
+                $updateData['date_settlement'] = null;
             }
 
             $diffs = $this->calcIncomeDiffs(
@@ -5011,8 +5381,58 @@ class BankStatementController extends Controller
     }
 
     /**
-     * Compare bank tag amount (per collection date) to MOC DOC for each selected mode.
-     * Uses the same API spacing as applyIncomeTag to reduce HTTP 429 on multi-date checks.
+     * MOC mismatch / preview uses one combined bucket when both Card and UPI are selected
+     * (same as income row column bank_upi_card).
+     *
+     * @return array<int, string>  e.g. cash, card_upi, neft, other — never both card and upi separately
+     */
+    private function buildIncomeTagMocMismatchModeSpecs(array $modes): array
+    {
+        $uniq = array_values(array_unique(array_filter($modes)));
+        $out = [];
+        $hasCard = in_array('card', $uniq, true);
+        $hasUpi = in_array('upi', $uniq, true);
+        if ($hasCard && $hasUpi) {
+            $out[] = 'card_upi';
+        } elseif ($hasCard) {
+            $out[] = 'card';
+        } elseif ($hasUpi) {
+            $out[] = 'upi';
+        }
+        foreach (['cash', 'neft', 'other'] as $m) {
+            if (in_array($m, $uniq, true)) {
+                $out[] = $m;
+            }
+        }
+
+        return $out;
+    }
+
+    private function incomeTagMocAmountForMismatchSpec(array $mocData, string $specMode): float
+    {
+        if ($specMode === 'card_upi') {
+            return $this->incomeTagMocAmountForMode($mocData, 'card') + $this->incomeTagMocAmountForMode($mocData, 'upi');
+        }
+
+        return $this->incomeTagMocAmountForMode($mocData, $specMode);
+    }
+
+    /**
+     * Sum of MOC DOC amounts for the selected mode buckets (card+upi merged when both selected).
+     */
+    private function incomeTagMocSelectedBucketsTotal(array $mocData, array $modes): float
+    {
+        $sum = 0.0;
+        foreach ($this->buildIncomeTagMocMismatchModeSpecs($modes) as $specMode) {
+            $sum += $this->incomeTagMocAmountForMismatchSpec($mocData, $specMode);
+        }
+
+        return $sum;
+    }
+
+    /**
+     * Compare bank tag amount (per collection date) to MOC DOC for each selected payment bucket.
+     * Card + UPI together use one check (MOC card + MOC UPI vs bank portion). Uses API spacing like applyIncomeTag.
      *
      * @param  array<int, string>  $sortedYmd
      * @param  array<int, string>  $modes
@@ -5023,6 +5443,7 @@ class BankStatementController extends Controller
     {
         $out = [];
         $eps = self::INCOME_TAG_MOC_AMOUNT_EPS;
+        $specModes = $this->buildIncomeTagMocMismatchModeSpecs($modes);
         foreach ($sortedYmd as $idx => $ymd) {
             if ($idx > 0) {
                 usleep(800000);
@@ -5034,22 +5455,104 @@ class BankStatementController extends Controller
             }
             $mocData = $this->fetchMocDocForBranch($branch, $dateObj->format('Ymd'));
             $portion = (float) ($amountByYmd[$ymd] ?? 0);
-            foreach ($modes as $mode) {
-                $mocAmt = $this->incomeTagMocAmountForMode($mocData, $mode);
+            foreach ($specModes as $specMode) {
+                $mocAmt = $this->incomeTagMocAmountForMismatchSpec($mocData, $specMode);
                 if (abs($mocAmt - $portion) > $eps) {
                     $out[] = [
-                        'date_ymd'      => $ymd,
-                        'date_display'  => $dateObj->format('d/m/Y'),
-                        'mode'          => $mode,
-                        'moc_amount'    => round($mocAmt, 2),
-                        'tag_amount'    => round($portion, 2),
-                        'diff'          => round($portion - $mocAmt, 2),
+                        'date_ymd'     => $ymd,
+                        'date_display' => $dateObj->format('d/m/Y'),
+                        'mode'         => $specMode,
+                        'moc_amount'   => round($mocAmt, 2),
+                        'tag_amount'   => round($portion, 2),
+                        'diff'         => round($portion - $mocAmt, 2),
                     ];
                 }
             }
         }
 
         return $out;
+    }
+
+    /**
+     * MOC DOC totals per collection date for the income-tag UI (split table / hints).
+     */
+    public function incomeTagMocTotalsForDates(Request $request)
+    {
+        $request->validate([
+            'branch'   => 'required|string|max:255',
+            'dates'    => 'required|array|min:1|max:62',
+            'dates.*'  => 'nullable|string',
+            'modes'    => 'nullable|array',
+            'modes.*'  => 'nullable|in:cash,card,upi,neft,other',
+        ]);
+
+        $branch = trim((string) $request->input('branch'));
+        $rawDates = $request->input('dates', []);
+        $modes = [];
+        if ($request->filled('modes') && is_array($request->modes)) {
+            $modes = array_values(array_unique(array_filter($request->modes)));
+        }
+
+        $parsed = [];
+        foreach ($rawDates as $ds) {
+            if ($ds === null || $ds === '') {
+                continue;
+            }
+            try {
+                $parsed[] = Carbon::createFromFormat('Y-m-d', (string) $ds)->startOfDay();
+            } catch (\Exception $e) {
+                try {
+                    $parsed[] = Carbon::parse((string) $ds)->startOfDay();
+                } catch (\Exception $e2) {
+                    return response()->json(['success' => false, 'message' => 'Invalid date: ' . $ds], 422);
+                }
+            }
+        }
+        usort($parsed, function (Carbon $a, Carbon $b) {
+            return $a->timestamp <=> $b->timestamp;
+        });
+        $sortedYmd = [];
+        foreach ($parsed as $c) {
+            $sortedYmd[] = $c->format('Y-m-d');
+        }
+        $sortedYmd = array_values(array_unique($sortedYmd));
+
+        $rows = [];
+        foreach ($sortedYmd as $idx => $ymd) {
+            if ($idx > 0) {
+                usleep(800000);
+            }
+            try {
+                $dateObj = Carbon::createFromFormat('Y-m-d', $ymd);
+            } catch (\Exception $e) {
+                continue;
+            }
+            $mocData = $this->fetchMocDocForBranch($branch, $dateObj->format('Ymd'));
+            $cash = round($this->incomeTagMocAmountForMode($mocData, 'cash'), 2);
+            $card = round($this->incomeTagMocAmountForMode($mocData, 'card'), 2);
+            $upi = round($this->incomeTagMocAmountForMode($mocData, 'upi'), 2);
+            $neft = round($this->incomeTagMocAmountForMode($mocData, 'neft'), 2);
+            $other = round($this->incomeTagMocAmountForMode($mocData, 'other'), 2);
+            $totalSelected = $modes === []
+                ? round(array_sum($mocData), 2)
+                : round($this->incomeTagMocSelectedBucketsTotal($mocData, $modes), 2);
+
+            $rows[] = [
+                'date_ymd'       => $ymd,
+                'date_display'   => $dateObj->format('d/m/Y'),
+                'cash'           => $cash,
+                'card'           => $card,
+                'upi'            => $upi,
+                'neft'           => $neft,
+                'other'          => $other,
+                'total_selected' => $totalSelected,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'rows'    => $rows,
+        ]);
     }
 
     /**
@@ -5259,6 +5762,9 @@ class BankStatementController extends Controller
                     'zone_name'    => trim((string) $zone),
                 ]);
             }
+            if (Schema::hasColumn('bank_statements', 'income_matched_modes')) {
+                $incomeUpdate['income_matched_modes'] = json_encode(array_values($modes));
+            }
 
             if (Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark')) {
                 $incomeUpdate['income_tag_mismatch_remark'] = ($acknowledgeMismatch && $mismatchRemark !== null && $mismatchRemark !== '')
@@ -5274,6 +5780,18 @@ class BankStatementController extends Controller
             }
             if (!empty($safeUpdate)) {
                 DB::table('bank_statements')->where('id', $stmt->id)->update($safeUpdate);
+            }
+
+            $stmtAfterIncome = DB::table('bank_statements')->where('id', $stmt->id)->first();
+            if ($stmtAfterIncome
+                && Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')
+                && ! empty($stmtAfterIncome->radiant_cash_pickup_id)
+                && Schema::hasTable('radiant_cash_pickups')
+                && Schema::hasTable('income_reconciliation_table')) {
+                $pu = DB::table('radiant_cash_pickups')->where('id', (int) $stmtAfterIncome->radiant_cash_pickup_id)->first();
+                if ($pu) {
+                    $this->syncIncomeReconciliationRadiantCollectionFromPickup($stmtAfterIncome, $pu);
+                }
             }
 
             $this->mergeBankStatementAttachmentsFromUpload($request, (int) $stmt->id);
@@ -5331,14 +5849,37 @@ class BankStatementController extends Controller
         try {
             $stmt = DB::table('bank_statements')->find($id);
             if (!$stmt) {
+                DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
             }
 
             if (($stmt->income_match_status ?? '') !== 'income_matched') {
+                DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'This statement has no income tag to remove'], 400);
             }
 
             $stmtId = (int) $id;
+
+            $reconIds = [];
+            if (! empty($stmt->income_reconciliation_id)) {
+                $reconIds[] = (int) $stmt->income_reconciliation_id;
+            }
+            if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
+                $splitJson = (string) ($stmt->income_match_split_json ?? '');
+                if ($splitJson !== '') {
+                    $split = json_decode($splitJson, true);
+                    if (is_array($split) && isset($split['recon_ids']) && is_array($split['recon_ids'])) {
+                        foreach ($split['recon_ids'] as $rid) {
+                            if ((int) $rid > 0) {
+                                $reconIds[] = (int) $rid;
+                            }
+                        }
+                    }
+                }
+            }
+
             $linkedRecons = DB::table('income_reconciliation_table')
                 ->where(function ($q) use ($stmtId) {
                     $q->where('cash_bank_id', $stmtId)
@@ -5347,69 +5888,12 @@ class BankStatementController extends Controller
                         ->orWhere('other_bank_id', $stmtId);
                 })
                 ->get();
-
             foreach ($linkedRecons as $recon) {
-                $clearData = ['updated_at' => now()];
-
-                if ((int) ($recon->cash_bank_id ?? 0) === $stmtId) {
-                    $clearData['cash_bank_id'] = null;
-                    $clearData['cash_bank_ref_no'] = null;
-                    $clearData['collection_amount'] = 0;
-                    $clearData['deposite_amount'] = 0;
-                    $clearData['date_collection'] = null;
-                    $clearData['date_deposited'] = null;
-                }
-                if ((int) ($recon->card_upi_bank_id ?? 0) === $stmtId) {
-                    $clearData['card_upi_bank_id'] = null;
-                    $clearData['card_upi_bank_ref_no'] = null;
-                    $clearData['bank_upi_card'] = 0;
-                    $clearData['mespos_card'] = 0;
-                    $clearData['mespos_upi'] = 0;
-                    $clearData['date_settlement'] = null;
-                }
-                if ((int) ($recon->neft_bank_id ?? 0) === $stmtId) {
-                    $clearData['neft_bank_id'] = null;
-                    $clearData['neft_bank_ref_no'] = null;
-                    $clearData['bank_neft'] = 0;
-                }
-                if ((int) ($recon->other_bank_id ?? 0) === $stmtId) {
-                    $clearData['other_bank_id'] = null;
-                    $clearData['other_bank_ref_no'] = null;
-                    $clearData['bank_others'] = 0;
-                }
-
-                if (Schema::hasColumn('income_reconciliation_table', 'income_tag_mismatch_remark')) {
-                    $clearData['income_tag_mismatch_remark'] = null;
-                }
-
-                if (count($clearData) <= 1) {
-                    continue;
-                }
-
-                $merged = array_merge((array) $recon, $clearData);
-
-                $diffs = $this->calcIncomeDiffs(
-                    (float) ($merged['moc_cash_amt'] ?? 0),
-                    (float) ($merged['moc_card_amt'] ?? 0),
-                    (float) ($merged['moc_upi_amt'] ?? 0),
-                    (float) ($merged['moc_neft_amt'] ?? 0),
-                    (float) ($merged['moc_other_amt'] ?? 0),
-                    (float) ($merged['moc_overall_total'] ?? 0),
-                    (float) ($merged['collection_amount'] ?? 0),
-                    (float) ($merged['deposite_amount'] ?? 0),
-                    (float) ($merged['mespos_card'] ?? 0),
-                    (float) ($merged['mespos_upi'] ?? 0),
-                    (float) ($merged['bank_upi_card'] ?? 0),
-                    (float) ($merged['bank_neft'] ?? 0),
-                    (float) ($merged['bank_others'] ?? 0)
-                );
-
-                DB::table('income_reconciliation_table')
-                    ->where('id', $recon->id)
-                    ->update(array_merge($clearData, $diffs));
+                $reconIds[] = (int) $recon->id;
             }
+            $reconIds = array_values(array_unique(array_filter($reconIds)));
 
-            // --- Reset bank_statements income tracking columns ---
+            // --- Reset bank_statements income tracking columns (before recomputing income rows) ---
             $resetUpdate = [
                 'income_match_status'      => 'income_unmatched',
                 'income_reconciliation_id' => null,
@@ -5421,6 +5905,9 @@ class BankStatementController extends Controller
             ];
             if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
                 $resetUpdate['income_match_split_json'] = null;
+            }
+            if (Schema::hasColumn('bank_statements', 'income_matched_modes')) {
+                $resetUpdate['income_matched_modes'] = null;
             }
             if (Schema::hasColumn('bank_statements', 'income_tag_mismatch_remark')) {
                 $resetUpdate['income_tag_mismatch_remark'] = null;
@@ -5436,6 +5923,10 @@ class BankStatementController extends Controller
             }
             DB::table('bank_statements')->where('id', $id)->update($safeReset);
 
+            foreach ($reconIds as $reconId) {
+                $this->refreshIncomeReconciliationBankAmountsFromLinkedStatements($reconId);
+            }
+
             DB::commit();
 
             $this->logBankReconUserHistory('income_unmatch', (int) $id, array_filter([
@@ -5446,7 +5937,7 @@ class BankStatementController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Income tag removed and reconciliation record cleared',
+                'message' => 'Income tag removed; linked income reconciliation totals were recalculated from remaining tags',
             ]);
 
         } catch (\Exception $e) {
@@ -5562,6 +6053,7 @@ class BankStatementController extends Controller
 
         $hasTracking = Schema::hasColumn('bank_statements', 'radiant_match_status');
 
+        $pickup = null;
         if ($hasTracking) {
             if ($pickupId) {
                 $pickup = DB::table('radiant_cash_pickups')->where('id', $pickupId)->first();
@@ -5608,6 +6100,10 @@ class BankStatementController extends Controller
         DB::table('bank_statements')->where('id', $stmt->id)->update($safeUpdate);
 
         $fresh = DB::table('bank_statements')->where('id', $stmt->id)->first();
+        if ($pickupId && $pickup !== null && $fresh && Schema::hasTable('income_reconciliation_table')) {
+            $this->syncIncomeReconciliationRadiantCollectionFromPickup($fresh, $pickup);
+        }
+
         $byName = null;
         $byUsername = null;
         if ($fresh && ! empty($fresh->radiant_matched_by) && Schema::hasTable('users')) {
@@ -5704,6 +6200,91 @@ class BankStatementController extends Controller
             'success' => true,
             'message' => 'Radiant pickup link removed (keyword kept if set)',
         ]);
+    }
+
+    /**
+     * After linking a bank statement to a Radiant cash pickup, update the related
+     * income_reconciliation_table row: Radiant collection date + amount (and cash diffs).
+     * Uses bank_statements.income_reconciliation_id, or falls back to income_matched_branch + income_matched_date.
+     */
+    private function syncIncomeReconciliationRadiantCollectionFromPickup(object $stmt, object $pickup): void
+    {
+        if (! Schema::hasTable('income_reconciliation_table')) {
+            return;
+        }
+
+        $reconId = (int) ($stmt->income_reconciliation_id ?? 0);
+        if ($reconId <= 0) {
+            $branch = trim((string) ($stmt->income_matched_branch ?? ''));
+            $dateDmy = trim((string) ($stmt->income_matched_date ?? ''));
+            if ($branch !== '' && $dateDmy !== '') {
+                $row = DB::table('income_reconciliation_table')
+                    ->where('location_name', $branch)
+                    ->where('date_range', $dateDmy)
+                    ->orderByDesc('id')
+                    ->first();
+                if ($row) {
+                    $reconId = (int) $row->id;
+                }
+            }
+        }
+        if ($reconId <= 0) {
+            return;
+        }
+
+        $recon = DB::table('income_reconciliation_table')->find($reconId);
+        if (! $recon) {
+            return;
+        }
+
+        $pickupAmt = (float) ($pickup->total ?? 0);
+        if (abs($pickupAmt) < 0.00001) {
+            $pickupAmt = (float) ($pickup->pickup_amount ?? 0);
+        }
+
+        $pickupDateDmy = trim((string) ($pickup->pickup_date ?? ''));
+        if ($pickupDateDmy === '' && ! empty($pickup->pickup_date_parsed ?? null)) {
+            try {
+                $pickupDateDmy = Carbon::parse($pickup->pickup_date_parsed)->format('d/m/Y');
+            } catch (\Exception $e) {
+                $pickupDateDmy = (string) $pickup->pickup_date_parsed;
+            }
+        }
+
+        $upd = ['updated_at' => now()];
+        if (Schema::hasColumn('income_reconciliation_table', 'date_collection')) {
+            $upd['date_collection'] = $pickupDateDmy !== '' ? $pickupDateDmy : null;
+        }
+        if (Schema::hasColumn('income_reconciliation_table', 'collection_amount')) {
+            $upd['collection_amount'] = $pickupAmt;
+        }
+
+        $diffs = $this->calcIncomeDiffs(
+            (float) ($recon->moc_cash_amt ?? 0),
+            (float) ($recon->moc_card_amt ?? 0),
+            (float) ($recon->moc_upi_amt ?? 0),
+            (float) ($recon->moc_neft_amt ?? 0),
+            (float) ($recon->moc_other_amt ?? 0),
+            (float) ($recon->moc_overall_total ?? 0),
+            $pickupAmt,
+            (float) ($recon->deposite_amount ?? 0),
+            (float) ($recon->mespos_card ?? 0),
+            (float) ($recon->mespos_upi ?? 0),
+            (float) ($recon->bank_upi_card ?? 0),
+            (float) ($recon->bank_neft ?? 0),
+            (float) ($recon->bank_others ?? 0)
+        );
+
+        $merged = array_merge($upd, $diffs);
+        $safe = [];
+        foreach ($merged as $col => $val) {
+            if (Schema::hasColumn('income_reconciliation_table', $col)) {
+                $safe[$col] = $val;
+            }
+        }
+        if (count($safe) > 1) {
+            DB::table('income_reconciliation_table')->where('id', $reconId)->update($safe);
+        }
     }
 
     /**

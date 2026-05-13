@@ -225,7 +225,7 @@ html,body{height:100%;font-family:'Inter',system-ui,sans-serif;background:var(--
 /* Select2 customisation */
 .select2-container--default .select2-selection--multiple{border:1px solid var(--border)!important;border-radius:8px!important;background:var(--bg)!important;min-height:36px!important;font-size:12px;padding:2px 6px}
 .select2-container--default .select2-selection--multiple .select2-selection__choice{background:#f0fdf4!important;border:1px solid #86efac!important;color:#166534!important;border-radius:6px!important;font-size:11px!important;padding:1px 8px!important;margin:2px 3px!important}
-.select2-container--default .select2-selection--multiple .select2-selection__choice__remove{color:#166534!important;margin-right:4px!important}
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove{color:#166534!important;margin-right:4px!important ;border:none!important;padding: 0 2px !important;}
 .select2-dropdown{border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 24px rgba(0,0,0,0.1)!important}
 .select2-container--default .select2-results__option--highlighted{background:var(--accent)!important}
 
@@ -267,49 +267,113 @@ html,body{height:100%;font-family:'Inter',system-ui,sans-serif;background:var(--
 
   {{-- Navigation --}}
   @php
+    use Illuminate\Support\Facades\DB;
+
     $pendingCount = \App\Models\VmsVisitor::where('status','pending')->count();
     $insideCount  = \App\Models\VmsVisitor::where('status','inside')->count();
     $blCount      = \App\Models\VmsBlacklist::where('is_active',true)->count();
+
+    $vmsLayoutUser = auth()->user();
+    $isFullAdmin   = (int)($vmsLayoutUser->access_limits ?? 0) === 1;
+
+    // Build allowed VMS routes set for this user
+    $allowedVmsRoutes = [];
+    if ($isFullAdmin) {
+        // Full admin sees all VMS menus
+        $allowedVmsRoutes = DB::table('menus')
+            ->where('active_ids','vms_color')
+            ->pluck('route')
+            ->toArray();
+    } else {
+        $allowedVmsRoutes = DB::table('user_menus')
+            ->join('menus','user_menus.menu_id','=','menus.id')
+            ->where('user_menus.user_id', $vmsLayoutUser->id)
+            ->where('user_menus.status','1')
+            ->where('menus.active_ids','vms_color')
+            ->pluck('menus.route')
+            ->toArray();
+    }
+
+    // Helper: check if a VMS route is in allowed list
+    $vmsAllowed = fn(string $route) => in_array($route, $allowedVmsRoutes);
   @endphp
   <nav class="vms-nav">
+
+    @if($vmsAllowed('vms/dashboard') || $vmsAllowed('vms/approvals') || $vmsAllowed('vms/active') || $vmsAllowed('vms/history'))
     <div class="nav-section">Main</div>
+    @endif
+
+    @if($vmsAllowed('vms/dashboard'))
     <a href="{{ route('vms.dashboard') }}" class="nav-link-vms {{ request()->routeIs('vms.dashboard') ? 'active' : '' }}">
       <i class="ti ti-layout-dashboard"></i> Dashboard
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/approvals'))
     <a href="{{ route('vms.approvals') }}" class="nav-link-vms {{ request()->routeIs('vms.approvals') ? 'active' : '' }}">
       <i class="ti ti-checklist"></i> Approvals
       @if($pendingCount > 0)<span class="nav-badge-vms" style="background:var(--warn)">{{ $pendingCount }}</span>@endif
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/active'))
     <a href="{{ route('vms.active') }}" class="nav-link-vms {{ request()->routeIs('vms.active') ? 'active' : '' }}">
       <i class="ti ti-users"></i> Active Visitors
       @if($insideCount > 0)<span class="nav-badge-vms" style="background:var(--blue)">{{ $insideCount }}</span>@endif
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/history'))
     <a href="{{ route('vms.history') }}" class="nav-link-vms {{ request()->routeIs('vms.history') ? 'active' : '' }}">
       <i class="ti ti-history"></i> Visitor History
     </a>
+    @endif
 
+    @if($vmsAllowed('vms/pharma') || $vmsAllowed('vms/non-pharma') || $vmsAllowed('vms/blacklist'))
     <div class="nav-section">Vendors</div>
+    @endif
+
+    @if($vmsAllowed('vms/pharma'))
     <a href="{{ route('vms.pharma') }}" class="nav-link-vms {{ request()->routeIs('vms.pharma') ? 'active' : '' }}">
       <i class="ti ti-pill"></i> Pharma Vendors
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/non-pharma'))
     <a href="{{ route('vms.non-pharma') }}" class="nav-link-vms {{ request()->routeIs('vms.non-pharma') ? 'active' : '' }}">
       <i class="ti ti-briefcase"></i> Non-Pharma
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/blacklist'))
     <a href="{{ route('vms.blacklist') }}" class="nav-link-vms {{ request()->routeIs('vms.blacklist') ? 'active' : '' }}">
       <i class="ti ti-ban"></i> Blacklisted
       @if($blCount > 0)<span class="nav-badge-vms" style="background:var(--danger)">{{ $blCount }}</span>@endif
     </a>
+    @endif
 
+    @if($vmsAllowed('vms/reports') || $vmsAllowed('vms/qr') || $vmsAllowed('vms/settings'))
     <div class="nav-section">Management</div>
+    @endif
+
+    @if($vmsAllowed('vms/reports'))
     <a href="{{ route('vms.reports') }}" class="nav-link-vms {{ request()->routeIs('vms.reports') ? 'active' : '' }}">
       <i class="ti ti-chart-bar"></i> Reports
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/qr'))
     <a href="{{ route('vms.qr') }}" class="nav-link-vms {{ request()->routeIs('vms.qr') ? 'active' : '' }}">
       <i class="ti ti-qrcode"></i> QR Management
     </a>
+    @endif
+
+    @if($vmsAllowed('vms/settings'))
     <a href="{{ route('vms.settings') }}" class="nav-link-vms {{ request()->routeIs('vms.settings') ? 'active' : '' }}">
       <i class="ti ti-settings"></i> Settings
     </a>
+    @endif
+
   </nav>
 
   {{-- User footer --}}

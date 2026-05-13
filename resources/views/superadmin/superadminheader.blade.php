@@ -31,8 +31,26 @@
     <div class="ms-auto">
     <ul class="list-unstyled">
 
-        {{-- ── App Switcher: only for superadmin (role_id = 1) ── --}}
-        @if(auth()->check() && auth()->user()->role_id == 1)
+        {{-- ── App Switcher: show for access_limits=1 OR user has any VMS menu assigned ── --}}
+        @php
+          $showVmsSwitch = false;
+          if (auth()->check()) {
+              $u = auth()->user();
+              // access_limits = 1 → full superadmin, always show
+              if ((int)($u->access_limits ?? 0) === 1) {
+                  $showVmsSwitch = true;
+              } else {
+                  // Check if user has at least one VMS menu assigned in user_menus
+                  $showVmsSwitch = DB::table('user_menus')
+                      ->join('menus', 'user_menus.menu_id', '=', 'menus.id')
+                      ->where('user_menus.user_id', $u->id)
+                      ->where('user_menus.status', '1')
+                      ->where('menus.active_ids', 'vms_color')
+                      ->exists();
+              }
+          }
+        @endphp
+        @if($showVmsSwitch)
         <li class="pc-h-item" style="position:relative;display:flex;align-items:center" id="appSwitcherWrap">
           <a href="#" class="pc-head-link" id="appSwitcherBtn" title="Switch App"
              onclick="event.preventDefault();toggleAppSwitcher()"
