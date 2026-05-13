@@ -456,17 +456,16 @@
                   @php
                     $isAdminScope = (int) ($admin->access_limits ?? 0) === 1;
                     $isOwner = (int) $r->created_by === (int) auth()->id();
-                    $canEditRow = $r->isPendingReview() && ($isAdminScope || $isOwner);
+                    $canEditRow = $r->canBeEdited() && ($isAdminScope || $isOwner);
+                    $isRejectedRow = (string) ($r->status ?? '') === \App\Models\PaymentRequest::STATUS_REJECTED;
                   @endphp
                   <div class="pay-pr-action-group" role="group" aria-label="Row actions">
-                    <a class="pay-pr-btn-view" href="{{ route('superadmin.payment-requests.show', $r) }}">
+                    <a class="pay-pr-btn-view pay-pr-btn-icononly" href="{{ route('superadmin.payment-requests.show', $r) }}" title="View request" aria-label="View request">
                       <span class="pay-pr-btn-view-ic" aria-hidden="true"><i class="bi bi-eye"></i></span>
-                      <span>View</span>
                     </a>
                     @if($canEditRow)
-                      <a class="pay-pr-btn-edit" href="{{ route('superadmin.payment-requests.edit', $r) }}" title="Edit this pending request">
+                      <a class="pay-pr-btn-edit pay-pr-btn-icononly" href="{{ route('superadmin.payment-requests.edit', $r) }}" title="{{ $isRejectedRow ? 'Edit and resubmit this rejected request' : 'Edit this pending request' }}" aria-label="{{ $isRejectedRow ? 'Edit and resubmit this rejected request' : 'Edit this pending request' }}">
                         <span class="pay-pr-btn-edit-ic" aria-hidden="true"><i class="bi bi-pencil-square"></i></span>
-                        <span>Edit</span>
                       </a>
                     @endif
                   </div>

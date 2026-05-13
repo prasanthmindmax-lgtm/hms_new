@@ -31,6 +31,9 @@
   $isPo = \App\Models\PaymentRequest::requiresPoAttachment($r->payment_type);
   $st = (string) ($r->status ?? \App\Models\PaymentRequest::STATUS_PENDING);
   $pending = $r->isPendingReview();
+  $isAdminScope = (int) (($admin->access_limits ?? 0)) === 1;
+  $isOwner = (int) $r->created_by === (int) auth()->id();
+  $canEditResubmit = $r->canBeEdited() && ($isAdminScope || $isOwner);
   $canApproveReject = $pending && (int) (($admin->access_limits ?? 0)) === 1;
   $payPrBackListFrom = (string) request()->query('from', '');
   $payPrBackListUrl = $payPrBackListFrom === 'approved-payments'
@@ -39,6 +42,10 @@
   $payPrBackListLabel = $payPrBackListFrom === 'approved-payments'
     ? 'Back to list'
     : 'Back to list';
+  $requestHistoryEntries = collect(is_array($r->edit_history) ? $r->edit_history : [])
+    ->filter(fn ($entry) => is_array($entry))
+    ->reverse()
+    ->values();
 @endphp
 <div class="pr-pay-module w-100 mb-4">
   <div class="qd-card tk-tickets-page pr-show-surface">
@@ -50,6 +57,11 @@
       </div>
       <div class="tk-hero-actions flex-wrap pr-show-hero-actions">
         <a href="{{ $payPrBackListUrl }}" class="tk-btn-export text-decoration-none"><i class="bi bi-arrow-left-short" aria-hidden="true"></i> {{ $payPrBackListLabel }}</a>
+        @if($canEditResubmit)
+          <a href="{{ route('superadmin.payment-requests.edit', $r) }}" class="tk-btn-export text-decoration-none pr-show-hero-iconbtn" title="{{ $st === \App\Models\PaymentRequest::STATUS_REJECTED ? 'Edit and resubmit request' : 'Edit request' }}" aria-label="{{ $st === \App\Models\PaymentRequest::STATUS_REJECTED ? 'Edit and resubmit request' : 'Edit request' }}">
+            <i class="bi bi-pencil-square" aria-hidden="true"></i>
+          </a>
+        @endif
         @if($canApproveReject)
           <button type="button" class="pr-show-btn-approve" data-bs-toggle="modal" data-bs-target="#payReqApproveModal" title="Approve for processing">
             <i class="bi bi-check2-circle" aria-hidden="true"></i> Approve
@@ -97,7 +109,6 @@
           <p class="mb-0 small">{!! nl2br(e($r->rejection_reason)) !!}</p>
         </div>
       @endif
-
       <section class="pr-show-section" aria-labelledby="pr-show-details-heading">
         <h2 id="pr-show-details-heading" class="pr-show-section-head">
           <span class="pr-show-section-head-ic" aria-hidden="true"><i class="bi bi-info-square"></i></span>
@@ -596,6 +607,55 @@
           <div class="pr-pay-form-section-title mb-2" style="border:0; padding:0; margin:0;">Remarks</div>
           <p class="pr-show-remarks-body mb-0">{!! nl2br(e($r->remarks)) !!}</p>
         </div>
+      @endif
+
+      @if($requestHistoryEntries->isNotEmpty())
+        <section class="pr-show-section mt-4" aria-labelledby="pr-show-history-heading">
+          <h2 id="pr-show-history-heading" class="pr-show-section-head">
+            <span class="pr-show-section-head-ic" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+            <span class="pr-show-section-head-text">Request history</span>
+          </h2>
+          <div class="pr-pay-history-card pr-show-history-card">
+            <header class="pr-pay-card-head">
+              <span class="pr-pay-card-head-ic"><i class="bi bi-activity" aria-hidden="true"></i></span>
+              <span class="pr-pay-card-head-title">Edit, review and resubmission timeline</span>
+              <span class="pr-pay-card-head-meta">{{ $requestHistoryEntries->count() }} event{{ $requestHistoryEntries->count() === 1 ? '' : 's' }}</span>
+            </header>
+            <ul class="pr-pay-history-list">
+              @foreach($requestHistoryEntries as $__entry)
+                @php
+                  $__action = (string) ($__entry['action'] ?? 'edited');
+                  $__badgeClass = match ($__action) {
+                    'approved' => 'text-bg-success',
+                    'rejected' => 'text-bg-danger',
+                    'resubmitted' => 'text-bg-warning text-dark',
+                    'submitted' => 'text-bg-primary',
+                    default => 'text-bg-secondary',
+                  };
+                  $__at = !empty($__entry['at']) ? \Illuminate\Support\Carbon::parse($__entry['at']) : null;
+                  $__note = trim((string) ($__entry['note'] ?? ''));
+                  $__actor = trim((string) ($__entry['by_name'] ?? 'System'));
+                  $__role = trim((string) ($__entry['role'] ?? ''));
+                @endphp
+                <li class="pr-pay-history-item pr-show-history-item d-block">
+                  <div class="pr-show-history-line d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="badge rounded-pill pr-show-history-badge {{ $__badgeClass }}">{{ \App\Models\PaymentRequest::historyActionLabel($__action) }}</span>
+                    <span class="fw-semibold text-dark pr-show-history-actor">{{ $__actor !== '' ? $__actor : 'System' }}</span>
+                    @if($__role !== '')
+                      <span class="text-body-secondary small pr-show-history-meta">· {{ $__role }}</span>
+                    @endif
+                    @if($__at)
+                      <span class="text-body-secondary small pr-show-history-meta">· {{ $__at->format('M j, Y · H:i') }}</span>
+                    @endif
+                  </div>
+                  @if($__note !== '')
+                    <div class="small text-body-secondary pr-show-history-note">{{ $__note }}</div>
+                  @endif
+                </li>
+              @endforeach
+            </ul>
+          </div>
+        </section>
       @endif
     </div>
   </div>

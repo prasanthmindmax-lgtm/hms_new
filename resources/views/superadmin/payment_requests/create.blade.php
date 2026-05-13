@@ -1,6 +1,7 @@
 @php
   $isEdit = ! empty($isEdit) && isset($paymentRequest);
   $pr = $isEdit ? $paymentRequest : null;
+  $isRejectedEdit = $isEdit && (string) ($pr->status ?? '') === \App\Models\PaymentRequest::STATUS_REJECTED;
 
   /** Old input wins (validation redirect); otherwise fall back to the existing model value when editing. */
   $o = function ($key, $default = null) use ($pr) {
@@ -94,7 +95,7 @@
       <div>
         <h1>
           <i class="bi bi-cash-coin me-1" style="color:#a5b4fc;" aria-hidden="true"></i>
-          {{ $isEdit ? 'Edit payment request' : 'New payment request' }}
+          {{ $isEdit ? ($isRejectedEdit ? 'Resubmit payment request' : 'Edit payment request') : 'New payment request' }}
           @if($isEdit)
             <span class="ms-1 align-middle" style="font-size: 0.85rem; opacity: 0.85;">· {{ $pr->request_no }}</span>
           @endif
@@ -105,6 +106,14 @@
       </a>
     </div>
   </header>
+
+  @if($isRejectedEdit && $pr && $pr->rejection_reason)
+    <div class="alert alert-danger border-0 rounded-4 shadow-sm mb-4" role="alert">
+      <div class="fw-bold mb-1"><i class="bi bi-x-octagon me-1" aria-hidden="true"></i> Last rejection reason</div>
+      <div class="small">{!! nl2br(e($pr->rejection_reason)) !!}</div>
+      <div class="small mt-2 text-body-secondary">Update the request details below and submit again to send it back for review.</div>
+    </div>
+  @endif
 
   <div class="card pr-form-page-card pay-create-form-card border-0 shadow">
     <div class="row g-0 pay-layout-row">
@@ -558,7 +567,7 @@
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <a href="{{ $isEdit ? route('superadmin.payment-requests.show', $pr) : route('superadmin.payment-requests.index') }}" class="btn btn-outline-secondary rounded-3 border-0 bg-light">Cancel</a>
                 <button type="submit" class="btn btn-pr-submit px-4 py-2 rounded-3 fw-bold shadow">
-                  <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> {{ $isEdit ? 'Save changes' : 'Submit payment request' }}
+                  <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> {{ $isEdit ? ($isRejectedEdit ? 'Resubmit payment request' : 'Save changes') : 'Submit payment request' }}
                 </button>
               </div>
             </div>

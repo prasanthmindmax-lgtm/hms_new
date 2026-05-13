@@ -45,6 +45,48 @@ class PaymentRequestController extends Controller
         return (int) ($user->access_limits ?? 0) === 1;
     }
 
+    private function paymentRequestRoleLabel(object $user): string
+    {
+        $roles = [1 => 'Superadmin', 2 => 'Zonal Admin', 3 => 'Admin', 4 => 'Auditor', 5 => 'User'];
+
+        return $roles[(int) ($user->access_limits ?? 0)] ?? 'User';
+    }
+
+    private function paymentRequestHistoryEntry(string $action, object $user, ?string $note = null): array
+    {
+        $entry = [
+            'action' => $action,
+            'at' => now()->toIso8601String(),
+            'by_id' => (int) (auth()->id() ?? ($user->id ?? 0)),
+            'by_name' => trim((string) ($user->user_fullname ?? $user->username ?? $user->email ?? 'System')) ?: 'System',
+            'role' => $this->paymentRequestRoleLabel($user),
+        ];
+
+        if ($note !== null && trim($note) !== '') {
+            $entry['note'] = trim($note);
+        }
+
+        return $entry;
+    }
+
+    private function appendPaymentRequestHistory(PaymentRequest $paymentRequest, array $entries): void
+    {
+        $history = $paymentRequest->edit_history;
+        if (! is_array($history)) {
+            $history = json_decode((string) ($paymentRequest->getRawOriginal('edit_history') ?? '[]'), true) ?: [];
+        }
+
+        foreach ($entries as $entry) {
+            if (is_array($entry) && $entry !== []) {
+                $history[] = $entry;
+            }
+        }
+
+        $paymentRequest->forceFill([
+            'edit_history' => array_values($history),
+        ])->save();
+    }
+
     private function scopePaymentRequestsForUser(Builder $query, object $user): void
     {
         if ($this->isPaymentRequestSuperAdmin($user)) {
@@ -1023,7 +1065,7 @@ class PaymentRequestController extends Controller
 
     public function store(Request $request): JsonResponse|RedirectResponse
     {
-        $this->userRow();
+        $u = $this->userRow();
         $type = (string) $request->input('payment_type', '');
 
         $base = [
@@ -1213,6 +1255,9 @@ class PaymentRequestController extends Controller
             'status' => PaymentRequest::STATUS_PENDING,
             'created_by' => (int) auth()->id(),
         ]);
+        $this->appendPaymentRequestHistory($created, [
+            $this->paymentRequestHistoryEntry('submitted', $u, 'Payment request submitted for review.'),
+        ]);
 
         $successMessage = 'Payment request submitted successfully.';
         if ($request->expectsJson()) {
@@ -1224,13 +1269,12 @@ class PaymentRequestController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('superadmin.payment-requests.index', $created)
+        return to_route('superadmin.payment-requests.index')
             ->with('success', $successMessage);
     }
 
     /**
-     * Only the creator (or a super-admin) may edit; only while the request is still pending review.
+     * Only the creator (or a super-admin) may edit; pending and rejected requests remain editable.
      */
     private function authorizePaymentRequestEdit(PaymentRequest $paymentRequest): void
     {
@@ -1240,8 +1284,8 @@ class PaymentRequestController extends Controller
                 abort(403, 'You can only edit payment requests you created.');
             }
         }
-        if (! $paymentRequest->isPendingReview()) {
-            abort(403, 'This payment request is no longer pending review and cannot be edited.');
+        if (! $paymentRequest->canBeEdited()) {
+            abort(403, 'Only pending or rejected payment requests can be edited.');
         }
     }
 
@@ -1278,6 +1322,9 @@ class PaymentRequestController extends Controller
     public function update(Request $request, PaymentRequest $paymentRequest): JsonResponse|RedirectResponse
     {
         $this->authorizePaymentRequestEdit($paymentRequest);
+        $u = $this->userRow();
+        $wasRejected = (string) $paymentRequest->status === PaymentRequest::STATUS_REJECTED;
+        $previousRejectionReason = trim((string) ($paymentRequest->rejection_reason ?? ''));
 
         $type = (string) $request->input('payment_type', '');
 
@@ -1513,10 +1560,31 @@ class PaymentRequestController extends Controller
             'bank_branch_details' => $validated['bank_branch_details'] ?? null,
             'bank_document_path' => $bankDocPath,
             'remarks' => $validated['remarks'] ?? null,
+            'status' => $wasRejected ? PaymentRequest::STATUS_PENDING : $paymentRequest->status,
+            'rejection_reason' => $wasRejected ? null : $paymentRequest->rejection_reason,
+            'reviewed_by' => $wasRejected ? null : $paymentRequest->reviewed_by,
+            'reviewed_at' => $wasRejected ? null : $paymentRequest->reviewed_at,
         ]);
         $paymentRequest->save();
+        $historyEntries = [
+            $this->paymentRequestHistoryEntry(
+                'edited',
+                $u,
+                $wasRejected ? 'Request details updated after rejection.' : 'Payment request details updated while pending review.'
+            ),
+        ];
+        if ($wasRejected) {
+            $resubmittedNote = 'Payment request resubmitted for review.';
+            if ($previousRejectionReason !== '') {
+                $resubmittedNote .= ' Previous rejection reason: '.$previousRejectionReason;
+            }
+            $historyEntries[] = $this->paymentRequestHistoryEntry('resubmitted', $u, $resubmittedNote);
+        }
+        $this->appendPaymentRequestHistory($paymentRequest, $historyEntries);
 
-        $successMessage = 'Payment request updated successfully.';
+        $successMessage = $wasRejected
+            ? 'Payment request updated and resubmitted successfully.'
+            : 'Payment request updated successfully.';
         if ($request->expectsJson()) {
             session()->flash('success', $successMessage);
 
@@ -1526,8 +1594,7 @@ class PaymentRequestController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('superadmin.payment-requests.show', $paymentRequest)
+        return to_route('superadmin.payment-requests.show', $paymentRequest)
             ->with('success', $successMessage);
     }
 
@@ -1575,6 +1642,9 @@ class PaymentRequestController extends Controller
             $paymentRequest->save();
 
             $this->applyApprovedPoLinkedLedger($paymentRequest);
+            $this->appendPaymentRequestHistory($paymentRequest, [
+                $this->paymentRequestHistoryEntry('approved', $this->userRow(), 'Payment request approved for processing.'),
+            ]);
         });
 
         return back()->with('success', 'Payment request approved.');
@@ -1597,6 +1667,9 @@ class PaymentRequestController extends Controller
         $paymentRequest->reviewed_at = now();
         $paymentRequest->rejection_reason = $validated['rejection_reason'];
         $paymentRequest->save();
+        $this->appendPaymentRequestHistory($paymentRequest, [
+            $this->paymentRequestHistoryEntry('rejected', $u, $validated['rejection_reason']),
+        ]);
 
         return back()->with('success', 'Payment request rejected.');
     }

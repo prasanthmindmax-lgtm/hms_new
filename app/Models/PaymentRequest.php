@@ -98,6 +98,15 @@ class PaymentRequest extends Model
         self::STATUS_REJECTED => 'Rejected',
     ];
 
+    /** @var array<string, string> */
+    public const HISTORY_ACTION_LABELS = [
+        'submitted' => 'Submitted',
+        'edited' => 'Edited',
+        'resubmitted' => 'Resubmitted',
+        'approved' => 'Approved',
+        'rejected' => 'Rejected',
+    ];
+
     /** No vendor bill linked to this payment request yet. */
     public const BILL_DISBURSE_NONE = 'none';
 
@@ -149,6 +158,7 @@ class PaymentRequest extends Model
         'remarks',
         'status',
         'rejection_reason',
+        'edit_history',
         'reviewed_by',
         'reviewed_at',
         'created_by',
@@ -160,6 +170,7 @@ class PaymentRequest extends Model
         'bill_total_snapshot' => 'decimal:2',
         'bill_balance_snapshot' => 'decimal:2',
         'reviewed_at' => 'datetime',
+        'edit_history' => 'array',
     ];
 
     public static function typeLabel(string $type): string
@@ -212,6 +223,11 @@ class PaymentRequest extends Model
         return self::STATUS_LABELS[$status] ?? ucfirst(str_replace('_', ' ', $status));
     }
 
+    public static function historyActionLabel(string $action): string
+    {
+        return self::HISTORY_ACTION_LABELS[$action] ?? ucfirst(str_replace('_', ' ', $action));
+    }
+
     public static function statusPillClass(string $status): string
     {
         return match ($status) {
@@ -239,7 +255,7 @@ class PaymentRequest extends Model
     }
     public function billDisbursementState(): string
     {
-        $bills = collect();
+        $bills = collect([]);
 
         if ($this->bill_id) {
             $src = $this->relationLoaded('sourceBill') ? $this->sourceBill : $this->sourceBill()->first([
@@ -292,6 +308,11 @@ class PaymentRequest extends Model
     public function isPendingReview(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    public function canBeEdited(): bool
+    {
+        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_REJECTED], true);
     }
 
     /**

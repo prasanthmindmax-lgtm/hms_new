@@ -2887,6 +2887,13 @@ button.pr-show-file-tile {
     color: #1d4ed8;
 }
 
+.tk-pr-index .pay-pr-btn-view.pay-pr-btn-icononly {
+    min-width: 2.35rem;
+    width: 2.35rem;
+    padding: 0.35rem;
+    gap: 0;
+}
+
 .tk-pr-index .pay-pr-empty {
     padding: 3rem 1.5rem !important;
     background: linear-gradient(180deg, #fafbfd 0%, #fff 100%);
@@ -3299,6 +3306,20 @@ body.pay-pr-index-page > .pay-pr-tax-dd .inner-search {
     color: #92400e;
 }
 
+.tk-pr-index .pay-pr-btn-edit.pay-pr-btn-icononly {
+    min-width: 2.35rem;
+    width: 2.35rem;
+    padding: 0.35rem;
+    gap: 0;
+}
+
+.pay-pr-show-page .pr-show-hero-iconbtn {
+    min-width: 2.6rem;
+    width: 2.6rem;
+    justify-content: center;
+    padding-inline: 0.65rem;
+}
+
 .tk-hero .pr-show-btn-edit {
     display: inline-flex;
     align-items: center;
@@ -3528,6 +3549,73 @@ body.pay-pr-index-page > .pay-pr-tax-dd .inner-search {
     font-variant-numeric: tabular-nums;
     color: #1d4ed8;
     white-space: nowrap;
+}
+
+body.pay-pr-show-page .pr-show-history-card {
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+}
+
+body.pay-pr-show-page .pr-show-history-card .pr-pay-card-head {
+    padding: 0.85rem 1rem;
+}
+
+body.pay-pr-show-page .pr-show-history-card .pr-pay-card-head-title {
+    font-size: 0.98rem;
+    color: #0f172a;
+}
+
+body.pay-pr-show-page .pr-show-history-card .pr-pay-card-head-meta {
+    font-size: 0.84rem;
+    color: #1e293b;
+}
+
+body.pay-pr-show-page .pr-show-history-card .pr-pay-history-list {
+    padding: 0.55rem 0.75rem 0.7rem;
+    max-height: none;
+}
+
+body.pay-pr-show-page .pr-show-history-item {
+    padding: 0.8rem 0.85rem;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+body.pay-pr-show-page .pr-show-history-item + .pr-show-history-item {
+    border-top: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+body.pay-pr-show-page .pr-show-history-line {
+    line-height: 1.5;
+}
+
+body.pay-pr-show-page .pr-show-history-badge {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    padding: 0.42rem 0.7rem;
+}
+
+body.pay-pr-show-page .pr-show-history-actor {
+    font-size: 0.93rem;
+    color: #0f172a !important;
+}
+
+body.pay-pr-show-page .pr-show-history-meta {
+    font-size: 0.82rem !important;
+    color: #475569 !important;
+}
+
+body.pay-pr-show-page .pr-show-history-note {
+    font-size: 0.9rem !important;
+    line-height: 1.65;
+    color: #334155 !important;
+    padding-left: 0.1rem;
 }
 
 .pr-pay-pr-item {
