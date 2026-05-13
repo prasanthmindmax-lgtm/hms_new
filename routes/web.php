@@ -745,6 +745,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/income-tag/branches', [BankStatementController::class, 'incomeTagBranches'])->name('income-tag.branches');
         Route::get('/income-tag/branch-financial-files', [BankStatementController::class, 'incomeTagBranchFinancialFiles'])->name('income-tag.branch-financial-files');
         Route::get('/income-tag/resolve-description', [BankStatementController::class, 'incomeTagResolveDescription'])->name('income-tag.resolve-description');
+        Route::get('/income-tag/moc-totals-for-dates', [BankStatementController::class, 'incomeTagMocTotalsForDates'])->name('income-tag.moc-totals-for-dates');
         Route::get('/radiant-cash-pickups-for-date', [BankStatementController::class, 'radiantCashPickupsForTransactionDate'])->name('radiant-cash-pickups-for-date');
         Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
         Route::post('/radiant-unmatch/{id}', [BankStatementController::class, 'unmatchRadiant'])->name('radiant-unmatch');
