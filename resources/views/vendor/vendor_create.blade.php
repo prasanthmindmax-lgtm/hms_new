@@ -66,14 +66,15 @@
                                         <div class="col-md-3 col-sm-6">
                                             <div class="customer-form-group">
                                                 <label class="customer-form-label">First Name</label>
-                                                <input type="text" class="customer-form-input" id="first_name" name="primary_contact_first_name" autocomplete="off" autocorrect="off"  value={{$vendor->vendor_first_name}}>
+                                                <input type="text" class="customer-form-input vendor-uppercase-only" id="first_name" name="primary_contact_first_name" autocomplete="off" autocorrect="off" value="{{ $vendor->vendor_first_name }}">
                                                 <span class="error_first_name" style="color:red"></span>
                                             </div>
                                         </div>
                                         <div class="col-md-3 col-sm-6">
                                             <div class="customer-form-group">
                                                 <label class="customer-form-label">Last Name</label>
-                                                <input type="text" class="customer-form-input" name="primary_contact_last_name" autocomplete="off" autocorrect="off" value={{$vendor->vendor_last_name}}>
+                                                <input type="text" class="customer-form-input vendor-uppercase-only" name="primary_contact_last_name" autocomplete="off" autocorrect="off" value="{{ $vendor->vendor_last_name }}">
+                                                <span class="error_last_name" style="color:red"></span>
                                             </div>
                                         </div>
                                     </div>
@@ -82,7 +83,8 @@
                                         <div class="customer-section-title">Company Name</div>
                                         <div class="col-12 col-md-6">
                                             <div class="customer-form-group">
-                                                <input type="text" class="customer-display-name-input" placeholder="Select or type to add" name="company_name" autocomplete="off" autocorrect="off" value={{$vendor->company_name}}>
+                                                <input type="text" class="customer-display-name-input vendor-uppercase-only" id="company_name" placeholder="Select or type to add" name="company_name" autocomplete="off" autocorrect="off" value="{{ $vendor->company_name }}">
+                                                <span class="error_company_name" style="color:red"></span>
                                             </div>
                                         </div>
                                     </div>
@@ -90,7 +92,7 @@
                                         <div class="customer-section-title">Display Name</div>
                                         <div class="col-12 col-md-6">
                                             <div class="customer-form-group">
-                                                <input type="text" class="customer-form-input" id="display_name" name="display_name" autocomplete="off" autocorrect="off" value="{{ $vendor->display_name }}">
+                                                <input type="text" class="customer-form-input vendor-uppercase-only" id="display_name" name="display_name" autocomplete="off" autocorrect="off" value="{{ $vendor->display_name }}">
                                                 <span class="error_display_name" style="color:red"></span>
                                             </div>
                                         </div>
@@ -632,14 +634,15 @@
                                 <div class="col-md-3 col-sm-6">
                                     <div class="customer-form-group">
                                         <label class="customer-form-label">First Name</label>
-                                        <input type="text" class="customer-form-input" id="first_name" autocomplete="off" autocorrect="off" name="primary_contact_first_name" >
+                                        <input type="text" class="customer-form-input vendor-uppercase-only" id="first_name" autocomplete="off" autocorrect="off" name="primary_contact_first_name" >
                                         <span class="error_first_name" style="color:red"></span>
                                     </div>
                                 </div>
                                 <div class="col-md-3 col-sm-6">
                                     <div class="customer-form-group">
                                         <label class="customer-form-label">Last Name</label>
-                                        <input type="text" class="customer-form-input" autocomplete="off" autocorrect="off" name="primary_contact_last_name" >
+                                        <input type="text" class="customer-form-input vendor-uppercase-only" autocomplete="off" autocorrect="off" name="primary_contact_last_name" >
+                                        <span class="error_last_name" style="color:red"></span>
                                     </div>
                                 </div>
                             </div>
@@ -648,7 +651,7 @@
                                 <div class="customer-section-title">Company Name <span style="color:red;">*</span></div>
                                 <div class="col-12 col-md-6">
                                     <div class="customer-form-group">
-                                        <input type="text" class="customer-display-name-input" id="company_name" placeholder="Select or type to add" autocomplete="off" autocorrect="off" name="company_name" >
+                                        <input type="text" class="customer-display-name-input vendor-uppercase-only" id="company_name" placeholder="Select or type to add" autocomplete="off" autocorrect="off" name="company_name" >
                                         <span class="error_company_name" style="color:red"></span>
                                     </div>
                                 </div>
@@ -657,7 +660,7 @@
                                 <div class="customer-section-title">Display Name</div>
                                 <div class="col-12 col-md-6">
                                     <div class="customer-form-group">
-                                        <input type="text" class="customer-form-input" id="display_name" autocomplete="off" autocorrect="off" name="display_name" >
+                                        <input type="text" class="customer-form-input vendor-uppercase-only" id="display_name" autocomplete="off" autocorrect="off" name="display_name" >
                                         <span class="error_display_name" style="color:red"></span>
                                     </div>
                                 </div>
@@ -2368,25 +2371,99 @@
 
 
             // Handle Save button click
+            function normalizeVendorUppercaseOnly(value) {
+                return String(value || '')
+                    .toUpperCase()
+                    .replace(/[^A-Z\s]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .replace(/^\s+/, '');
+            }
+
+            function validateVendorUppercaseOnlyField($input, $error, options) {
+                const settings = Object.assign({
+                    required: false,
+                    requiredMessage: 'This field is required.',
+                    invalidMessage: 'Only capital letters and spaces are allowed.'
+                }, options || {});
+
+                const normalized = normalizeVendorUppercaseOnly($input.val());
+                $input.val(normalized);
+
+                if (settings.required && normalized.trim() === '') {
+                    $error.text(settings.requiredMessage);
+                    return false;
+                }
+
+                if (normalized.trim() !== '' && !/^[A-Z ]+$/.test(normalized)) {
+                    $error.text(settings.invalidMessage);
+                    return false;
+                }
+
+                $error.text('');
+                return true;
+            }
+
+            $(document).on('input', '.vendor-uppercase-only', function () {
+                const normalized = normalizeVendorUppercaseOnly($(this).val());
+                $(this).val(normalized);
+            });
+
+            $(document).on('input', '[name="primary_contact_first_name"]', function () {
+                $('.error_first_name').text('');
+            });
+
+            $(document).on('input', '[name="primary_contact_last_name"]', function () {
+                $('.error_last_name').text('');
+            });
+
+            $(document).on('input', '[name="company_name"]', function () {
+                $('.error_company_name').text('');
+            });
+
+            $(document).on('input', '[name="display_name"]', function () {
+                $('.error_display_name').text('');
+            });
+
+            $('.vendor-uppercase-only').each(function () {
+                $(this).val(normalizeVendorUppercaseOnly($(this).val()));
+            });
+
             $('#save-customer').on('click', function() {
                 // Create FormData object to handle file uploads
                 const formData = new FormData();
                 let isValid = true;
 
-                    if ($('#first_name').val() === "") {
-                        $('.error_first_name').text('Name Required');
+                    if (!validateVendorUppercaseOnlyField($('[name="primary_contact_first_name"]').first(), $('.error_first_name').first(), {
+                        required: true,
+                        requiredMessage: 'Name Required',
+                        invalidMessage: 'Only capital letters and spaces are allowed'
+                    })) {
                         isValid = false;
                     }
-                    if ($('#display_name').val() === "") {
-                        $('.error_display_name').text('Enter the Display Name');
+
+                    if (!validateVendorUppercaseOnlyField($('[name="primary_contact_last_name"]').first(), $('.error_last_name').first(), {
+                        required: false,
+                        invalidMessage: 'Only capital letters and spaces are allowed'
+                    })) {
                         isValid = false;
                     }
-                    if ($('#company_name').val() === "") {
-                        $('.error_company_name').text('Company Name is required');
+
+                    if (!validateVendorUppercaseOnlyField($('#display_name'), $('.error_display_name').first(), {
+                        required: true,
+                        requiredMessage: 'Enter the Display Name',
+                        invalidMessage: 'Only capital letters and spaces are allowed'
+                    })) {
                         isValid = false;
-                    } else {
-                        $('.error_company_name').text('');
                     }
+
+                    if (!validateVendorUppercaseOnlyField($('#company_name'), $('.error_company_name').first(), {
+                        required: true,
+                        requiredMessage: 'Company Name is required',
+                        invalidMessage: 'Only capital letters and spaces are allowed'
+                    })) {
+                        isValid = false;
+                    }
+
                     if ($('#pan_number').val().trim() === "") {
                         $('.error_pan_number').text('PAN Number is required');
                         isValid = false;
@@ -2528,10 +2605,15 @@
                         let errorMessage = 'An error occurred';
                         if (xhr.responseJSON && xhr.responseJSON.message) {
                             errorMessage = xhr.responseJSON.message;
+                        } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                            const firstError = Object.values(xhr.responseJSON.errors)[0];
+                            if (Array.isArray(firstError) && firstError.length) {
+                                errorMessage = firstError[0];
+                            }
                         } else if (xhr.responseText) {
                             errorMessage = xhr.responseText;
                         }
-                        alert(errorMessage);
+                        toastr.error(errorMessage);
                     }
                 });
             });

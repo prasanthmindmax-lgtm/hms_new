@@ -3236,6 +3236,9 @@ function calculateFinalTotals() {
                     `);
                     fileList.append(li);
                   });
+                  if (typeof window.appendPaymentRequestFilesToFileList === 'function') {
+                    window.appendPaymentRequestFilesToFileList();
+                  }
                 });
 
                 // Remove file from list visually
@@ -3259,6 +3262,9 @@ function calculateFinalTotals() {
                     `);
                     $('#fileList').append(li);
                   });
+                  if (typeof window.appendPaymentRequestFilesToFileList === 'function') {
+                    window.appendPaymentRequestFilesToFileList();
+                  }
                 });
                 // When clicking file name -> open your modal and preview
                 $('#fileList').on('click', '.file-name', function () {
@@ -3627,6 +3633,7 @@ function calculateFinalTotals() {
 
                 let billPrSearchTimer = null;
                 let billPrBlurTimer = null;
+                window.paymentRequestFiles = window.paymentRequestFiles || [];
 
                 function updatePaymentRequestMeta() {
                     const hasId = ($('#payment_request_id').val() || '').trim() !== '';
@@ -3639,6 +3646,51 @@ function calculateFinalTotals() {
                     } else {
                         $('#payment-request-meta').text('Link an approved payment request to pre-fill party or PO details.');
                     }
+                }
+
+                window.appendPaymentRequestFilesToFileList = function () {
+                    const $list = $('#fileList');
+                    $list.find('.payment-request-doc').remove();
+
+                    if (!Array.isArray(window.paymentRequestFiles) || !window.paymentRequestFiles.length) {
+                        return;
+                    }
+
+                    $.each(window.paymentRequestFiles, function (_, file) {
+                        if (!file || !file.url) {
+                            return;
+                        }
+
+                        const files = [String(file.url)];
+                        const displayName = String(file.name || file.label || 'Attachment');
+                        const $item = $('<li>', {
+                            class: 'documentclk payment-request-doc',
+                            'data-filetype': 'document',
+                            title: displayName
+                        }).attr('data-files', JSON.stringify(files));
+
+                        $item.text(displayName);
+                        $list.append($item);
+                    });
+                };
+
+                function renderPaymentRequestAttachments(attachments) {
+                    if (!Array.isArray(attachments) || !attachments.length) {
+                        window.paymentRequestFiles = [];
+                        window.appendPaymentRequestFilesToFileList();
+                        return;
+                    }
+
+                    window.paymentRequestFiles = attachments
+                        .filter(function (file) { return file && file.url; })
+                        .map(function (file) {
+                            return {
+                                name: String(file.name || file.label || 'Attachment'),
+                                url: String(file.url)
+                            };
+                        });
+
+                    window.appendPaymentRequestFilesToFileList();
                 }
 
                 function syncBillVendorFieldLock() {
@@ -3665,6 +3717,7 @@ function calculateFinalTotals() {
                     $('#payment_request_id').val(resp.payment_request.id);
                     $('#payment_request_number_input').val(resp.payment_request.request_number || '');
                     const prLabel = (resp.payment_request.request_number || '') + ' — ' + (resp.payment_request.payment_type_label || '');
+                    renderPaymentRequestAttachments(resp.payment_request.attachments || []);
                     if (resp.populate_mode === 'full_po' && resp.purchase && resp.purchase.length) {
                         window.applyPurchaseHeaderToBillForm(resp.purchase[0]);
                         stabilizePaymentRequestBillLinkFields(resp);
@@ -3694,6 +3747,7 @@ function calculateFinalTotals() {
                             const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Could not load payment request.';
                             toastr.error(msg);
                             $('#payment_request_id').val('');
+                            renderPaymentRequestAttachments([]);
                             updatePaymentRequestMeta();
                             syncBillVendorFieldLock();
                         }
@@ -3702,6 +3756,7 @@ function calculateFinalTotals() {
 
                 $('#payment_request_number_input').on('input', function () {
                     $('#payment_request_id').val('');
+                    renderPaymentRequestAttachments([]);
                     updatePaymentRequestMeta();
                     const q = ($(this).val() || '').trim();
                     clearTimeout(billPrSearchTimer);
@@ -3784,6 +3839,7 @@ function calculateFinalTotals() {
                                 const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Could not load payment request.';
                                 toastr.warning(msg);
                                 $('#payment_request_id').val('');
+                                renderPaymentRequestAttachments([]);
                                 updatePaymentRequestMeta();
                                 syncBillVendorFieldLock();
                                 checkRequiredFields();
@@ -4001,6 +4057,7 @@ function calculateFinalTotals() {
                 })();
 
                 updatePaymentRequestMeta();
+                renderPaymentRequestAttachments([]);
                 syncBillVendorFieldLock();
             });
 
@@ -4037,10 +4094,12 @@ function calculateFinalTotals() {
 
               let views = '';
               fileArray.forEach(file => {
-                const firstFile = `../public/uploads/vendor/bill/${file}`;
+                const firstFile = /^(https?:)?\/\//i.test(String(file)) || String(file).startsWith('../') || String(file).startsWith('/')
+                  ? String(file)
+                  : `../public/uploads/vendor/bill/${file}`;
                 $('#pdfmain').attr('src', firstFile);
-                const fileName = file.split('/').pop().trim();
-                views += `<button style="font-size: 11px;" type="button" class="btn btn-primary pdf-btn" data-filepath="../uploads/vendor/bill/${file}">${fileName}</button>`;
+                const fileName = firstFile.split('/').pop().split('?')[0].trim();
+                views += `<button style="font-size: 11px;" type="button" class="btn btn-primary pdf-btn" data-filepath="${firstFile}">${fileName}</button>`;
               });
 
               $('#image_pdfs').html(views);
@@ -4288,6 +4347,9 @@ function calculateFinalTotals() {
                             </li>
                             `);
                           });
+                          if (typeof window.appendPaymentRequestFilesToFileList === 'function') {
+                            window.appendPaymentRequestFilesToFileList();
+                          }
                           $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                         }
 
@@ -4482,6 +4544,9 @@ function calculateFinalTotals() {
                             </li>
                             `);
                           });
+                          if (typeof window.appendPaymentRequestFilesToFileList === 'function') {
+                            window.appendPaymentRequestFilesToFileList();
+                          }
                           $('#existingFilesInput').val(JSON.stringify(window.existingFiles));
                         }
 
