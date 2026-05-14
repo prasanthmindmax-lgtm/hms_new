@@ -81,10 +81,16 @@ class PharmacyAuditController extends Controller
             $like = '%'.addcslashes($search, '%_\\').'%';
             $q->where(function (Builder $sub) use ($like) {
                 $sub->where('audit_number', 'like', $like)
-                    ->orWhere('company_name', 'like', $like)
-                    ->orWhere('zone_name', 'like', $like)
-                    ->orWhere('branch_name', 'like', $like)
                     ->orWhere('notes', 'like', $like)
+                    ->orWhereHas('company', function (Builder $companyQuery) use ($like) {
+                        $companyQuery->where('company_name', 'like', $like);
+                    })
+                    ->orWhereHas('zone', function (Builder $zoneQuery) use ($like) {
+                        $zoneQuery->where('name', 'like', $like);
+                    })
+                    ->orWhereHas('branch', function (Builder $branchQuery) use ($like) {
+                        $branchQuery->where('name', 'like', $like);
+                    })
                     ->orWhereHas('items', function (Builder $iq) use ($like) {
                         $iq->where('item_name', 'like', $like)
                             ->orWhere('batch_no', 'like', $like);
@@ -331,11 +337,8 @@ class PharmacyAuditController extends Controller
         DB::transaction(function () use ($validated, $pharmacyAudit) {
             $pharmacyAudit->update([
                 'company_id' => $validated['company_id'],
-                'company_name' => $validated['company_name'] ?? null,
                 'zone_id' => $validated['zone_id'],
-                'zone_name' => $validated['zone_name'] ?? null,
                 'branch_id' => $validated['branch_id'],
-                'branch_name' => $validated['branch_name'] ?? null,
                 'audit_date' => $validated['audit_date'],
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -374,7 +377,11 @@ class PharmacyAuditController extends Controller
         $ids = $this->auditsFilteredQuery($request)->pluck('id');
         $rows = PharmacyAuditItem::query()
             ->whereIn('pharmacy_audit_id', $ids)
-            ->with(['audit'])
+            ->with([
+                'audit.company:id,company_name',
+                'audit.zone:id,name',
+                'audit.branch:id,name',
+            ])
             ->orderByDesc('pharmacy_audit_id')
             ->orderBy('line_no')
             ->get();

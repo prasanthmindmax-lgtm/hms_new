@@ -9,6 +9,7 @@
         <th>GRN NO #</th>
         <th>BILL GENERATE No.</th>
         <th>REFERENCE NO</th>
+        <th>DEPARTMENT</th>
         <th>VENDOR</th>
         <th>QC Checked By</th>
         <th>STATUS</th>
@@ -47,6 +48,7 @@
             data-bill-number="{{ $grn->bill_id }}"
             data-bill-date="{{ $grn->bill_date }}"
             data-due-date="{{ $grn->due_date }}"
+            data-department-name="{{ $grn->Department->name }}"
             data-approval_status="{{ $grn->approval_status }}"
             data-payment-terms="{{ $grn->payment_terms }}"
             data-note="{{ $grn->note ?? 'No notes' }}"
@@ -82,6 +84,8 @@
           <td class="qdt-mono">{{ $grn->billRecord?->bill_gen_number ? trim((string) $grn->billRecord->bill_gen_number) : '—' }}</td>
 
           <td class="qdt-mono">{{ $grn->order_number ?? '—' }}</td>
+
+          <td class="qdt-mono">{{ $grn->Department->name ?? '—' }}</td>
 
           <td class="qdt-vendor-link">{{ $grn->vendor_name ?? '—' }}</td>
 

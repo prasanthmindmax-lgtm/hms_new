@@ -65,11 +65,8 @@ class PharmacyAuditImport implements ToCollection, WithHeadingRow
 
             $groups[$key][] = [
                 'company_id' => $companyId,
-                'company_name' => $this->companyName($companyId),
                 'zone_id' => $zoneId,
-                'zone_name' => $this->zoneName($zoneId),
                 'branch_id' => $branchId,
-                'branch_name' => $this->branchName($branchId),
                 'audit_date' => $auditDate,
                 'item' => $arr,
                 'name' => $itemName,
@@ -86,11 +83,8 @@ class PharmacyAuditImport implements ToCollection, WithHeadingRow
                 $audit = PharmacyAudit::query()->create([
                     'audit_number' => $this->nextAuditNumber(),
                     'company_id' => $head['company_id'],
-                    'company_name' => $head['company_name'],
                     'zone_id' => $head['zone_id'],
-                    'zone_name' => $head['zone_name'],
                     'branch_id' => $head['branch_id'],
-                    'branch_name' => $head['branch_name'],
                     'audit_date' => $head['audit_date']->format('Y-m-d'),
                     'notes' => null,
                     'total_lines' => 0,
@@ -161,33 +155,6 @@ class PharmacyAuditImport implements ToCollection, WithHeadingRow
         }
 
         return $prefix.str_pad((string) $n, 5, '0', STR_PAD_LEFT);
-    }
-
-    protected function companyName(?int $id): ?string
-    {
-        if (! $id) {
-            return null;
-        }
-
-        return Tblcompany::query()->where('id', $id)->value('company_name');
-    }
-
-    protected function zoneName(?int $id): ?string
-    {
-        if (! $id) {
-            return null;
-        }
-
-        return TblZonesModel::query()->where('id', $id)->value('name');
-    }
-
-    protected function branchName(?int $id): ?string
-    {
-        if (! $id) {
-            return null;
-        }
-
-        return TblLocationModel::query()->where('id', $id)->value('name');
     }
 
     protected function normalizeRowKeys(array $row): array

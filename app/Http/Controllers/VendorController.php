@@ -116,6 +116,36 @@ use TCPDF;
 
 class VendorController extends Controller
 {
+    private function normalizeRestrictedVendorName(?string $value): string
+    {
+        $value = preg_replace('/\s+/', ' ', trim((string) $value));
+
+        return strtoupper($value ?? '');
+    }
+
+    private function validateRestrictedVendorNameField(?string $value, string $field, string $label, bool $required = false): ?string
+    {
+        $normalized = $this->normalizeRestrictedVendorName($value);
+
+        if ($normalized === '') {
+            if ($required) {
+                throw ValidationException::withMessages([
+                    $field => $label . ' is required.',
+                ]);
+            }
+
+            return null;
+        }
+
+        if (! preg_match('/^[A-Z ]+$/', $normalized)) {
+            throw ValidationException::withMessages([
+                $field => $label . ' may contain only capital letters and spaces.',
+            ]);
+        }
+
+        return $normalized;
+    }
+
     /**
      * Normalize a bill / PO / quotation line from request data.
      * Returns null for empty new rows (skip insert). Coerces quantity/rate for NOT NULL columns.
@@ -450,7 +480,7 @@ public function getvendor(Request $request)
 
     // ── AJAX: return only the table partial ──────────────────
     if ($request->ajax()) {
-        return view('vendor.partials.table.vendor_rows', compact('vendor', 'perPage'))->render();
+        return view('vendor.partials.table.vendor_rows', compact('vendor', 'perPage', 'limit_access'))->render();
     }
 
     // ── Full page load: fetch extra data only when needed ────
@@ -481,6 +511,9 @@ public function getvendorcreate()
         $serial = 'VEN-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
         $admin = auth()->user();
         $limit_access=$admin->access_limits;
+        if ($id !== "" && (int) $limit_access !== 1) {
+            return redirect()->route('superadmin.getvendor')->with('error', 'Only admin users can edit vendors.');
+        }
         $locations = TblLocationModel::all();
         $Tbltdstax = Tbltdstax::orderBy('id', 'desc')->paginate(10);
         $Tbltdssection = Tbltdssection::orderBy('id', 'asc')->paginate(10);
@@ -500,6 +533,38 @@ public function getvendorcreate()
     $now = now();
     $user_id = auth()->user()->id;
     $admin = auth()->user();
+    $limit_access = (int) ($admin->access_limits ?? 0);
+
+    if ($isUpdate && $limit_access !== 1) {
+        return response()->json([
+            'message' => 'Only admin users can edit vendors.',
+        ], 403);
+    }
+
+    $primaryContactFirstName = $this->validateRestrictedVendorNameField(
+        $request->input('primary_contact_first_name'),
+        'primary_contact_first_name',
+        'First name',
+        true
+    );
+    $primaryContactLastName = $this->validateRestrictedVendorNameField(
+        $request->input('primary_contact_last_name'),
+        'primary_contact_last_name',
+        'Last name'
+    );
+    $companyName = $this->validateRestrictedVendorNameField(
+        $request->input('company_name'),
+        'company_name',
+        'Company name',
+        true
+    );
+    $displayName = $this->validateRestrictedVendorNameField(
+        $request->input('display_name'),
+        'display_name',
+        'Display name',
+        true
+    );
+
     // Get the last vendor row
     $lastVendor = Tblvendor::orderBy('id', 'desc')->first();
 
@@ -515,10 +580,10 @@ public function getvendorcreate()
         'user_id' => $user_id,
         'vendor_id' => $vendor_id,
         'vendor_salutation' => $request->primary_contact_salutation,
-        'vendor_first_name' => $request->primary_contact_first_name,
-        'vendor_last_name' => $request->primary_contact_last_name,
-        'company_name' => $request->company_name,
-        'display_name' => $request->display_name,
+        'vendor_first_name' => $primaryContactFirstName,
+        'vendor_last_name' => $primaryContactLastName,
+        'company_name' => $companyName,
+        'display_name' => $displayName,
         'email' => $request->email,
         'work_phone' => $request->work_phone,
         'reference' => $request->reference_name,
@@ -863,6 +928,11 @@ public function getvendorcreate()
 }
 public function vendordelete(Request $request)
 {
+    $admin = auth()->user();
+    if ((int) ($admin->access_limits ?? 0) !== 1) {
+        return response()->json(['message' => 'Only admin users can delete vendors.'], 403);
+    }
+
     $id = $request->id;
     DB::transaction(function () use ($id) {
         TblContact::where('vendor_id', $id)->delete();
@@ -876,6 +946,11 @@ public function vendordelete(Request $request)
 
 public function toggleVendorStatus(Request $request)
 {
+    $admin = auth()->user();
+    if ((int) ($admin->access_limits ?? 0) !== 1) {
+        return response()->json(['message' => 'Only admin users can change vendor status.'], 403);
+    }
+
     $vendor = Tblvendor::findOrFail($request->id);
     $vendor->active_status = $vendor->active_status == 0 ? 1 : 0;
     $vendor->save();
@@ -3770,6 +3845,38 @@ public function getpurchaseorder(Request $request)
         ];
     }
 
+    private function buildPaymentRequestAttachmentPayload(PaymentRequest $pr): array
+    {
+        $files = [];
+
+        $map = [
+            'po_attachment_path' => 'PO attachment',
+            'document_attachment_path' => 'Supporting document',
+            'bank_document_path' => 'Bank document',
+        ];
+
+        foreach ($map as $field => $label) {
+            $storedPath = (string) ($pr->{$field} ?? '');
+            if ($storedPath === '') {
+                continue;
+            }
+
+            $url = PaymentRequest::attachmentPublicUrl($storedPath);
+            if (! $url) {
+                continue;
+            }
+
+            $files[] = [
+                'field' => $field,
+                'label' => $label,
+                'name' => basename(str_replace('\\', '/', $storedPath)),
+                'url' => $url,
+            ];
+        }
+
+        return $files;
+    }
+
     public function getPaymentRequestPurchaseForBill(Request $request)
     {
         $id = $request->get('id');
@@ -3800,6 +3907,7 @@ public function getpurchaseorder(Request $request)
             'request_number' => $pr->request_no,
             'payment_type' => $pr->payment_type,
             'payment_type_label' => PaymentRequest::typeLabel($pr->payment_type),
+            'attachments' => $this->buildPaymentRequestAttachmentPayload($pr),
         ];
 
         $useFullPo = in_array($pr->payment_type, PaymentRequest::PO_LINKED_TYPES, true)
@@ -5420,7 +5528,7 @@ public function getgrndashboard(Request $request)
         $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
         $Tblvendor = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
 
-        $query = Tblgrn::with(['BillLines', 'Tblvendor', 'TblBilling', 'billRecord'])->orderBy('id', 'desc');
+        $query = Tblgrn::with(['BillLines', 'Tblvendor', 'TblBilling', 'billRecord', 'Department'])->orderBy('id', 'desc');
 
         // Apply filter
         if ($request->filled('date_from') && $request->filled('date_to')) {

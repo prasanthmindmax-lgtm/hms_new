@@ -4,13 +4,17 @@
 @include('superadmin.superadminhead')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}" />
+<link rel="stylesheet" href="{{ asset('/assets/css/quotation.css') }}" />
+<link rel="stylesheet" href="{{ asset('/assets/css/tickets.css') }}" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+<link rel="stylesheet" href="{{ asset('/assets/css/payment_request.css') }}" />
 <link rel="stylesheet" href="{{ asset('assets/css/pharmacy_audit.css') }}">
 
-<body class="phau-page" style="overflow-x: hidden;">
+<body class="phau-page pay-pr-index-page" style="overflow-x: hidden;">
 @include('superadmin.superadminnav')
 @include('superadmin.superadminheader')
 
@@ -62,11 +66,10 @@
       $exportQs = http_build_query(request()->except(['page']));
     @endphp
 
-    <div class="phau-shell phau-index">
-      <div class="phau-card phau-card--index">
+    <div class="phau-shell phau-index tk-pr-index">
+      <div class="phau-card phau-card--index qd-card tk-tickets-page">
         <header class="phau-hero phau-hero--index">
           <div class="phau-hero-inner">
-            <span class="phau-hero-kicker"><i class="bi bi-clipboard2-pulse me-1"></i> Stock reconciliation</span>
             <h1 class="phau-hero-title"><i class="bi bi-capsule-pill"></i> Pharmacy audit</h1>
           </div>
           <div class="phau-hero-toolbar" role="toolbar" aria-label="Audit actions">
@@ -104,118 +107,161 @@
             </div>
           </div>
 
-          <form method="get" action="{{ route('pharmacy-audits.index') }}" id="phauFilterForm" autocomplete="off">
-          <div class="phau-filter phau-filter--index">
-            <div class="phau-filter-head">
-              <div class="phau-filter-head-left">
-                <span class="phau-filter-title"><i class="bi bi-funnel"></i> Filters</span>
+          <form method="get" action="{{ route('pharmacy-audits.index') }}" id="pay-pr-filter-form" autocomplete="off">
+            <div class="tk-filter-shell tk-filter-qd pay-pr-filter-shell">
+              <div class="tk-filter-head pay-pr-filter-head">
+                <div class="tk-filter-title">
+                  <i class="bi bi-sliders2" aria-hidden="true"></i> Refine list
+                </div>
+                <div class="pay-pr-filter-head-meta d-flex flex-wrap align-items-center gap-2 justify-content-end">
+                  <span class="tk-showing-pill mb-0">
+                    Rows <strong>{{ $rowRange }}</strong> of <strong>{{ $records->total() }}</strong>
+                  </span>
+                </div>
               </div>
-              <span class="phau-showing">Showing <strong>{{ $rowRange }}</strong> of <strong>{{ $records->total() }}</strong></span>
-            </div>
 
-              <input type="hidden" name="date_from" id="phauDateFrom" value="{{ request('date_from') }}">
-              <input type="hidden" name="date_to" id="phauDateTo" value="{{ request('date_to') }}">
+              <input type="hidden" name="date_from" id="pay_pr_date_from" value="{{ request('date_from') }}">
+              <input type="hidden" name="date_to" id="pay_pr_date_to" value="{{ request('date_to') }}">
 
-              <div class="grnpr-array-hiddens" data-array-name="company_id" hidden>
+              <div class="pay-pr-array-hiddens" data-array-name="company_id" aria-hidden="true">
                 @foreach ($selCompanyIds as $cid)
                   <input type="hidden" name="company_id[]" value="{{ $cid }}">
                 @endforeach
               </div>
-              <div class="grnpr-array-hiddens" data-array-name="zone_id" hidden>
+              <div class="pay-pr-array-hiddens" data-array-name="zone_id" aria-hidden="true">
                 @foreach ($selZoneIds as $zid)
                   <input type="hidden" name="zone_id[]" value="{{ $zid }}">
                 @endforeach
               </div>
-              <div class="grnpr-array-hiddens" data-array-name="branch_id" hidden>
+              <div class="pay-pr-array-hiddens" data-array-name="branch_id" aria-hidden="true">
                 @foreach ($selBranchIds as $bid)
                   <input type="hidden" name="branch_id[]" value="{{ $bid }}">
                 @endforeach
               </div>
 
-              <div class="phau-filter-grid">
-                <div class="phau-fg">
-                  <label><i class="bi bi-calendar3 me-1"></i>Date range</label>
-                  <div class="phau-date-wrap" id="phauReportRange" role="button" tabindex="0">
-                    <i class="bi bi-calendar3"></i>
-                    <span class="flex-grow-1 text-start" id="phauDateLabel">{{ $dateLabel }}</span>
-                    <i class="bi bi-caret-down-fill" style="font-size:0.7rem;"></i>
+              <div class="qd-filters pay-pr-qd-filters">
+                <div class="qd-filter-row pay-pr-qd-filter-row">
+                  <div class="qd-filter-group">
+                    <label><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Date range</label>
+                    <div class="qd-date-wrap" id="payPrReportRange" role="button" tabindex="0">
+                      <i class="bi bi-calendar3" aria-hidden="true"></i>
+                      <span id="payPrDateLabel">{{ $dateLabel }}</span>
+                      <i class="bi bi-caret-down-fill" style="margin-left:auto;" aria-hidden="true"></i>
+                    </div>
                   </div>
-                </div>
-                <div class="phau-fg">
-                  <label>Company</label>
-                  <div class="grnpr-dd" data-filter-param="company_id" data-empty-label="All companies">
-                    <input type="text" class="grnpr-dd-input" placeholder="Select company" value="{{ $companyDisp }}" readonly>
-                    <template>
-                      @foreach ($companies as $co)
-                        <div class="grnpr-opt @if(in_array((int) $co->id, $selCompanyIds, true)) selected @endif" data-id="{{ $co->id }}" data-label="{{ $co->company_name }}">{{ $co->company_name }}</div>
-                      @endforeach
-                    </template>
+
+                  <div class="qd-filter-group tax-dropdown-wrapper company-section pay-pr-dd" data-filter-param="company_id" data-empty-label="All companies">
+                    <label>Company</label>
+                    <input type="text" class="form-control pay-pr-dd-input dropdown-search-input" placeholder="Select Company" value="{{ $companyDisp }}" readonly autocomplete="off">
+                    <div class="dropdown-menu tax-dropdown pay-pr-tax-dd">
+                      <div class="inner-search-container"><input type="text" class="inner-search" placeholder="Search company..." autocomplete="off"></div>
+                      <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                        <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                      </div>
+                      <div class="dropdown-list multiselect company-list">
+                        @foreach ($companies as $co)
+                          <div data-value="{{ $co->company_name }}" data-id="{{ $co->id }}" @class(['selected' => in_array((int) $co->id, $selCompanyIds, true)])>{{ $co->company_name }}</div>
+                        @endforeach
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="phau-fg">
-                  <label>Zone</label>
-                  <div class="grnpr-dd" data-filter-param="zone_id" data-empty-label="All zones">
-                    <input type="text" class="grnpr-dd-input" placeholder="Select zone" value="{{ $zoneDisp }}" readonly>
-                    <template>
-                      @foreach ($zones as $z)
-                        <div class="grnpr-opt @if(in_array((int) $z->id, $selZoneIds, true)) selected @endif" data-id="{{ $z->id }}" data-label="{{ $z->name }}">{{ $z->name }}</div>
-                      @endforeach
-                    </template>
+
+                  <div class="qd-filter-group tax-dropdown-wrapper zone-section pay-pr-dd" data-filter-param="zone_id" data-empty-label="All zones">
+                    <label>Zone</label>
+                    <input type="text" class="form-control pay-pr-dd-input dropdown-search-input" placeholder="Select Zone" value="{{ $zoneDisp }}" readonly autocomplete="off">
+                    <div class="dropdown-menu tax-dropdown pay-pr-tax-dd">
+                      <div class="inner-search-container"><input type="text" class="inner-search" placeholder="Search zone..." autocomplete="off"></div>
+                      <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                        <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                      </div>
+                      <div class="dropdown-list multiselect zone-list">
+                        @foreach ($zones as $z)
+                          <div data-value="{{ $z->name }}" data-id="{{ $z->id }}" @class(['selected' => in_array((int) $z->id, $selZoneIds, true)])>{{ $z->name }}</div>
+                        @endforeach
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="phau-fg">
-                  <label>Branch</label>
-                  <div class="grnpr-dd" data-filter-param="branch_id" data-empty-label="All branches">
-                    <input type="text" class="grnpr-dd-input" placeholder="Select branch" value="{{ $branchDisp }}" readonly>
-                    <template>
-                      @foreach ($branches as $b)
-                        <div class="grnpr-opt @if(in_array((int) $b->id, $selBranchIds, true)) selected @endif" data-id="{{ $b->id }}" data-label="{{ $b->name }}" data-zone="{{ $b->zone_id }}">{{ $b->name }}</div>
-                      @endforeach
-                    </template>
+
+                  <div class="qd-filter-group tax-dropdown-wrapper branch-section pay-pr-dd" data-filter-param="branch_id" data-empty-label="All branches">
+                    <label>Branch</label>
+                    <input type="text" class="form-control pay-pr-dd-input dropdown-search-input" placeholder="Select Branch" value="{{ $branchDisp }}" readonly autocomplete="off">
+                    <div class="dropdown-menu tax-dropdown pay-pr-tax-dd">
+                      <div class="inner-search-container"><input type="text" class="inner-search" placeholder="Search branch..." autocomplete="off"></div>
+                      <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                        <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                      </div>
+                      <div class="dropdown-list multiselect branch-list">
+                        @foreach ($branches as $b)
+                          <div data-value="{{ $b->name }}" data-id="{{ $b->id }}" @class(['selected' => in_array((int) $b->id, $selBranchIds, true)])>{{ $b->name }}</div>
+                        @endforeach
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               @if ($hasChips)
-                <div class="phau-chips">
-                  <span class="phau-chips-label">Filters:</span>
-                  @if ($df && $dt)
-                    <a href="{{ $chipUrl(['date_from', 'date_to']) }}" class="phau-chip"><i class="bi bi-calendar3"></i><span>{{ $dateLabel }}</span><span class="phau-chip-x">&times;</span></a>
-                  @endif
-                  @if ($selCompanyIds !== [])
-                    <a href="{{ $chipUrl(['company_id']) }}" class="phau-chip"><span>{{ $companyDisp }}</span><span class="phau-chip-x">&times;</span></a>
-                  @endif
-                  @if ($selZoneIds !== [])
-                    <a href="{{ $chipUrl(['zone_id']) }}" class="phau-chip"><span>{{ $zoneDisp }}</span><span class="phau-chip-x">&times;</span></a>
-                  @endif
-                  @if ($selBranchIds !== [])
-                    <a href="{{ $chipUrl(['branch_id']) }}" class="phau-chip"><span>{{ $branchDisp }}</span><span class="phau-chip-x">&times;</span></a>
-                  @endif
-                  @if ($searchTrim !== '')
-                    <a href="{{ $chipUrl(['universal_search']) }}" class="phau-chip"><span>Search: {{ $searchTrim }}</span><span class="phau-chip-x">&times;</span></a>
-                  @endif
-                  <a href="{{ route('pharmacy-audits.index') }}" class="phau-chip phau-chip--clear">Clear all</a>
+                <div class="qd-applied-bar pay-pr-applied-bar">
+                  <span class="applied-label">Filters:</span>
+                  <div class="pay-pr-filter-chips d-flex flex-wrap align-items-center" style="gap:6px;flex:1;min-width:0;">
+                    @if ($df && $dt)
+                      <a href="{{ $chipUrl(['date_from', 'date_to']) }}" class="filter-badge text-decoration-none text-white d-inline-flex align-items-center gap-1">
+                        <i class="bi bi-calendar3" aria-hidden="true"></i><span>{{ $dateLabel }}</span><span class="remove-icon" aria-hidden="true">&times;</span>
+                      </a>
+                    @endif
+                    @if ($selCompanyIds !== [])
+                      <a href="{{ $chipUrl(['company_id']) }}" class="filter-badge text-decoration-none text-white d-inline-flex align-items-center gap-1">
+                        <span>{{ $companyDisp }}</span><span class="remove-icon" aria-hidden="true">&times;</span>
+                      </a>
+                    @endif
+                    @if ($selZoneIds !== [])
+                      <a href="{{ $chipUrl(['zone_id']) }}" class="filter-badge text-decoration-none text-white d-inline-flex align-items-center gap-1">
+                        <span>{{ $zoneDisp }}</span><span class="remove-icon" aria-hidden="true">&times;</span>
+                      </a>
+                    @endif
+                    @if ($selBranchIds !== [])
+                      <a href="{{ $chipUrl(['branch_id']) }}" class="filter-badge text-decoration-none text-white d-inline-flex align-items-center gap-1">
+                        <span>{{ $branchDisp }}</span><span class="remove-icon" aria-hidden="true">&times;</span>
+                      </a>
+                    @endif
+                    @if ($searchTrim !== '')
+                      <a href="{{ $chipUrl(['universal_search']) }}" class="filter-badge text-decoration-none text-white d-inline-flex align-items-center gap-1">
+                        <i class="bi bi-search" aria-hidden="true"></i><span>{{ \Illuminate\Support\Str::limit($searchTrim, 48) }}</span><span class="remove-icon" aria-hidden="true">&times;</span>
+                      </a>
+                    @endif
+                  </div>
+                  <a href="{{ route('pharmacy-audits.index') }}" class="filter-badge filter-clear text-decoration-none ms-auto">Clear all</a>
                 </div>
               @endif
-          </div>
 
-          <div class="phau-table-toolbar phau-table-toolbar--index">
-            <div class="phau-table-toolbar__field phau-table-toolbar__field--search">
-              <label class="phau-table-toolbar__label" for="phauSearch">Search</label>
-              <div class="phau-table-toolbar__search-wrap">
-                <i class="bi bi-search phau-table-toolbar__search-icon" aria-hidden="true"></i>
-                <input type="search" name="universal_search" id="phauSearch" class="form-control phau-form-ctl phau-table-toolbar__search-input" placeholder="Item, batch, audit #…" value="{{ request('universal_search') }}" autocomplete="off">
+              <div class="row align-items-end justify-content-between pay-pr-table-toolbar mt-3 g-2 g-md-3 mx-0 w-100">
+                <div class="col-12 col-md-4 pay-pr-table-toolbar-search">
+                  <div class="qd-search-row pay-pr-toolbar-search-row mb-0">
+                    <div class="qd-search-wrap pay-pr-toolbar-search-wrap w-100">
+                      <i class="bi bi-search" aria-hidden="true"></i>
+                      <input type="text"
+                        name="universal_search"
+                        id="pay_pr_universal_search"
+                        value="{{ request('universal_search') }}"
+                        maxlength="200"
+                        placeholder="Search audits, items, batch..."
+                        autocomplete="off">
+                    </div>
+                  </div>
+                </div>
+                <div class="col-12 col-md-auto pay-pr-per-page-field pay-pr-per-page-field--toolbar">
+                  <label class="form-label pay-pr-per-page-label mb-1 d-block text-md-end" for="pay-pr-per-page">Rows per page</label>
+                  <select id="pay-pr-per-page" name="per_page" class="form-select form-select-sm pay-pr-per-page-select" autocomplete="off" aria-label="Rows per page">
+                    @foreach ($perPageChoices as $n)
+                      <option value="{{ $n }}" @selected((int) $perPage === (int) $n)>{{ $n }}</option>
+                    @endforeach
+                  </select>
+                </div>
               </div>
             </div>
-            <div class="phau-table-toolbar__field phau-table-toolbar__field--pagesize">
-              <label class="phau-table-toolbar__label" for="phauPerPage">Rows per page</label>
-              <select name="per_page" id="phauPerPage" class="form-select phau-form-ctl phau-table-toolbar__select">
-                @foreach ($perPageChoices as $n)
-                  <option value="{{ $n }}" @selected((int) $perPage === (int) $n)>{{ $n }}</option>
-                @endforeach
-              </select>
-            </div>
-          </div>
           </form>
 
           <div class="phau-table-panel">
@@ -231,7 +277,7 @@
                     <th>Date</th>
                     <th>Company</th>
                     <th>Location</th>
-                    <th class="phau-num text-center">Lines</th>
+                    <th class="phau-num text-center">Items</th>
                     <th class="phau-num text-center">Total (₹)</th>
                     <th>Created by</th>
                     <th class="phau-th-actions">Actions</th>
@@ -265,12 +311,7 @@
                     <tr>
                       <td colspan="8" class="phau-empty phau-empty--index">
                         <div class="phau-empty-visual" aria-hidden="true"><i class="bi bi-inbox"></i></div>
-                        <p class="phau-empty-title">No audits to display</p>
-                        <p class="phau-empty-text">Adjust filters or create a new audit. You can import multiple rows from an Excel or CSV file using <strong>Import</strong> above.</p>
-                        <div class="phau-empty-actions">
-                          <a href="{{ route('pharmacy-audits.create') }}" class="phau-empty-btn phau-empty-btn--solid"><i class="bi bi-plus-lg"></i> New audit</a>
-                          <button type="button" class="phau-empty-btn phau-empty-btn--ghost" data-bs-toggle="modal" data-bs-target="#phauImportModal"><i class="bi bi-upload"></i> Import</button>
-                        </div>
+                        <p class="phau-empty-title">No records found.</p>
                       </td>
                     </tr>
                   @endforelse
@@ -301,7 +342,6 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body phau-modal-body">
-          <p class="phau-modal-hint mb-3">Rows are grouped by <strong>Company</strong>, <strong>Zone</strong>, <strong>Branch</strong>, and <strong>Audit date</strong>. Each group becomes one audit record. Use the sample file so column headers match.</p>
           <div class="phau-modal-template-row">
             <div class="phau-modal-template-copy">
               <span class="phau-modal-template-label"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Sample file</span>
@@ -314,8 +354,19 @@
           <div class="phau-modal-upload-block mt-4">
             <label class="phau-modal-file-label" for="phauImportModalFile">Upload file <span class="text-danger">*</span></label>
             <div class="phau-modal-file-row">
-              <input type="file" name="import_file" id="phauImportModalFile" class="form-control phau-form-ctl phau-modal-file-input" accept=".xlsx,.xls,.csv" required>
-              <span class="phau-modal-file-note" id="phauImportModalFileName" aria-live="polite"></span>
+              <label for="phauImportModalFile" class="phau-upload-surface" id="phauImportDropzone">
+                <span class="phau-upload-icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up"></i></span>
+                <span class="phau-upload-copy">
+                  <span class="phau-upload-title">Drop your import file here or click to browse</span>
+                  <span class="phau-upload-subtitle">Accepted formats: `.xlsx`, `.xls`, `.csv`</span>
+                </span>
+                <span class="phau-upload-cta"><i class="bi bi-paperclip"></i> Choose file</span>
+              </label>
+              <input type="file" name="import_file" id="phauImportModalFile" class="phau-modal-file-input" accept=".xlsx,.xls,.csv" required>
+            </div>
+            <div class="phau-selected-file" id="phauSelectedFileBox" hidden>
+              <span class="phau-selected-file-label"><i class="bi bi-file-earmark-text"></i> Selected file</span>
+              <span class="phau-modal-file-note" id="phauImportModalFileName" aria-live="polite">No file selected</span>
             </div>
           </div>
         </div>
@@ -328,14 +379,24 @@
   </div>
 </div>
 
+<script type="application/json" id="phau-toast-data">@json([
+  'success' => session('success'),
+  'error' => session('error'),
+])</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script>
 (function ($) {
-  const $form = $('#phauFilterForm');
+  if (typeof toastr !== 'undefined') {
+    toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3500 };
+  }
+
+  const $form = $('#pay-pr-filter-form');
   if (!$form.length) return;
+
   let submitTimer = null;
   function submitNow() {
     if (submitTimer) { clearTimeout(submitTimer); submitTimer = null; }
@@ -346,127 +407,162 @@
     submitTimer = setTimeout(function () { submitTimer = null; submitNow(); }, 380);
   }
   function syncHidden(name, ids) {
-    const $box = $form.find('.grnpr-array-hiddens[data-array-name="' + name + '"]');
+    const $box = $form.find('.pay-pr-array-hiddens[data-array-name="' + name + '"]');
     $box.empty();
     ids.forEach(function (id) {
       if (id === '' || id == null) return;
       $box.append($('<input>', { type: 'hidden', name: name + '[]', value: String(id) }));
     });
   }
-  function refreshDdInputFromState($dd) {
-    const $float = $dd.data('float');
-    if (!$float) return;
-    const param = $dd.data('filter-param');
-    const empty = $dd.data('empty-label') || 'All';
-    const labels = [], ids = [];
-    $float.find('.grnpr-opt.selected').each(function () {
-      labels.push($(this).attr('data-label') || $(this).text().trim());
+
+  function updateDropdown($dropdown) {
+    const $wrapper = $dropdown.data('wrapper');
+    if (!$wrapper || !$wrapper.length) return;
+    const param = $wrapper.data('filter-param');
+    const empty = $wrapper.data('empty-label') || 'All';
+    const labels = [];
+    const ids = [];
+    $dropdown.find('.dropdown-list.multiselect div').each(function () {
+      if (!$(this).hasClass('selected')) return;
+      labels.push($(this).text().trim());
       ids.push($(this).attr('data-id'));
     });
-    $dd.find('.grnpr-dd-input').val(labels.length ? labels.join(', ') : empty);
+    $wrapper.find('.pay-pr-dd-input').val(labels.length ? labels.join(', ') : empty);
     syncHidden(param, ids);
     scheduleSubmit();
   }
-  function position($input, $float) {
-    const r = $input[0].getBoundingClientRect();
-    const w = Math.max(r.width, 240);
-    const vw = window.innerWidth || document.documentElement.clientWidth || 0;
-    let left = r.left;
-    if (left + w > vw - 8) left = Math.max(8, vw - w - 8);
-    $float.css({ position: 'fixed', top: r.bottom + 4, left: left, width: w, zIndex: 10050 });
+
+  function positionDropdown($input, $dropdown) {
+    const rect = $input[0].getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    let left = rect.left;
+    if (left + width > viewportWidth - 8) left = Math.max(8, viewportWidth - width - 8);
+    $dropdown.css({ position: 'fixed', top: rect.bottom + 4, left: left, width: width, zIndex: 10050 });
   }
-  function buildFloating($dd) {
-    let $float = $dd.data('float');
-    if ($float) return $float;
-    const tplHtml = $dd.find('template').html() || '';
-    $float = $('<div class="grnpr-floating"></div>').append(
-      '<div class="grnpr-search-wrap"><input type="text" class="grnpr-search-input" placeholder="Search…"></div>' +
-      '<div class="grnpr-actions">' +
-        '<button type="button" class="grnpr-btn-mini grnpr-btn-all">Select all</button>' +
-        '<button type="button" class="grnpr-btn-mini grnpr-btn-clear">Clear</button>' +
-      '</div>' +
-      '<div class="grnpr-list">' + tplHtml + '</div>'
-    );
-    $('body').append($float);
-    $float.data('owner', $dd);
-    $dd.data('float', $float);
-    $float.on('click', '.grnpr-opt', function (e) {
-      e.stopPropagation();
-      $(this).toggleClass('selected');
-      refreshDdInputFromState($dd);
+
+  $(window).on('scroll.phauPayPrFilter resize.phauPayPrFilter', function () {
+    $('.dropdown-menu.tax-dropdown.pay-pr-tax-dd:visible').each(function () {
+      const $dropdown = $(this);
+      const $wrapper = $dropdown.data('wrapper');
+      if (!$wrapper || !$wrapper.length) return;
+      const $input = $wrapper.find('.pay-pr-dd-input').first();
+      if ($input.length) positionDropdown($input, $dropdown);
     });
-    $float.on('click', '.grnpr-btn-all', function (e) {
-      e.stopPropagation();
-      $float.find('.grnpr-opt:visible').addClass('selected');
-      refreshDdInputFromState($dd);
-    });
-    $float.on('click', '.grnpr-btn-clear', function (e) {
-      e.stopPropagation();
-      $float.find('.grnpr-opt').removeClass('selected');
-      refreshDdInputFromState($dd);
-    });
-    $float.on('keyup input', '.grnpr-search-input', function () {
-      const q = ($(this).val() || '').toLowerCase();
-      $float.find('.grnpr-opt').each(function () {
-        $(this).toggle(($(this).text() || '').toLowerCase().indexOf(q) > -1);
-      });
-    });
-    $float.on('click', function (e) { e.stopPropagation(); });
-    return $float;
-  }
-  $(document).on('click', '.grnpr-dd .grnpr-dd-input', function (e) {
+  });
+
+  $(document).on('click', '#pay-pr-filter-form .pay-pr-dd-input', function (e) {
     e.stopPropagation();
-    $('.grnpr-floating.show').removeClass('show').hide();
+    $('.dropdown-menu.tax-dropdown.pay-pr-tax-dd').hide();
+
     const $input = $(this);
-    const $dd = $input.closest('.grnpr-dd');
-    const $float = buildFloating($dd);
-    position($input, $float);
-    $float.addClass('show').show();
-    $float.find('.grnpr-search-input').val('').focus();
-    $float.find('.grnpr-opt').show();
-  });
-  $(document).on('keydown', '.grnpr-dd .grnpr-dd-input', function (e) {
-    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      $(this).trigger('click');
+    let $dropdown = $input.data('dropdown');
+    if (!$dropdown) {
+      $dropdown = $input.siblings('.dropdown-menu').clone(true);
+      $('body').append($dropdown);
+      $input.data('dropdown', $dropdown);
     }
+    $dropdown.addClass('pay-pr-tax-dd');
+    $dropdown.data('wrapper', $input.closest('.pay-pr-dd'));
+    positionDropdown($input, $dropdown);
+    $dropdown.show();
+    $dropdown.find('.inner-search').first().val('');
+    $dropdown.find('.dropdown-list.multiselect div').show();
+    $dropdown.find('.inner-search').first().focus();
   });
-  $(window).on('scroll resize', function () {
-    $('.grnpr-floating.show').each(function () {
-      const $float = $(this);
-      const $dd = $float.data('owner');
-      if (!$dd || !$dd.length) return;
-      position($dd.find('.grnpr-dd-input').first(), $float);
+
+  $(document).on('keyup', '.pay-pr-tax-dd .inner-search', function () {
+    const q = ($(this).val() || '').toLowerCase();
+    $(this).closest('.dropdown-menu').find('.dropdown-list.multiselect div').each(function () {
+      $(this).toggle($(this).text().toLowerCase().indexOf(q) > -1);
     });
   });
-  $(document).on('click', function (e) {
-    if ($(e.target).closest('.grnpr-dd, .grnpr-floating').length) return;
-    $('.grnpr-floating.show').removeClass('show').hide();
+
+  $(document).on('click', '.pay-pr-tax-dd .dropdown-list.multiselect div', function (e) {
+    e.stopPropagation();
+    $(this).toggleClass('selected');
+    updateDropdown($(this).closest('.dropdown-menu.tax-dropdown'));
   });
-  $('#phauSearch').on('input', function () { scheduleSubmit(); });
-  $('#phauPerPage').on('change', function () { submitNow(); });
+
+  $(document).on('click', '.pay-pr-tax-dd .select-all', function (e) {
+    e.stopPropagation();
+    const $dropdown = $(this).closest('.dropdown-menu.tax-dropdown');
+    $dropdown.find('.dropdown-list.multiselect div').addClass('selected');
+    updateDropdown($dropdown);
+  });
+
+  $(document).on('click', '.pay-pr-tax-dd .deselect-all', function (e) {
+    e.stopPropagation();
+    const $dropdown = $(this).closest('.dropdown-menu.tax-dropdown');
+    $dropdown.find('.dropdown-list.multiselect div').removeClass('selected');
+    updateDropdown($dropdown);
+  });
+
+  $(document).on('click', function (e) {
+    if ($(e.target).closest('#pay-pr-filter-form .tax-dropdown-wrapper').length) return;
+    if ($(e.target).closest('.dropdown-menu.tax-dropdown.pay-pr-tax-dd').length) return;
+    $('.dropdown-menu.tax-dropdown.pay-pr-tax-dd').hide();
+  });
+
+  $('#pay_pr_universal_search').on('input', function () { scheduleSubmit(); });
+  $('#pay-pr-per-page').on('change', function () { submitNow(); });
 
   $('#phauImportModalFile').on('change', function () {
     var f = this.files && this.files[0];
     var $n = $('#phauImportModalFileName');
+    var $dropzone = $('#phauImportDropzone');
+    var $fileBox = $('#phauSelectedFileBox');
     if (!$n.length) return;
-    $n.text(f ? f.name : '');
+    $n.text(f ? f.name : 'No file selected');
+    if ($fileBox.length) {
+      $fileBox.prop('hidden', !f);
+    }
+    if ($dropzone.length) {
+      $dropzone.toggleClass('has-file', !!f);
+    }
   });
   $('#phauImportModal').on('hidden.bs.modal', function () {
     var form = document.getElementById('phauImportForm');
     if (form) form.reset();
-    $('#phauImportModalFileName').text('');
+    $('#phauImportModalFileName').text('No file selected');
+    $('#phauSelectedFileBox').prop('hidden', true);
+    $('#phauImportDropzone').removeClass('has-file is-dragover');
   });
 
+  var $importDropzone = $('#phauImportDropzone');
+  var $importFileInput = $('#phauImportModalFile');
+  if ($importDropzone.length && $importFileInput.length) {
+    $importDropzone.on('dragenter dragover', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      $importDropzone.addClass('is-dragover');
+    });
+    $importDropzone.on('dragleave dragend drop', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      $importDropzone.removeClass('is-dragover');
+    });
+    $importDropzone.on('drop', function (e) {
+      var files = e.originalEvent && e.originalEvent.dataTransfer ? e.originalEvent.dataTransfer.files : null;
+      if (!files || !files.length) return;
+      try {
+        $importFileInput[0].files = files;
+        $importFileInput.trigger('change');
+      } catch (_err) {
+        if (window.toastr) toastr.info('Drag-drop selected the file. If it is not attached, click "Choose file" once.');
+      }
+    });
+  }
+
   if (typeof $.fn.daterangepicker === 'function' && typeof moment !== 'undefined') {
-    const $dr = $('#phauReportRange');
-    const df = $('#phauDateFrom').val();
-    const dt = $('#phauDateTo').val();
+    const $dr = $('#payPrReportRange');
+    const df = $('#pay_pr_date_from').val();
+    const dt = $('#pay_pr_date_to').val();
     const opts = {
       autoUpdateInput: false,
       locale: { format: 'YYYY-MM-DD', separator: ' – ', cancelLabel: 'Clear', applyLabel: 'Apply' },
       opens: 'left',
-      parentEl: 'body',
+      drops: 'down'
     };
     if (df && dt) {
       opts.startDate = moment(df, 'YYYY-MM-DD');
@@ -474,26 +570,33 @@
     }
     $dr.daterangepicker(opts);
     $dr.on('apply.daterangepicker', function (ev, picker) {
-      $('#phauDateFrom').val(picker.startDate.format('YYYY-MM-DD'));
-      $('#phauDateTo').val(picker.endDate.format('YYYY-MM-DD'));
-      $('#phauDateLabel').text(picker.startDate.format('MMM D, YYYY') + ' – ' + picker.endDate.format('MMM D, YYYY'));
+      $('#pay_pr_date_from').val(picker.startDate.format('YYYY-MM-DD'));
+      $('#pay_pr_date_to').val(picker.endDate.format('YYYY-MM-DD'));
+      $('#payPrDateLabel').text(picker.startDate.format('MMM D, YYYY') + ' – ' + picker.endDate.format('MMM D, YYYY'));
       submitNow();
     });
     $dr.on('cancel.daterangepicker', function () {
-      $('#phauDateFrom').val('');
-      $('#phauDateTo').val('');
-      $('#phauDateLabel').text('All dates');
+      $('#pay_pr_date_from').val('');
+      $('#pay_pr_date_to').val('');
+      $('#payPrDateLabel').text('All dates');
       submitNow();
     });
   }
-})(jQuery);
 
-@if (session('success'))
-  toastr.success(@json(session('success')));
-@endif
-@if (session('error'))
-  toastr.error(@json(session('error')));
-@endif
+  let phauToastPayload = {};
+  const phauToastData = document.getElementById('phau-toast-data');
+  if (phauToastData) {
+    try {
+      phauToastPayload = JSON.parse(phauToastData.textContent || '{}') || {};
+    } catch (error) {
+      phauToastPayload = {};
+    }
+  }
+  if (typeof toastr !== 'undefined') {
+    if (phauToastPayload.success) toastr.success(phauToastPayload.success);
+    if (phauToastPayload.error) toastr.error(phauToastPayload.error);
+  }
+})(jQuery);
 </script>
 @include('superadmin.superadminfooter')
 </body>

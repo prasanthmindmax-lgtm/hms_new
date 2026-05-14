@@ -108,16 +108,23 @@
                     @endif
                   </td>
                   <td>
-                      <div class="form-check form-switch d-flex align-items-center gap-2" style="padding-left:0;">
-                          <input class="form-check-input vendor-status-toggle" type="checkbox"
-                              data-id="{{ $v->id }}"
-                              {{ $v->active_status == 0 ? 'checked' : '' }}
-                              style="cursor:pointer; width:38px; height:20px; margin:0;">
+                      @if ((int) ($limit_access ?? 0) === 1)
+                          <div class="form-check form-switch d-flex align-items-center gap-2" style="padding-left:0;">
+                              <input class="form-check-input vendor-status-toggle" type="checkbox"
+                                  data-id="{{ $v->id }}"
+                                  {{ $v->active_status == 0 ? 'checked' : '' }}
+                                  style="cursor:pointer; width:38px; height:20px; margin:0;">
+                              <span class="vendor-status-label badge {{ $v->active_status == 0 ? 'bg-success' : 'bg-secondary' }}"
+                                  style="font-size:11px;">
+                                  {{ $v->active_status == 0 ? 'Active' : 'Inactive' }}
+                              </span>
+                          </div>
+                      @else
                           <span class="vendor-status-label badge {{ $v->active_status == 0 ? 'bg-success' : 'bg-secondary' }}"
                               style="font-size:11px;">
                               {{ $v->active_status == 0 ? 'Active' : 'Inactive' }}
                           </span>
-                      </div>
+                      @endif
                   </td>
               </tr>
           @empty

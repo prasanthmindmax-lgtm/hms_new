@@ -4,7 +4,7 @@
 @include('superadmin.superadminhead')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}" />
 <link rel="stylesheet" href="{{ asset('/assets/css/quotation.css') }}" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -214,6 +214,15 @@
     margin-top: 2px; font-size: 0.68rem; color: #b91c1c; font-weight: 600; line-height: 1.25;
   }
   .phau-line-field-error.is-active { display: block; }
+  .phau-items-table input[type="month"].form-control-sm {
+    min-width: 10rem;
+    max-width: 100%;
+  }
+  .phau-notes-below-table {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #e2e8f0;
+  }
 </style>
 
 <body class="phau-page grn-page" style="overflow-x: hidden;">
@@ -225,6 +234,33 @@
   $isEdit = $isEdit ?? false;
   $o = fn (string $k, $def = '') => old($k, $r ? data_get($r, $k) : $def);
   $auditDate = old('audit_date', $r && $r->audit_date ? $r->audit_date->format('Y-m-d') : '');
+
+  /** Normalize stored / legacy expiry values for HTML month input (value must be YYYY-MM). */
+  $phauExpiryForMonthInput = static function (?string $exp): string {
+      $exp = trim((string) $exp);
+      if ($exp === '') {
+          return '';
+      }
+      if (preg_match('/^\d{4}-\d{2}$/', $exp)) {
+          return $exp;
+      }
+      if (preg_match('/^(\d{1,2})[\/\-](\d{2})$/', $exp, $m)) {
+          $mm = str_pad((string) (int) $m[1], 2, '0', STR_PAD_LEFT);
+          $yy = (int) $m[2];
+          $year = $yy <= 30 ? 2000 + $yy : 1900 + $yy;
+
+          return sprintf('%04d-%s', $year, $mm);
+      }
+      if (preg_match('/^(\d{4})[\/\-](\d{1,2})$/', $exp, $m)) {
+          return sprintf('%04d-%s', (int) $m[1], str_pad((string) (int) $m[2], 2, '0', STR_PAD_LEFT));
+      }
+      try {
+          return \Carbon\Carbon::parse($exp)->format('Y-m');
+      } catch (\Throwable $e) {
+          return '';
+      }
+  };
+
   $itemRows = old('items');
   if (! is_array($itemRows)) {
     if ($r) {
@@ -233,7 +269,7 @@
         ? $r->items->map(fn ($i) => [
             'item_name' => $i->item_name,
             'batch_no' => $i->batch_no,
-            'expiry' => $i->expiry,
+            'expiry' => $phauExpiryForMonthInput($i->expiry),
             'mrp' => $i->mrp,
             'system_qty' => $i->system_qty,
             'manual_qty' => $i->manual_qty,
@@ -244,6 +280,13 @@
     } else {
       $itemRows = [];
     }
+  } else {
+      foreach ($itemRows as $k => $row) {
+          if (! is_array($row)) {
+              continue;
+          }
+          $itemRows[$k]['expiry'] = $phauExpiryForMonthInput($row['expiry'] ?? '');
+      }
   }
   if ($itemRows === []) {
     $itemRows = [[
@@ -270,6 +313,7 @@
               <i class="bi bi-shield-check me-1"></i>
               {{ $isEdit && $r ? $r->audit_number : 'Reference assigned on save' }}
             </span>
+            <p class="grn-hero-sub">{{ $isEdit ? 'Update stock variance lines and keep the audit record consistent across location and date.' : 'Capture branch-wise stock variance with a cleaner audit form and auto-calculated quantity differences.' }}</p>
           </div>
           <a href="{{ route('pharmacy-audits.index') }}" class="grn-btn-ghost">
             <i class="bi bi-arrow-left"></i> Back to list
@@ -294,7 +338,6 @@
         <section class="grn-sec grn-sec--location">
           <div class="grn-sec-title">
             <i class="bi bi-buildings"></i> Company &amp; location
-            <small>Required — search inside each dropdown (same as GRN)</small>
           </div>
           <div class="row g-3">
             <div class="col-xl-3 col-md-6">
@@ -344,18 +387,12 @@
               <input type="date" name="audit_date" class="form-control" value="{{ $auditDate }}">
               <div class="grn-field-error" data-for="audit_date"></div>
             </div>
-            <div class="col-12">
-              <label class="form-label">Notes</label>
-              <textarea name="notes" class="form-control" rows="2" maxlength="5000" placeholder="Optional context for this audit">{{ $o('notes') }}</textarea>
-              <div class="grn-field-error" data-for="notes"></div>
-            </div>
           </div>
         </section>
 
         <section class="grn-sec">
           <div class="grn-sec-title">
             <i class="bi bi-table"></i> Line items
-            <small>Diff &amp; value recalc from MRP and quantities</small>
           </div>
           <div class="grn-field-error" data-for="items"></div>
           <div class="phau-items-table-wrap">
@@ -365,13 +402,13 @@
                   <th class="phau-th-nowrap" style="width:36px;">#</th>
                   <th class="phau-th-nowrap">Name <span class="text-danger">*</span></th>
                   <th class="phau-th-nowrap">Batch</th>
-                  <th class="phau-th-nowrap">Expiry</th>
+                  <th class="phau-th-nowrap">Expiry <span class="text-muted fw-normal" style="font-size:0.65rem;">(Mo/Yr)</span></th>
                   <th class="text-end phau-th-nowrap">MRP</th>
                   <th class="text-end phau-th-qty">System Quantity<span class="phau-th-hint">Stock on system</span></th>
                   <th class="text-end phau-th-qty">Manual Quantity<span class="phau-th-hint">Physical count</span></th>
                   <th class="text-end phau-th-nowrap">Diff</th>
                   <th class="text-end phau-th-nowrap">Val</th>
-                  <th class="phau-th-nowrap" style="width:44px;"></th>
+                  <th class="phau-th-nowrap phau-th-action" style="width:92px;">Action</th>
                 </tr>
               </thead>
               <tbody id="phauItemsBody">
@@ -387,7 +424,7 @@
                       <div class="phau-line-field-error" data-line-field="batch_no"></div>
                     </td>
                     <td>
-                      <input type="text" name="items[{{ $idx }}][expiry]" class="form-control form-control-sm phau-line-inp" placeholder="MM/YY" value="{{ $row['expiry'] ?? '' }}">
+                      <input type="month" name="items[{{ $idx }}][expiry]" class="form-control form-control-sm phau-line-inp phau-in-expiry" value="{{ $row['expiry'] ?? '' }}" title="Month and year only">
                       <div class="phau-line-field-error" data-line-field="expiry"></div>
                     </td>
                     <td>
@@ -410,21 +447,27 @@
                       <input type="number" step="0.01" name="items[{{ $idx }}][val]" class="form-control form-control-sm text-end phau-in-val phau-line-inp" value="{{ $row['val'] ?? '' }}">
                       <div class="phau-line-field-error" data-line-field="val"></div>
                     </td>
-                    <td class="text-center">
-                      <button type="button" class="phau-btn-remove phau-remove-row" title="Remove" @if (count($itemRows) < 2) style="opacity:0.35" disabled @endif><i class="bi bi-x-lg"></i></button>
+                    <td class="text-center phau-action-cell">
+                      <button type="button" class="phau-btn-addline-icon phau-add-row" title="Add line after this row" aria-label="Add line after this row"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                      <button type="button" class="phau-btn-remove phau-remove-row" title="Remove line" aria-label="Remove line" @if (count($itemRows) < 2) disabled @endif><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                     </td>
                   </tr>
                 @endforeach
               </tbody>
             </table>
           </div>
-          <button type="button" class="phau-btn-addline" id="phauAddRow"><i class="bi bi-plus-circle"></i> Add line</button>
+
+          <div class="phau-notes-below-table">
+            <label class="form-label" for="phau_notes_field">Notes</label>
+            <textarea id="phau_notes_field" name="notes" class="form-control" rows="2" maxlength="5000" placeholder="Optional context for this audit">{{ $o('notes') }}</textarea>
+            <div class="grn-field-error" data-for="notes"></div>
+          </div>
         </section>
 
         <div class="grn-footer">
           <div class="grn-meta">
-            <i class="bi bi-info-circle"></i>
-            <span>Review highlighted fields before saving.</span>
+            <i class="bi bi-info-circle-fill"></i>
+            <span>Difference and value fields are recalculated while you type.</span>
           </div>
           <a href="{{ $isEdit ? route('pharmacy-audits.show', $r) : route('pharmacy-audits.index') }}" class="btn btn-light border">Cancel</a>
           <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> Save</button>
@@ -760,9 +803,26 @@ $(function () {
     });
   });
 
-  // Line items table (unchanged behaviour)
+  // Line items table
   const tbody = document.getElementById('phauItemsBody');
-  const addBtn = document.getElementById('phauAddRow');
+
+  function phauNewRowHtml(i) {
+    return (
+      '<td class="text-muted small phau-line-no"></td>' +
+      '<td><input type="text" name="items[' + i + '][item_name]" class="form-control form-control-sm phau-line-inp"><div class="phau-line-field-error" data-line-field="item_name"></div></td>' +
+      '<td><input type="text" name="items[' + i + '][batch_no]" class="form-control form-control-sm phau-line-inp"><div class="phau-line-field-error" data-line-field="batch_no"></div></td>' +
+      '<td><input type="month" name="items[' + i + '][expiry]" class="form-control form-control-sm phau-line-inp phau-in-expiry" title="Month and year only"><div class="phau-line-field-error" data-line-field="expiry"></div></td>' +
+      '<td><input type="number" step="0.01" name="items[' + i + '][mrp]" class="form-control form-control-sm text-end phau-in-mrp phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="mrp"></div></td>' +
+      '<td><input type="number" step="1" name="items[' + i + '][system_qty]" class="form-control form-control-sm text-end phau-in-sys phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="system_qty"></div></td>' +
+      '<td><input type="number" step="1" name="items[' + i + '][manual_qty]" class="form-control form-control-sm text-end phau-in-man phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="manual_qty"></div></td>' +
+      '<td><input type="number" step="1" name="items[' + i + '][diff_qty]" class="form-control form-control-sm text-end phau-in-diff phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="diff_qty"></div></td>' +
+      '<td><input type="number" step="0.01" name="items[' + i + '][val]" class="form-control form-control-sm text-end phau-in-val phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="val"></div></td>' +
+      '<td class="text-center phau-action-cell">' +
+      '<button type="button" class="phau-btn-addline-icon phau-add-row" title="Add line after this row" aria-label="Add line after this row"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>' +
+      '<button type="button" class="phau-btn-remove phau-remove-row" title="Remove line" aria-label="Remove line"><i class="bi bi-x-lg" aria-hidden="true"></i></button>' +
+      '</td>'
+    );
+  }
 
   function parseNum(el, dec) {
     const v = parseFloat(String(el.value || '0').replace(',', '.'));
@@ -805,7 +865,6 @@ $(function () {
       const rm = tr.querySelector('.phau-remove-row');
       if (rm) {
         rm.disabled = rows.length < 2;
-        rm.style.opacity = rows.length < 2 ? '0.35' : '1';
       }
     });
     clearAllLineErrors();
@@ -815,30 +874,25 @@ $(function () {
     tbody.querySelectorAll('.phau-item-row').forEach(wireRow);
   }
 
-  if (addBtn && tbody) {
-    addBtn.addEventListener('click', function () {
-      const i = tbody.querySelectorAll('.phau-item-row').length;
-      const tr = document.createElement('tr');
-      tr.className = 'phau-item-row';
-      tr.innerHTML =
-        '<td class="text-muted small phau-line-no"></td>' +
-        '<td><input type="text" name="items[' + i + '][item_name]" class="form-control form-control-sm phau-line-inp"><div class="phau-line-field-error" data-line-field="item_name"></div></td>' +
-        '<td><input type="text" name="items[' + i + '][batch_no]" class="form-control form-control-sm phau-line-inp"><div class="phau-line-field-error" data-line-field="batch_no"></div></td>' +
-        '<td><input type="text" name="items[' + i + '][expiry]" class="form-control form-control-sm phau-line-inp" placeholder="MM/YY"><div class="phau-line-field-error" data-line-field="expiry"></div></td>' +
-        '<td><input type="number" step="0.01" name="items[' + i + '][mrp]" class="form-control form-control-sm text-end phau-in-mrp phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="mrp"></div></td>' +
-        '<td><input type="number" step="1" name="items[' + i + '][system_qty]" class="form-control form-control-sm text-end phau-in-sys phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="system_qty"></div></td>' +
-        '<td><input type="number" step="1" name="items[' + i + '][manual_qty]" class="form-control form-control-sm text-end phau-in-man phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="manual_qty"></div></td>' +
-        '<td><input type="number" step="1" name="items[' + i + '][diff_qty]" class="form-control form-control-sm text-end phau-in-diff phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="diff_qty"></div></td>' +
-        '<td><input type="number" step="0.01" name="items[' + i + '][val]" class="form-control form-control-sm text-end phau-in-val phau-line-inp" value="0"><div class="phau-line-field-error" data-line-field="val"></div></td>' +
-        '<td class="text-center"><button type="button" class="phau-btn-remove phau-remove-row" title="Remove"><i class="bi bi-x-lg"></i></button></td>';
-      tbody.appendChild(tr);
-      wireRow(tr);
-      renumber();
-    });
-  }
-
   if (tbody) {
     tbody.addEventListener('click', function (e) {
+      const addB = e.target.closest('.phau-add-row');
+      if (addB) {
+        e.preventDefault();
+        const trAfter = addB.closest('.phau-item-row');
+        const i = tbody.querySelectorAll('.phau-item-row').length;
+        const tr = document.createElement('tr');
+        tr.className = 'phau-item-row';
+        tr.innerHTML = phauNewRowHtml(i);
+        if (trAfter) {
+          trAfter.insertAdjacentElement('afterend', tr);
+        } else {
+          tbody.appendChild(tr);
+        }
+        wireRow(tr);
+        renumber();
+        return;
+      }
       const btn = e.target.closest('.phau-remove-row');
       if (!btn || btn.disabled) return;
       const tr = btn.closest('.phau-item-row');

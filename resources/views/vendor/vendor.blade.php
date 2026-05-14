@@ -284,7 +284,7 @@
                 {{-- ── Table ── --}}
                 <div class="qd-table-wrap">
               <div id="Neft-body">
-                @include('vendor.partials.table.vendor_rows',['vendor' => $vendor, 'perPage' => $perPage])
+                @include('vendor.partials.table.vendor_rows',['vendor' => $vendor, 'perPage' => $perPage, 'limit_access' => $limit_access])
                     </div>
               </div>
 
@@ -309,13 +309,13 @@
             </div>
             <div class="vp-header-right">
                 @if ($limit_access === 1)
+                    <button class="btn btn-sm btn-outline-secondary edit_btn">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
                     <button class="btn btn-sm btn-outline-danger delete_btn">
                         <i class="bi bi-trash"></i> Delete
                     </button>
                 @endif
-                <button class="btn btn-sm btn-outline-secondary edit_btn">
-                    <i class="bi bi-pencil"></i> Edit
-                </button>
                 <div class="dropdown">
                     <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
                         <i class="bi bi-plus-lg me-1"></i>New
@@ -648,8 +648,9 @@
                         toastr.success(response.message);
                     }
                 },
-                error: function () {
-                    toastr.error('Failed to update vendor status.');
+                error: function (xhr) {
+                    const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to update vendor status.';
+                    toastr.error(message);
                     $toggle.prop('checked', !$toggle.prop('checked'));
                 }
             });

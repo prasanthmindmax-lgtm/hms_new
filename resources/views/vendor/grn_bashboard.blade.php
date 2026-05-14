@@ -65,6 +65,13 @@
 .grn-items-table td { padding:9px 10px; border-bottom:1px solid #f1f5f9; color:#1e293b; }
 .grn-items-table tbody tr:last-child td { border-bottom:none; }
 .grn-items-table tbody tr:hover td { background:#f8fafc; }
+.qd-table-wrap .qdt-mono {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: #1e2746;
+}
 </style>
 
 <body style="overflow-x: hidden;">
