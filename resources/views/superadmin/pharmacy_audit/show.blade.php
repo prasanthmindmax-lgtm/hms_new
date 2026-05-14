@@ -4,7 +4,7 @@
 @include('superadmin.superadminhead')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="{{ asset('assets/css/pharmacy_audit.css') }}">
 
@@ -32,34 +32,46 @@
             <a href="{{ route('pharmacy-audits.edit', $r) }}" class="phau-btn-new"><i class="bi bi-pencil-square"></i> Edit</a>
           </div>
         </header>
-        <div class="phau-body">
-          <div class="row g-3 mb-4">
+        <div class="phau-body phau-body--detail">
+          <div class="row g-3 mb-4 phau-detail-grid">
             <div class="col-md-3">
-              <div class="phau-detail-label">Zone</div>
-              <div class="phau-detail-value">{{ $r->zone?->name ?: '—' }}</div>
+              <div class="phau-detail-card">
+                <div class="phau-detail-label">Zone</div>
+                <div class="phau-detail-value">{{ $r->zone?->name ?: '—' }}</div>
+              </div>
             </div>
             <div class="col-md-3">
-              <div class="phau-detail-label">Branch</div>
-              <div class="phau-detail-value">{{ $r->branch?->name ?: '—' }}</div>
+              <div class="phau-detail-card">
+                <div class="phau-detail-label">Branch</div>
+                <div class="phau-detail-value">{{ $r->branch?->name ?: '—' }}</div>
+              </div>
             </div>
             <div class="col-md-3">
-              <div class="phau-detail-label">Created by</div>
-              <div class="phau-detail-value">{{ $r->creator?->user_fullname ?? '—' }}</div>
+              <div class="phau-detail-card">
+                <div class="phau-detail-label">Created by</div>
+                <div class="phau-detail-value">{{ $r->creator?->user_fullname ?? '—' }}</div>
+              </div>
             </div>
             <div class="col-md-3">
-              <div class="phau-detail-label">Recorded</div>
-              <div class="phau-detail-value">{{ $r->created_at?->format('d M Y, h:i A') }}</div>
+              <div class="phau-detail-card">
+                <div class="phau-detail-label">Recorded</div>
+                <div class="phau-detail-value">{{ $r->created_at?->format('d M Y, h:i A') }}</div>
+              </div>
             </div>
             @if ($r->notes)
               <div class="col-12">
-                <div class="phau-detail-label">Notes</div>
-                <div class="phau-detail-value phau-detail-value--notes">{{ $r->notes }}</div>
+                <div class="phau-detail-card phau-detail-card--notes">
+                  <div class="phau-detail-label">Notes</div>
+                  <div class="phau-detail-value phau-detail-value--notes">{{ $r->notes }}</div>
+                </div>
               </div>
             @endif
           </div>
 
-          <div class="phau-items-table-wrap">
-            <table class="phau-items-table">
+          <div class="phau-items-card">
+            <div class="phau-items-head"><i class="bi bi-table"></i> Audit items</div>
+            <div class="phau-items-table-wrap phau-table-wrap--show">
+              <table class="phau-items-table">
               <thead>
                 <tr>
                   <th class="phau-th-nowrap">S.No</th>
@@ -79,7 +91,24 @@
                     <td>{{ $item->line_no }}</td>
                     <td>{{ $item->item_name }}</td>
                     <td>{{ $item->batch_no ?: '—' }}</td>
-                    <td>{{ $item->expiry ?: '—' }}</td>
+                    <td>
+                      @php
+                        $__ex = trim((string) ($item->expiry ?? ''));
+                        $__disp = '—';
+                        if ($__ex !== '') {
+                            if (preg_match('/^\d{4}-\d{2}$/', $__ex)) {
+                                try {
+                                    $__disp = \Carbon\Carbon::createFromFormat('Y-m', $__ex)->format('M Y');
+                                } catch (\Throwable $e) {
+                                    $__disp = $__ex;
+                                }
+                            } else {
+                                $__disp = $__ex;
+                            }
+                        }
+                      @endphp
+                      {{ $__disp }}
+                    </td>
                     <td class="text-end font-monospace">{{ number_format((float) $item->mrp, 2) }}</td>
                     <td class="text-end font-monospace">{{ number_format($item->system_qty) }}</td>
                     <td class="text-end font-monospace">{{ number_format($item->manual_qty) }}</td>
@@ -94,7 +123,8 @@
                   <td class="text-end phau-total-val">{{ number_format($totalVal, 2) }}</td>
                 </tr>
               </tfoot>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       </div>

@@ -47,9 +47,9 @@ class PharmacyAuditExport implements FromCollection, WithHeadings, WithMapping
 
         return [
             $a?->audit_number,
-            $a?->company_name,
-            $a?->zone_name,
-            $a?->branch_name,
+            $a?->company?->company_name,
+            $a?->zone?->name,
+            $a?->branch?->name,
             $a?->audit_date?->format('Y-m-d'),
             $item->line_no,
             $item->item_name,

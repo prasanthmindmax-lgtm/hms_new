@@ -1,12 +1,15 @@
 /* Pharmacy Audit — layout aligned with superadmin GRN (grnpr) dashboard */
 body.phau-page {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 0.9375rem;
-  line-height: 1.55;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  background: #f1f5f9;
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   scroll-behavior: smooth;
   color: #1e293b;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 body.phau-page .pc-container .pc-content {
   max-width: 100%; width: 100%; box-sizing: border-box;
@@ -16,8 +19,8 @@ body.phau-page .pc-container .pc-content {
 .phau-card {
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
   overflow: hidden;
 }
 .phau-hero {
@@ -37,33 +40,41 @@ body.phau-page .pc-container .pc-content {
 }
 .phau-hero-inner { position: relative; z-index: 1; }
 .phau-hero-title {
-  margin: 0 0 6px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em;
+  margin: 0 0 8px; font-size: 1.62rem; font-weight: 800; letter-spacing: -0.03em;
   color: #f8fafc; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
 .phau-hero-title i { color: #a5b4fc; }
-.phau-hero-sub { margin: 0; font-size: 0.9375rem; line-height: 1.55; color: rgba(248, 250, 252, 0.92); max-width: 56ch; }
+.phau-hero-sub {
+  margin: 0;
+  font-size: 0.93rem;
+  font-weight: 500;
+  line-height: 1.65;
+  color: rgba(248, 250, 252, 0.9);
+  max-width: 60ch;
+}
 .phau-hero-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px; }
 .phau-btn-new {
   display: inline-flex; align-items: center; gap: 0.45rem;
-  padding: 0.55rem 1.05rem; border-radius: 999px;
-  font-size: 0.85rem; font-weight: 700; line-height: 1.2;
+  padding: 0.62rem 1.1rem; border-radius: 14px;
+  font-size: 0.84rem; font-weight: 700; line-height: 1.2;
   color: #1e1b4b !important; text-decoration: none !important; white-space: nowrap;
-  background: #f8fafc;
-  border: 1px solid rgba(248,250,252,0.6);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+  border: 1px solid rgba(224, 231, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-.phau-btn-new:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(15,23,42,0.25); color: #1e1b4b !important; }
+.phau-btn-new:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(15,23,42,0.18); color: #1e1b4b !important; }
 .phau-btn-outline {
   display: inline-flex; align-items: center; gap: 0.45rem;
-  padding: 0.55rem 1.05rem; border-radius: 999px;
-  font-size: 0.85rem; font-weight: 700;
+  padding: 0.62rem 1.1rem; border-radius: 14px;
+  font-size: 0.84rem; font-weight: 700;
   color: #f8fafc !important;
   border: 1px solid rgba(248,250,252,0.45);
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.1);
   text-decoration: none !important;
 }
 .phau-btn-outline:hover { background: rgba(255,255,255,0.18); color: #fff !important; }
-.phau-body { padding: 18px 22px 22px; }
+.phau-body { padding: 22px 24px 24px; }
 
 /* Stats */
 .phau-stats {
@@ -88,7 +99,7 @@ body.phau-page .pc-container .pc-content {
   background: #eef2ff; color: #4f46e5; font-size: 1rem;
 }
 .phau-stat-lbl { font-size: 0.8125rem; font-weight: 600; text-transform: none; letter-spacing: 0.01em; color: #475569; }
-.phau-stat-num { font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1.1; }
+.phau-stat-num { font-size: 1.58rem; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; line-height: 1.05; }
 .phau-stat-hint { font-size: 0.8125rem; line-height: 1.4; color: #64748b; }
 .phau-stat--var .phau-stat-ic { background: #fee2e2; color: #b91c1c; }
 .phau-stat--var .phau-stat-num { color: #b91c1c; }
@@ -607,9 +618,9 @@ body.phau-page .pc-container .pc-content {
 .phau-table-panel {
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
   margin-bottom: 4px;
 }
 .phau-table-panel-head {
@@ -662,7 +673,7 @@ body.phau-page .pc-container .pc-content {
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
   color: #1e293b;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .phau-table--index tbody tr.phau-tr:hover {
   background: linear-gradient(90deg, #fafbff 0%, #f8fafc 100%);
@@ -760,7 +771,7 @@ body.phau-page .pc-container .pc-content {
 .phau-empty-text {
   margin: 0 auto 20px;
   max-width: 42ch;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   color: #475569;
   line-height: 1.6;
 }
@@ -929,7 +940,86 @@ body.phau-page .pc-container .pc-content {
   gap: 8px;
 }
 .phau-modal-file-input {
-  border-radius: 10px !important;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.phau-upload-surface {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 18px;
+  border: 1.5px dashed #c7d2fe;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8faff 0%, #eef2ff 100%);
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+.phau-upload-surface:hover {
+  border-color: #818cf8;
+  box-shadow: 0 10px 26px rgba(99, 102, 241, 0.12);
+  transform: translateY(-1px);
+}
+.phau-upload-surface.is-dragover {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14);
+  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+}
+.phau-upload-surface.has-file {
+  border-style: solid;
+  border-color: #4f46e5;
+  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+}
+.phau-upload-icon {
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(79, 70, 229, 0.12);
+  color: #4f46e5;
+  font-size: 1.35rem;
+}
+.phau-upload-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+}
+.phau-upload-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.45;
+}
+.phau-upload-subtitle {
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+.phau-upload-cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #4f46e5, #6366f1);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.28);
 }
 .phau-modal-file-note {
   font-size: 0.8125rem;
@@ -937,6 +1027,27 @@ body.phau-page .pc-container .pc-content {
   color: #4338ca;
   min-height: 1.25em;
   word-break: break-all;
+}
+.phau-selected-file {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+}
+.phau-selected-file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+.phau-selected-file-label i {
+  font-size: 0.9rem;
 }
 .phau-modal-footer {
   border: none;
@@ -979,12 +1090,54 @@ body.phau-page .pc-container .pc-content {
   white-space: pre-wrap;
 }
 
+.phau-body--detail {
+  padding-top: 24px;
+}
+
+.phau-detail-grid {
+  --bs-gutter-x: 1rem;
+  --bs-gutter-y: 1rem;
+}
+
+.phau-detail-card {
+  height: 100%;
+  padding: 1rem 1.05rem;
+  border: 1px solid #e6ebf3;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.phau-detail-card--notes {
+  min-height: 8rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.phau-detail-card .phau-detail-label {
+  margin-bottom: 0.45rem;
+}
+
+.phau-detail-card .phau-detail-value {
+  font-size: 0.96rem;
+}
+
+.phau-items-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.phau-table-wrap--show {
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
 /* Create/edit — clearer type over GRN inline styles */
 body.phau-page .grn-shell .grn-sec-title {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 700;
   text-transform: none;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   color: #1e293b;
 }
 body.phau-page .grn-shell .grn-sec-title small {
@@ -993,13 +1146,13 @@ body.phau-page .grn-shell .grn-sec-title small {
   color: #64748b;
 }
 body.phau-page .grn-shell .form-label {
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #334155;
 }
 body.phau-page .grn-hero h1 {
-  font-size: 1.5rem;
-  line-height: 1.25;
+  font-size: 1.62rem;
+  line-height: 1.2;
 }
 body.phau-page .grn-hero-badge {
   font-size: 0.75rem;
@@ -1007,10 +1160,41 @@ body.phau-page .grn-hero-badge {
   text-transform: none;
   letter-spacing: 0.02em;
 }
+body.phau-page .grn-hero-sub {
+  margin: 0.5rem 0 0;
+  color: rgba(248, 250, 252, 0.9);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  max-width: 62ch;
+}
+body.phau-page .grn-shell .grn-sec {
+  border-radius: 20px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+body.phau-page .grn-shell .form-control,
+body.phau-page .grn-shell .form-select {
+  border-radius: 12px;
+  min-height: 44px;
+  font-size: 0.9rem;
+}
+body.phau-page .grn-shell textarea.form-control {
+  min-height: 88px;
+}
+body.phau-page .grn-shell .tax-dropdown-wrapper .dropdown-search-input {
+  border-radius: 12px;
+  min-height: 44px;
+}
+body.phau-page .grn-footer {
+  border-radius: 18px;
+  padding: 14px 16px;
+}
 body.phau-page .grn-footer .grn-meta {
-  font-size: 0.8125rem;
+  font-size: 0.84rem;
   color: #475569;
   line-height: 1.45;
+}
+body.phau-page .grn-footer .grn-meta i {
+  color: #6366f1;
 }
 body.phau-page .grn-info-banner {
   font-size: 0.875rem;
@@ -1018,6 +1202,10 @@ body.phau-page .grn-info-banner {
 }
 body.phau-page .grn-shell .grn-field-error {
   font-size: 0.8125rem;
+}
+body.phau-page .phau-items-table input.form-control,
+body.phau-page .phau-items-table input.form-control-sm {
+  border-radius: 10px;
 }
 
 @media (max-width: 575.98px) {
@@ -1029,8 +1217,17 @@ body.phau-page .grn-shell .grn-field-error {
     width: 100%;
     justify-content: center;
   }
+  .phau-upload-surface {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+  }
+  .phau-upload-cta {
+    width: 100%;
+    justify-content: center;
+  }
   .phau-hero { padding: 18px; }
-  .phau-hero-title { font-size: 1.2rem; }
+  .phau-hero-title { font-size: 1.28rem; }
   .phau-body { padding: 14px 12px 16px; }
   .phau-hero--index {
     flex-direction: column;
@@ -1057,5 +1254,8 @@ body.phau-page .grn-shell .grn-field-error {
   }
   .phau-table-toolbar__select {
     max-width: 100%;
+  }
+  .phau-detail-card {
+    padding: 0.9rem;
   }
 }
