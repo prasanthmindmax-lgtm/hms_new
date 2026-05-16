@@ -462,6 +462,44 @@ class VmsController extends Controller
 
     // ─── PUBLIC: VISITOR REGISTRATION ────────────────────────────────────────
 
+    // ─── PUBLIC: Real-time blacklist check (called on phone blur) ────────────────
+    public function checkBlacklist(Request $request)
+    {
+        $phone = trim($request->input('phone', ''));
+        $name  = trim($request->input('name', ''));
+
+        if (empty($phone) && empty($name)) {
+            return response()->json(['blacklisted' => false]);
+        }
+
+        $query = \App\Models\VmsBlacklist::where('is_active', true);
+
+        if ($phone) {
+            $query->where(function ($q) use ($phone, $name) {
+                $q->where('visitor_phone', $phone);
+                if ($name) {
+                    $q->orWhere(function ($q2) use ($name) {
+                        $q2->whereRaw('LOWER(visitor_name) = ?', [strtolower($name)]);
+                    });
+                }
+            });
+        } elseif ($name) {
+            $query->whereRaw('LOWER(visitor_name) = ?', [strtolower($name)]);
+        }
+
+        $record = $query->first();
+
+        if ($record) {
+            return response()->json([
+                'blacklisted' => true,
+                'reason'      => $record->reason,
+                'name'        => $record->visitor_name,
+            ]);
+        }
+
+        return response()->json(['blacklisted' => false]);
+    }
+
     public function showRegister(string $uuid)
     {
         $qr = VmsQrCode::where('uuid', $uuid)->where('is_active', true)->firstOrFail();

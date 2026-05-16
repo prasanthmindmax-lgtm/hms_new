@@ -61,14 +61,80 @@ body{background:linear-gradient(135deg,#0f2d4a 0%,#1a7f64 100%);min-height:100vh
 /* Buttons */
 .btn-next{width:100%;background:linear-gradient(135deg,#1a7f64,#16a37e);color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;margin-top:8px}
 .btn-next:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(26,127,100,0.35)}
+.btn-next:disabled{background:linear-gradient(135deg,#94a3b8,#cbd5e1)!important;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 .btn-back{background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:12px;padding:11px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%;transition:all 0.15s}
 .btn-back:hover{background:var(--border)}
 .error-msg{color:#dc2626;font-size:11px;margin-top:4px;display:none}
 .step-page{display:none}
 .step-page.active{display:block}
+
+/* Blacklist warning */
+.bl-warning{
+  display:none;background:#fff1f2;border:2px solid #fca5a5;
+  border-radius:14px;padding:18px 20px;margin-top:14px;
+  animation:blPulse 0.3s ease;
+}
+@keyframes blPulse{from{transform:scale(0.97);opacity:0}to{transform:scale(1);opacity:1}}
+.bl-warning-icon{
+  width:52px;height:52px;border-radius:50%;background:#fee2e2;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 10px;flex-shrink:0;
+}
+.bl-warning-icon i{font-size:26px;color:#dc2626}
+.bl-warning-title{font-size:16px;font-weight:700;color:#991b1b;text-align:center;margin-bottom:6px}
+.bl-warning-msg{font-size:13px;color:#b91c1c;text-align:center;line-height:1.5}
+.bl-warning-reason{
+  background:#fee2e2;border-radius:8px;padding:8px 12px;
+  font-size:12px;color:#7f1d1d;margin-top:10px;text-align:center;
+}
+.bl-warning-footer{
+  font-size:11px;color:#6b7280;text-align:center;margin-top:10px;
+}
+
+/* Phone checking spinner */
+.phone-checking{display:none;font-size:11px;color:var(--muted);margin-top:4px}
+.phone-ok{display:none;font-size:11px;color:#16a34a;margin-top:4px}
+
+/* Full page block overlay */
+.bl-fullblock{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#450a0a 0%,#7f1d1d 100%);
+  flex-direction:column;align-items:center;justify-content:center;
+  padding:30px 20px;text-align:center;
+}
+.bl-fullblock.show{display:flex}
+.bl-fullblock-icon{
+  width:90px;height:90px;border-radius:50%;
+  background:rgba(255,255,255,0.1);border:3px solid rgba(255,255,255,0.3);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:24px;
+}
+.bl-fullblock-icon i{font-size:44px;color:#fca5a5}
+.bl-fullblock h2{font-size:22px;font-weight:800;color:#fff;margin-bottom:10px}
+.bl-fullblock p{font-size:14px;color:rgba(255,255,255,0.75);max-width:380px;line-height:1.6;margin-bottom:16px}
+.bl-fullblock .bl-reason-box{
+  background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);
+  border-radius:12px;padding:12px 20px;font-size:13px;color:#fecaca;
+  max-width:400px;margin-bottom:24px;
+}
+.bl-fullblock small{font-size:11px;color:rgba(255,255,255,0.4)}
 </style>
 </head>
 <body>
+
+{{-- ██ BLACKLIST FULL-PAGE BLOCK ██ --}}
+<div class="bl-fullblock" id="blFullBlock">
+  <div class="bl-fullblock-icon">
+    <i class="ti ti-ban"></i>
+  </div>
+  <h2>Access Denied</h2>
+  <p>You have been restricted from registering at <strong>{{ $settings['hospital_name'] ?? "Dr. Aravind's IVF" }}</strong>. Your details are on our security blacklist.</p>
+  <div class="bl-reason-box">
+    <i class="ti ti-alert-triangle me-1"></i>
+    <span id="blFullReason">Entry not permitted.</span>
+  </div>
+  <small>If you believe this is a mistake, please contact the hospital security desk.</small>
+</div>
 
 <div class="reg-wrapper">
   <div class="reg-header">
@@ -110,8 +176,16 @@ body{background:linear-gradient(135deg,#0f2d4a 0%,#1a7f64 100%);min-height:100vh
           </div>
           <div class="col-md-6">
             <label class="form-label">Mobile Number <span class="req">*</span></label>
-            <input type="tel" name="visitor_phone" id="visitor_phone" class="form-control" placeholder="10-digit mobile number" maxlength="15" required autocomplete="tel">
+            <input type="tel" name="visitor_phone" id="visitor_phone" class="form-control"
+                   placeholder="10-digit mobile number" maxlength="15" required autocomplete="tel">
             <div class="error-msg" id="err_phone">Please enter a valid phone number</div>
+            <div class="phone-checking" id="phoneChecking">
+              <i class="ti ti-loader-2 me-1" style="animation:spin 0.8s linear infinite;display:inline-block"></i>
+              Checking security list…
+            </div>
+            <div class="phone-ok" id="phoneOk">
+              <i class="ti ti-circle-check me-1"></i> Verified — not on blacklist
+            </div>
           </div>
           <div class="col-md-6">
             <label class="form-label">Email Address</label>
@@ -143,7 +217,21 @@ body{background:linear-gradient(135deg,#0f2d4a 0%,#1a7f64 100%);min-height:100vh
             <input type="file" id="photoInput" name="photo" accept="image/*" capture="user" style="display:none">
           </div>
         </div>
-        <button type="button" class="btn-next mt-4" onclick="goStep(2)">
+        {{-- Inline blacklist warning --}}
+        <div class="bl-warning" id="blInlineWarn">
+          <div class="bl-warning-icon"><i class="ti ti-ban"></i></div>
+          <div class="bl-warning-title">Registration Blocked</div>
+          <div class="bl-warning-msg">
+            Your mobile number or name has been found on our security restricted list.
+            You are not permitted to register a visit at this facility.
+          </div>
+          <div class="bl-warning-reason" id="blInlineReason"></div>
+          <div class="bl-warning-footer">
+            Please contact the hospital security desk if you believe this is an error.
+          </div>
+        </div>
+
+        <button type="button" class="btn-next mt-4" id="step1NextBtn" onclick="goStep(2)">
           Continue <i class="ti ti-arrow-right" style="font-size:16px"></i>
         </button>
       </div>
@@ -303,9 +391,91 @@ body{background:linear-gradient(135deg,#0f2d4a 0%,#1a7f64 100%);min-height:100vh
   </div>
 </div>
 
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script>
 let currentStep = 1;
+let isBlacklisted = false;   // global flag — blocks step advance if true
+let blCheckTimer  = null;    // debounce timer
+
+// ── Blacklist check ────────────────────────────────────
+function runBlacklistCheck() {
+  const phone = $('#visitor_phone').val().trim();
+  const name  = $('#visitor_name').val().trim();
+
+  // Need at least a phone number to check
+  if (phone.length < 10) {
+    clearBlacklistUI();
+    return;
+  }
+
+  $('#phoneChecking').show();
+  $('#phoneOk').hide();
+  $('#blInlineWarn').hide();
+  $('#step1NextBtn').prop('disabled', false);
+  isBlacklisted = false;
+
+  $.ajax({
+    url: '{{ route("vms.check.blacklist") }}',
+    type: 'POST',
+    data: { phone, name, _token: '{{ csrf_token() }}' },
+    success: function(res) {
+      $('#phoneChecking').hide();
+      if (res.blacklisted) {
+        isBlacklisted = true;
+        // Show inline warning
+        $('#blInlineReason').text('Reason: ' + (res.reason || 'Security restriction'));
+        $('#blInlineWarn').fadeIn(300);
+        // Disable Continue button
+        $('#step1NextBtn').prop('disabled', true).html('<i class="ti ti-ban me-2"></i>Registration Blocked');
+        // Show full-screen block after a short delay
+        setTimeout(() => {
+          $('#blFullReason').text(res.reason || 'Entry not permitted per security policy.');
+          $('#blFullBlock').addClass('show');
+        }, 1200);
+      } else {
+        $('#phoneOk').fadeIn(200);
+        isBlacklisted = false;
+        $('#step1NextBtn').prop('disabled', false).html('Continue <i class="ti ti-arrow-right" style="font-size:16px"></i>');
+      }
+    },
+    error: function() {
+      $('#phoneChecking').hide();
+      // On error, allow form but server will catch at submit
+    }
+  });
+}
+
+function clearBlacklistUI() {
+  isBlacklisted = false;
+  $('#blInlineWarn').hide();
+  $('#phoneChecking').hide();
+  $('#phoneOk').hide();
+  $('#blFullBlock').removeClass('show');
+  $('#step1NextBtn').prop('disabled', false).html('Continue <i class="ti ti-arrow-right" style="font-size:16px"></i>');
+}
+
+// Debounced listeners on phone and name
+$(document).ready(function() {
+  $('#visitor_phone').on('blur', function() {
+    clearTimeout(blCheckTimer);
+    runBlacklistCheck();
+  }).on('input', function() {
+    clearTimeout(blCheckTimer);
+    clearBlacklistUI();
+    blCheckTimer = setTimeout(runBlacklistCheck, 800);
+  });
+
+  $('#visitor_name').on('blur', function() {
+    if ($('#visitor_phone').val().trim().length >= 10) {
+      clearTimeout(blCheckTimer);
+      blCheckTimer = setTimeout(runBlacklistCheck, 400);
+    }
+  });
+
+  // Clicking outside the full-block is prevented (user cannot dismiss it)
+  $('#blFullBlock').on('click', function(e) { e.stopPropagation(); });
+});
 
 // ── Step navigation ───────────────────────────────────
 function goStep(target) {
@@ -330,6 +500,12 @@ function validateStep(step) {
     let ok = true;
     if (!name) { $('#err_name').show(); ok = false; } else $('#err_name').hide();
     if (!phone || phone.length < 10) { $('#err_phone').show(); ok = false; } else $('#err_phone').hide();
+    // Block if blacklisted
+    if (isBlacklisted) {
+      $('#blInlineWarn').fadeIn(300);
+      $('#blFullBlock').addClass('show');
+      return false;
+    }
     return ok;
   }
   if (step === 2) {

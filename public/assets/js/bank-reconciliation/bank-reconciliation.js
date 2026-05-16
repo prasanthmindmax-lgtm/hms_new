@@ -5687,6 +5687,8 @@ $(document).ready(function() {
     var incomeTagBranchFinancialFilesByDate = null;
     var incomeTagBfXhr = null;
     var incomeTagBfTimer = null;
+    var incomeTagMocRowsTimer = null;
+    var incomeTagMocRowsXhr = null;
 
     function incomeTagBfRowToViewerBySection(x) {
         var p = x && x.path ? String(x.path).trim() : '';
@@ -5929,6 +5931,86 @@ $(document).ready(function() {
         return out;
     }
 
+    function scheduleIncomeTagMocDateRowFetch() {
+        if (incomeTagMocRowsTimer) {
+            clearTimeout(incomeTagMocRowsTimer);
+        }
+        incomeTagMocRowsTimer = setTimeout(function () {
+            incomeTagMocRowsTimer = null;
+            fetchIncomeTagMocDateRowTotals();
+        }, 450);
+    }
+
+    /** Placeholder HTML for MOC DOC cells while MOC API is loading (Bootstrap 5 spinner). */
+    function incomeTagMocCellLoadingHtml() {
+        return (
+            '<span class="income-tag-moc-loading d-inline-flex align-items-center justify-content-end" aria-busy="true">' +
+            '<span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Loading MOC DOC"></span>' +
+            '</span>'
+        );
+    }
+
+    function fetchIncomeTagMocDateRowTotals() {
+        if (!routes.incomeTagMocTotals) {
+            return;
+        }
+        var branch = ($('#incomeTagBranchName').val() || '').trim();
+        var dates = getIncomeTagSelectedYmdSorted();
+        if (!branch || dates.length < 2) {
+            $('.income-tag-moc-cell').empty().text('—');
+            return;
+        }
+        var modes = Array.from(incomeTagSelectedModes);
+        if (incomeTagMocRowsXhr && incomeTagMocRowsXhr.abort) {
+            try {
+                incomeTagMocRowsXhr.abort();
+            } catch (eAbort) { /* ignore */ }
+        }
+        $('.income-tag-moc-cell').html(incomeTagMocCellLoadingHtml());
+        var ajaxData = { branch: branch, dates: dates };
+        if (modes.length) {
+            ajaxData.modes = modes;
+        }
+        incomeTagMocRowsXhr = $.ajax({
+            url: routes.incomeTagMocTotals,
+            type: 'GET',
+            // Do not use traditional: true — Laravel needs dates[] / modes[] bracket arrays for validation.
+            data: ajaxData,
+            success: function (res) {
+                incomeTagMocRowsXhr = null;
+                if (!res || !res.success || !res.rows) {
+                    $('.income-tag-moc-cell').empty().text('—');
+                    return;
+                }
+                var byYmd = {};
+                res.rows.forEach(function (r) {
+                    if (r && r.date_ymd) {
+                        byYmd[r.date_ymd] = r;
+                    }
+                });
+                $('.income-tag-moc-cell').each(function () {
+                    var ymd = $(this).data('ymd');
+                    var row = ymd ? byYmd[ymd] : null;
+                    if (!row || typeof row.total_selected !== 'number') {
+                        $(this).empty().text('—');
+                        return;
+                    }
+                    var t = row.total_selected;
+                    var tip = 'Cash ₹' + formatNumber(row.cash)
+                        + ' · Card ₹' + formatNumber(row.card)
+                        + ' · UPI ₹' + formatNumber(row.upi)
+                        + ' · NEFT ₹' + formatNumber(row.neft)
+                        + ' · Other ₹' + formatNumber(row.other);
+                    $(this).empty().text('₹' + formatNumber(t)).attr('title', tip);
+                });
+            },
+            error: function () {
+                incomeTagMocRowsXhr = null;
+                $('.income-tag-moc-cell').empty().text('—');
+            },
+        });
+    }
+
     /** When 2+ collection dates: show per-date bank split (defaults to equal parts of this line). */
     function rebuildIncomeTagSplitRows() {
         var $wrap = $('#incomeTagDateSplitWrap');
@@ -5946,8 +6028,8 @@ $(document).ready(function() {
         }
         var n = dates.length;
         var each = n ? Math.round((total / n) * 100) / 100 : 0;
-        var html = '<p class="small text-muted mb-1">Split this bank line across dates (sum must equal ₹' + formatNumber(total) + '). Edit if needed.</p>';
-        html += '<div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead><tr><th>Date</th><th>Amount (₹)</th></tr></thead><tbody>';
+        var html = '<p class="small text-muted mb-1">Split this bank line across dates (sum must equal ₹' + formatNumber(total) + '). The <strong>MOC DOC</strong> column loads from MOC for each date (selected modes; Card+UPI combined when both are selected; if no mode is selected, shows the full MOC total).</p>';
+        html += '<div class="table-responsive"><table class="table table-sm table-bordered mb-0"><thead><tr><th>Date</th><th>Amount (₹)</th><th class="text-end">MOC DOC</th></tr></thead><tbody>';
         var sumFirst = 0;
         dates.forEach(function (ymd, i) {
             var amt = (i === n - 1) ? Math.round((total - sumFirst) * 100) / 100 : each;
@@ -5956,10 +6038,11 @@ $(document).ready(function() {
             }
             html += '<tr><td class="small">' + moment(ymd, 'YYYY-MM-DD').format('DD/MM/YYYY') + '</td><td>';
             html += '<input type="number" step="0.01" min="0" class="form-control form-control-sm income-tag-split-amt" data-ymd="' + ymd + '" value="' + amt + '">';
-            html += '</td></tr>';
+            html += '</td><td class="small text-end income-tag-moc-cell text-nowrap align-middle" data-ymd="' + ymd + '">' + incomeTagMocCellLoadingHtml() + '</td></tr>';
         });
         html += '</tbody></table></div>';
         $wrap.html(html).show();
+        scheduleIncomeTagMocDateRowFetch();
     }
 
     function collectIncomeTagDateAmountsMap() {
@@ -6024,6 +6107,10 @@ $(document).ready(function() {
             clearTimeout(incomeTagBfTimer);
             incomeTagBfTimer = null;
         }
+        if (incomeTagMocRowsTimer) {
+            clearTimeout(incomeTagMocRowsTimer);
+            incomeTagMocRowsTimer = null;
+        }
         if (incomeTagBfXhr && incomeTagBfXhr.abort) {
             try {
                 incomeTagBfXhr.abort();
@@ -6032,6 +6119,14 @@ $(document).ready(function() {
             }
         }
         incomeTagBfXhr = null;
+        if (incomeTagMocRowsXhr && incomeTagMocRowsXhr.abort) {
+            try {
+                incomeTagMocRowsXhr.abort();
+            } catch (eAbMoc) {
+                /* ignore */
+            }
+        }
+        incomeTagMocRowsXhr = null;
         incomeTagBranchFinancialFlatFiles = [];
         incomeTagBranchFinancialFilesByDate = null;
         patchIncomeTagBranchFinancialControls({ count: 0, launchEnabled: false });
@@ -6249,6 +6344,7 @@ $(document).ready(function() {
         $('#incomeTagFilterSummary').text(parts.length ? parts.join(' | ') : 'No filters applied yet');
 
         scheduleIncomeTagBranchFinancialFetch();
+        scheduleIncomeTagMocDateRowFetch();
     }
 
     // ---- Apply Income Tag ----
@@ -6383,6 +6479,7 @@ $(document).ready(function() {
             upi:  'bi-phone',
             neft: 'bi-bank',
             other:'bi-three-dots',
+            card_upi: 'bi-wallet2',
         };
         var modeColorMap = {
             cash:  '#10b981',
@@ -6390,11 +6487,12 @@ $(document).ready(function() {
             upi:   '#f59e0b',
             neft:  '#0ea5e9',
             other: '#94a3b8',
+            card_upi: '#6366f1',
         };
 
         var cards = mismatches.map(function (m) {
             var mode   = String(m.mode || '').toLowerCase();
-            var modeUp = mode.toUpperCase();
+            var modeUp = mode === 'card_upi' ? 'CARD + UPI' : mode.toUpperCase();
             var icon   = modeIconMap[mode]  || 'bi-currency-rupee';
             var color  = modeColorMap[mode] || '#6366f1';
             var diff   = m.diff;

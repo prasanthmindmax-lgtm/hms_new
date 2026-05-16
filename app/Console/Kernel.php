@@ -28,13 +28,13 @@ class Kernel extends ConsoleKernel
 
        // Sync MOC Doc data to local DB (runs at 23:30 IST every night for yesterday's data)
        $schedule->command('mocdoc:sync-checkin --days=1')
-                ->dailyAt('13:22')
+                ->dailyAt('12:31')
                 ->timezone('Asia/Kolkata')
                 ->withoutOverlapping()
                 ->appendOutputTo(storage_path('logs/mocdoc-checkin-sync.log'));
 
        $schedule->command('mocdoc:sync-registration --days=1')
-                ->dailyAt('13:15')
+                ->dailyAt('12:31')
                 ->timezone('Asia/Kolkata')
                 ->withoutOverlapping()
                 ->appendOutputTo(storage_path('logs/mocdoc-registration-sync.log'));

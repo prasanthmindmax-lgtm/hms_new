@@ -2644,6 +2644,7 @@
             incomeTagBranches: "{{ route('bank-reconciliation.income-tag.branches') }}",
             incomeTagBranchFinancialFiles: "{{ route('bank-reconciliation.income-tag.branch-financial-files') }}",
             incomeTagResolve: "{{ route('bank-reconciliation.income-tag.resolve-description') }}",
+            incomeTagMocTotals: "{{ route('bank-reconciliation.income-tag.moc-totals-for-dates') }}",
             radiantMatchAgainst: "{{ route('bank-reconciliation.radiant-match-against') }}",
             radiantCashPickupsForDate: "{{ route('bank-reconciliation.radiant-cash-pickups-for-date') }}",
             radiantUnmatch: "{{ route('bank-reconciliation.radiant-unmatch', ':id') }}",
