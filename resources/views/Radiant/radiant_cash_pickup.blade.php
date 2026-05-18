@@ -87,11 +87,18 @@ body{font-family:var(--font);background:#f1f5f9;}
 .hbtn-outline{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.18);}
 .hbtn-outline:hover{background:rgba(255,255,255,.15);}
 
-/* ── STAT CARDS ── */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px;}
+/* ── STAT CARDS (single row) ── */
+.stat-grid{
+    display:flex;flex-wrap:nowrap;align-items:stretch;gap:12px;
+    margin-bottom:24px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+}
+.stat-grid::-webkit-scrollbar{height:5px;}
+.stat-grid::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
 .stat-card{
+    flex:1 1 0;min-width:0;
     background:var(--surface);border-radius:var(--radius);
-    padding:20px 22px;border:1px solid var(--border);
+    padding:14px 16px;border:1px solid var(--border);
     box-shadow:var(--shadow);position:relative;overflow:hidden;
     transition:transform .15s,box-shadow .15s;
 }
@@ -104,13 +111,80 @@ body{font-family:var(--font);background:#f1f5f9;}
 .sc-teal::after{background:linear-gradient(90deg,var(--teal),#2dd4bf);}
 .sc-violet::after{background:linear-gradient(90deg,var(--violet),#c084fc);}
 .sc-rose::after{background:linear-gradient(90deg,var(--rose),#fb7185);}
-.stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:12px;}
+.stat-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.95rem;margin-bottom:8px;}
 .sc-amber .stat-icon{background:var(--amber-lt);color:var(--amber2);}
 .sc-teal  .stat-icon{background:var(--teal-lt);color:var(--teal);}
 .sc-violet .stat-icon{background:var(--violet-lt);color:var(--violet);}
 .sc-rose  .stat-icon{background:var(--rose-lt);color:var(--rose);}
 .sc-emerald::after{background:linear-gradient(90deg,#059669,#34d399);}
 .sc-emerald .stat-icon{background:#d1fae5;color:#047857;}
+.sc-slate::after{background:linear-gradient(90deg,#475569,#94a3b8);}
+.sc-slate .stat-icon{background:#f1f5f9;color:#475569;}
+
+/* ── FILTER PANEL (external, settlement-style) ── */
+.filter-panel{
+    background:var(--surface);border-radius:var(--radius);
+    border:1px solid var(--border);box-shadow:var(--shadow);
+    margin-bottom:18px;overflow:visible;position:relative;z-index:20;
+}
+.filter-panel-header{
+    padding:14px 20px;background:var(--surface2);
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+}
+.filter-panel-title{font-size:.82rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:7px;}
+.filter-panel-actions{display:flex;align-items:center;gap:8px;}
+.filter-count-badge{
+    background:var(--amber-lt);color:var(--amber2);
+    font-size:.68rem;font-weight:800;padding:2px 8px;
+    border-radius:20px;border:1px solid #fcd34d;display:none;
+}
+.filter-count-badge.show{display:inline-flex;}
+.filter-body{padding:18px 20px;}
+.filter-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+    gap:14px;align-items:start;
+}
+.filter-field label{
+    display:flex;align-items:center;gap:5px;
+    font-size:.67rem;font-weight:800;text-transform:uppercase;
+    letter-spacing:.7px;color:var(--text3);margin-bottom:6px;
+}
+.fc,.fc-date{
+    width:100%;padding:8px 12px;border:1.5px solid var(--border);
+    border-radius:var(--radius-sm);font-size:.82rem;font-family:var(--font);
+    color:var(--text);background:var(--surface2);
+    transition:border-color .15s,box-shadow .15s;
+}
+.fc:focus,.fc-date:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(245,158,11,.12);}
+.date-wrap{position:relative;}
+.date-wrap .cal-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:.8rem;pointer-events:none;}
+.date-wrap .fc-date{padding-left:32px;}
+.fbtn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:700;cursor:pointer;border:none;font-family:var(--font);transition:all .15s;}
+.fbtn-amber{background:var(--amber);color:var(--navy);}
+.fbtn-amber:hover{background:var(--amber2);transform:translateY(-1px);}
+.fbtn-ghost{background:var(--surface2);color:var(--text2);border:1.5px solid var(--border);}
+.fbtn-ghost:hover{border-color:var(--border2);background:var(--border);}
+.fbtn-sm{padding:6px 12px;font-size:.76rem;}
+.filter-panel .active-chips{
+    display:flex;flex-wrap:wrap;gap:6px;
+    padding:0 20px 14px;min-height:0;
+}
+.filter-panel .active-chips:empty{display:none;}
+.filter-panel .no-chip{font-size:.75rem;color:var(--text3);font-style:italic;}
+.fchip{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:3px 10px;border-radius:20px;
+    font-size:.7rem;font-weight:700;
+    background:var(--navy);color:#fff;border:1px solid var(--navy2);
+}
+.fchip .rx,.fchip-remove{
+    display:flex;align-items:center;justify-content:center;
+    width:14px;height:14px;border-radius:50%;
+    background:rgba(255,255,255,.2);cursor:pointer;font-size:.6rem;margin-left:2px;
+}
+.fchip .rx:hover,.fchip-remove:hover{background:rgba(255,255,255,.4);}
+.bdg-gray{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}
 .rcp-stat-interactive{cursor:pointer;}
 .rcp-stat-interactive:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
 .rcp-stat-interactive:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
@@ -120,7 +194,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 .stat-card.sc-rose.rcp-stat-active{box-shadow:0 0 0 3px rgba(244,63,94,.38),var(--shadow-lg);}
 @keyframes rcpFadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .stat-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:3px;}
-.stat-value{font-size:1.35rem;font-weight:800;color:var(--text);font-family:var(--mono);letter-spacing:-.5px;}
+.stat-value{font-size:1.05rem;font-weight:800;color:var(--text);font-family:var(--mono);letter-spacing:-.5px;line-height:1.25;word-break:break-word;}
 .stat-sub{font-size:.72rem;color:var(--text3);margin-top:2px;}
 
 /* ── UPLOAD MODAL OVERLAY ── */
@@ -420,7 +494,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 
 @media(max-width:640px){
     .rcp-wrap{padding:14px 10px;}
-    .stat-grid{grid-template-columns:repeat(2,1fr);}
+    .stat-card{flex:0 0 min(28vw, 160px);min-width:130px;}
     .fm-row{grid-template-columns:1fr;}
     .search-input{width:100%;}
 }
@@ -871,7 +945,24 @@ body{font-family:var(--font);background:#f1f5f9;}
     <div class="stat-value" id="rcpStatMismatch">—</div>
     <div class="stat-sub">Missing data or amount variance · click</div>
   </div>
+
+  @if($bankRadiantLinking ?? false)
+  <div class="stat-card sc-slate" id="rcpStatBankTaggedWrap">
+    <div class="stat-icon"><i class="bi bi-link-45deg"></i></div>
+    <div class="stat-label">Bank tagged</div>
+    <div class="stat-value" id="rcpStatBankTagged">{{ $bankRadiantTagged !== null ? number_format($bankRadiantTagged) : '—' }}</div>
+    <div class="stat-sub">Linked in bank recon</div>
+  </div>
+  <div class="stat-card sc-slate" id="rcpStatBankUntaggedWrap">
+    <div class="stat-icon"><i class="bi bi-link-break"></i></div>
+    <div class="stat-label">Bank not tagged</div>
+    <div class="stat-value" id="rcpStatBankUntagged">{{ $bankRadiantUntagged !== null ? number_format($bankRadiantUntagged) : '—' }}</div>
+    <div class="stat-sub">No bank recon link</div>
+  </div>
+  @endif
 </div>
+
+@include('Radiant.partials.radiant_filter_panel')
 
 {{-- ── BATCH UPLOADS: toggled from “Upload Batches” stat card ─────────── --}}
 <div id="rcpBatchSection" class="rcp-batch-section">
@@ -906,25 +997,17 @@ body{font-family:var(--font);background:#f1f5f9;}
   </div>
 </div>
 
-{{-- ── ACTIVE FILTER CHIPS ───────────────────────────────────────────── --}}
-<div class="active-chips" id="activeChips">
-  <span class="no-chip" id="noChip">No filters applied</span>
-</div>
 
 {{-- ── TABLE TOOLBAR ─────────────────────────────────────────────────── --}}
 <div class="tbl-toolbar">
   <div class="toolbar-left">
-    <div class="search-wrap">
+    <!-- <div class="search-wrap">
       <i class="bi bi-search search-ico"></i>
       <input type="text" class="search-input" id="searchInput"
              placeholder="Search by state, location, slip no…"
              value="{{ request('search') }}"
              autocomplete="off">
-    </div>
-    <button type="button" class="btn-filter" id="filterBtn">
-      <i class="bi bi-sliders2"></i> Filters
-      <span class="filter-dot" id="filterDot"></span>
-    </button>
+    </div> -->
     <select class="per-page-select" id="rcpPerPage">
       @foreach([25,50,100,250] as $pp)
         <option value="{{ $pp }}" {{ request('per_page', 25) == $pp ? 'selected' : '' }}>{{ $pp }} / page</option>
@@ -954,11 +1037,17 @@ body{font-family:var(--font);background:#f1f5f9;}
           <th>Difference</th>
           <th>Remarks</th>
           <th>CCV</th>
+          @if($bankRadiantLinking ?? false)
+          <th>Bank Recon</th>
+          <th>Tagged by</th>
+          <th>Tagged at</th>
+          <th>Status</th>
+          @endif
           <th>Batch</th>
         </tr>
       </thead>
       <tbody id="rcpTableBody">
-        @include('Radiant.partials.radiant_cash_rows', ['records' => $records])
+        @include('Radiant.partials.radiant_cash_rows', ['records' => $records, 'bankRadiantLinking' => $bankRadiantLinking ?? false])
       </tbody>
     </table>
   </div>
@@ -1023,85 +1112,6 @@ body{font-family:var(--font);background:#f1f5f9;}
         <button type="button" class="btn-cancel" id="rcpUploadCancelBtn">Cancel</button>
         <button type="submit" class="btn-upload" id="uploadBtn">
           <i class="bi bi-cloud-upload-fill"></i> Upload &amp; Import
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-{{-- ══════════════════════════════════════════════════════════════════
-     FILTER MODAL
-══════════════════════════════════════════════════════════════════ --}}
-<div class="filter-overlay" id="filterOverlay">
-  <div class="filter-modal" id="filterModalInner">
-    <div class="fm-header">
-      <div class="fm-title"><i class="bi bi-sliders2"></i> Search &amp; Filter</div>
-      <div class="fm-close" id="rcpFilterClose" role="button" tabindex="0"><i class="bi bi-x-lg"></i></div>
-    </div>
-    <form id="filterForm" action="#" onsubmit="return false;">
-      <div class="fm-body">
-        <div class="fm-row">
-          <div class="fm-field">
-            <label>Date From</label>
-            <div class="date-wrap">
-              <i class="bi bi-calendar3 cal-ico"></i>
-              <input type="text" name="date_from" id="fDateFrom" class="fc fc-date"
-                     placeholder="dd/mm/yyyy" autocomplete="off" readonly
-                     value="{{ request('date_from') }}">
-            </div>
-          </div>
-          <div class="fm-field">
-            <label>Date To</label>
-            <div class="date-wrap">
-              <i class="bi bi-calendar3 cal-ico"></i>
-              <input type="text" name="date_to" id="fDateTo" class="fc fc-date"
-                     placeholder="dd/mm/yyyy" autocomplete="off" readonly
-                     value="{{ request('date_to') }}">
-            </div>
-          </div>
-        </div>
-        <div class="fm-row">
-          <div class="fm-field">
-            <label>State</label>
-            <select name="state" id="rcpStateSelect" class="fc">
-              <option value="">All States</option>
-              @foreach($states as $s)
-                <option value="{{ $s }}" {{ request('state') == $s ? 'selected' : '' }}>{{ $s }}</option>
-              @endforeach
-            </select>
-          </div>
-          <div class="fm-field">
-            <label>Zone</label>
-            <select name="zone_id" id="rcpZoneSelect" class="fc">
-              <option value="">All Zones</option>
-              @foreach($zones as $z)
-                <option value="{{ $z->id }}" {{ (string) request('zone_id') === (string) $z->id ? 'selected' : '' }}>{{ $z->name }}</option>
-              @endforeach
-            </select>
-          </div>
-          <div class="fm-field">
-            <label>Branch</label>
-            <select name="branch_id" id="rcpBranchSelect" class="fc">
-              <option value="">All Branches</option>
-              @foreach($branchesForFilter as $b)
-                <option value="{{ $b->id }}" {{ (string) request('branch_id') === (string) $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
-              @endforeach
-            </select>
-          </div>
-        </div>
-        <div class="fm-field">
-          <label>Universal Search</label>
-          <input type="text" name="search" id="filterSearchInput" class="fc" placeholder="Slip no, location, state, amount…"
-                 value="{{ request('search') }}">
-        </div>
-        <input type="hidden" name="per_page" id="filterFormPerPage" value="{{ request('per_page', 25) }}">
-      </div>
-      <div class="fm-footer">
-        <button type="button" class="btn-reset-f" id="rcpFilterResetBtn">
-          <i class="bi bi-arrow-counterclockwise"></i> Reset
-        </button>
-        <button type="button" class="btn-apply-f" id="rcpFilterApplyBtn">
-          <i class="bi bi-search"></i> Apply Filters
         </button>
       </div>
     </form>
@@ -1368,6 +1378,7 @@ body{font-family:var(--font);background:#f1f5f9;}
     var rcpState = { page: {{ (int) $records->currentPage() }} };
     var rcpSearchTimer = null;
     var rcpLoading = false;
+    var rcpBankRadiantLinking = @json($bankRadiantLinking ?? false);
 
     toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
 
@@ -1392,7 +1403,7 @@ body{font-family:var(--font);background:#f1f5f9;}
 
     function getListParams(page) {
         syncPerPageHidden();
-        return {
+        var p = {
             page: page,
             per_page: $('#rcpPerPage').val(),
             date_from: $('#fDateFrom').val() || '',
@@ -1400,8 +1411,17 @@ body{font-family:var(--font);background:#f1f5f9;}
             state: $('#rcpStateSelect').val() || '',
             zone_id: $('#rcpZoneSelect').val() || '',
             branch_id: $('#rcpBranchSelect').val() || '',
-            search: $('#searchInput').val() || ''
+            search: $('#searchInput').val() || $('#filterSearchInput').val() || ''
         };
+        var bankTag = $('#rcpBankRadiantTag').val() || '';
+        if (bankTag === 'tagged' || bankTag === 'untagged') {
+            p.bank_radiant_tag = bankTag;
+        }
+        var taggedBy = $('#rcpRadiantTaggedBy').val() || '';
+        if (taggedBy) {
+            p.radiant_tagged_by = [taggedBy];
+        }
+        return p;
     }
 
     function getReconcileParams() {
@@ -1595,6 +1615,24 @@ body{font-family:var(--font);background:#f1f5f9;}
                     $br.append(opt);
                 });
             }
+
+            if (res.bank_radiant_linking) {
+                $('#rcpBankRadiantTagWrap, #rcpRadiantTaggedByWrap').show();
+            } else {
+                $('#rcpBankRadiantTagWrap, #rcpRadiantTaggedByWrap').hide();
+                $('#rcpBankRadiantTag, #rcpRadiantTaggedBy').val('');
+            }
+
+            if (opts.populateTaggers && res.taggers && $('#rcpRadiantTaggedBy').length) {
+                var $tb = $('#rcpRadiantTaggedBy');
+                var curT = $tb.val();
+                $tb.html('<option value="">Anyone</option>');
+                (res.taggers || []).forEach(function (u) {
+                    var opt = $('<option></option>').attr('value', u.id).text(u.name);
+                    if (curT && String(curT) === String(u.id)) opt.prop('selected', true);
+                    $tb.append(opt);
+                });
+            }
         });
     }
 
@@ -1617,16 +1655,27 @@ body{font-family:var(--font);background:#f1f5f9;}
         if ($('#rcpBranchSelect').val()) {
             addChip('Branch', $('#rcpBranchSelect option:selected').text(), 'branch_id');
         }
-        addChip('Search', $('#searchInput').val(), 'search');
+        addChip('Search', $('#searchInput').val() || $('#filterSearchInput').val(), 'search');
+        var bankTag = $('#rcpBankRadiantTag').val() || '';
+        if (bankTag === 'tagged') {
+            count++;
+            html += '<span class="fchip">Bank: <strong>Tagged only</strong><span class="rx rcp-chip-remove" data-key="bank_radiant_tag">×</span></span>';
+        } else if (bankTag === 'untagged') {
+            count++;
+            html += '<span class="fchip">Bank: <strong>Not tagged only</strong><span class="rx rcp-chip-remove" data-key="bank_radiant_tag">×</span></span>';
+        }
+        var taggedByVal = $('#rcpRadiantTaggedBy').val();
+        if (taggedByVal) {
+            count++;
+            html += '<span class="fchip">Tagged by: <strong>' + esc($('#rcpRadiantTaggedBy option:selected').text()) + '</strong><span class="rx rcp-chip-remove" data-key="radiant_tagged_by">×</span></span>';
+        }
         if (count > 0) {
             html += '<span class="fchip rcp-clear-all" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5;cursor:pointer">Clear All ×</span>';
             bar.html(html);
-            $('#filterDot').addClass('show').text(count);
-            $('#filterBtn').addClass('active');
+            $('#rcpFilterCountBadge').addClass('show').text(count + ' active');
         } else {
             bar.html('<span class="no-chip" id="noChip">No filters applied</span>');
-            $('#filterDot').removeClass('show').text('');
-            $('#filterBtn').removeClass('active');
+            $('#rcpFilterCountBadge').removeClass('show').text('0 active');
         }
     }
 
@@ -1649,6 +1698,16 @@ body{font-family:var(--font);background:#f1f5f9;}
             $('#rcpPaginationHost').html(res.pagination_html);
             $('#rcpStatAmount').text(fmtINR(res.stats.total_amount));
             $('#rcpStatBatches').text(res.stats.total_batches);
+            if (res.bank_radiant_linking) {
+                rcpBankRadiantLinking = true;
+                $('#rcpStatBankTaggedWrap, #rcpStatBankUntaggedWrap, #rcpBankRadiantTagWrap').show();
+                if (res.stats.bank_radiant_tagged != null) {
+                    $('#rcpStatBankTagged').text(Number(res.stats.bank_radiant_tagged).toLocaleString('en-IN'));
+                }
+                if (res.stats.bank_radiant_untagged != null) {
+                    $('#rcpStatBankUntagged').text(Number(res.stats.bank_radiant_untagged).toLocaleString('en-IN'));
+                }
+            }
             loadReconcileCounts();
             if ($('#rcpBatchSection').hasClass('rcp-batch-section--open')) {
                 loadBatches();
@@ -1724,6 +1783,8 @@ body{font-family:var(--font);background:#f1f5f9;}
         // Reload all zones that have data (no state filter)
         loadFilterOptions({ state: '', updateZones: true, updateBranches: false });
         $('#filterSearchInput, #searchInput').val('');
+        $('#rcpBankRadiantTag').val('');
+        $('#rcpRadiantTaggedBy').val('');
         $('#rcpPerPage').val('25');
         $('#filterFormPerPage').val('25');
         rcpLoad(1);
@@ -1747,6 +1808,10 @@ body{font-family:var(--font);background:#f1f5f9;}
             $('#rcpBranchSelect').val('');
         } else if (key === 'search') {
             $('#filterSearchInput, #searchInput').val('');
+        } else if (key === 'bank_radiant_tag') {
+            $('#rcpBankRadiantTag').val('');
+        } else if (key === 'radiant_tagged_by') {
+            $('#rcpRadiantTaggedBy').val('');
         }
         rcpLoad(1);
     }
@@ -1850,23 +1915,15 @@ body{font-family:var(--font);background:#f1f5f9;}
         });
     });
 
-    /* ── Filter modal ── */
-    $('#filterBtn').on('click.rcp', function () { openFilterModal(); });
-    $('#rcpFilterClose').on('click.rcp', function () { closeFilterModal(); });
-    $('#filterOverlay').on('click.rcp', function (e) {
-        if (e.target === this) closeFilterModal();
-    });
-    $('#filterModalInner').on('click.rcp', function (e) { e.stopPropagation(); });
-
+    /* ── External filter panel ── */
     $('#rcpFilterApplyBtn').on('click.rcp', function () {
         syncToolbarSearchFromFilter();
-        closeFilterModal();
+        $('#searchInput').val($('#filterSearchInput').val());
         rcpLoad(1);
     });
 
     $('#rcpFilterResetBtn').on('click.rcp', function () {
         resetAllFilters();
-        closeFilterModal();
     });
 
     $(document).on('click.rcp', '.rcp-chip-remove', function () {
@@ -1931,9 +1988,12 @@ body{font-family:var(--font);background:#f1f5f9;}
         }
     });
 
+    loadFilterOptions({ state: '', updateZones: true, updateBranches: false, populateTaggers: true });
     renderChips();
 
     loadReconcileCounts();
+
+    $('#rcpRadiantTaggedBy').on('change.rcp', function () { rcpLoad(1); });
 
     function toggleUploadBatchesPanel() {
         var $sec = $('#rcpBatchSection');

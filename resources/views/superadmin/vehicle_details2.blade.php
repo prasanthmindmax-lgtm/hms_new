@@ -734,24 +734,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-md-2">
-                            <div class="card">
-                                <div class="dropdown">
-                                    <input type="text" class="searchInput single_search vehiclevalues_search"
-                                        name="vehicle_details.vehicle_type" id="vehicle_type_filter"
-                                        placeholder="Select Vehicle Type" autocomplete="off">
-                                    <div class="dropdown-options single_search vehicle_marketers">
-                                        @if ($type)
-                                            @foreach ($type as $vt)
-                                                <div data-value="{{ $vt->id }}">{{ $vt->type }}</div>
-                                            @endforeach
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         <!-- @php $insurance_company = App\Models\VehicleInsurance::select('vehicle_insurance_details.company_name','vehicle_insurance_details.id','vehicle_insurance_details.vehicle_id')->get(); @endphp -->
-                        @php
+                        @php 
                         $insurance_company =App\Models\VehicleInsurance::select('company_name', 'id', 'vehicle_id')
                             ->whereIn(DB::raw('(vehicle_id, updated_at)'), function ($query) {
                                 $query->select(DB::raw('vehicle_id, MAX(updated_at)'))
@@ -759,15 +743,15 @@
                                     ->groupBy('vehicle_id');
                             })
                             ->get();
-
+                            
                         @endphp
 
-
+   
                         <!-- <div class="col-xl-2 col-md-2" >
                             <div class="card">
                                 <div class="dropdown">
                                     <input type="text" class="searchInput single_search vehiclevalues_search"
-                                        name="vehicle_insurance_details.company_name" id="insurance_company_name_filter"
+                                        name="vehicle_id" id="insurance_company_name_filter"
                                         placeholder="Select Insurance Company Name" autocomplete="off">
                                     <div class="dropdown-options single_search vehicle_marketers ">
                                         @if ($insurance_company)
@@ -783,13 +767,13 @@
                             <div class="card">
                                 <div class="dropdown">
                                     <input type="text" class="searchInput single_search vehiclevalues_search"
-                                        name="vehicle_insurance_details.company_name" id="insurance_company_name_filter"
+                                        name="vehicle_id" id="insurance_company_name_filter"
                                         placeholder="Select Insurance Company Name" autocomplete="off">
                                     <div class="dropdown-options single_search vehicle_marketers ">
                                       @if ($insurance_company)
                                     @foreach ($insurance_company as $value)
                                         @if (!empty($value->company_name))
-                                            <div data-value="{{ $value->company_name }}">{{ $value->company_name }}</div>
+                                            <div data-value="{{ $value->vehicle_id }}">{{ $value->company_name }}</div>
                                         @endif
                                     @endforeach
                                 @endif
@@ -807,7 +791,7 @@
                     <p style="margin-top: -9px;" class="text-muted f-12 mb-0">
                     <span class="text-truncate w-100"><span id="edit_counts">0</span> Rows for <span id="dateallviews">Last 30 days</span></span>
                     <span class="search_view" style="color:rgb(16 35 255);font-size: 12px;font-weight: unset;cursor: pointer;">Search</span>
-
+                        
                     {{-- <span style="cursor: pointer;" id="created_by_search"
                             class="badge bg-success value_views_mainsearch"></span> --}}
 
@@ -822,10 +806,7 @@
 
                     <span style="cursor: pointer;" id="fuel_type_search"
                         class="badge bg-success value_views_mainsearch"></span>
-
-                    <span style="cursor: pointer;" id="vehicle_type_search"
-                        class="badge bg-success value_views_mainsearch"></span>
-
+                        
                     <span style="cursor: pointer;" id="insurance_company_search"
                         class="badge bg-success value_views_mainsearch"></span>
 
@@ -862,8 +843,6 @@
                                             <th class="thview">Insurance Details</th>
                                             <th class="thview">Vehicle Incharge Driver</th>
                                             <th class="thview">Vehicle Incharge Admin</th>
-                                            <th class="thview">GTS Installed</th>
-                                            <th class="thview">GTS Status</th>
                                             <!-- <th class="thview">Last Service Date</th>
                                             <th class="thview">Last Tyre Change Date</th> -->
                                             <th class="thview">Upload Document</th>
@@ -1000,7 +979,7 @@
                     <!-- Document Upload Model  -->
 
 
-
+                    
                     <!-- Insurance Upload Existing vehicle Id Model  -->
                 <div class="card-body pc-component btn-page">
                     <div class="modal fade" id="exampleModal_ins_1" role="dialog" aria-labelledby="exampleModalLabel"
@@ -1019,12 +998,12 @@
                                         @csrf
                                         <input type="hidden" name="vehicle_id" id="vehicle_id_ins" value="">
                                         <div class="row">
-
+                                            
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
                                                     <label class="form-label required"
                                                         style="font-size: 12px;font-weight: 600;">OD Insurance Company name </label>&nbsp;&nbsp;
-
+                                                       
                                                     <input type="text" class="form-control" id=""
                                                         name="company_name"
                                                         style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
@@ -1034,24 +1013,23 @@
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
                                                     <label class="form-label required"
-                                                        style="font-size: 12px;font-weight: 600;">OD Insurance Start Date</label>&nbsp;&nbsp;
-                                                    <input type="date" class="form-control" id=""
-                                                        name="renewal_date"
-                                                        style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                                        placeholder="Enter Insurance Renewal Date " required>
-                                                </div>
-                                            </div>
-                                            <div class="col-sm-3">
-                                                <div class="mb-3">
-                                                    <label class="form-label required"
-                                                        style="font-size: 12px;font-weight: 600;">OD Insurance End Date</label>&nbsp;&nbsp;
+                                                        style="font-size: 12px;font-weight: 600;">OD Insurance Expiry Date</label>&nbsp;&nbsp;
                                                     <input type="date" class="form-control" id=""
                                                         name="expiry_date"
                                                         style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
                                                         placeholder="Enter Insurance Expiry Date" required>
                                                 </div>
                                             </div>
-
+                                            <div class="col-sm-3">
+                                                <div class="mb-3">
+                                                    <label class="form-label required"
+                                                        style="font-size: 12px;font-weight: 600;">OD Insurance Renewal Date</label>&nbsp;&nbsp;
+                                                    <input type="date" class="form-control" id=""
+                                                        name="renewal_date"
+                                                        style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
+                                                        placeholder="Enter Insurance Renewal Date " required>
+                                                </div>
+                                            </div>
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
                                                     <label class="form-label required"
@@ -1076,24 +1054,23 @@
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
                                                     <label class="form-label required"
-                                                        style="font-size: 12px;font-weight: 600;">TP Insurance Start Date</label>&nbsp;&nbsp;
-                                                    <input type="date" class="form-control" id=""
-                                                        name="thirdparty_renewal_date"
-                                                        style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                                        placeholder="Enter Insurance Renewal Date "required >
-                                                </div>
-                                            </div>
-                                            <div class="col-sm-3">
-                                                <div class="mb-3">
-                                                    <label class="form-label required"
-                                                        style="font-size: 12px;font-weight: 600;">TP Insurance End Date</label>&nbsp;&nbsp;
+                                                        style="font-size: 12px;font-weight: 600;">TP Insurance Expiry Date</label>&nbsp;&nbsp;
                                                     <input type="date" class="form-control" id=""
                                                         name="thirdparty_expiry_date"
                                                         style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
                                                         placeholder="Enter Insurance Expiry Date" required>
                                                 </div>
                                             </div>
-
+                                            <div class="col-sm-3">
+                                                <div class="mb-3">
+                                                    <label class="form-label required"
+                                                        style="font-size: 12px;font-weight: 600;">TP Insurance Renewal Date</label>&nbsp;&nbsp;
+                                                    <input type="date" class="form-control" id=""
+                                                        name="thirdparty_renewal_date"
+                                                        style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
+                                                        placeholder="Enter Insurance Renewal Date "required >
+                                                </div>
+                                            </div>
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
                                                     <label class="form-label required"
@@ -1104,8 +1081,8 @@
                                                         placeholder="Enter Insurance Policy"required >
                                                 </div>
                                             </div>
-
-
+                                    
+                                        
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
                                                     <label class="form-label required"
@@ -1121,7 +1098,7 @@
                                                 </div>
                                             </div>
 
-
+                                           
 
                                             <div class="col-sm-3">
                                                 <div class="mb-3">
@@ -1133,7 +1110,7 @@
                                                         placeholder="Enter Insurance Policy" required>
                                                 </div>
                                             </div>
-
+            
                                         </div>
                                         <div class="row">
                                             <div class="modal-footer">
@@ -1153,11 +1130,11 @@
                 </div>
                     <!-- Insurance Upload Existing vehicle Id Model  -->
 
+                
+                
 
 
-
-
-
+                    
             </div>
         </div>
     </div>
@@ -1173,7 +1150,7 @@
                         <div class="card-header d-flex align-items-center justify-content-between sticky-top bg-white">
                             <h5>Edit Vehicle</h5>
                         </div>
-
+                        
                         <!-- Scrollable Block -->
                         <form method="post" action="{{ route('superadmin.vehicleupdate') }}" name=""
                             id="" enctype="multipart/form-data">
@@ -1228,10 +1205,10 @@
                                         </div>
                                         <br>
 
+                                        
 
-
-
-
+                                      
+                                
 
 
                                         <div class="col-sm-12">
@@ -1293,30 +1270,6 @@
                                                     name="registration_number"
                                                     style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
                                                     placeholder="Enter Registration Number" >
-                                                <br>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-12">
-                                            <div class="mb-12">
-                                                <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">Registered Owner:</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
-                                                    class="error_subject errorss"></span>
-                                                <input type="text" class="form-control" id="edit_regis_owner"
-                                                    name="registration_owner"
-                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                                    placeholder="Enter Registered Owner" >
-                                                <br>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-12">
-                                            <div class="mb-12">
-                                                <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">RTO :</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
-                                                    class="error_subject errorss"></span>
-                                                <input type="text" class="form-control" id="edit_rto"
-                                                    name="rto_location"
-                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                                    placeholder="Enter RTO" >
                                                 <br>
                                             </div>
                                         </div>
@@ -1388,7 +1341,7 @@
                                         <div class="col-sm-12">
                                             <div class="mb-12">
                                                 <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">OD Insurance Company name </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                                    style="font-size: 12px;font-weight: 600;">Insurance Company name </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                                     class="error_subject errorss"></span>
                                                 <input type="text" class="form-control" id="insurance_company_name"
                                                     name="company_name"
@@ -1399,7 +1352,18 @@
                                         <div class="col-sm-12">
                                             <div class="mb-12">
                                                 <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">OD Insurance Start Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                                    style="font-size: 12px;font-weight: 600;">Insurance Expiry Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                                    class="error_subject errorss"></span>
+                                                <input type="date" class="form-control" id="insurance_expiry_data"
+                                                    name="expiry_date"
+                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
+                                                    placeholder="Enter Insurance Expiry Date" ><br>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-12">
+                                            <div class="mb-12">
+                                                <label class="form-label required"
+                                                    style="font-size: 12px;font-weight: 600;">Insurance Renewal Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                                     class="error_subject errorss"></span>
                                                 <input type="date" class="form-control" id="insurance_renewal_date"
                                                     name="renewal_date"
@@ -1410,19 +1374,7 @@
                                         <div class="col-sm-12">
                                             <div class="mb-12">
                                                 <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">OD Insurance End Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
-                                                    class="error_subject errorss"></span>
-                                                <input type="date" class="form-control" id="insurance_expiry_data"
-                                                    name="expiry_date"
-                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                                    placeholder="Enter Insurance Expiry Date" ><br>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-sm-12">
-                                            <div class="mb-12">
-                                                <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">OD Insurance Policy </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                                    style="font-size: 12px;font-weight: 600;">Insurance Policy </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                                     class="error_subject errorss"></span>
                                                 <input type="text" class="form-control" id="insurance_policy"
                                                     name="policy_details"
@@ -1445,18 +1397,7 @@
                                         <div class="col-sm-12">
                                             <div class="mb-12">
                                                 <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">TP Insurance Start Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
-                                                    class="error_subject errorss"></span>
-                                                <input type="date" class="form-control" id="thirdparty_insurance_renewal_date"
-                                                    name="thirdparty_renewal_date"
-                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                                    placeholder="Enter Insurance Renewal Date " ><br>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-12">
-                                            <div class="mb-12">
-                                                <label class="form-label required"
-                                                    style="font-size: 12px;font-weight: 600;">TP Insurance End Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                                    style="font-size: 12px;font-weight: 600;">TP Insurance Expiry Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                                     class="error_subject errorss"></span>
                                                 <input type="date" class="form-control"          id="thirdparty_insurance_expiry_data"
                                                     name="thirdparty_expiry_date"
@@ -1464,7 +1405,17 @@
                                                     placeholder="Enter Insurance Expiry Date" ><br>
                                             </div>
                                         </div>
-
+                                        <div class="col-sm-12">
+                                            <div class="mb-12">
+                                                <label class="form-label required"
+                                                    style="font-size: 12px;font-weight: 600;">TP Insurance Renewal Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                                    class="error_subject errorss"></span>
+                                                <input type="date" class="form-control" id="thirdparty_insurance_renewal_date"
+                                                    name="thirdparty_renewal_date"
+                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
+                                                    placeholder="Enter Insurance Renewal Date " ><br>
+                                            </div>
+                                        </div>
                                         <div class="col-sm-12">
                                             <div class="mb-12">
                                                 <label class="form-label required"
@@ -1497,14 +1448,10 @@
                                                 <label class="form-label required"
                                                     style="font-size: 12px;font-weight: 600;">Vehicle Incharge Driver </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                                     class="error_subject errorss"></span>
-                                                    <select class="mb-3 form-select" id="edit_vehicle_incharge_driver"
+                                                    <select class="mb-3 form-select" id="vehicle_incharge_driver"
                                                     style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
                                                     name="vehicle_incharge">
                                                     <option value="">Select Incharge Driver</option>
-                                                    @php $edit_driver = App\Models\usermanagementdetails::where('category','Driver')->get(); @endphp
-                                                    @foreach ($edit_driver as $drivername)
-                                                    <option value="{{ $drivername->id }}">{{ $drivername->user_fullname}}</option>
-                                                    @endforeach
                                                 </select><br>
                                             </div>
                                         </div>
@@ -1513,14 +1460,10 @@
                                                 <label class="form-label required"
                                                     style="font-size: 12px;font-weight: 600;">Vehicle Incharge Admin </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                                     class="error_subject errorss"></span>
-                                                    <select class="mb-3 form-select" id="edit_vechile_incharge_admin"
+                                                    <select class="mb-3 form-select" id="vechile_incharge_admin"
                                                     style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
                                                     name="vehicle_incharge_admin">
                                                     <option value="">Select Incharge Admin</option>
-                                                    @php $edit_driveradmin = App\Models\usermanagementdetails::where('category','Driver Admin')->get(); @endphp
-                                                    @foreach ($edit_driveradmin as $adminname)
-                                                    <option value="{{ $adminname->id }}">{{ $adminname->user_fullname}}</option>
-                                                    @endforeach
                                                 </select><br>
                                             </div>
                                         </div>
@@ -1547,29 +1490,7 @@
                                             </div><br>
                                         </div><br>
 
-                                        <div class="col-sm-12">
-                                            <div class="mb-12">
-                                                <label class="form-label" style="font-size: 12px;font-weight: 600;">GTS Installed</label>
-                                                <select class="mb-3 form-select" id="edit_gts_installed" name="gts_installed"
-                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;">
-                                                    <option value="">Select</option>
-                                                    <option value="yes">Yes</option>
-                                                    <option value="no">No</option>
-                                                </select><br>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-12">
-                                            <div class="mb-12">
-                                                <label class="form-label" style="font-size: 12px;font-weight: 600;">GTS Online / Offline</label>
-                                                <select class="mb-3 form-select" id="edit_gts_status" name="gts_status"
-                                                    style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;">
-                                                    <option value="">Select</option>
-                                                    <option value="online">Online</option>
-                                                    <option value="offline">Offline</option>
-                                                </select><br>
-                                            </div>
-                                        </div>
-
+                                 
                                         <div class="col-sm-12">
                                             <div class="mb-12">
                                                 <label class="form-label required"
@@ -1645,7 +1566,7 @@
                         </div>
                         <div class="col-sm-3"><br>
                             <div class="mb-4">
-                                <div
+                                <div 
                                     id="all_insurance_list"
                                     class="card"
                                     style="overflow-y: auto; max-height: 600px;scrollbar-width: thin; /* For Firefox */ ">
@@ -1940,18 +1861,7 @@
                                 <div class="col-sm-3">
                                     <div class="mb-3">
                                         <label class="form-label required"
-                                            style="font-size: 12px;font-weight: 600;">OD Insurance Start Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
-                                            class="error_subject errorss"></span>
-                                        <input type="date" class="form-control" id=""
-                                            name="renewal_date"
-                                            style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                            placeholder="Enter Insurance Renewal Date " >
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="mb-3">
-                                        <label class="form-label required"
-                                            style="font-size: 12px;font-weight: 600;">OD Insurance End Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                            style="font-size: 12px;font-weight: 600;">OD Insurance Expiry Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                             class="error_subject errorss"></span>
                                         <input type="date" class="form-control" id=""
                                             name="expiry_date"
@@ -1959,7 +1869,17 @@
                                             placeholder="Enter Insurance Expiry Date" >
                                     </div>
                                 </div>
-
+                                <div class="col-sm-3">
+                                    <div class="mb-3">
+                                        <label class="form-label required"
+                                            style="font-size: 12px;font-weight: 600;">OD Insurance Renewal Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                            class="error_subject errorss"></span>
+                                        <input type="date" class="form-control" id=""
+                                            name="renewal_date"
+                                            style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
+                                            placeholder="Enter Insurance Renewal Date " >
+                                    </div>
+                                </div>
                                 <div class="col-sm-3">
                                     <div class="mb-3">
                                         <label class="form-label required"
@@ -1986,18 +1906,7 @@
                                 <div class="col-sm-3">
                                     <div class="mb-3">
                                         <label class="form-label required"
-                                            style="font-size: 12px;font-weight: 600;">TP Insurance Start Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
-                                            class="error_subject errorss"></span>
-                                        <input type="date" class="form-control" id=""
-                                            name="thirdparty_renewal_date"
-                                            style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
-                                            placeholder="Enter Insurance Renewal Date " >
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="mb-3">
-                                        <label class="form-label required"
-                                            style="font-size: 12px;font-weight: 600;">TP Insurance End Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                            style="font-size: 12px;font-weight: 600;">TP Insurance Expiry Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                             class="error_subject errorss"></span>
                                         <input type="date" class="form-control" id=""
                                             name="thirdparty_expiry_date"
@@ -2005,7 +1914,17 @@
                                             placeholder="Enter Insurance Expiry Date" >
                                     </div>
                                 </div>
-
+                                <div class="col-sm-3">
+                                    <div class="mb-3">
+                                        <label class="form-label required"
+                                            style="font-size: 12px;font-weight: 600;">TP Insurance Renewal Date</label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
+                                            class="error_subject errorss"></span>
+                                        <input type="date" class="form-control" id=""
+                                            name="thirdparty_renewal_date"
+                                            style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
+                                            placeholder="Enter Insurance Renewal Date " >
+                                    </div>
+                                </div>
                                 <div class="col-sm-3">
                                     <div class="mb-3">
                                         <label class="form-label required"
@@ -2017,7 +1936,7 @@
                                             placeholder="Enter Insurance Policy" >
                                     </div>
                                 </div>
-
+                         
                                 <!-- <div class="col-sm-3">
                                     <div class="mb-3">
                                         <label class="form-label required"
@@ -2102,32 +2021,10 @@
                                         <label class="form-label required"
                                             style="font-size: 12px;font-weight: 600;">Last Tyre Changed Date </label>&nbsp;&nbsp;<span style="font-size:10px; color:red;"
                                             class="error_subject errorss"></span>
-                                        <input type="date" class="form-control" id="add_last_tyre_changed_date"
+                                        <input type="date" class="form-control" id="last_tyre_changed_date"
                                             name="last_tyre_change"
                                             style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;"
                                             placeholder="Enter Last Serivce Date " >
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="mb-3">
-                                        <label class="form-label" style="font-size: 12px;font-weight: 600;">GTS Installed</label>
-                                        <select class="mb-3 form-select" id="add_gts_installed" name="gts_installed"
-                                            style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;">
-                                            <option value="">Select</option>
-                                            <option value="yes">Yes</option>
-                                            <option value="no">No</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="mb-3">
-                                        <label class="form-label" style="font-size: 12px;font-weight: 600;">GTS Online / Offline</label>
-                                        <select class="mb-3 form-select" id="add_gts_status" name="gts_status"
-                                            style="height: 36px;border-radius: 10px;border: solid 1px #d3d3d3;background-color: #fff;color: #505050 !important;width: 100%;padding-left: 6px;">
-                                            <option value="">Select</option>
-                                            <option value="online">Online</option>
-                                            <option value="offline">Offline</option>
-                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -2148,7 +2045,7 @@
         </div>
     </div>
     <!-- //// ADD VEHICLE MODEL //// -->
-
+    
     {{--//// DOCUMENT VIEW MODEL//////  --}}
     <div class="modal fade" id="exampleModal1" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
         aria-hidden="true">
@@ -2356,7 +2253,7 @@
             @endif
         };
     </script>
-
+   
 
             <!--VEHICLE EDIT ==> IMAGE DRAG AND DROP SCRIPT (SHOULD NOT ALLOW IMAGE IF DRAG AND DROP ALSO) -->
     <script>
@@ -2417,7 +2314,7 @@
             }
         });
     </script>
-
+    
          <!-- VEHICLE ADD ==> IMAGE DRAG AND DROP SCRIPT (SHOULD NOT ALLOW IMAGE IF DRAG AND DROP ALSO) -->
 
 
@@ -2446,7 +2343,7 @@
             });
         </script>
             <!--  ADD  INSURANCE FOR EXISTIGN  VEHICLE  ==> IMAGE DRAG AND DROP SCRIPT (SHOULD NOT ALLOW IMAGE IF DRAG AND DROP ALSO) -->
-
+ 
 
 
     <script type="text/javascript">
@@ -2542,15 +2439,15 @@
     <!-- //zone based Branch - Select Dropdown // -->
     <script>
          $(document).ready(function () {
-
+        
             $('.selectzone_vehicle > div').off('click').on('click', function () {
                 const selectedType = $(this).data('value');
-                const selectedText = $(this).text();
-                // alert(selectedType);
-                $('#zone_views').val(selectedText);
-                $('#veh_zone_id').val(selectedType);
-                $('#branch_views').val('');
-                $('#getbranch').hide();
+                const selectedText = $(this).text();      
+                // alert(selectedType);  
+                $('#zone_views').val(selectedText);     
+                $('#veh_zone_id').val(selectedType);        
+                $('#branch_views').val('');               
+                $('#getbranch').hide();                   
 
                 $('#getbranch > div').removeClass('selected');
 
@@ -2563,7 +2460,7 @@
             });
 
             $('#zone_views').on('input', function () {
-                    $('#veh_zone_id').val('');
+                    $('#veh_zone_id').val(''); 
                     $('#getbranch > div').show();
                     $('#branch_views').val('');
                     $('#getbranch > div').removeClass('selected');
@@ -2679,7 +2576,7 @@
                     $(e.target).addClass("selected");
 
                     inputField.closest(".dropdown").removeClass("active"); // Close dropdown
-
+                    
                 } else {
                     const currentValues = inputField.val().split(",").map(v => v.trim()).filter(Boolean);
                     if (!currentValues.includes(selectedValue)) {

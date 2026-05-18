@@ -2308,12 +2308,16 @@ public function leadsfilter(Request $request){
             // 'vehicle_document_details.id as document_id',
             // 'vehicle_document_details.document_name',
             'tblzones.id as zoneid',
-            'tblzones.*'
+            'tblzones.*',
+            'driver_user.user_fullname as incharge_driver_name',
+            'admin_incharge_user.user_fullname as incharge_admin_name'
         )
             ->selectRaw("(select count(*) from vehicle_document_details where vehicle_document_details.vehicle_id = vehicle_details.id) as document_count")
             ->join('tbl_locations', 'vehicle_details.branch', '=', 'tbl_locations.id')
             ->join('vehicle_type', 'vehicle_details.vehicle_type', '=', 'vehicle_type.id')
             ->join('tblzones', 'vehicle_details.zone_id', '=', 'tblzones.id')
+            ->leftJoin('users as driver_user', 'vehicle_details.vehicle_incharge', '=', 'driver_user.id')
+            ->leftJoin('users as admin_incharge_user', 'vehicle_details.vehicle_incharge_admin', '=', 'admin_incharge_user.id')
             ->leftJoin('vehicle_activities', 'vehicle_details.id', '=', 'vehicle_activities.vehicle_id')
             // ->leftJoin('vehicle_document_details', 'vehicle_details.id', '=', 'vehicle_document_details.vehicle_id')
             ->leftJoin('vehicle_insurance_details', function ($join) {
@@ -2354,16 +2358,21 @@ public function leadsfilter(Request $request){
             ->with('vehicleType', 'location', 'serviceDetails') // exclude insuranceDetails here
             ->first();
 
-         // Only fetch and attach insuranceDetails if insurance_id is not null
-        if (!is_null($insurance_id)) {
+        if (!empty($insurance_id)) {
             $insuranceDetails = VehicleInsurance::where('id', $insurance_id)->first();
-            $vehicleDetails->setRelation('insuranceDetails', $insuranceDetails);
         } else {
-            // You can also explicitly set it to null if needed
-            $vehicleDetails->setRelation('insuranceDetails', null);
+            $insuranceDetails = VehicleInsurance::where('vehicle_id', $id)
+                ->orderByDesc('updated_at')
+                ->first();
         }
+        $vehicleDetails->setRelation('insuranceDetails', $insuranceDetails);
 
-        // dd($vehicleDetails);
+        if (!$vehicleDetails->serviceDetails) {
+            $serviceDetails = VehicleServiceDetails::where('vehicle_id', $id)
+                ->orderByDesc('updated_at')
+                ->first();
+            $vehicleDetails->setRelation('serviceDetails', $serviceDetails);
+        }
 
         return response()->json($vehicleDetails);
     }
@@ -2491,6 +2500,8 @@ public function leadsfilter(Request $request){
         'thirdparty_policy_details' => 'nullable|string|max:255',
         'vehicle_incharge' => 'nullable|string|max:255',
         'vehicle_incharge_admin' => 'nullable|string|max:255',
+        'gts_installed' => 'nullable|in:yes,no',
+        'gts_status' => 'nullable|in:online,offline',
         'payment' => 'nullable|string|max:255',
         'last_service' => 'nullable|string|max:255',
         'last_tyre_change' => 'nullable|string|max:255',
@@ -2597,6 +2608,8 @@ public function leadsfilter(Request $request){
 
             'vehicle_incharge' => 'nullable|string|max:255',
             'vehicle_incharge_admin' => 'nullable|string|max:255',
+            'gts_installed' => 'nullable|in:yes,no',
+            'gts_status' => 'nullable|in:online,offline',
 
             // 'files' => 'nullable|array',
             // 'files.*' => 'file|mimes:pdf|max:10240', // max size in kilobytes (e.g., 10MB)
@@ -2719,14 +2732,28 @@ public function leadsfilter(Request $request){
 
     public function vehicleDocumentFilter(Request $request)
 {
-    // dd($request->all());
     $filterDataAll = $request->input('morefilltersall');
     $moreDateFilterValue = $request->input('moredatefittervale');
-    // dd($filterDataAll);
 
-    $dates = explode(' - ', $moreDateFilterValue);
-    $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', $dates[0])->format('Y-m-d') . ' 00:00:00';
-    $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', $dates[1])->format('Y-m-d') . ' 23:59:59';
+    $dimensionFilterMarkers = [
+        'registration_number=',
+        'fuel_type=',
+        'vehicle_details.vehicle_type=',
+        'vehicle_type.type=',
+        'vehicle_id=',
+        'vehicle_insurance_details.company_name=',
+        'tblzones.id=',
+        'tbl_locations.name=',
+    ];
+    $hasDimensionFilter = false;
+    if ($filterDataAll) {
+        foreach ($dimensionFilterMarkers as $marker) {
+            if (str_contains($filterDataAll, $marker)) {
+                $hasDimensionFilter = true;
+                break;
+            }
+        }
+    }
 
     $query = VehicleDetails::select(
         'vehicle_details.*',
@@ -2743,12 +2770,16 @@ public function leadsfilter(Request $request){
         'vehicle_service_details.id as service_id',
         'vehicle_service_details.*',
         'tblzones.id as zoneid',
-        'tblzones.*'
+        'tblzones.*',
+        'driver_user.user_fullname as incharge_driver_name',
+        'admin_incharge_user.user_fullname as incharge_admin_name'
     )
         ->selectRaw("(select count(*) from vehicle_document_details where vehicle_document_details.vehicle_id = vehicle_details.id) as document_count")
         ->join('tbl_locations', 'vehicle_details.branch', '=', 'tbl_locations.id')
         ->join('vehicle_type', 'vehicle_details.vehicle_type', '=', 'vehicle_type.id')
         ->join('tblzones', 'vehicle_details.zone_id', '=', 'tblzones.id')
+        ->leftJoin('users as driver_user', 'vehicle_details.vehicle_incharge', '=', 'driver_user.id')
+        ->leftJoin('users as admin_incharge_user', 'vehicle_details.vehicle_incharge_admin', '=', 'admin_incharge_user.id')
         ->leftJoin('vehicle_activities', 'vehicle_details.id', '=', 'vehicle_activities.vehicle_id')
         ->leftJoin('vehicle_insurance_details', function ($join) {
             $join->on('vehicle_details.id', '=', 'vehicle_insurance_details.vehicle_id')
@@ -2766,70 +2797,81 @@ public function leadsfilter(Request $request){
                         ->whereColumn('vehicle_service_details.vehicle_id', 'vehicle_details.id');
                 });
         })
-        ->orderBy('vehicle_details.created_at', 'desc')
-        ->whereBetween('vehicle_details.created_at', [$startDate, $endDate]);
+        ->orderBy('vehicle_details.created_at', 'desc');
 
-
-    if ($filterDataAll) {
-        // foreach (explode(' AND ', $filterDataAll) as $condition) {
-        //     [$column, $value] = explode('=', $condition);
-        //     // dd($condition);
-
-        //     $column = trim($column);
-        //     $value = trim($value, "'");
-
-        //     if ($column === 'vehicle_details.registration_number') {
-        //         $entries = explode(",", $value);
-        //         $ids = [];
-
-        //         foreach ($entries as $entry) {
-        //             $parts = explode(' - ', $entry);
-        //             $ids[] = trim($parts[0]);
-        //         }
-
-        //         $query->whereIn($column, $ids);
-        //     } else {
-        //         $query->whereIn($column, explode(',', $value));
-        //     }
-        // }
-        foreach (explode(' AND ', $filterDataAll) as $condition) {
-            [$column, $value] = explode('=', $condition);
-
-            $column = trim($column);
-            $value = trim($value, "'");
-
-            // Map unqualified column names to fully qualified ones if needed
-            switch ($column) {
-                case 'vehicle_id':
-                    $column = 'vehicle_details.id'; // correct actual column
-                    break;
-                case 'registration_number':
-                    $column = 'vehicle_details.registration_number';
-                    break;
-                // add more mappings as needed
-            }
-
-            if ($column === 'vehicle_details.registration_number') {
-                $entries = explode(",", $value);
-                $ids = [];
-
-                foreach ($entries as $entry) {
-                    $parts = explode(' - ', $entry);
-                    $ids[] = trim($parts[0]);
-                }
-
-                $query->whereIn($column, $ids);
-            } else {
-                $query->whereIn($column, explode(',', $value));
+    if (!$hasDimensionFilter && $moreDateFilterValue) {
+        $dates = explode(' - ', $moreDateFilterValue);
+        if (count($dates) === 2) {
+            try {
+                $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[0]))->format('Y-m-d') . ' 00:00:00';
+                $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[1]))->format('Y-m-d') . ' 23:59:59';
+                $query->whereBetween('vehicle_details.created_at', [$startDate, $endDate]);
+            } catch (\Exception $e) {
+                // ignore invalid date format
             }
         }
-
     }
 
-    // If you want to debug the SQL:
-    $sql = str_replace_array('?', $query->getBindings(), $query->toSql());
+    $fuelLabelToId = [
+        'petrol' => '1',
+        'diesel' => '2',
+        'electronic vehicle' => '3',
+        'cng' => '4',
+    ];
 
-    // Otherwise, actually fetch the data:
+    if ($filterDataAll) {
+        foreach (explode(' AND ', $filterDataAll) as $condition) {
+            if (!str_contains($condition, '=')) {
+                continue;
+            }
+
+            [$column, $value] = explode('=', $condition, 2);
+
+            $column = trim($column);
+            $value = trim($value, "'\"");
+            $values = array_values(array_filter(array_map('trim', explode(',', $value)), fn ($v) => $v !== ''));
+
+            if (empty($values)) {
+                continue;
+            }
+
+            if ($column === 'vehicle_id') {
+                $query->whereIn('vehicle_details.id', $values);
+            } elseif ($column === 'registration_number') {
+                $regNumbers = [];
+                foreach ($values as $entry) {
+                    if (str_contains($entry, ' - ')) {
+                        $regNumbers[] = trim(explode(' - ', $entry, 2)[0]);
+                    } else {
+                        $regNumbers[] = trim($entry);
+                    }
+                }
+                $query->whereIn('vehicle_details.registration_number', $regNumbers);
+            } elseif ($column === 'fuel_type') {
+                $fuelValues = [];
+                foreach ($values as $entry) {
+                    $key = strtolower(trim($entry));
+                    $fuelValues[] = $fuelLabelToId[$key] ?? $entry;
+                }
+                $query->whereIn('vehicle_details.fuel_type', $fuelValues);
+            } elseif ($column === 'tblzones.id') {
+                $query->whereIn('vehicle_details.zone_id', $values);
+            } elseif ($column === 'tbl_locations.name') {
+                $query->whereIn('tbl_locations.name', $values);
+            } elseif ($column === 'vehicle_insurance_details.company_name') {
+                $query->whereIn('vehicle_insurance_details.company_name', $values);
+            } elseif ($column === 'vehicle_details.vehicle_type' || $column === 'vehicle_type.type') {
+                if ($column === 'vehicle_type.type' || !is_numeric($values[0])) {
+                    $query->whereIn('vehicle_type.type', $values);
+                } else {
+                    $query->whereIn('vehicle_details.vehicle_type', $values);
+                }
+            } else {
+                $query->whereIn($column, $values);
+            }
+        }
+    }
+
     $data = $query->orderBy('vehicle_details.created_at', 'desc')->get();
     // dd($data);
 

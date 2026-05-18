@@ -41,6 +41,7 @@ use App\Http\Controllers\CheckinReportController;
 use App\Http\Controllers\RegistrationReportController;
 use App\Http\Controllers\ArtBankController;
 use App\Http\Controllers\VmsController;
+use App\Http\Controllers\SettlementController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -708,6 +709,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/upload', [BankStatementController::class, 'upload'])->name('upload');
         // Get bank statements with filters
         Route::get('/statements', [BankStatementController::class, 'getStatements'])->name('statements');
+        Route::post('/statement-lazy-billing-details', [BankStatementController::class, 'statementLazyBillingDetails'])->name('statement-lazy-billing-details');
         Route::get('/drilldown/by-nature', [BankStatementController::class, 'drilldownStatementsByNature'])->name('drilldown.by-nature');
         Route::get('/drilldown/by-zone', [BankStatementController::class, 'drilldownStatementsByZone'])->name('drilldown.by-zone');
         Route::get('/statements-export', [BankStatementController::class, 'exportStatements'])->name('statements-export');
@@ -750,6 +752,9 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::get('/radiant-cash-pickups-for-date', [BankStatementController::class, 'radiantCashPickupsForTransactionDate'])->name('radiant-cash-pickups-for-date');
         Route::post('/radiant-match-against', [BankStatementController::class, 'saveRadiantMatchAgainst'])->name('radiant-match-against');
         Route::post('/radiant-unmatch/{id}', [BankStatementController::class, 'unmatchRadiant'])->name('radiant-unmatch');
+        Route::get('/settlement-accounts-for-pos', [BankStatementController::class, 'settlementAccountsForBankPos'])->name('settlement-accounts-for-pos');
+        Route::post('/pos-settlement-match', [BankStatementController::class, 'savePosSettlementMatch'])->name('pos-settlement-match');
+        Route::post('/pos-settlement-unmatch/{id}', [BankStatementController::class, 'unmatchPosSettlement'])->name('pos-settlement-unmatch');
         // Bank account master & batch history
         Route::get('/batch-uploads', [BankStatementController::class, 'batchUploadPage'])->name('batch-uploads');
         Route::get('/accounts', [BankStatementController::class, 'listBankAccounts'])->name('accounts');
@@ -763,6 +768,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         Route::post('/match-attachment-types', [BankStatementController::class, 'storeMatchAttachmentType'])->name('match-attachment-types.store');
         Route::post('/match-attachment-types/{id}', [BankStatementController::class, 'updateMatchAttachmentType'])->name('match-attachment-types.update');
         Route::delete('/match-attachment-types/{id}', [BankStatementController::class, 'destroyMatchAttachmentType'])->name('match-attachment-types.destroy');
+    
     });
 
 
@@ -788,6 +794,27 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
         // Export
         Route::get('/export/xlsx',       [GstR1WorkingController::class, 'exportXlsx'])->name('export.xlsx');
         Route::get('/export/csv',        [GstR1WorkingController::class, 'exportCsv']) ->name('export.csv');
+    });
+
+     
+    Route::prefix('settlement')->name('settlement.')->group(function () {
+    
+        // ── Page Views ────────────────────────────────────────────────────
+        Route::get('/',        [SettlementController::class, 'index'])->name('index');
+        Route::get('/monitor', [SettlementController::class, 'uploads'])->name('uploads');
+    
+        // ── AJAX Upload & Process ─────────────────────────────────────────
+        Route::post('/upload', [SettlementController::class, 'upload'])->name('upload');
+    
+        // ── AJAX Data Endpoints ───────────────────────────────────────────
+        Route::get('/api/accounts',       [SettlementController::class, 'getAccounts'])->name('api.accounts');
+        Route::get('/api/uploads',        [SettlementController::class, 'getUploads'])->name('api.uploads');
+        Route::get('/api/filter-options', [SettlementController::class, 'getFilterOptions'])->name('api.filter-options');
+    
+        // ── Download & Delete ─────────────────────────────────────────────
+        Route::get('/download/{upload}/{format}',  [SettlementController::class, 'downloadUpload'])->name('download')
+            ->where('format', 'xlsx|csv');
+        Route::delete('/uploads/{upload}', [SettlementController::class, 'deleteUpload'])->name('uploads.destroy');
     });
 
     //income new stats

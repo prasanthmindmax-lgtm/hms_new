@@ -3585,8 +3585,10 @@ body > .daterangepicker {
 }
 
 .br-mocdoc-date-cell {
-    max-width: 118px;
-    vertical-align: middle;
+    min-width: 9.5rem;
+    max-width: 14rem;
+    vertical-align: top;
+    white-space: normal;
 }
 
 /* MDOC collection rows container */

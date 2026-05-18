@@ -750,6 +750,35 @@
             color: #64748b;
             font-weight: 500;
         }
+
+        /* MocDoc date ↔ Radiant/POS: avoid column collision in dense statement table */
+        #statementsTable th.br-col-mocdoc,
+        #statementsTable td.br-col-mocdoc {
+            min-width: 10.5rem;
+            max-width: 13rem;
+            padding-right: 1rem !important;
+            vertical-align: top;
+            /* border-right: 1px solid rgba(15, 23, 42, 0.08); */
+            white-space: normal;
+        }
+        #statementsTable th.br-col-radiant-pos,
+        #statementsTable td.br-col-radiant-pos {
+            min-width: 13rem;
+            max-width: 22rem;
+            padding-left: 1rem !important;
+            vertical-align: top;
+        }
+        #statementsTable .br-radiant-pos-cell {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        #statementsTable .br-radiant-pos-cell .badge {
+            display: inline-block;
+            max-width: 100%;
+            white-space: normal;
+            text-align: left;
+            line-height: 1.25;
+        }
     </style>
 </head>
 <body style="overflow-x: hidden;">
@@ -1254,8 +1283,8 @@
                                             <th>Matched date</th>
                                             <th>Nature / files</th>
                                             <th>Income Tag</th>
-                                            <th class="text-nowrap">MocDoc date</th>
-                                            <th>Radiant</th>
+                                            <th class="text-nowrap br-col-mocdoc">MocDoc date</th>
+                                            <th class="br-col-radiant-pos">Radiant / POS</th>
                                             <th>Salary</th>
                                             @if(!empty($bankReconSuperAdmin))
                                             <th>Actions</th>
@@ -1668,6 +1697,17 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-md-4">
+                                <label class="br-filter-label"><i class="bi bi-credit-card me-1 text-primary"></i>POS / settlement</label>
+                                <select class="form-select br-filter-select" id="filterPosMatch">
+                                    <option value="">All</option>
+                                    <option value="pos_matched">POS linked</option>
+                                    <option value="pos_keyword_only">Keyword only</option>
+                                    <option value="pos_unmatched">Not linked</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     {{-- Amount & search group --}}
@@ -1740,6 +1780,8 @@
                                 <option value="income_unmatch">Income Unmatch</option>
                                 <option value="radiant_match">Radiant Match</option>
                                 <option value="radiant_unmatch">Radiant Unmatch</option>
+                                <option value="pos_settlement_match">POS / Settlement Match</option>
+                                <option value="pos_settlement_unmatch">POS / Settlement Unmatch</option>
                                 <option value="delete_statement">Delete Statement</option>
                                 <option value="delete_batch">Delete Batch</option>
                                 <option value="salary_upload">Salary UTR upload</option>
@@ -2027,6 +2069,11 @@
                                 <i class="bi bi-brightness-high me-1"></i>RADIANT MATCH
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pos-match-tab" data-bs-toggle="tab" data-bs-target="#pos-match-content" type="button">
+                                <i class="bi bi-credit-card me-1"></i>POS / SETTLEMENT
+                            </button>
+                        </li>
                     </ul>
 
                     {{-- Tab Content --}}
@@ -2198,6 +2245,24 @@
                                     <small class="text-muted" style="font-size:10px;">Card &amp; UPI share the same bank entry. NEFT and Others are tracked separately.</small>
                                 </div>
 
+                                {{-- Radiant / POS controls move here when Cash and/or Card+UPI modes are selected (same selects as Radiant &amp; POS tabs) --}}
+                                <div id="incomeTagInlineRadiantWrap" class="mb-3 br-income-inline-panel" style="display:none;">
+                                    <label class="income-tag-label">
+                                        <span class="income-tag-label-dot" style="background:#f97316;"></span>RADIANT CASH PICKUP
+                                        <span class="text-muted fw-normal ms-1" style="font-size:10px;text-transform:none;">(Cash mode)</span>
+                                    </label>
+                                    <p class="small text-muted mb-2">Required when <strong>Cash</strong> is selected — choose a pickup slip before you apply the income tag.</p>
+                                    <div id="incomeTagInlineRadiantMount"></div>
+                                </div>
+                                <div id="incomeTagInlinePosWrap" class="mb-3 br-income-inline-panel" style="display:none;">
+                                    <label class="income-tag-label">
+                                        <span class="income-tag-label-dot" style="background:#0f766e;"></span>POS SETTLEMENT
+                                        <span class="text-muted fw-normal ms-1" style="font-size:10px;text-transform:none;">(Card / UPI)</span>
+                                    </label>
+                                    <p class="small text-muted mb-2">Required when <strong>Card</strong> and/or <strong>UPI</strong> is selected — choose a settlement row before you apply the income tag.</p>
+                                    <div id="incomeTagInlinePosMount"></div>
+                                </div>
+
                                 {{-- Branch financial uploads from daily report (same zone / branch / collection date — preview on demand) --}}
                                 <div class="mb-3 br-income-tag-bfr-block" id="incomeTagBranchFinancialBlock">
                                     <label class="income-tag-label">
@@ -2284,27 +2349,32 @@
                                     </p>
                                 </div>
 
-                                {{-- Pickup dropdown --}}
-                                <div class="br-radiant-section">
-                                    <label class="br-radiant-field-label" for="radiantCashPickupSelect">
-                                        <span class="br-radiant-dot" style="background:#c2410c;"></span>
-                                        Radiant Pickup Slip <span class="br-radiant-field-hint">(same date as bank line)</span>
-                                    </label>
+                                {{-- Pickup dropdown (panel may move into Income tag tab when Cash mode is on) --}}
+                                <div id="brRadiantPickupPanelDefaultHost">
+                                    <p id="brRadiantPickupMovedHint" class="small text-muted py-2 mb-0" style="display:none;">
+                                        <i class="bi bi-info-circle me-1"></i>Radiant pickup is shown under <strong>Income tag</strong> while <strong>Cash</strong> collection mode is selected.
+                                    </p>
+                                    <div id="brRadiantPickupPanel" class="br-radiant-section">
+                                        <label class="br-radiant-field-label" for="radiantCashPickupSelect">
+                                            <span class="br-radiant-dot" style="background:#c2410c;"></span>
+                                            Radiant Pickup Slip <span class="br-radiant-field-hint">(same date as bank line)</span>
+                                        </label>
 
-                                    {{-- Loading skeleton shown while AJAX fetches --}}
-                                    <div class="br-radiant-pickup-loading" id="radiantPickupLoading" style="display:none;">
-                                        <div class="br-radiant-loading-bar"></div>
-                                        <span class="br-radiant-loading-text">Fetching pickups for this date…</span>
-                                    </div>
+                                        {{-- Loading skeleton shown while AJAX fetches --}}
+                                        <div class="br-radiant-pickup-loading" id="radiantPickupLoading" style="display:none;">
+                                            <div class="br-radiant-loading-bar"></div>
+                                            <span class="br-radiant-loading-text">Fetching pickups for this date…</span>
+                                        </div>
 
-                                    <select id="radiantCashPickupSelect" class="form-select form-select-sm br-radiant-pickup-select" data-placeholder="Search branch — amount…" disabled>
-                                        <option value="">— Open a deposit row to load pickups —</option>
-                                    </select>
+                                        <select id="radiantCashPickupSelect" class="form-select form-select-sm br-radiant-pickup-select" data-placeholder="Search branch — amount…" disabled>
+                                            <option value="">— Open a deposit row to load pickups —</option>
+                                        </select>
 
-                                    {{-- Pickup count badge (filled by JS) --}}
-                                    <div class="br-radiant-pickup-meta" id="radiantPickupMeta" style="display:none;">
-                                        <span class="br-radiant-count-badge" id="radiantPickupCount">0</span>
-                                        <span class="br-radiant-count-label">pickups found for this date</span>
+                                        {{-- Pickup count badge (filled by JS) --}}
+                                        <div class="br-radiant-pickup-meta" id="radiantPickupMeta" style="display:none;">
+                                            <span class="br-radiant-count-badge" id="radiantPickupCount">0</span>
+                                            <span class="br-radiant-count-label">pickups found for this date</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -2315,6 +2385,69 @@
                                     </button>
                                     <button type="button" class="btn br-radiant-btn-save" id="saveRadiantMatchBtn">
                                         <i class="bi bi-check2-circle me-1"></i>Save &amp; Link
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        {{-- POS settlement (MESPOS / ICICI POS — link to settlement_accounts by date + MID/TID key) --}}
+                        <div class="tab-pane fade" id="pos-match-content">
+                            <div class="br-radiant-panel">
+
+                                <div class="br-radiant-header">
+                                    <div class="br-radiant-header-icon" style="background:linear-gradient(135deg,#0d9488,#0f766e);">
+                                        <i class="bi bi-credit-card-2-front-fill"></i>
+                                    </div>
+                                    <div>
+                                        <div class="br-radiant-header-title">POS / Card settlement</div>
+                                        <div class="br-radiant-header-sub">Match MESPOS / POS narration to a settlement row for the same date (last 5 digits of numbers in the description → MID/TID)</div>
+                                    </div>
+                                </div>
+
+                                <div class="br-radiant-section">
+                                    <label class="br-radiant-field-label" for="posMatchAgainstInput">
+                                        <span class="br-radiant-dot" style="background:#14b8a6;"></span>
+                                        Note / keyword <span class="br-radiant-field-hint">(optional)</span>
+                                    </label>
+                                    <div class="br-radiant-input-wrap">
+                                        <i class="bi bi-pencil br-radiant-input-icon"></i>
+                                        <input type="text" class="form-control form-control-sm br-radiant-input" id="posMatchAgainstInput"
+                                               maxlength="255" placeholder="Optional memo…" autocomplete="off">
+                                    </div>
+                                    <p class="br-radiant-hint-text small mb-0">
+                                        Parsed keys from the bank line are shown under the dropdown after load.
+                                    </p>
+                                </div>
+
+                                <div id="brPosSettlementPanelDefaultHost">
+                                    <p id="brPosSettlementMovedHint" class="small text-muted py-2 mb-0" style="display:none;">
+                                        <i class="bi bi-info-circle me-1"></i>POS settlement is shown under <strong>Income tag</strong> while <strong>Card</strong> or <strong>UPI</strong> collection mode is selected.
+                                    </p>
+                                    <div id="brPosSettlementPanel" class="br-radiant-section">
+                                        <label class="br-radiant-field-label" for="posSettlementAccountSelect">
+                                            <span class="br-radiant-dot" style="background:#0f766e;"></span>
+                                            Settlement row <span class="br-radiant-field-hint">(same date; filtered by account &amp; description keys)</span>
+                                        </label>
+                                        <div class="br-radiant-pickup-loading" id="posSettlementLoading" style="display:none;">
+                                            <div class="br-radiant-loading-bar"></div>
+                                            <span class="br-radiant-loading-text">Loading settlement rows…</span>
+                                        </div>
+                                        <select id="posSettlementAccountSelect" class="form-select form-select-sm br-radiant-pickup-select" data-placeholder="Search MID / merchant…" disabled>
+                                            <option value="">— Open a deposit row to load settlements —</option>
+                                        </select>
+                                        <div class="br-radiant-pickup-meta" id="posSettlementMeta" style="display:none;">
+                                            <span class="br-radiant-count-badge" id="posSettlementKeyHint" title="Keys extracted from description"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="br-radiant-actions">
+                                    <button type="button" class="btn br-radiant-btn-clear" id="clearPosMatchBtn">
+                                        <i class="bi bi-x-circle me-1"></i>Clear
+                                    </button>
+                                    <button type="button" class="btn br-radiant-btn-save" id="savePosMatchBtn" style="background:linear-gradient(135deg,#0d9488,#0f766e);border:none;">
+                                        <i class="bi bi-check2-circle me-1"></i>Save POS link
                                     </button>
                                 </div>
 
@@ -2343,7 +2476,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body br-income-ro-body">
-                    <p class="br-income-ro-hint small mb-3">Read-only summary. To change tags, use <strong>Unmatch Income</strong> and/or <strong>Unmatch Radiant</strong> on the row.</p>
+                    <p class="br-income-ro-hint small mb-3">Read-only summary. To change tags, use <strong>Unmatch Income</strong>, <strong>Unmatch Radiant</strong>, or <strong>Unmatch POS</strong> on the row.</p>
                     <div id="incomeTagReadonlyBody" class="income-tag-panel br-income-ro-panel"></div>
                 </div>
                 <div class="modal-footer br-income-ro-footer border-0">
@@ -2632,6 +2765,7 @@
         window.bankReconRoutes = {
             upload: "{{ route('bank-reconciliation.upload') }}",
             statements: "{{ route('bank-reconciliation.statements') }}",
+            statementLazyBillingDetails: "{{ route('bank-reconciliation.statement-lazy-billing-details') }}",
             statementsExport: "{{ route('bank-reconciliation.statements-export') }}",
             searchBills: "{{ route('bank-reconciliation.search-bills') }}",
             filterBills: "{{ route('bank-reconciliation.filter-bills') }}",
@@ -2648,6 +2782,9 @@
             radiantMatchAgainst: "{{ route('bank-reconciliation.radiant-match-against') }}",
             radiantCashPickupsForDate: "{{ route('bank-reconciliation.radiant-cash-pickups-for-date') }}",
             radiantUnmatch: "{{ route('bank-reconciliation.radiant-unmatch', ':id') }}",
+            settlementAccountsForPos: "{{ route('bank-reconciliation.settlement-accounts-for-pos') }}",
+            posSettlementMatch: "{{ route('bank-reconciliation.pos-settlement-match') }}",
+            posSettlementUnmatch: "{{ route('bank-reconciliation.pos-settlement-unmatch', ':id') }}",
             accounts: "{{ route('bank-reconciliation.accounts') }}",
             accountsStore: "{{ route('bank-reconciliation.accounts.store') }}",
             accountsUpdateBase: "{{ url('/bank-reconciliation/accounts') }}",

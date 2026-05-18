@@ -20,6 +20,7 @@ use App\Models\Tblaccount;
 use App\Models\TblLocationModel;
 use App\Support\MocdocLocationKeys;
 use App\Support\BankReconIncomeRequiredAttachments;
+use App\Models\SettlementAccount;
 
 class BankStatementController extends Controller
 {
@@ -335,10 +336,19 @@ class BankStatementController extends Controller
 
         $dashboard = $this->buildDashboardStatistics($request);
         $paginator = $this->bankStatementsFilteredQuery($request)->simplePaginate($perPage);
-        $this->hydrateBillLineAccountNamesForStatementRows($paginator->getCollection());
-        $this->hydrateIncomeBillingListForStatementRows($paginator->getCollection());
+        // List view: skip bill_lines + billing_list hydration (slow); client loads via statementLazyBillingDetails on demand.
         $paginator->getCollection()->transform(function ($row) {
             $this->hydrateStatementBillDisplayFields($row);
+            if (! isset($row->bill_line_account_names)) {
+                $row->bill_line_account_names = '';
+            }
+            $row->income_billing_list = null;
+            $row->income_billing_list_total = null;
+            $row->income_tag_billing_modes = null;
+            $row->lazy_bill_details_pending = (
+                ((int) ($row->resolved_bill_id ?? 0)) > 0
+                || (($row->income_match_status ?? '') === 'income_matched')
+            );
 
             return $row;
         });
@@ -347,6 +357,52 @@ class BankStatementController extends Controller
         $payload['dashboard'] = $dashboard;
 
         return response()->json($payload);
+    }
+
+    /**
+     * On-demand bill line accounts + income billing_list (Mocdoc) for specific statement IDs.
+     * Uses the same list filters so rows outside the current scope are not returned.
+     */
+    public function statementLazyBillingDetails(Request $request)
+    {
+        $ids = $this->requestIntIdArray($request, 'statement_ids');
+        if ($ids === []) {
+            return response()->json(['success' => false, 'message' => 'statement_ids is required.'], 422);
+        }
+        $ids = array_values(array_unique(array_slice($ids, 0, 60)));
+
+        $filters = $request->input('filters', []);
+        if (! is_array($filters)) {
+            $filters = [];
+        }
+        $inner = Request::create($request->url(), 'GET', $filters);
+
+        $query = $this->bankStatementsFilteredQuery($inner)->whereIn('bs.id', $ids);
+        $rows = $query->get();
+
+        $this->hydrateBillLineAccountNamesForStatementRows($rows);
+        $this->hydrateIncomeBillingListForStatementRows($rows);
+
+        $details = [];
+        foreach ($rows as $row) {
+            $this->hydrateStatementBillDisplayFields($row);
+            $sid = (int) ($row->id ?? 0);
+            if ($sid <= 0) {
+                continue;
+            }
+            $details[$sid] = [
+                'bill_line_account_names'   => (string) ($row->bill_line_account_names ?? ''),
+                'income_billing_list'       => $row->income_billing_list,
+                'income_billing_list_total' => $row->income_billing_list_total,
+                'income_tag_billing_modes'  => $row->income_tag_billing_modes,
+                'lazy_bill_details_pending' => false,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'details' => $details,
+        ]);
     }
 
     /**
@@ -539,6 +595,7 @@ class BankStatementController extends Controller
             'Bill number',
             'Vendor',
             'Matched by',
+            'Radiant / POS tag',
         ];
 
         $baseName = 'bank_statements_' . date('Y-m-d_His');
@@ -565,7 +622,7 @@ class BankStatementController extends Controller
             $sheet->fromArray($this->bankStatementExportRow($r), null, 'A' . $rowNum);
             $rowNum++;
         }
-        foreach (range('A', 'Q') as $col) {
+        foreach (range('A', 'R') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
@@ -604,6 +661,11 @@ class BankStatementController extends Controller
             $matchedWhen = (string) $r->bank_match_matched_at;
         }
 
+        $radiantPos = trim(implode(' | ', array_filter([
+            $this->formatRadiantExportSummary($r),
+            $this->formatPosExportSummary($r),
+        ])));
+
         return [
             $r->id ?? '',
             $r->transaction_date ?? '',
@@ -623,7 +685,53 @@ class BankStatementController extends Controller
             $billNumber,
             $vendorName,
             $matchedByDisplay,
+            $radiantPos !== '' ? $radiantPos : '',
         ];
+    }
+
+    private function formatRadiantExportSummary(object $r): string
+    {
+        $status = (string) ($r->radiant_match_status ?? '');
+        $kw = trim((string) ($r->radiant_match_against ?? ''));
+        if ($status === 'radiant_matched') {
+            $loc = trim((string) ($r->radiant_matched_location ?? ''));
+            $pd = trim((string) ($r->radiant_matched_pickup_date ?? ''));
+
+            return 'Radiant linked'
+                .($loc !== '' ? ': '.$loc : '')
+                .($pd !== '' ? ' '.$pd : '');
+        }
+        if ($kw !== '') {
+            return 'Radiant keyword: '.$kw;
+        }
+
+        return '';
+    }
+
+    private function formatPosExportSummary(object $r): string
+    {
+        if (! Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            return '';
+        }
+        $status = (string) ($r->pos_match_status ?? '');
+        $kw = trim((string) ($r->pos_match_against ?? ''));
+        if ($status === 'pos_matched') {
+            $mid = trim((string) ($r->pos_matched_mid ?? ''));
+            $mer = trim((string) ($r->pos_matched_merchant ?? ''));
+            $sd = $r->pos_matched_settlement_date ?? '';
+            $key = trim((string) ($r->pos_extracted_key ?? ''));
+
+            return 'POS linked'
+                .($mid !== '' ? ' MID '.$mid : '')
+                .($mer !== '' ? ' '.$mer : '')
+                .($sd !== '' ? ' '.$sd : '')
+                .($key !== '' ? ' key='.$key : '');
+        }
+        if ($kw !== '') {
+            return 'POS keyword: '.$kw;
+        }
+
+        return '';
     }
 
     /**
@@ -1197,7 +1305,11 @@ class BankStatementController extends Controller
     }
 
     /**
-     * Zone/branch quick filter: include vendor bill rows AND income-tagged / untagged rows matched by branch name in description.
+     * Zone/branch quick filter:
+     * - PAY OUT: matched vendor bill must match bill_tbl branch (and zone when zone filter is on).
+     * - PAY IN: income-tagged rows only — income_matched_branch + zone_name on income_match_split_json.
+     * - Salary UTR: sheet branch column vs tbl_locations name.
+     * Does not match uncategorized deposits by description text.
      */
     private function applyInclusiveZoneBranchFilter(Builder $query, Request $request): void
     {
@@ -1208,12 +1320,23 @@ class BankStatementController extends Controller
         }
 
         if (! Schema::hasTable('tbl_locations')) {
-            if (count($zoneIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'zone_id')) {
-                $query->whereIn('bill.zone_id', $zoneIds);
-            }
-            if (count($branchIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'branch_id')) {
-                $query->whereIn('bill.branch_id', $branchIds);
-            }
+            $query->where(function ($outer) use ($zoneIds, $branchIds) {
+                $hasBill = Schema::hasTable('bill_tbl');
+                $hasBillBranch = $hasBill && Schema::hasColumn('bill_tbl', 'branch_id');
+                $hasBillZone = $hasBill && Schema::hasColumn('bill_tbl', 'zone_id');
+                if ($hasBillBranch && count($branchIds) > 0) {
+                    $outer->orWhere(function ($q) use ($branchIds, $zoneIds, $hasBillZone) {
+                        $q->whereNotNull('bill.id')->whereIn('bill.branch_id', $branchIds);
+                        if (count($zoneIds) > 0 && $hasBillZone) {
+                            $q->whereIn('bill.zone_id', $zoneIds);
+                        }
+                    });
+                } elseif (count($zoneIds) > 0 && $hasBillZone) {
+                    $outer->orWhere(function ($q) use ($zoneIds) {
+                        $q->whereNotNull('bill.id')->whereIn('bill.zone_id', $zoneIds);
+                    });
+                }
+            });
 
             return;
         }
@@ -1239,29 +1362,61 @@ class BankStatementController extends Controller
 
         $locIds = $locs->pluck('id')->unique()->values()->all();
 
-        $query->where(function ($outer) use ($locs, $locIds, $zoneIds, $branchIds) {
-            if (Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'branch_id') && $locIds !== []) {
-                $outer->orWhereIn('bill.branch_id', $locIds);
+        $zoneIdToName = [];
+        if (Schema::hasTable('tblzones')) {
+            $zoneIdsForNames = count($zoneIds) > 0
+                ? $zoneIds
+                : $locs->pluck('zone_id')->unique()->filter()->values()->all();
+            if ($zoneIdsForNames !== []) {
+                $zoneIdToName = DB::table('tblzones')
+                    ->whereIn('id', $zoneIdsForNames)
+                    ->pluck('name', 'id')
+                    ->map(static fn ($n) => trim((string) $n))
+                    ->all();
             }
-            if (count($branchIds) === 0 && count($zoneIds) > 0 && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'zone_id')) {
-                $outer->orWhereIn('bill.zone_id', $zoneIds);
+        }
+
+        $hasIncomeSplitJson = Schema::hasColumn('bank_statements', 'income_match_split_json');
+
+        $query->where(function ($outer) use ($locs, $locIds, $zoneIds, $branchIds, $zoneIdToName, $hasIncomeSplitJson) {
+            $hasBillTbl = Schema::hasTable('bill_tbl');
+            $hasBillBranch = $hasBillTbl && Schema::hasColumn('bill_tbl', 'branch_id');
+            $hasBillZone = $hasBillTbl && Schema::hasColumn('bill_tbl', 'zone_id');
+
+            // Vendor bill (PAY OUT): branch from tbl_locations; zone on bill when zone filter is active.
+            if ($hasBillBranch && $locIds !== []) {
+                $outer->orWhere(function ($q) use ($locIds, $zoneIds, $hasBillZone) {
+                    $q->whereNotNull('bill.id')->whereIn('bill.branch_id', $locIds);
+                    if (count($zoneIds) > 0 && $hasBillZone) {
+                        $q->whereIn('bill.zone_id', $zoneIds);
+                    }
+                });
+            }
+            if (count($branchIds) === 0 && count($zoneIds) > 0 && $hasBillZone) {
+                $outer->orWhere(function ($q) use ($zoneIds) {
+                    $q->whereNotNull('bill.id')->whereIn('bill.zone_id', $zoneIds);
+                });
             }
 
+            // Income tag (PAY IN): tagged branch name + tagged zone on split JSON (no description fallback).
             foreach ($locs as $loc) {
                 $name = trim((string) ($loc->name ?? ''));
                 if ($name === '') {
                     continue;
                 }
-                $tokens = $this->branchDescriptionMatchTokens($name);
-                $outer->orWhere(function ($q) use ($name, $tokens) {
-                    $q->whereRaw('LOWER(TRIM(IFNULL(bs.income_matched_branch, ""))) = LOWER(?)', [$name]);
-                    foreach ($tokens as $tok) {
-                        $pat = '%'.addcslashes($tok, '%_\\').'%';
-                        $q->orWhereRaw('LOWER(bs.description) LIKE LOWER(?)', [$pat]);
+                $locZoneName = trim((string) ($zoneIdToName[(int) ($loc->zone_id ?? 0)] ?? ''));
+
+                $outer->orWhere(function ($q) use ($name, $locZoneName, $zoneIds, $hasIncomeSplitJson) {
+                    $q->where('bs.income_match_status', '=', 'income_matched')
+                        ->whereRaw('LOWER(TRIM(IFNULL(bs.income_matched_branch, ""))) = LOWER(?)', [$name]);
+                    if (count($zoneIds) > 0 && $hasIncomeSplitJson && $locZoneName !== '') {
+                        $zp = '%'.addcslashes($locZoneName, '%_\\').'%';
+                        $q->whereRaw('LOWER(IFNULL(bs.income_match_split_json, "")) LIKE LOWER(?)', [$zp]);
                     }
                 });
-                // Salary UTR row: match Excel "branch" column to zone/branch (tbl_locations) names
+
                 if (Schema::hasTable('bank_recon_salary_rows')) {
+                    $tokens = $this->branchDescriptionMatchTokens($name);
                     $outer->orWhere(function ($q) use ($name, $tokens) {
                         $q->whereNotNull('bsr.id')
                             ->where('bsr.match_status', 'matched')
@@ -1276,6 +1431,166 @@ class BankStatementController extends Controller
                                 }
                             });
                     });
+                }
+            }
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeBankReconCategoryFilterTokens(array $categories): array
+    {
+        $out = [];
+        foreach ($categories as $c) {
+            $c = strtolower(trim((string) $c));
+            if ($c === '') {
+                continue;
+            }
+            $out[] = match ($c) {
+                'categorized' => '__categorized',
+                'uncategorized' => '__uncategorized',
+                default => $c,
+            };
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeCollectionModeFilterTokens(array $modes): array
+    {
+        $allowed = ['cash', 'card', 'upi', 'neft', 'other'];
+        $out = [];
+        foreach ($modes as $m) {
+            $m = strtolower(trim((string) $m));
+            if ($m !== '' && in_array($m, $allowed, true)) {
+                $out[] = $m;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectionModeToBillPayPaymentTokens(string $mode): array
+    {
+        return match (strtolower(trim($mode))) {
+            'cash' => ['cash'],
+            'card' => ['card'],
+            'upi' => ['upi'],
+            'neft' => ['neft'],
+            'other' => ['cheque', 'dd', 'credit', 'other'],
+            default => [],
+        };
+    }
+
+    /**
+     * PAY IN: income tag modes (income_matched_modes / split JSON) + Radiant/POS links.
+     * PAY OUT: matched bill_pay payment / payment_mode on the active bank_bill_matches row.
+     */
+    private function applyCollectionModeFilterToQuery(Builder $query, array $modes): void
+    {
+        $query->where(function ($outer) use ($modes) {
+            foreach ($modes as $mode) {
+                $mode = strtolower(trim($mode));
+                if ($mode === '') {
+                    continue;
+                }
+                $modeJsonNeedle = '"'.addcslashes($mode, '%_\\').'"';
+
+                $outer->orWhere(function ($q) use ($mode, $modeJsonNeedle) {
+                    $q->where(function ($qIncome) use ($mode, $modeJsonNeedle) {
+                        $qIncome->where('bs.income_match_status', '=', 'income_matched');
+                        $qIncome->where(function ($qm) use ($mode, $modeJsonNeedle) {
+                            if (Schema::hasColumn('bank_statements', 'income_matched_modes')) {
+                                $qm->orWhereRaw('LOWER(IFNULL(bs.income_matched_modes, "")) LIKE ?', [
+                                    '%'.strtolower($modeJsonNeedle).'%',
+                                ]);
+                            }
+                            if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
+                                $qm->orWhereRaw('LOWER(IFNULL(bs.income_match_split_json, "")) LIKE ?', [
+                                    '%'.strtolower($modeJsonNeedle).'%',
+                                ]);
+                            }
+                            if ($mode === 'card' || $mode === 'upi') {
+                                $alt = $mode === 'card' ? 'upi' : 'card';
+                                $altNeedle = '"'.addcslashes($alt, '%_\\').'"';
+                                if (Schema::hasColumn('bank_statements', 'income_matched_modes')) {
+                                    $qm->orWhereRaw('LOWER(IFNULL(bs.income_matched_modes, "")) LIKE ?', [
+                                        '%'.strtolower($altNeedle).'%',
+                                    ]);
+                                }
+                                if (Schema::hasColumn('bank_statements', 'income_match_split_json')) {
+                                    $qm->orWhereRaw('LOWER(IFNULL(bs.income_match_split_json, "")) LIKE ?', [
+                                        '%'.strtolower($altNeedle).'%',
+                                    ]);
+                                }
+                            }
+                        });
+                    });
+
+                    if ($mode === 'cash' && Schema::hasColumn('bank_statements', 'radiant_match_status')) {
+                        $q->orWhere('bs.radiant_match_status', '=', 'radiant_matched');
+                    }
+                    if (($mode === 'card' || $mode === 'upi') && Schema::hasColumn('bank_statements', 'pos_match_status')) {
+                        $q->orWhere('bs.pos_match_status', '=', 'pos_matched');
+                    }
+                });
+
+                if (Schema::hasTable('bill_tbl') && Schema::hasTable('bank_bill_matches')) {
+                    $payTokens = $this->collectionModeToBillPayPaymentTokens($mode);
+                    if ($payTokens !== []) {
+                        $outer->orWhere(function ($q) use ($payTokens) {
+                            $q->whereNotNull('bill.id');
+                            $q->where(function ($qp) use ($payTokens) {
+                                foreach ($payTokens as $tok) {
+                                    $qp->orWhereExists(function ($sub) use ($tok) {
+                                        $sub->select(DB::raw('1'))
+                                            ->from('bank_bill_matches as bbm_mode')
+                                            ->whereColumn('bbm_mode.bank_statement_id', 'bs.id');
+                                        if (Schema::hasColumn('bank_bill_matches', 'status')) {
+                                            $sub->where('bbm_mode.status', '=', 'active');
+                                        }
+                                        $sub->where(function ($sPay) use ($tok) {
+                                            if (Schema::hasColumn('bank_bill_matches', 'bill_pay_id')) {
+                                                $sPay->whereExists(function ($sBp) use ($tok) {
+                                                    $sBp->select(DB::raw('1'))
+                                                        ->from('bill_pay_tbl as bp')
+                                                        ->whereColumn('bp.id', 'bbm_mode.bill_pay_id')
+                                                        ->where(function ($sTok) use ($tok) {
+                                                            $sTok->whereRaw('LOWER(TRIM(bp.payment)) = ?', [$tok]);
+                                                            if (Schema::hasColumn('bill_pay_tbl', 'payment_mode')) {
+                                                                $sTok->orWhereRaw('LOWER(TRIM(bp.payment_mode)) LIKE ?', ['%'.$tok.'%']);
+                                                            }
+                                                        });
+                                                });
+                                            }
+                                            $sPay->orWhereExists(function ($sBp) use ($tok) {
+                                                $sBp->select(DB::raw('1'))
+                                                    ->from('bill_pay_lines_tbl as bpl')
+                                                    ->join('bill_pay_tbl as bp', 'bp.id', '=', 'bpl.bill_pay_id')
+                                                    ->whereColumn('bpl.bill_id', 'bill.id')
+                                                    ->where(function ($sTok) use ($tok) {
+                                                        $sTok->whereRaw('LOWER(TRIM(bp.payment)) = ?', [$tok]);
+                                                        if (Schema::hasColumn('bill_pay_tbl', 'payment_mode')) {
+                                                            $sTok->orWhereRaw('LOWER(TRIM(bp.payment_mode)) LIKE ?', ['%'.$tok.'%']);
+                                                        }
+                                                    });
+                                                if (Schema::hasColumn('bill_pay_tbl', 'delete_status')) {
+                                                    $sBp->where('bp.delete_status', '=', 0);
+                                                }
+                                            });
+                                        });
+                                    });
+                                }
+                            });
+                        });
+                    }
                 }
             }
         });
@@ -1339,6 +1654,33 @@ class BankStatementController extends Controller
                 ->where(function ($q) {
                     $q->whereNull('bs.radiant_match_status')
                         ->orWhere('bs.radiant_match_status', '!=', 'radiant_matched');
+                });
+        }
+    }
+
+    private function applyPosMatchValueToQuery(Builder $query, string $val): void
+    {
+        if (! Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            return;
+        }
+        if (! in_array($val, ['pos_matched', 'pos_unmatched', 'pos_keyword_only'], true)) {
+            return;
+        }
+        if ($val === 'pos_matched') {
+            $query->where('bs.pos_match_status', 'pos_matched');
+        } elseif ($val === 'pos_unmatched') {
+            $query->where(function ($q) {
+                $q->where('bs.pos_match_status', 'pos_unmatched')
+                    ->orWhereNull('bs.pos_match_status');
+            });
+        } elseif ($val === 'pos_keyword_only') {
+            $query->where(function ($q) {
+                $q->whereNotNull('bs.pos_match_against')
+                    ->where('bs.pos_match_against', '!=', '');
+            })
+                ->where(function ($q) {
+                    $q->whereNull('bs.pos_match_status')
+                        ->orWhere('bs.pos_match_status', '!=', 'pos_matched');
                 });
         }
     }
@@ -1514,6 +1856,11 @@ class BankStatementController extends Controller
             'bill.branch_id as resolved_bill_branch_id',
         ];
 
+        if (Schema::hasColumn('bank_statements', 'pos_matched_by')) {
+            $select[] = 'pos_user.user_fullname as pos_matched_by_name';
+            $select[] = 'pos_user.username as pos_matched_by_username';
+        }
+
         if (Schema::hasTable('bank_statements') && Schema::hasColumn('bank_statements', 'br_nature_account_names')
             && Schema::hasTable('bill_tbl') && Schema::hasColumn('bill_tbl', 'br_nature_account_names')) {
             $select[] = DB::raw(
@@ -1568,6 +1915,10 @@ class BankStatementController extends Controller
             ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id')
             ->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id')
             ->leftJoin('bank_reconciliation_accounts as bra', 'bs.bank_account_id', '=', 'bra.id');
+
+        if (Schema::hasColumn('bank_statements', 'pos_matched_by')) {
+            $query->leftJoin('users as pos_user', 'bs.pos_matched_by', '=', 'pos_user.id');
+        }
 
         $this->applyBankStatementBillJoins($query);
         if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
@@ -1674,6 +2025,25 @@ class BankStatementController extends Controller
             $this->applyRadiantMatchValueToQuery($query, (string) $request->radiant_match);
         }
 
+        $allowedPos = ['pos_matched', 'pos_unmatched', 'pos_keyword_only'];
+        $posMatches = array_values(array_intersect(
+            $allowedPos,
+            $this->requestStringList($request, 'pos_matches')
+        ));
+        if (Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            if (count($posMatches) > 0) {
+                $query->where(function ($outer) use ($posMatches) {
+                    foreach ($posMatches as $val) {
+                        $outer->orWhere(function ($q) use ($val) {
+                            $this->applyPosMatchValueToQuery($q, $val);
+                        });
+                    }
+                });
+            } elseif ($request->filled('pos_match')) {
+                $this->applyPosMatchValueToQuery($query, (string) $request->pos_match);
+            }
+        }
+
         $allowedTxn = ['deposit', 'withdrawal', 'income', 'expense'];
         $txnTypes = array_values(array_intersect(
             $allowedTxn,
@@ -1693,12 +2063,14 @@ class BankStatementController extends Controller
 
         $this->applyInclusiveZoneBranchFilter($query, $request);
 
-        $categories = $this->requestStringList($request, 'categories');
+        $categories = $this->normalizeBankReconCategoryFilterTokens(
+            $this->requestStringList($request, 'categories')
+        );
         if (count($categories) > 0 && Schema::hasColumn('bank_statements', 'category')) {
             $special = array_values(array_intersect(['__categorized', '__uncategorized'], $categories));
             $rest = array_values(array_diff($categories, ['__categorized', '__uncategorized']));
-            // Legacy data often uses literal "Uncategorized" (or variants) instead of NULL/empty.
-            $uncatLiterals = ['uncategorized', 'un-categorized', 'un categorised', 'uncategorised'];
+            // Legacy data: uncategory / uncategorized / empty / NULL.
+            $uncatLiterals = ['uncategorized', 'uncategory', 'un-categorized', 'un categorised', 'uncategorised'];
             if (count($special) > 0 && count($rest) === 0) {
                 $query->where(function ($q) use ($special, $uncatLiterals) {
                     foreach ($special as $s) {
@@ -1742,6 +2114,13 @@ class BankStatementController extends Controller
             }
         }
 
+        $collectionModes = $this->normalizeCollectionModeFilterTokens(
+            $this->requestStringList($request, 'collection_modes')
+        );
+        if ($collectionModes !== []) {
+            $this->applyCollectionModeFilterToQuery($query, $collectionModes);
+        }
+
         $vendorNames = $this->requestStringList($request, 'vendor_names');
         if (count($vendorNames) > 0 && Schema::hasTable('bill_tbl')) {
             $query->whereIn('bill.vendor_name', $vendorNames);
@@ -1764,6 +2143,14 @@ class BankStatementController extends Controller
                     ->orWhere('bs.transaction_id', 'LIKE', '%'.$search.'%');
                 if (Schema::hasColumn('bank_statements', 'radiant_match_against')) {
                     $q->orWhere('bs.radiant_match_against', 'LIKE', '%'.$search.'%');
+                }
+                if (Schema::hasColumn('bank_statements', 'pos_match_against')) {
+                    $q->orWhere('bs.pos_match_against', 'LIKE', '%'.$search.'%');
+                    $q->orWhere('bs.pos_matched_mid', 'LIKE', '%'.$search.'%');
+                    $q->orWhere('bs.pos_matched_merchant', 'LIKE', '%'.$search.'%');
+                }
+                if (Schema::hasColumn('bank_statements', 'pos_extracted_key')) {
+                    $q->orWhere('bs.pos_extracted_key', 'LIKE', '%'.$search.'%');
                 }
                 $digits = preg_replace('/\s+/', '', $search);
                 if ($digits !== '' && ctype_digit($digits)) {
@@ -1808,6 +2195,12 @@ class BankStatementController extends Controller
                 if (Schema::hasColumn('bank_statements', 'income_matched_by')) {
                     $q->orWhereIn('bs.income_matched_by', $matchedByIds);
                 }
+                if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+                    $q->orWhereIn('bs.radiant_matched_by', $matchedByIds);
+                }
+                if (Schema::hasColumn('bank_statements', 'pos_matched_by')) {
+                    $q->orWhereIn('bs.pos_matched_by', $matchedByIds);
+                }
                 if (Schema::hasTable('bank_bill_matches')) {
                     $q->orWhereIn('bbm.matched_by', $matchedByIds);
                 }
@@ -1824,6 +2217,12 @@ class BankStatementController extends Controller
                     }
                     if (Schema::hasColumn('bank_statements', 'income_matched_by')) {
                         $q->orWhere('bs.income_matched_by', $uid);
+                    }
+                    if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+                        $q->orWhere('bs.radiant_matched_by', $uid);
+                    }
+                    if (Schema::hasColumn('bank_statements', 'pos_matched_by')) {
+                        $q->orWhere('bs.pos_matched_by', $uid);
                     }
                 });
             }
@@ -1887,6 +2286,9 @@ class BankStatementController extends Controller
             'radiant_matched'      => 0,
             'radiant_unmatched'    => 0,
             'radiant_keyword_only' => 0,
+            'pos_matched'          => 0,
+            'pos_unmatched'        => 0,
+            'pos_keyword_only'     => 0,
         ];
 
         $idSub = $this->bankStatementsFilteredQuery($request);
@@ -1923,6 +2325,20 @@ class BankStatementController extends Controller
             $aggregates[] = '0 as agg_radiant_keyword_only';
         }
 
+        if (Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            $aggregates[] = "SUM(CASE WHEN bs.pos_match_status = 'pos_matched' THEN 1 ELSE 0 END) as agg_pos_matched";
+            $aggregates[] = "SUM(CASE WHEN bs.pos_match_status = 'pos_unmatched' OR bs.pos_match_status IS NULL THEN 1 ELSE 0 END) as agg_pos_unmatched";
+            if (Schema::hasColumn('bank_statements', 'pos_match_against')) {
+                $aggregates[] = "SUM(CASE WHEN bs.pos_match_against IS NOT NULL AND TRIM(bs.pos_match_against) <> '' AND (bs.pos_match_status IS NULL OR bs.pos_match_status <> 'pos_matched') THEN 1 ELSE 0 END) as agg_pos_keyword_only";
+            } else {
+                $aggregates[] = '0 as agg_pos_keyword_only';
+            }
+        } else {
+            $aggregates[] = '0 as agg_pos_matched';
+            $aggregates[] = '0 as agg_pos_unmatched';
+            $aggregates[] = '0 as agg_pos_keyword_only';
+        }
+
         $row = DB::table('bank_statements as bs')
             ->joinSub($idSub, 'br_filtered', function ($join) {
                 $join->on('br_filtered.id', '=', 'bs.id');
@@ -1949,6 +2365,9 @@ class BankStatementController extends Controller
             'radiant_matched'      => (int) $row->agg_radiant_matched,
             'radiant_unmatched'    => (int) $row->agg_radiant_unmatched,
             'radiant_keyword_only' => (int) $row->agg_radiant_keyword_only,
+            'pos_matched'          => (int) $row->agg_pos_matched,
+            'pos_unmatched'        => (int) $row->agg_pos_unmatched,
+            'pos_keyword_only'     => (int) $row->agg_pos_keyword_only,
         ];
     }
     
@@ -3648,6 +4067,14 @@ class BankStatementController extends Controller
         if (Schema::hasColumn('bill_tbl', 'bill_gen_number')) {
             $select[] = 'bill.bill_gen_number as resolved_bill_gen_number';
         }
+        if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+            $select[] = 'radiant_user.user_fullname as radiant_matched_by_name';
+            $select[] = 'radiant_user.username as radiant_matched_by_username';
+        }
+        if (Schema::hasColumn('bank_statements', 'pos_matched_by')) {
+            $select[] = 'pos_user.user_fullname as pos_matched_by_name';
+            $select[] = 'pos_user.username as pos_matched_by_username';
+        }
         if (Schema::hasTable('bank_bill_matches')) {
             $select[] = 'bbm_matcher.user_fullname as bbm_matched_by_name';
             $select[] = 'bbm_matcher.username as bbm_matched_by_username';
@@ -3683,6 +4110,12 @@ class BankStatementController extends Controller
         $query = DB::table('bank_statements as bs')
             ->leftJoin('users as matched_user', 'bs.matched_by', '=', 'matched_user.id')
             ->leftJoin('users as income_user', 'bs.income_matched_by', '=', 'income_user.id');
+        if (Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+            $query->leftJoin('users as radiant_user', 'bs.radiant_matched_by', '=', 'radiant_user.id');
+        }
+        if (Schema::hasColumn('bank_statements', 'pos_matched_by')) {
+            $query->leftJoin('users as pos_user', 'bs.pos_matched_by', '=', 'pos_user.id');
+        }
         if (Schema::hasTable('bank_recon_salary_rows') && Schema::hasTable('bank_recon_salary_uploads')) {
             $query->leftJoin('bank_recon_salary_rows as bsr', 'bsr.bank_statement_id', '=', 'bs.id')
                 ->leftJoin('bank_recon_salary_uploads as bsu', 'bsr.salary_upload_id', '=', 'bsu.id')
@@ -3699,7 +4132,9 @@ class BankStatementController extends Controller
         }
 
         $this->hydrateStatementBillDisplayFields($stmt);
+        $this->hydrateBillLineAccountNamesForStatementRows(collect([$stmt]));
         $this->hydrateIncomeBillingListForStatementRow($stmt);
+        $stmt->lazy_bill_details_pending = false;
 
         return response()->json(['success' => true, 'data' => $stmt]);
     }
@@ -4640,7 +5075,8 @@ class BankStatementController extends Controller
      *
      * Patterns handled:
      *   CASH  → "BY CASH -DHARMAPURI 6057 ..."   → mode=cash,  branch resolved by name
-     *   MESPOS→ "FT-MESPOS SET 10XX123558 310126" → mode=card,  branch resolved by MOC code suffix
+     *   MESPOS / ICICIPOS → "FT-MESPOS SET 10XX123558 …" / "FT-ICICIPOS SET 10XX119088 …020526ICICIPOS"
+     *     → modes card+upi, branch resolved by MOC code suffix (10XX + digits)
      *   NEFT  → "NEFT-..."                        → mode=neft
      *   UPI   → "UPI-..." / "UPI/"                → mode=upi
      */
@@ -4728,14 +5164,14 @@ class BankStatementController extends Controller
         }
 
         // =========================================================
-        // 2. MESPOS — "FT-MESPOS SET 10XXNNNNNN" / "MESPOS 10XXNNNNNN"
-        //    10XX<6+digits> → full code = 100000000<suffix>
-        //    MESPOS collects both Card and UPI — select both modes
+        // 2. MESPOS / ICICIPOS — "FT-MESPOS SET 10XXNNNNNN" / "FT-ICICIPOS SET 10XX119088 …ICICIPOS"
+        //    Same 10XX<digits> MOC suffix as MESPOS; ICICI POS lines also tag ICICIPOS in the narrative.
+        //    Collects both Card and UPI — select both modes
         // =========================================================
-        elseif (preg_match('/MESPOS/i', $description)) {
-            $mode = ['card', 'upi']; // MESPOS handles both card & UPI
+        elseif (preg_match('/MESPOS|ICICIPOS/i', $description)) {
+            $mode = ['card', 'upi']; // POS settlement lines: card & UPI
 
-            // Extract the 10XX code pattern: "10" + at least 4 digits (last 6 are the suffix)
+            // Extract the 10XX code pattern: "10" + X/0 run + digits (last 6 are the suffix)
             if (preg_match('/10[X0]+([0-9]{6,})/i', $description, $m)) {
                 $suffix = substr($m[1], -6); // take last 6 digits
                 // dd($suffix);
@@ -5586,6 +6022,10 @@ class BankStatementController extends Controller
             'attachment_tags.*'   => 'nullable|string|max:255',
             'attachment_type_ids' => 'nullable|array',
             'attachment_type_ids.*' => 'nullable|integer',
+            'radiant_cash_pickup_id' => 'nullable',
+            'radiant_match_against'  => 'nullable|string|max:255',
+            'settlement_account_id'  => 'nullable',
+            'pos_match_against'      => 'nullable|string|max:255',
         ], [
             'attachments.required' => 'Add at least one supporting document for this income tag (types: Income or Both).',
             'attachments.min'      => 'Add at least one supporting document for this income tag.',
@@ -5619,6 +6059,11 @@ class BankStatementController extends Controller
         $stmt = DB::table('bank_statements')->find($request->bank_statement_id);
         if (!$stmt) {
             return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+        }
+
+        [$radiantPosError, $radiantPickupIdApply, $posSettlementIdApply] = $this->resolveIncomeTagRadiantPosIds($request, $modes);
+        if ($radiantPosError !== null) {
+            return $radiantPosError;
         }
 
         $lineTotal = $stmt->withdrawal > 0 ? (float) $stmt->withdrawal : (float) $stmt->deposit;
@@ -5780,6 +6225,24 @@ class BankStatementController extends Controller
             }
             if (!empty($safeUpdate)) {
                 DB::table('bank_statements')->where('id', $stmt->id)->update($safeUpdate);
+            }
+
+            if ($radiantPickupIdApply) {
+                $radiantKw = trim((string) $request->input('radiant_match_against', ''));
+                $this->persistRadiantPickupLinkOnStatement(
+                    (int) $stmt->id,
+                    $radiantPickupIdApply,
+                    $radiantKw !== '' ? $radiantKw : null
+                );
+            }
+
+            if ($posSettlementIdApply) {
+                $posKw = trim((string) $request->input('pos_match_against', ''));
+                $this->persistPosSettlementLinkOnStatement(
+                    (int) $stmt->id,
+                    $posSettlementIdApply,
+                    $posKw !== '' ? $posKw : null
+                );
             }
 
             $stmtAfterIncome = DB::table('bank_statements')->where('id', $stmt->id)->first();
@@ -6005,6 +6468,213 @@ class BankStatementController extends Controller
     }
 
     /**
+     * @return array{0: ?\Illuminate\Http\JsonResponse, 1: ?int, 2: ?int}
+     */
+    private function resolveIncomeTagRadiantPosIds(Request $request, array $modes): array
+    {
+        $needsRadiant = in_array('cash', $modes, true);
+        $needsPos = in_array('card', $modes, true) || in_array('upi', $modes, true);
+
+        $pickupId = null;
+        $settlementId = null;
+
+        if ($needsRadiant) {
+            if (! Schema::hasTable('radiant_cash_pickups')
+                || ! Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')) {
+                return [
+                    response()->json([
+                        'success' => false,
+                        'message' => 'Radiant pickup is required for Cash mode but Radiant is not configured. Run migrations.',
+                    ], 503),
+                    null,
+                    null,
+                ];
+            }
+            $pickupRaw = $request->input('radiant_cash_pickup_id');
+            if ($pickupRaw === '' || $pickupRaw === null) {
+                return [
+                    response()->json([
+                        'success' => false,
+                        'message' => 'Select a Radiant cash pickup slip before applying the income tag (Cash mode).',
+                    ], 422),
+                    null,
+                    null,
+                ];
+            }
+            $pickupId = (int) $pickupRaw;
+            if ($pickupId <= 0 || ! DB::table('radiant_cash_pickups')->where('id', $pickupId)->exists()) {
+                return [
+                    response()->json([
+                        'success' => false,
+                        'message' => 'Invalid Radiant cash pickup selected.',
+                    ], 422),
+                    null,
+                    null,
+                ];
+            }
+        }
+
+        if ($needsPos) {
+            if (! Schema::hasTable('settlement_accounts')
+                || ! Schema::hasColumn('bank_statements', 'pos_match_status')) {
+                return [
+                    response()->json([
+                        'success' => false,
+                        'message' => 'POS settlement is required for Card/UPI mode but settlement is not configured. Run migrations.',
+                    ], 503),
+                    null,
+                    null,
+                ];
+            }
+            $acctRaw = $request->input('settlement_account_id');
+            if ($acctRaw === '' || $acctRaw === null) {
+                return [
+                    response()->json([
+                        'success' => false,
+                        'message' => 'Select a POS settlement row before applying the income tag (Card / UPI mode).',
+                    ], 422),
+                    null,
+                    null,
+                ];
+            }
+            $settlementId = (int) $acctRaw;
+            if ($settlementId <= 0 || ! SettlementAccount::query()->where('id', $settlementId)->exists()) {
+                return [
+                    response()->json([
+                        'success' => false,
+                        'message' => 'Invalid POS settlement row selected.',
+                    ], 422),
+                    null,
+                    null,
+                ];
+            }
+        }
+
+        return [null, $pickupId, $settlementId];
+    }
+
+    private function persistRadiantPickupLinkOnStatement(int $statementId, int $pickupId, ?string $keyword = null): void
+    {
+        $stmt = DB::table('bank_statements')->where('id', $statementId)->first();
+        if (! $stmt) {
+            throw new \RuntimeException('Bank statement not found');
+        }
+
+        $pickup = DB::table('radiant_cash_pickups')->where('id', $pickupId)->first();
+        if (! $pickup) {
+            throw new \RuntimeException('Radiant cash pickup #'.$pickupId.' was not found.');
+        }
+
+        $pickupDateStr = $pickup->pickup_date;
+        if (! $pickupDateStr && ! empty($pickup->pickup_date_parsed)) {
+            try {
+                $pickupDateStr = Carbon::parse($pickup->pickup_date_parsed)->format('d/m/Y');
+            } catch (\Exception $e) {
+                $pickupDateStr = (string) $pickup->pickup_date_parsed;
+            }
+        }
+
+        $user = Auth::user();
+        $update = [
+            'radiant_match_against'       => $keyword,
+            'radiant_match_status'        => 'radiant_matched',
+            'radiant_cash_pickup_id'      => $pickupId,
+            'radiant_matched_location'    => $pickup->location,
+            'radiant_matched_pickup_date' => $pickupDateStr,
+            'radiant_matched_by'          => $user ? $user->id : null,
+            'radiant_matched_at'          => now(),
+            'updated_at'                  => now(),
+        ];
+
+        $safe = [];
+        foreach ($update as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safe[$col] = $val;
+            }
+        }
+        if ($safe !== []) {
+            DB::table('bank_statements')->where('id', $statementId)->update($safe);
+        }
+    }
+
+    private function persistPosSettlementLinkOnStatement(int $statementId, int $accountId, ?string $keyword = null): void
+    {
+        $stmt = DB::table('bank_statements')->where('id', $statementId)->first();
+        if (! $stmt) {
+            throw new \RuntimeException('Bank statement not found');
+        }
+
+        $account = SettlementAccount::query()->where('id', $accountId)->first();
+        if (! $account) {
+            throw new \RuntimeException('Settlement row #'.$accountId.' was not found.');
+        }
+
+        $keys = $this->extractPosMatchKeyCandidatesFromDescription((string) ($stmt->description ?? ''));
+        $primaryKey = $keys[0] ?? null;
+        $stmtDates = $this->bankStatementPosMatchDatesYmd($stmt);
+
+        if (count($stmtDates) > 0) {
+            $sdY = $account->settlement_date ? $account->settlement_date->format('Y-m-d') : null;
+            $tdY = $account->transaction_date ? $account->transaction_date->format('Y-m-d') : null;
+            $dateOk = false;
+            foreach ($stmtDates as $d) {
+                if ($sdY === $d || $tdY === $d) {
+                    $dateOk = true;
+                    break;
+                }
+            }
+            if (! $dateOk) {
+                throw new \RuntimeException(
+                    'Settlement dates do not match this bank line. Expected one of: '.implode(', ', $stmtDates).'.'
+                );
+            }
+        }
+
+        $keyOk = count($keys) === 0;
+        if (! $keyOk) {
+            foreach ($keys as $k) {
+                if (str_contains((string) $account->mid, $k) || str_contains((string) $account->tid, $k)) {
+                    $keyOk = true;
+                    break;
+                }
+            }
+        }
+        if (! $keyOk) {
+            throw new \RuntimeException('Selected settlement row does not match the digit key from the bank description.');
+        }
+
+        $user = Auth::user();
+        $settleYmd = $account->settlement_date ? $account->settlement_date->format('Y-m-d') : null;
+        $merchant = trim((string) ($account->merchant_name ?? ''));
+        if ($merchant === '') {
+            $merchant = trim((string) ($account->trading_name ?? ''));
+        }
+
+        $update = [
+            'pos_match_against'           => $keyword,
+            'pos_match_status'            => 'pos_matched',
+            'pos_settlement_account_id'   => $account->id,
+            'pos_matched_mid'             => (string) ($account->mid ?? ''),
+            'pos_matched_merchant'        => $merchant !== '' ? $merchant : null,
+            'pos_matched_settlement_date' => $settleYmd,
+            'pos_extracted_key'         => $primaryKey,
+            'pos_matched_by'              => $user ? $user->id : null,
+            'pos_matched_at'              => now(),
+            'updated_at'                  => now(),
+        ];
+
+        $safe = [];
+        foreach ($update as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safe[$col] = $val;
+            }
+        }
+        if ($safe !== []) {
+            DB::table('bank_statements')->where('id', $statementId)->update($safe);
+        }
+    }
+
+    /**
      * Save Radiant keyword and/or link to radiant_cash_pickups (marks radiant_matched like income tag).
      */
     public function saveRadiantMatchAgainst(Request $request)
@@ -6199,6 +6869,425 @@ class BankStatementController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Radiant pickup link removed (keyword kept if set)',
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractPosMatchKeyCandidatesFromDescription(string $description): array
+    {
+        $description = trim($description);
+        if ($description === '' || ! preg_match_all('/\d{5,}/', $description, $m)) {
+            return [];
+        }
+        $out = [];
+        foreach ($m[0] as $run) {
+            $suffix = substr($run, -5);
+            if ($suffix !== '' && ctype_digit($suffix)) {
+                $out[$suffix] = true;
+            }
+        }
+
+        return array_keys($out);
+    }
+
+    private function bankStatementRowTransactionCarbon(object $stmt): ?Carbon
+    {
+        $raw = trim((string) ($stmt->transaction_date ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'd/M/Y', 'd/M/y', 'd M Y', 'j M Y', 'd-M-Y', 'M d, Y'] as $fmt) {
+            try {
+                return Carbon::createFromFormat($fmt, $raw)->startOfDay();
+            } catch (\Exception $e) {
+            }
+        }
+        try {
+            return Carbon::parse($raw)->startOfDay();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Dates on the bank line that can align with settlement_accounts.transaction_date or settlement_date.
+     *
+     * @return list<string> Y-m-d
+     */
+    private function bankStatementPosMatchDatesYmd(object $stmt): array
+    {
+        $out = [];
+        $dt = $this->bankStatementRowTransactionCarbon($stmt);
+        if ($dt) {
+            $out[] = $dt->format('Y-m-d');
+        }
+        if (Schema::hasColumn('bank_statements', 'value_date')) {
+            $vRaw = trim((string) ($stmt->value_date ?? ''));
+            if ($vRaw !== '') {
+                $vDt = $this->bankStatementRowTransactionCarbon((object) ['transaction_date' => $vRaw]);
+                if ($vDt) {
+                    $out[] = $vDt->format('Y-m-d');
+                }
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    private function bankReconciliationAccountDigitsSuffix(?int $bankAccountId, int $maxLen = 6): ?string
+    {
+        if ($bankAccountId === null || $bankAccountId <= 0 || ! Schema::hasTable('bank_reconciliation_accounts')) {
+            return null;
+        }
+        $bra = DB::table('bank_reconciliation_accounts')->where('id', $bankAccountId)->first();
+        if (! $bra) {
+            return null;
+        }
+        $digits = preg_replace('/\D/', '', (string) ($bra->account_number ?? ''));
+        if (strlen($digits) < 4) {
+            return null;
+        }
+        $len = min($maxLen, strlen($digits));
+
+        return substr($digits, -$len);
+    }
+
+    /**
+     * Settlement/POS rows for the income-tag modal (same txn date as bank line; optional bank account suffix; description digit keys).
+     */
+    public function settlementAccountsForBankPos(Request $request)
+    {
+        if (! Schema::hasTable('settlement_accounts')) {
+            return response()->json(['success' => true, 'data' => [], 'extracted_keys' => []]);
+        }
+        if (! Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'POS columns missing on bank_statements. Run migrations.',
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'bank_statement_id' => 'required|integer|min:1',
+        ]);
+
+        $stmt = DB::table('bank_statements')->where('id', $validated['bank_statement_id'])->first();
+        if (! $stmt) {
+            return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+        }
+
+        $keys = $this->extractPosMatchKeyCandidatesFromDescription((string) ($stmt->description ?? ''));
+        $stmtDates = $this->bankStatementPosMatchDatesYmd($stmt);
+        if (count($stmtDates) === 0) {
+            return response()->json([
+                'success'          => true,
+                'data'             => [],
+                'extracted_keys'   => $keys,
+                'message'          => 'Could not parse transaction or value date for this line.',
+            ]);
+        }
+
+        $suffix = $this->bankReconciliationAccountDigitsSuffix(
+            isset($stmt->bank_account_id) ? (int) $stmt->bank_account_id : null
+        );
+
+        $q = SettlementAccount::query()
+            ->where(function ($outer) use ($stmtDates) {
+                foreach ($stmtDates as $d) {
+                    $outer->orWhere(function ($w) use ($d) {
+                        $w->whereDate('settlement_date', $d)
+                            ->orWhereDate('transaction_date', $d);
+                    });
+                }
+            });
+
+        // Bank ledger account digits rarely appear inside POS MID/TID; only use this filter when we
+        // have no description keys (otherwise it incorrectly returns zero rows).
+        if ($suffix !== null && $suffix !== '' && count($keys) === 0) {
+            $q->where(function ($w) use ($suffix) {
+                $w->where('mid', 'like', '%'.$suffix.'%')
+                    ->orWhere('tid', 'like', '%'.$suffix.'%');
+            });
+        }
+
+        if (count($keys) > 0) {
+            $q->where(function ($w) use ($keys) {
+                foreach ($keys as $k) {
+                    $w->orWhere(function ($qq) use ($k) {
+                        $qq->where('mid', 'like', '%'.$k.'%')
+                            ->orWhere('tid', 'like', '%'.$k.'%');
+                    });
+                }
+            });
+        } elseif ($suffix === null || $suffix === '') {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'extracted_keys' => $keys,
+                'message' => 'No 5-digit keys found in the description and no bank account to filter by.',
+            ]);
+        }
+
+        $rows = $q->orderBy('id')->limit(250)->get();
+
+        $data = $rows->map(function (SettlementAccount $row) {
+            $sd = $row->settlement_date ? $row->settlement_date->format('Y-m-d') : '';
+            $td = $row->transaction_date ? $row->transaction_date->format('Y-m-d') : '';
+            $merchant = trim((string) ($row->merchant_name ?? ''));
+            if ($merchant === '') {
+                $merchant = trim((string) ($row->trading_name ?? ''));
+            }
+            $net = $row->total_net_settlement_amount;
+            $label = 'MID '.($row->mid ?? '—');
+            if (trim((string) ($row->tid ?? '')) !== '') {
+                $label .= ' · TID '.$row->tid;
+            }
+            if ($merchant !== '') {
+                $label .= ' — '.$merchant;
+            }
+            $label .= ' · '.$sd.' · ₹'.number_format((float) $net, 2, '.', ',');
+
+            return [
+                'id'          => (int) $row->id,
+                'label'       => $label,
+                'mid'         => (string) ($row->mid ?? ''),
+                'tid'         => (string) ($row->tid ?? ''),
+                'merchant'    => (string) ($row->merchant_name ?? ''),
+                'branch'      => (string) ($row->branch ?? ''),
+                'settlement_date'  => $sd,
+                'transaction_date' => $td,
+                'net_amount'       => $net !== null ? (float) $net : null,
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+            'extracted_keys' => $keys,
+        ]);
+    }
+
+    /**
+     * Save POS/settlement keyword and/or link to settlement_accounts (mirrors Radiant pickup flow).
+     */
+    public function savePosSettlementMatch(Request $request)
+    {
+        if (! Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'POS columns missing. Run: php artisan migrate',
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'bank_statement_id'        => 'required|integer|min:1',
+            'pos_match_against'        => 'nullable|string|max:255',
+            'settlement_account_id'    => 'nullable',
+        ]);
+
+        $stmt = DB::table('bank_statements')->where('id', $validated['bank_statement_id'])->first();
+        if (! $stmt) {
+            return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+        }
+
+        $rawKw = isset($validated['pos_match_against']) ? trim((string) $validated['pos_match_against']) : '';
+        $keyword = $rawKw === '' ? null : $rawKw;
+
+        $acctRaw = $request->input('settlement_account_id');
+        $acctId = ($acctRaw === '' || $acctRaw === null) ? null : (int) $acctRaw;
+
+        $keys = $this->extractPosMatchKeyCandidatesFromDescription((string) ($stmt->description ?? ''));
+        $primaryKey = $keys[0] ?? null;
+
+        $stmtDates = $this->bankStatementPosMatchDatesYmd($stmt);
+
+        $update = [
+            'pos_match_against' => $keyword,
+            'updated_at'        => now(),
+        ];
+
+        $account = null;
+        if ($acctId) {
+            if (! Schema::hasTable('settlement_accounts')) {
+                return response()->json(['success' => false, 'message' => 'settlement_accounts table not found'], 503);
+            }
+            $account = SettlementAccount::query()->where('id', $acctId)->first();
+            if (! $account) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Settlement row #'.$acctId.' was not found.',
+                ], 422);
+            }
+            if (count($stmtDates) > 0) {
+                $sdY = $account->settlement_date ? $account->settlement_date->format('Y-m-d') : null;
+                $tdY = $account->transaction_date ? $account->transaction_date->format('Y-m-d') : null;
+                $dateOk = false;
+                foreach ($stmtDates as $d) {
+                    if ($sdY === $d || $tdY === $d) {
+                        $dateOk = true;
+                        break;
+                    }
+                }
+                if (! $dateOk) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Settlement dates do not match this bank line (transaction/value date). Expected one of: '
+                            .implode(', ', $stmtDates).'.',
+                    ], 422);
+                }
+            }
+            $keyOk = false;
+            foreach ($keys as $k) {
+                if (str_contains((string) $account->mid, $k) || str_contains((string) $account->tid, $k)) {
+                    $keyOk = true;
+                    break;
+                }
+            }
+            if (count($keys) > 0 && ! $keyOk) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected settlement row does not match the digit key from the bank description.',
+                ], 422);
+            }
+            $suffix = $this->bankReconciliationAccountDigitsSuffix(
+                isset($stmt->bank_account_id) ? (int) $stmt->bank_account_id : null
+            );
+            if ($suffix !== null && $suffix !== '' && count($keys) === 0) {
+                $mid = (string) ($account->mid ?? '');
+                $tid = (string) ($account->tid ?? '');
+                if (! str_contains($mid, $suffix) && ! str_contains($tid, $suffix)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Settlement MID/TID does not match the filtered bank account for this line.',
+                    ], 422);
+                }
+            }
+
+            $user = Auth::user();
+            $settleYmd = $account->settlement_date ? $account->settlement_date->format('Y-m-d') : null;
+            $merchant = trim((string) ($account->merchant_name ?? ''));
+            if ($merchant === '') {
+                $merchant = trim((string) ($account->trading_name ?? ''));
+            }
+
+            $update['pos_match_status'] = 'pos_matched';
+            $update['pos_settlement_account_id'] = $account->id;
+            $update['pos_matched_mid'] = (string) ($account->mid ?? '');
+            $update['pos_matched_merchant'] = $merchant !== '' ? $merchant : null;
+            $update['pos_matched_settlement_date'] = $settleYmd;
+            $update['pos_extracted_key'] = $primaryKey;
+            $update['pos_matched_by'] = $user ? $user->id : null;
+            $update['pos_matched_at'] = now();
+        } else {
+            $hadLink = (($stmt->pos_match_status ?? '') === 'pos_matched') || ! empty($stmt->pos_settlement_account_id);
+            $update['pos_match_status'] = 'pos_unmatched';
+            $update['pos_settlement_account_id'] = null;
+            $update['pos_matched_mid'] = null;
+            $update['pos_matched_merchant'] = null;
+            $update['pos_matched_settlement_date'] = null;
+            $update['pos_extracted_key'] = $primaryKey;
+            $update['pos_matched_by'] = null;
+            $update['pos_matched_at'] = null;
+            if (! $hadLink && $keyword === null) {
+                $update['pos_extracted_key'] = null;
+            }
+        }
+
+        $safe = [];
+        foreach ($update as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safe[$col] = $val;
+            }
+        }
+
+        DB::table('bank_statements')->where('id', $stmt->id)->update($safe);
+
+        $fresh = DB::table('bank_statements')->where('id', $stmt->id)->first();
+        $byName = null;
+        $byUsername = null;
+        if ($fresh && ! empty($fresh->pos_matched_by) && Schema::hasTable('users')) {
+            $u = DB::table('users')->where('id', $fresh->pos_matched_by)->first();
+            if ($u) {
+                $byName = $u->user_fullname ?? null;
+                $byUsername = $u->username ?? null;
+            }
+        }
+
+        $this->logBankReconUserHistory('pos_settlement_match', (int) $stmt->id, array_filter([
+            'keyword'                   => $keyword,
+            'settlement_account_id'     => $acctId,
+            'pos_extracted_key'       => $fresh->pos_extracted_key ?? null,
+        ]));
+
+        return response()->json([
+            'success'                  => true,
+            'message'                  => $acctId ? 'POS / settlement linked.' : ($keyword !== null ? 'POS note saved.' : 'POS link cleared.'),
+            'pos_match_against'        => $fresh->pos_match_against ?? null,
+            'pos_match_status'         => $fresh->pos_match_status ?? null,
+            'pos_settlement_account_id'=> $fresh->pos_settlement_account_id ?? null,
+            'pos_matched_mid'          => $fresh->pos_matched_mid ?? null,
+            'pos_matched_merchant'     => $fresh->pos_matched_merchant ?? null,
+            'pos_matched_settlement_date' => $fresh->pos_matched_settlement_date ?? null,
+            'pos_extracted_key'        => $fresh->pos_extracted_key ?? null,
+            'pos_matched_at'           => $fresh->pos_matched_at ?? null,
+            'pos_matched_by_name'      => $byName,
+            'pos_matched_by_username'  => $byUsername,
+        ]);
+    }
+
+    public function unmatchPosSettlement($id)
+    {
+        if (! $this->bankReconIsSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only Super Admin can perform this action.'], 403);
+        }
+
+        if (! Schema::hasColumn('bank_statements', 'pos_match_status')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'POS columns missing. Run migrations.',
+            ], 503);
+        }
+
+        $stmt = DB::table('bank_statements')->where('id', $id)->first();
+        if (! $stmt) {
+            return response()->json(['success' => false, 'message' => 'Bank statement not found'], 404);
+        }
+
+        if (($stmt->pos_match_status ?? '') !== 'pos_matched') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This statement has no POS settlement link to remove',
+            ], 400);
+        }
+
+        $reset = [
+            'pos_match_status'              => 'pos_unmatched',
+            'pos_settlement_account_id'     => null,
+            'pos_matched_mid'               => null,
+            'pos_matched_merchant'          => null,
+            'pos_matched_settlement_date'   => null,
+            'pos_matched_by'                => null,
+            'pos_matched_at'                => null,
+            'updated_at'                    => now(),
+        ];
+        $safe = [];
+        foreach ($reset as $col => $val) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $safe[$col] = $val;
+            }
+        }
+        DB::table('bank_statements')->where('id', $id)->update($safe);
+
+        $this->logBankReconUserHistory('pos_settlement_unmatch', (int) $id, array_filter([
+            'keyword'                => $stmt->pos_match_against ?? null,
+            'settlement_account_id'  => $stmt->pos_settlement_account_id ?? null,
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'POS settlement link removed (keyword kept if set)',
         ]);
     }
 

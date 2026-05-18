@@ -1,3 +1,7 @@
+@php
+  $showBankCols = $bankRadiantLinking ?? ($records->isNotEmpty() && ($records->first()->bank_radiant_linking ?? false));
+  $colspan = $showBankCols ? 19 : 16;
+@endphp
 @forelse($records as $r)
 <tr class="rcp-row-clickable"
     data-id="{{ $r->id }}"
@@ -61,6 +65,33 @@
       {{ $r->ccv ?? '—' }}
     </span>
   </td>
+  @if($showBankCols)
+  <td style="min-width:108px;vertical-align:middle;">
+    @if(($r->bank_radiant_tag_status ?? '') === 'tagged')
+      <span class="bdg bdg-green">Tagged</span>
+      @if(!empty($r->bank_radiant_link_count) && $r->bank_radiant_link_count > 1)
+        <div style="font-size:.65rem;color:var(--text3);margin-top:3px;display:block;">{{ $r->bank_radiant_link_count }} bank lines</div>
+      @elseif(!empty($r->bank_radiant_statement_id))
+        <div style="font-size:.65rem;color:var(--text3);margin-top:3px;display:block;">#{{ $r->bank_radiant_statement_id }}</div>
+      @endif
+    @else
+      <span class="bdg bdg-gray">Not tagged</span>
+    @endif
+  </td>
+  <td style="font-size:.73rem;color:var(--text2);max-width:120px;">
+    {{ $r->bank_radiant_matched_by ?? '—' }}
+  </td>
+  <td style="font-family:var(--mono);font-size:.7rem;color:var(--text3);white-space:nowrap;">
+    {{ $r->bank_radiant_matched_at ?? '—' }}
+  </td>
+  <td style="font-size:.7rem;">
+    @if(!empty($r->bank_radiant_match_status))
+      <span class="bdg bdg-teal" style="font-size:.62rem;">{{ str_replace('_', ' ', $r->bank_radiant_match_status) }}</span>
+    @else
+      <span style="color:var(--text3);">—</span>
+    @endif
+  </td>
+  @endif
   <td>
     @if($r->upload_batch_id)
       <span style="font-size:.65rem;font-family:var(--mono);color:var(--text3);">
@@ -73,7 +104,7 @@
 </tr>
 @empty
 <tr>
-  <td colspan="16">
+  <td colspan="{{ $colspan }}">
     <div class="empty-state">
       <i class="bi bi-inbox"></i>
       <p>No records found. Try adjusting filters or upload an Excel file.</p>

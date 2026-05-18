@@ -89,8 +89,8 @@
             </div>
         </div>
         <select id="qfCategory" multiple class="d-none">
-            <option value="categorized">Categorized</option>
-            <option value="uncategorized">Uncategorized</option>
+            <option value="__categorized">Categorized</option>
+            <option value="__uncategorized">Uncategorized</option>
         </select>
     </div>
 
@@ -123,6 +123,55 @@
         <select id="qfTxnType" multiple class="d-none">
             <option value="deposit">PAY IN</option>
             <option value="withdrawal">PAY OUT</option>
+        </select>
+    </div>
+
+    <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
+        <div class="bank-recon-qf-field-label" title="Income tag modes (PAY IN) and bill payment type (PAY OUT).">
+            <i class="bi bi-wallet2"></i> Mode of payment
+        </div>
+        <div class="dropdown w-100">
+            <button class="bank-recon-qf-btn w-100 text-start" type="button" id="qfBtn-collectionMode" data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                <span class="qf-btn-text">All modes</span>
+                <i class="bi bi-chevron-down qf-btn-arrow"></i>
+            </button>
+            <div class="dropdown-menu bank-recon-qf-menu w-100" id="qfMenu-collectionMode">
+                <div class="qf-menu-item qf-menu-item-all">
+                    <input type="checkbox" class="qf-all-chk" id="brqf_qfCollectionMode_all" checked>
+                    <label class="qf-menu-item-text" for="brqf_qfCollectionMode_all">All modes</label>
+                </div>
+                <div class="qf-menu-list">
+                    <div class="qf-options-inner">
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfCollectionMode_cash" value="cash">
+                            <label class="qf-menu-item-text" for="brqf_qfCollectionMode_cash">Cash</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfCollectionMode_card" value="card">
+                            <label class="qf-menu-item-text" for="brqf_qfCollectionMode_card">Card</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfCollectionMode_upi" value="upi">
+                            <label class="qf-menu-item-text" for="brqf_qfCollectionMode_upi">UPI</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfCollectionMode_neft" value="neft">
+                            <label class="qf-menu-item-text" for="brqf_qfCollectionMode_neft">NEFT</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfCollectionMode_other" value="other">
+                            <label class="qf-menu-item-text" for="brqf_qfCollectionMode_other">Others</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <select id="qfCollectionMode" multiple class="d-none">
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="upi">UPI</option>
+            <option value="neft">NEFT</option>
+            <option value="other">Others</option>
         </select>
     </div>
 
@@ -197,6 +246,42 @@
             <option value="radiant_matched">Radiant linked</option>
             <option value="radiant_keyword_only">Keyword only</option>
             <option value="radiant_unmatched">Not linked</option>
+        </select>
+    </div>
+    <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf5-c">
+        <div class="bank-recon-qf-field-label"><i class="bi bi-credit-card"></i> POS / settlement</div>
+        <div class="dropdown w-100">
+            <button class="bank-recon-qf-btn w-100 text-start" type="button" id="qfBtn-posMatch" data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                <span class="qf-btn-text">All</span>
+                <i class="bi bi-chevron-down qf-btn-arrow"></i>
+            </button>
+            <div class="dropdown-menu bank-recon-qf-menu w-100" id="qfMenu-posMatch">
+                <div class="qf-menu-item qf-menu-item-all">
+                    <input type="checkbox" class="qf-all-chk" id="brqf_qfPosMatch_all" checked>
+                    <label class="qf-menu-item-text" for="brqf_qfPosMatch_all">All</label>
+                </div>
+                <div class="qf-menu-list">
+                    <div class="qf-options-inner">
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfPosMatch_pos_matched" value="pos_matched">
+                            <label class="qf-menu-item-text" for="brqf_qfPosMatch_pos_matched">POS linked</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfPosMatch_pos_keyword_only" value="pos_keyword_only">
+                            <label class="qf-menu-item-text" for="brqf_qfPosMatch_pos_keyword_only">Keyword only</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfPosMatch_pos_unmatched" value="pos_unmatched">
+                            <label class="qf-menu-item-text" for="brqf_qfPosMatch_pos_unmatched">Not linked</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <select id="qfPosMatch" multiple class="d-none">
+            <option value="pos_matched">POS linked</option>
+            <option value="pos_keyword_only">Keyword only</option>
+            <option value="pos_unmatched">Not linked</option>
         </select>
     </div>
     @endif
@@ -275,6 +360,42 @@
             <option value="radiant_matched">Radiant linked</option>
             <option value="radiant_keyword_only">Keyword only</option>
             <option value="radiant_unmatched">Not linked</option>
+        </select>
+    </div>
+    <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf6-c">
+        <div class="bank-recon-qf-field-label"><i class="bi bi-credit-card"></i> POS / settlement</div>
+        <div class="dropdown w-100">
+            <button class="bank-recon-qf-btn w-100 text-start" type="button" id="qfBtn-posMatch" data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">
+                <span class="qf-btn-text">All</span>
+                <i class="bi bi-chevron-down qf-btn-arrow"></i>
+            </button>
+            <div class="dropdown-menu bank-recon-qf-menu w-100" id="qfMenu-posMatch">
+                <div class="qf-menu-item qf-menu-item-all">
+                    <input type="checkbox" class="qf-all-chk" id="brqf_qfPosMatch2_all" checked>
+                    <label class="qf-menu-item-text" for="brqf_qfPosMatch2_all">All</label>
+                </div>
+                <div class="qf-menu-list">
+                    <div class="qf-options-inner">
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfPosMatch2_pos_matched" value="pos_matched">
+                            <label class="qf-menu-item-text" for="brqf_qfPosMatch2_pos_matched">POS linked</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfPosMatch2_pos_keyword_only" value="pos_keyword_only">
+                            <label class="qf-menu-item-text" for="brqf_qfPosMatch2_pos_keyword_only">Keyword only</label>
+                        </div>
+                        <div class="qf-menu-item">
+                            <input type="checkbox" id="brqf_qfPosMatch2_pos_unmatched" value="pos_unmatched">
+                            <label class="qf-menu-item-text" for="brqf_qfPosMatch2_pos_unmatched">Not linked</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <select id="qfPosMatch" multiple class="d-none">
+            <option value="pos_matched">POS linked</option>
+            <option value="pos_keyword_only">Keyword only</option>
+            <option value="pos_unmatched">Not linked</option>
         </select>
     </div>
     <div class="col-12 col-sm-6 col-md-4 min-w-0 bank-recon-qf6-c">

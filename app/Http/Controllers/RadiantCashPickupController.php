@@ -42,34 +42,26 @@ class RadiantCashPickupController extends Controller
             $query->where('location', $request->location);
         }
 
-        // Zone / Branch filters (from Location Master)
-        if ($request->filled('branch_id')) {
-            $branch = TblLocationModel::find((int) $request->branch_id);
-            if ($branch) {
-                $branchName = trim($branch->name);
-                $query->where(function ($q) use ($branchName) {
-                    $q->whereRaw('LOWER(TRIM(location)) = LOWER(?)', [$branchName])
-                      ->orWhere('location', 'like', '%' . $branchName . '%');
-                });
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        } elseif ($request->filled('zone_id')) {
-            $zid = (int) $request->zone_id;
-            if ($zid > 0) {
-                $branches = TblLocationModel::where('zone_id', $zid)->get();
-                if ($branches->count()) {
-                    $query->where(function ($q) use ($branches) {
-                        foreach ($branches as $b) {
-                            $bn = trim($b->name);
-                            $q->orWhereRaw('LOWER(TRIM(location)) = LOWER(?)', [$bn])
-                              ->orWhere('location', 'like', '%' . $bn . '%');
-                        }
-                    });
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
-            }
+        $zoneId = $request->filled('zone_id') ? (int) $request->zone_id : 0;
+        $branchId = $request->filled('branch_id') ? (int) $request->branch_id : 0;
+        if ($zoneId > 0 || $branchId > 0) {
+            $this->applyRadiantLocationFilter(
+                $query,
+                $zoneId > 0 ? $zoneId : null,
+                $branchId > 0 ? $branchId : null
+            );
+        }
+
+        $radiantTaggedBy = array_values(array_filter(array_map('intval', (array) $request->input('radiant_tagged_by', []))));
+        if (count($radiantTaggedBy) > 0 && $this->radiantBankLinkingAvailable()
+            && Schema::hasColumn('bank_statements', 'radiant_matched_by')) {
+            $query->whereExists(function ($sub) use ($radiantTaggedBy) {
+                $sub->select(DB::raw('1'))
+                    ->from('bank_statements')
+                    ->whereColumn('bank_statements.radiant_cash_pickup_id', 'radiant_cash_pickups.id')
+                    ->where('bank_statements.radiant_match_status', 'radiant_matched')
+                    ->whereIn('bank_statements.radiant_matched_by', $radiantTaggedBy);
+            });
         }
 
         if ($request->filled('search')) {
@@ -86,6 +78,162 @@ class RadiantCashPickupController extends Controller
                     ->orWhere('pickup_amount', 'like', "%{$s}%");
             });
         }
+
+        $bankTag = strtolower((string) $request->input('bank_radiant_tag', ''));
+        $this->applyBankRadiantTagFilter($query, $bankTag);
+    }
+
+    /**
+     * Bank reconciliation Radiant link is available when bank_statements has the Radiant columns.
+     */
+    protected function radiantBankLinkingAvailable(): bool
+    {
+        return Schema::hasTable('bank_statements')
+            && Schema::hasColumn('bank_statements', 'radiant_cash_pickup_id')
+            && Schema::hasColumn('bank_statements', 'radiant_match_status');
+    }
+
+    /**
+     * @param  ''|'tagged'|'untagged'  $tag
+     */
+    protected function applyBankRadiantTagFilter($query, string $tag): void
+    {
+        if (! $this->radiantBankLinkingAvailable() || ! in_array($tag, ['tagged', 'untagged'], true)) {
+            return;
+        }
+
+        if ($tag === 'tagged') {
+            $query->whereExists(function ($sub) {
+                $sub->select(DB::raw('1'))
+                    ->from('bank_statements')
+                    ->whereColumn('bank_statements.radiant_cash_pickup_id', 'radiant_cash_pickups.id')
+                    ->where('bank_statements.radiant_match_status', 'radiant_matched');
+            });
+        } else {
+            $query->whereNotExists(function ($sub) {
+                $sub->select(DB::raw('1'))
+                    ->from('bank_statements')
+                    ->whereColumn('bank_statements.radiant_cash_pickup_id', 'radiant_cash_pickups.id')
+                    ->where('bank_statements.radiant_match_status', 'radiant_matched');
+            });
+        }
+    }
+
+    /**
+     * Attach bank-recon link fields (who / when / status) to paginated pickup rows.
+     *
+     * @param  \Illuminate\Contracts\Pagination\LengthAwarePaginator|\Illuminate\Support\Collection  $records
+     */
+    protected function hydrateRadiantBankLinks($records): void
+    {
+        $available = $this->radiantBankLinkingAvailable();
+        $items = method_exists($records, 'getCollection') ? $records->getCollection() : $records;
+
+        foreach ($items as $r) {
+            $r->bank_radiant_linking = $available;
+            $r->bank_radiant_tag_status = 'untagged';
+            $r->bank_radiant_tag_label = $available ? 'Not tagged' : '—';
+            $r->bank_radiant_match_status = null;
+            $r->bank_radiant_matched_by = null;
+            $r->bank_radiant_matched_at = null;
+            $r->bank_radiant_statement_id = null;
+            $r->bank_radiant_link_count = 0;
+        }
+
+        if (! $available || $items->isEmpty()) {
+            return;
+        }
+
+        $ids = $items->pluck('id')->filter()->values()->all();
+        if ($ids === []) {
+            return;
+        }
+
+        $hasUser = Schema::hasTable('users') && Schema::hasColumn('bank_statements', 'radiant_matched_by');
+        $hasAt = Schema::hasColumn('bank_statements', 'radiant_matched_at');
+
+        $q = DB::table('bank_statements as bs')
+            ->whereIn('bs.radiant_cash_pickup_id', $ids)
+            ->where('bs.radiant_match_status', 'radiant_matched');
+
+        if ($hasUser) {
+            $q->leftJoin('users as u', 'u.id', '=', 'bs.radiant_matched_by');
+        }
+
+        $select = [
+            'bs.radiant_cash_pickup_id',
+            'bs.id as bank_statement_id',
+            'bs.radiant_match_status',
+        ];
+        if ($hasAt) {
+            $select[] = 'bs.radiant_matched_at';
+        }
+        if ($hasUser) {
+            $select[] = 'u.user_fullname as radiant_matched_by_name';
+            $select[] = 'u.username as radiant_matched_by_username';
+        }
+
+        $order = $hasAt ? 'bs.radiant_matched_at desc, bs.id desc' : 'bs.id desc';
+        $rows = $q->select($select)->orderByRaw($order)->get();
+
+        $byPickup = [];
+        $counts = [];
+        foreach ($rows as $row) {
+            $pid = (int) $row->radiant_cash_pickup_id;
+            $counts[$pid] = ($counts[$pid] ?? 0) + 1;
+            if (! isset($byPickup[$pid])) {
+                $byPickup[$pid] = $row;
+            }
+        }
+
+        foreach ($items as $r) {
+            $pid = (int) $r->id;
+            $link = $byPickup[$pid] ?? null;
+            $cnt = (int) ($counts[$pid] ?? 0);
+            $r->bank_radiant_link_count = $cnt;
+
+            if ($link) {
+                $r->bank_radiant_tag_status = 'tagged';
+                $r->bank_radiant_tag_label = 'Tagged (bank recon)';
+                $r->bank_radiant_match_status = (string) ($link->radiant_match_status ?? 'radiant_matched');
+                $r->bank_radiant_statement_id = (int) $link->bank_statement_id;
+                $name = trim((string) ($link->radiant_matched_by_name ?? ''));
+                if ($name === '') {
+                    $name = trim((string) ($link->radiant_matched_by_username ?? ''));
+                }
+                $r->bank_radiant_matched_by = $name !== '' ? $name : null;
+                if (! empty($link->radiant_matched_at)) {
+                    try {
+                        $r->bank_radiant_matched_at = Carbon::parse($link->radiant_matched_at)->format('d M Y, h:i A');
+                    } catch (\Throwable $e) {
+                        $r->bank_radiant_matched_at = (string) $link->radiant_matched_at;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array{bank_radiant_tagged: int|null, bank_radiant_untagged: int|null}
+     */
+    protected function computeBankRadiantTagStats($baseQuery): array
+    {
+        if (! $this->radiantBankLinkingAvailable()) {
+            return ['bank_radiant_tagged' => null, 'bank_radiant_untagged' => null];
+        }
+
+        $total = (clone $baseQuery)->count();
+        $tagged = (clone $baseQuery)->whereExists(function ($sub) {
+            $sub->select(DB::raw('1'))
+                ->from('bank_statements')
+                ->whereColumn('bank_statements.radiant_cash_pickup_id', 'radiant_cash_pickups.id')
+                ->where('bank_statements.radiant_match_status', 'radiant_matched');
+        })->count();
+
+        return [
+            'bank_radiant_tagged' => $tagged,
+            'bank_radiant_untagged' => max(0, $total - $tagged),
+        ];
     }
 
     protected function computeFilteredStats($baseQuery): array
@@ -162,6 +310,8 @@ class RadiantCashPickupController extends Controller
             'success'  => true,
             'zones'    => $zones->map(fn ($z) => ['id' => $z->id, 'name' => $z->name])->values(),
             'branches' => $branches->map(fn ($b) => ['id' => $b->id, 'name' => $b->name])->values(),
+            'taggers'  => $this->listBankReconTaggers(),
+            'bank_radiant_linking' => $this->radiantBankLinkingAvailable(),
         ]);
     }
 
@@ -178,7 +328,10 @@ class RadiantCashPickupController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $this->hydrateRadiantBankLinks($records);
+
         $stats = $this->computeFilteredStats(clone $base);
+        $stats = array_merge($stats, $this->computeBankRadiantTagStats(clone $base));
 
         $states = RadiantCashPickup::distinct()->orderBy('state_name')->pluck('state_name')->filter()->values();
 
@@ -198,8 +351,11 @@ class RadiantCashPickupController extends Controller
         return view('Radiant.radiant_cash_pickup', [
             'admin'             => $admin,
             'records'           => $records,
+            'bankRadiantLinking' => $this->radiantBankLinkingAvailable(),
             'totalAmount'       => $stats['total_amount'],
             'totalBatches'      => $stats['total_batches'],
+            'bankRadiantTagged' => $stats['bank_radiant_tagged'] ?? null,
+            'bankRadiantUntagged' => $stats['bank_radiant_untagged'] ?? null,
             'states'            => $states,
             'zones'             => $zones,
             'branchesForFilter' => $branchesForFilter,
@@ -221,12 +377,19 @@ class RadiantCashPickupController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $this->hydrateRadiantBankLinks($records);
+
         $stats = $this->computeFilteredStats(clone $base);
+        $stats = array_merge($stats, $this->computeBankRadiantTagStats(clone $base));
 
         return response()->json([
             'success' => true,
-            'table_html' => view('Radiant.partials.radiant_cash_rows', compact('records'))->render(),
+            'table_html' => view('Radiant.partials.radiant_cash_rows', [
+                'records' => $records,
+                'bankRadiantLinking' => $this->radiantBankLinkingAvailable(),
+            ])->render(),
             'pagination_html' => view('Radiant.partials.radiant_cash_pagination', compact('records'))->render(),
+            'bank_radiant_linking' => $this->radiantBankLinkingAvailable(),
             'stats' => $stats,
             'result' => [
                 'from' => $records->firstItem(),
@@ -724,5 +887,137 @@ class RadiantCashPickupController extends Controller
             'by_state' => (clone $base)->selectRaw('state_name, SUM(pickup_amount) as total, COUNT(*) as cnt')->groupBy('state_name')->orderByDesc('total')->get(),
             'by_region' => (clone $base)->selectRaw('region, SUM(pickup_amount) as total, COUNT(*) as cnt')->groupBy('region')->orderByDesc('total')->get(),
         ]);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\RadiantCashPickup>  $query
+     */
+    private function applyRadiantLocationFilter($query, ?int $zoneId, ?int $branchId): void
+    {
+        $locs = $this->resolveMasterLocations($zoneId, $branchId);
+        if ($locs->isEmpty()) {
+            if ((int) ($zoneId ?? 0) > 0 || (int) ($branchId ?? 0) > 0) {
+                $query->whereRaw('1 = 0');
+            }
+
+            return;
+        }
+
+        $query->where(function ($outer) use ($locs) {
+            foreach ($locs as $loc) {
+                $name = trim((string) ($loc->name ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $tokens = $this->branchMatchTokens($name);
+                $outer->orWhere(function ($w) use ($name, $tokens) {
+                    $w->whereRaw('LOWER(TRIM(location)) = LOWER(?)', [$name]);
+                    foreach ($tokens as $tok) {
+                        if ($tok === '') {
+                            continue;
+                        }
+                        $pat = '%'.addcslashes($tok, '%_\\').'%';
+                        $w->orWhereRaw('LOWER(location) LIKE LOWER(?)', [$pat]);
+                    }
+                });
+            }
+        });
+    }
+
+    private function resolveMasterLocations(?int $zoneId, ?int $branchId): \Illuminate\Support\Collection
+    {
+        if (! Schema::hasTable('tbl_locations')) {
+            return collect();
+        }
+
+        $zoneId = (int) ($zoneId ?? 0);
+        $branchId = (int) ($branchId ?? 0);
+        if ($zoneId <= 0 && $branchId <= 0) {
+            return collect();
+        }
+
+        $q = DB::table('tbl_locations')->select('id', 'name', 'zone_id');
+        if ($branchId > 0) {
+            $q->where('id', $branchId);
+            if ($zoneId > 0) {
+                $q->where('zone_id', $zoneId);
+            }
+        } elseif ($zoneId > 0) {
+            $q->where('zone_id', $zoneId);
+        }
+
+        return $q->orderBy('name')->get();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function branchMatchTokens(string $branchName): array
+    {
+        $name = trim($branchName);
+        if ($name === '') {
+            return [];
+        }
+        $tokens = [];
+        $push = static function (string $t) use (&$tokens): void {
+            $t = trim($t);
+            if ($t !== '' && ! in_array($t, $tokens, true)) {
+                $tokens[] = $t;
+            }
+        };
+        $push($name);
+
+        foreach (preg_split('/\s*[-–—,\/|]\s*/u', $name) as $part) {
+            $part = trim((string) $part);
+            if (mb_strlen($part) >= 2) {
+                $push($part);
+            }
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * @return list<array{id: int, name: string, username: string|null}>
+     */
+    private function listBankReconTaggers(): array
+    {
+        if (! Schema::hasTable('bank_statements') || ! Schema::hasTable('users')) {
+            return [];
+        }
+
+        $ids = collect();
+        foreach (['pos_matched_by', 'radiant_matched_by', 'income_matched_by', 'matched_by'] as $col) {
+            if (Schema::hasColumn('bank_statements', $col)) {
+                $ids = $ids->merge(
+                    DB::table('bank_statements')->whereNotNull($col)->distinct()->pluck($col)
+                );
+            }
+        }
+
+        $uniqueIds = $ids->unique()->filter()->values();
+        if ($uniqueIds->isEmpty()) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('id', $uniqueIds)
+            ->orderBy('user_fullname')
+            ->orderBy('username')
+            ->get(['id', 'user_fullname', 'username'])
+            ->map(function ($u) {
+                $name = trim((string) ($u->user_fullname ?? ''));
+                if ($name === '') {
+                    $name = (string) (($u->username ?? '') !== '' ? $u->username : 'User #'.$u->id);
+                }
+
+                return [
+                    'id' => (int) $u->id,
+                    'name' => $name,
+                    'username' => $u->username,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

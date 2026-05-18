@@ -20,6 +20,76 @@ $(document).ready(function() {
     var qfBranchLoadTimer = null;
     var routes = typeof window.bankReconRoutes !== 'undefined' ? window.bankReconRoutes : {};
     var matchAttachmentTypesAdminRows = [];
+    var bankReconLazyDetailPromises = {};
+
+    function bankReconEnsureLazyBillDetails(stmtId, done) {
+        var id = stmtId != null ? String(stmtId) : '';
+        if (!id) {
+            if (typeof done === 'function') {
+                done(false);
+            }
+            return;
+        }
+        var stmt = window.bankReconPageStatements && window.bankReconPageStatements[id];
+        if (!stmt || !stmt.lazy_bill_details_pending) {
+            if (typeof done === 'function') {
+                done(true);
+            }
+            return;
+        }
+        if (!routes.statementLazyBillingDetails) {
+            toastr.error('Bill details endpoint is not configured.');
+            if (typeof done === 'function') {
+                done(false);
+            }
+            return;
+        }
+        if (bankReconLazyDetailPromises[id]) {
+            bankReconLazyDetailPromises[id].always(function () {
+                if (typeof done === 'function') {
+                    var s2 = window.bankReconPageStatements && window.bankReconPageStatements[id];
+                    done(!!(s2 && !s2.lazy_bill_details_pending));
+                }
+            });
+            return;
+        }
+        var jqxhr = $.ajax({
+            url: routes.statementLazyBillingDetails,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                filters: currentFilters,
+                statement_ids: [parseInt(id, 10)],
+            },
+        })
+            .done(function (res) {
+                if (!res || !res.success || !res.details) {
+                    toastr.warning((res && res.message) || 'Could not load bill details.');
+                    return;
+                }
+                var det = res.details[id];
+                if (det === undefined) {
+                    det = res.details[parseInt(id, 10)];
+                }
+                if (det && window.bankReconPageStatements[id]) {
+                    Object.assign(window.bankReconPageStatements[id], det);
+                } else if (window.bankReconPageStatements[id]) {
+                    window.bankReconPageStatements[id].lazy_bill_details_pending = false;
+                }
+            })
+            .fail(function () {
+                toastr.error('Failed to load bill / Mocdoc details.');
+            })
+            .always(function () {
+                delete bankReconLazyDetailPromises[id];
+                if (typeof done === 'function') {
+                    var s3 = window.bankReconPageStatements && window.bankReconPageStatements[id];
+                    done(!!(s3 && !s3.lazy_bill_details_pending));
+                }
+            });
+        bankReconLazyDetailPromises[id] = jqxhr;
+    }
 
     function bankReconStatementColCount() {
         return (typeof window.bankReconSuperAdmin !== 'undefined' && window.bankReconSuperAdmin) ? 19 : 18;
@@ -67,6 +137,10 @@ $(document).ready(function() {
             reg.$menu.find('.qf-options-inner input[type="checkbox"]').prop('checked', false);
             reg.$select.val(null);
             _qfSync(reg);
+            if (selectId === 'qfZone') {
+                clearTimeout(qfBranchLoadTimer);
+                qfBranchLoadTimer = setTimeout(refreshQuickFilterBranches, 150);
+            }
         });
         // Prevent "All" checkbox unchecking when nothing else selected
         reg.$menu.on('change', '.qf-all-chk', function () {
@@ -123,6 +197,11 @@ $(document).ready(function() {
             reg.$btn.addClass('qf-has-value');
         }
         reg.$menu.find('.qf-all-chk').prop('checked', !vals || vals.length === 0);
+
+        if (reg.id === 'qfZone') {
+            clearTimeout(qfBranchLoadTimer);
+            qfBranchLoadTimer = setTimeout(refreshQuickFilterBranches, 150);
+        }
     }
 
     /** Stable DOM id for option row (checkbox outside label text — avoids theme hiding span inside label) */
@@ -189,8 +268,12 @@ $(document).ready(function() {
         qfRegister('qfBranch',       'qfBtn-branch',       'qfMenu-branch',       'All branches');
         qfRegister('qfCategory',     'qfBtn-category',     'qfMenu-category',     'All');
         qfRegister('qfTxnType',      'qfBtn-txnType',      'qfMenu-txnType',      'All types');
+        qfRegister('qfCollectionMode', 'qfBtn-collectionMode', 'qfMenu-collectionMode', 'All modes');
         qfRegister('qfExpenseMatch', 'qfBtn-expenseMatch', 'qfMenu-expenseMatch', 'All statuses');
         qfRegister('qfRadiantMatch', 'qfBtn-radiantMatch', 'qfMenu-radiantMatch', 'All');
+        if ($('#qfBtn-posMatch').length) {
+            qfRegister('qfPosMatch', 'qfBtn-posMatch', 'qfMenu-posMatch', 'All');
+        }
         qfRegister('qfIncomeMatch',  'qfBtn-incomeMatch',  'qfMenu-incomeMatch',  'All');
         if ($('#qfBtn-salaryTag').length) {
             qfRegister('qfSalaryTag', 'qfBtn-salaryTag', 'qfMenu-salaryTag', 'All');
@@ -603,6 +686,11 @@ $(document).ready(function() {
             f.categories = cats;
         }
 
+        var collModes = $('#qfCollectionMode').length ? ($('#qfCollectionMode').val() || []) : [];
+        if (collModes.length) {
+            f.collection_modes = collModes;
+        }
+
         var txn = $('#qfTxnType').length ? ($('#qfTxnType').val() || []) : [];
         if (txn.length) {
             f.txn_types = txn;
@@ -613,6 +701,13 @@ $(document).ready(function() {
             f.radiant_matches = rad;
         } else if ($('#filterRadiantMatch').length && $('#filterRadiantMatch').val()) {
             f.radiant_match = $('#filterRadiantMatch').val();
+        }
+
+        var pos = $('#qfPosMatch').length ? ($('#qfPosMatch').val() || []) : [];
+        if (pos.length) {
+            f.pos_matches = pos;
+        } else if ($('#filterPosMatch').length && $('#filterPosMatch').val()) {
+            f.pos_match = $('#filterPosMatch').val();
         }
 
         var exp = $('#qfExpenseMatch').length ? ($('#qfExpenseMatch').val() || []) : [];
@@ -731,6 +826,11 @@ $(document).ready(function() {
         var rad = $('#qfRadiantMatch').val() || [];
         $('#filterRadiantMatch').val(rad.length === 1 ? rad[0] : '');
 
+        var pos = $('#qfPosMatch').length ? ($('#qfPosMatch').val() || []) : [];
+        if ($('#filterPosMatch').length) {
+            $('#filterPosMatch').val(pos.length === 1 ? pos[0] : '');
+        }
+
         var mb = $('#qfMatchedBy').val() || [];
         $('#filterMatchedByUser').val(mb.length === 1 ? String(mb[0]) : '');
 
@@ -755,6 +855,11 @@ $(document).ready(function() {
 
         var r = $('#filterRadiantMatch').val();
         qfSetVals('qfRadiantMatch', r ? [r] : []);
+
+        if ($('#filterPosMatch').length) {
+            var p = $('#filterPosMatch').val();
+            qfSetVals('qfPosMatch', p ? [p] : []);
+        }
 
         var u = $('#filterMatchedByUser').val();
         qfSetVals('qfMatchedBy', u ? [String(u)] : []);
@@ -807,10 +912,19 @@ $(document).ready(function() {
         quickFilterListsLoaded = true;
         $.get(routes.quickFilterOptions, function (res) {
             var cats = [
-                { value: 'categorized', label: 'Categorized' },
-                { value: 'uncategorized', label: 'Uncategorized' }
+                { value: '__categorized', label: 'Categorized' },
+                { value: '__uncategorized', label: 'Uncategorized' }
             ];
             qfPopulate('qfCategory', cats, true);
+
+            var collModeOpts = [
+                { value: 'cash', label: 'Cash' },
+                { value: 'card', label: 'Card' },
+                { value: 'upi', label: 'UPI' },
+                { value: 'neft', label: 'NEFT' },
+                { value: 'other', label: 'Others' }
+            ];
+            qfPopulate('qfCollectionMode', collModeOpts, true);
 
             var vendors = (res.vendor_names || []).map(function (v) { return { value: v, label: v }; });
             qfPopulate('qfVendor', vendors, true);
@@ -827,12 +941,33 @@ $(document).ready(function() {
     }
 
     function refreshQuickFilterBranches() {
-        if (!routes.quickFilterOptions) return;
+        if (!routes.quickFilterOptions) {
+            return;
+        }
         var zoneIds = $('#qfZone').val() || [];
-        var params = zoneIds.length ? { zone_ids: zoneIds } : {};
+        var prevBranch = $('#qfBranch').val() || [];
+        var params = {};
+        if (zoneIds.length) {
+            zoneIds.forEach(function (zid, i) {
+                params['zone_ids[' + i + ']'] = zid;
+            });
+        }
         $.get(routes.quickFilterOptions, params, function (res) {
-            var branches = (res.branches || []).map(function (b) { return { value: b.id, label: b.name }; });
+            var branches = (res.branches || []).map(function (b) {
+                return { value: b.id, label: b.name };
+            });
+            var valid = branches.map(function (b) {
+                return String(b.value);
+            });
+            var keep = prevBranch.filter(function (id) {
+                return valid.indexOf(String(id)) >= 0;
+            });
             qfPopulate('qfBranch', branches, true);
+            if (keep.length) {
+                qfSetVals('qfBranch', keep);
+            } else if (prevBranch.length && zoneIds.length) {
+                qfResetOne('qfBranch');
+            }
         });
     }
 
@@ -1638,6 +1773,8 @@ $(document).ready(function() {
         delete currentFilters.income_matches;
         delete currentFilters.radiant_match;
         delete currentFilters.radiant_matches;
+        delete currentFilters.pos_match;
+        delete currentFilters.pos_matches;
         if ($('#filterMatchStatus').length) {
             $('#filterMatchStatus').val('');
         }
@@ -1647,9 +1784,15 @@ $(document).ready(function() {
         if ($('#filterRadiantMatch').length) {
             $('#filterRadiantMatch').val('');
         }
+        if ($('#filterPosMatch').length) {
+            $('#filterPosMatch').val('');
+        }
         qfSetVals('qfExpenseMatch', []);
         qfSetVals('qfIncomeMatch', []);
         qfSetVals('qfRadiantMatch', []);
+        if ($('#qfPosMatch').length) {
+            qfSetVals('qfPosMatch', []);
+        }
     }
 
     $('#statCardFilterAll').on('click', function () {
@@ -1702,6 +1845,9 @@ $(document).ready(function() {
         $('#filterMatchStatus').val('');
         $('#filterIncomeMatch').val('');
         $('#filterRadiantMatch').val('');
+        if ($('#filterPosMatch').length) {
+            $('#filterPosMatch').val('');
+        }
         $('#filterAmountMin').val('');
         $('#filterAmountMax').val('');
         $('#filterReference').val('');
@@ -2096,6 +2242,42 @@ $(document).ready(function() {
     /** Cash as the only selected mode → MOCDOC + Radiant + ledger; otherwise MOCDOC only. */
     function incomeTagRequiresCashFullAttachmentPack() {
         return incomeTagSelectedModes.size === 1 && incomeTagSelectedModes.has('cash');
+    }
+
+    function incomeTagRequiresRadiantPickup() {
+        return incomeTagSelectedModes.has('cash');
+    }
+
+    function incomeTagRequiresPosSettlement() {
+        return incomeTagSelectedModes.has('card') || incomeTagSelectedModes.has('upi');
+    }
+
+    function validateIncomeTagRadiantPosBeforeSubmit() {
+        if (incomeTagRequiresRadiantPickup()) {
+            var pickupId = ($('#radiantCashPickupSelect').val() || '').trim();
+            if (!pickupId) {
+                toastr.warning('Select a Radiant cash pickup slip (Cash mode) before applying the income tag.');
+                syncIncomeTagRadiantPosInlinePanels();
+                var $rWrap = $('#incomeTagInlineRadiantWrap');
+                if ($rWrap.length) {
+                    $rWrap[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                return false;
+            }
+        }
+        if (incomeTagRequiresPosSettlement()) {
+            var settlementId = ($('#posSettlementAccountSelect').val() || '').trim();
+            if (!settlementId) {
+                toastr.warning('Select a POS settlement row (Card / UPI mode) before applying the income tag.');
+                syncIncomeTagRadiantPosInlinePanels();
+                var $pWrap = $('#incomeTagInlinePosWrap');
+                if ($pWrap.length) {
+                    $pWrap[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                return false;
+            }
+        }
+        return true;
     }
 
     function incomeStagingHasMandatorySlots() {
@@ -2586,6 +2768,17 @@ $(document).ready(function() {
         return /\bMESPOS\b/i.test(String(desc || ''));
     }
 
+    /** POS / card settlement narrations (ICICI, EZY/MESPOS, etc.) — POS tab instead of Radiant-only cash path. */
+    function bankReconDescriptionLooksPosLike(desc) {
+        var s = String(desc || '');
+        if (/\bMESPOS\b/i.test(s)) return true;
+        if (/\bICICI\s*POS\b/i.test(s)) return true;
+        if (/\bicicimobile|ICICIPOS\b/i.test(s)) return true;
+        if (/EZY\s*\/\s*MESPOS/i.test(s)) return true;
+        if (/\bPOS_SET\b/i.test(s)) return true;
+        return false;
+    }
+
     /**
      * BY CASH / CAM / “cash” in narrative: after income is already tagged, open Radiant-only match modal;
      * if income is not tagged yet, use the normal deposit modal (Income tag + Radiant).
@@ -2864,7 +3057,9 @@ $(document).ready(function() {
 
             const incomeTagged = stmt.income_match_status === 'income_matched';
             const radiantLinked = stmt.radiant_match_status === 'radiant_matched';
+            var posLinked = stmt.pos_match_status === 'pos_matched';
             var descRules = String(stmt.description || '');
+            var posLikeStmt = bankReconDescriptionLooksPosLike(descRules);
             var radiantOnlyCashCam = bankReconDescriptionRadiantOnlyCashOrCam(descRules);
             const allowBrActions = typeof window.bankReconSuperAdmin !== 'undefined' && window.bankReconSuperAdmin;
             
@@ -2965,7 +3160,7 @@ $(document).ready(function() {
                 stackParts.push(incomeBillingCardHtml);
             }
             /* Deposits: income tag does not create a vendor bill match — explain empty "Matched bill" cell */
-            if (!stackParts.length && incomeTagged && amountType === 'deposit') {
+            if (!stackParts.length && incomeTagged && amountType === 'deposit' && !stmt.lazy_bill_details_pending) {
                 stackParts.push(
                     '<div class="br-matched-bill-card br-matched-bill-card--income-only">' +
                         '<div class="br-bill-sec-label text-muted small">Matched bill</div>' +
@@ -2981,10 +3176,21 @@ $(document).ready(function() {
                     '</div>'
                 );
             }
-            var matchedBillInfo =
+            var matchedBillInner =
                 stackParts.length > 0
                     ? '<div class="br-matched-bill-stack">' + stackParts.join('') + '</div>'
                     : '<span class="br-cell-empty"><i class="bi bi-dash"></i></span>';
+            var matchedBillInfo = matchedBillInner;
+            if (stmt.lazy_bill_details_pending) {
+                matchedBillInfo =
+                    '<div class="br-lazy-matched-bill-wrap d-flex flex-column gap-1">' +
+                    matchedBillInner +
+                    '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 align-self-start br-load-bill-details" data-stmt-id="' +
+                    String(stmt.id) +
+                    '" title="Load bill line accounts and Mocdoc billing_list (faster initial list)">' +
+                    '<i class="bi bi-cloud-download me-1"></i>Load bill / Mocdoc details</button>' +
+                    '</div>';
+            }
 
             /* ---- Matched By card ---- */
             let matchedbyInfo = '<span class="br-cell-empty"><i class="bi bi-dash"></i></span>';
@@ -3020,6 +3226,17 @@ $(document).ready(function() {
                     '</div>'
                 );
             }
+            if (posLinked) {
+                var posByName = (stmt.pos_matched_by_name || '').toString().trim();
+                mbCards.push(
+                    '<div class="br-matched-by-chip" style="border-left:3px solid #0d9488;">' +
+                        '<span class="br-matched-by-chip-label">POS</span>' +
+                        '<span class="br-matched-by-chip-name">' +
+                        escapeAttr(posByName || '—') +
+                        '</span>' +
+                    '</div>'
+                );
+            }
             if (bankReconHasSalaryTag(stmt)) {
                 var salByN = (stmt.salary_stmt_matched_by_name || stmt.salary_uploaded_by_name || '').toString().trim();
                 var salByU = (stmt.salary_stmt_matched_by_username || stmt.salary_uploaded_by_username || '').toString().trim();
@@ -3041,6 +3258,7 @@ $(document).ready(function() {
             var billDateRaw = stmt.matched_date || stmt.bank_match_matched_at || '';
             var incomeAtRaw = incomeTagged ? (stmt.income_matched_at || '') : '';
             var radiantAtRaw = radiantLinked ? (stmt.radiant_matched_at || '') : '';
+            var posAtRaw = posLinked ? (stmt.pos_matched_at || '') : '';
             var matchedDateHtml = '<span class="br-cell-empty"><i class="bi bi-dash"></i></span>';
             var dateLines = [];
             if (billDateRaw) {
@@ -3067,6 +3285,14 @@ $(document).ready(function() {
                     '</div>'
                 );
             }
+            if (posAtRaw) {
+                dateLines.push(
+                    '<div class="br-matched-date-line br-matched-date-line--pos">' +
+                        '<span class="br-matched-date-tag">POS</span>' +
+                        '<span class="br-matched-date-val">' + escapeAttr(formatDateTime(posAtRaw)) + '</span>' +
+                    '</div>'
+                );
+            }
             var salAtDisplay = bankReconSalaryDisplayAt(stmt);
             if (salAtDisplay) {
                 dateLines.push(
@@ -3083,7 +3309,7 @@ $(document).ready(function() {
             // Income reconciliation tag details
             let incomeTagCell = '<span class="br-income-not-tagged"><i class="bi bi-dash"></i> Not tagged</span>';
             var incomeRoQuickEnc = '';
-            if (incomeTagged && radiantOnlyCashCam && !radiantLinked) {
+            if (incomeTagged && radiantOnlyCashCam && !radiantLinked && !posLikeStmt) {
                 try {
                     incomeRoQuickEnc = encodeURIComponent(
                         JSON.stringify(buildBankReconIncomeTagReadonlyPayload(stmt, amount, amountType))
@@ -3153,29 +3379,79 @@ $(document).ready(function() {
                     '</div>';
             }
 
-            let radiantTagCell = '<span class="text-muted small"><i class="bi bi-dash"></i> Not linked</span>';
+            let radiantPosTagCell = '';
+            var radiantPart = '';
             if (radiantLinked) {
                 const rTaggedAt = stmt.radiant_matched_at
                     ? formatDate(stmt.radiant_matched_at.substring(0, 10))
                     : '';
-                radiantTagCell = `
-                    <div>
-                        <span class="badge bg-warning text-dark mb-1">
-                            <i class="bi bi-brightness-high me-1"></i>Radiant linked
-                        </span><br>
-                        <small class="text-dark fw-semibold">${stmt.radiant_matched_location || ''}</small><br>
-                        <small class="text-muted">${stmt.radiant_matched_pickup_date || ''}</small><br>
-                        ${stmt.radiant_cash_pickup_id ? '<small class="text-muted">Pickup #' + stmt.radiant_cash_pickup_id + '</small><br>' : ''}
-                        <small class="text-muted">By: <strong>${stmt.radiant_matched_by_name || ''}</strong></small>
-                        ${rTaggedAt ? '<br><small class="text-muted">' + rTaggedAt + '</small>' : ''}
-                        ${stmt.radiant_match_against ? '<br><small class="text-muted">Keyword: ' + escapeAttr(stmt.radiant_match_against) + '</small>' : ''}
-                    </div>`;
+                radiantPart =
+                    '<div class="mb-2 pb-2 border-bottom border-light-subtle">' +
+                        '<span class="badge bg-warning text-dark mb-1">' +
+                            '<i class="bi bi-brightness-high me-1"></i>Radiant linked' +
+                        '</span><br>' +
+                        '<small class="text-dark fw-semibold">' + escapeAttr(String(stmt.radiant_matched_location || '')) + '</small><br>' +
+                        '<small class="text-muted">' + escapeAttr(String(stmt.radiant_matched_pickup_date || '')) + '</small><br>' +
+                        (stmt.radiant_cash_pickup_id
+                            ? '<small class="text-muted">Pickup #' + escapeAttr(String(stmt.radiant_cash_pickup_id)) + '</small><br>'
+                            : '') +
+                        '<small class="text-muted">By: <strong>' +
+                        escapeAttr(String(stmt.radiant_matched_by_name || '')) +
+                        '</strong></small>' +
+                        (rTaggedAt ? '<br><small class="text-muted">' + escapeAttr(rTaggedAt) + '</small>' : '') +
+                        (stmt.radiant_match_against
+                            ? '<br><small class="text-muted">Keyword: ' + escapeAttr(stmt.radiant_match_against) + '</small>'
+                            : '') +
+                    '</div>';
             } else if (stmt.radiant_match_against) {
-                radiantTagCell = `
-                    <div>
-                        <span class="badge bg-secondary mb-1">Keyword only</span><br>
-                        <small class="text-muted">${escapeAttr(stmt.radiant_match_against)}</small>
-                    </div>`;
+                radiantPart =
+                    '<div class="mb-2 pb-2 border-bottom border-light-subtle">' +
+                        '<span class="badge bg-secondary mb-1">Radiant · keyword only</span><br>' +
+                        '<small class="text-muted">' + escapeAttr(stmt.radiant_match_against) + '</small>' +
+                    '</div>';
+            }
+
+            var posPart = '';
+            if (posLinked) {
+                var psd = stmt.pos_matched_settlement_date
+                    ? formatDate(String(stmt.pos_matched_settlement_date).substring(0, 10))
+                    : '';
+                var pAt = stmt.pos_matched_at ? formatDateTime(stmt.pos_matched_at) : '';
+                posPart =
+                    '<div>' +
+                        '<span class="badge mb-1" style="background:linear-gradient(135deg,#0d9488,#0f766e);">' +
+                            '<i class="bi bi-credit-card me-1"></i>POS linked' +
+                        '</span><br>' +
+                        '<small class="text-dark fw-semibold text-break">MID ' +
+                        escapeAttr(String(stmt.pos_matched_mid || '')) +
+                        '</small><br>' +
+                        (stmt.pos_matched_merchant
+                            ? '<small class="text-muted text-break">' + escapeAttr(String(stmt.pos_matched_merchant)) + '</small><br>'
+                            : '') +
+                        (stmt.pos_extracted_key
+                            ? '<small class="text-muted">Key: ' + escapeAttr(String(stmt.pos_extracted_key)) + '</small><br>'
+                            : '') +
+                        (psd ? '<small class="text-muted">Settlement: ' + escapeAttr(psd) + '</small><br>' : '') +
+                        '<small class="text-muted">By: <strong>' +
+                        escapeAttr(String(stmt.pos_matched_by_name || '')) +
+                        '</strong></small>' +
+                        (pAt ? '<br><small class="text-muted">' + escapeAttr(pAt) + '</small>' : '') +
+                        (stmt.pos_match_against
+                            ? '<br><small class="text-muted">Note: ' + escapeAttr(stmt.pos_match_against) + '</small>'
+                            : '') +
+                    '</div>';
+            } else if (stmt.pos_match_against) {
+                posPart =
+                    '<div>' +
+                        '<span class="badge bg-secondary mb-1">POS · keyword only</span><br>' +
+                        '<small class="text-muted">' + escapeAttr(stmt.pos_match_against) + '</small>' +
+                    '</div>';
+            }
+
+            if (radiantPart === '' && posPart === '') {
+                radiantPosTagCell = '<span class="text-muted small"><i class="bi bi-dash"></i> Not linked</span>';
+            } else {
+                radiantPosTagCell = '<div class="br-radiant-pos-cell small">' + radiantPart + posPart + '</div>';
             }
 
             var salaryTagCell = '<span class="text-muted small br-salary-cell-empty">—</span>';
@@ -3247,13 +3523,19 @@ $(document).ready(function() {
 
             var incomeViewAttr = '';
             var incomeRowReadonly =
-                incomeTagged && (radiantLinked || !radiantOnlyCashCam);
+                incomeTagged &&
+                (radiantLinked || posLinked || (!radiantOnlyCashCam && !posLikeStmt));
             if (incomeRowReadonly) {
                 try {
                     var roPayloadReadonly = buildBankReconIncomeTagReadonlyPayload(stmt, amount, amountType);
-                    var roTitle = radiantLinked
-                        ? 'View income &amp; Radiant tags (read-only)'
-                        : 'View income tag (read-only)';
+                    var roTitle = 'View income tag (read-only)';
+                    if (radiantLinked && posLinked) {
+                        roTitle = 'View income, Radiant &amp; POS tags (read-only)';
+                    } else if (radiantLinked) {
+                        roTitle = 'View income &amp; Radiant tags (read-only)';
+                    } else if (posLinked) {
+                        roTitle = 'View income &amp; POS tags (read-only)';
+                    }
                     incomeViewAttr =
                         ' data-income-readonly="1" data-income-ro="' +
                         encodeURIComponent(JSON.stringify(roPayloadReadonly)) +
@@ -3290,6 +3572,9 @@ $(document).ready(function() {
                     data-radiant-match="${escapeAttr(stmt.radiant_match_against)}"
                     data-radiant-status="${escapeAttr(stmt.radiant_match_status)}"
                     data-radiant-pickup-id="${stmt.radiant_cash_pickup_id || ''}"
+                    data-pos-match="${escapeAttr(stmt.pos_match_against)}"
+                    data-pos-status="${escapeAttr(stmt.pos_match_status)}"
+                    data-pos-settlement-id="${stmt.pos_settlement_account_id || ''}"
                     data-income-tagged="${incomeTagged ? '1' : '0'}"
                     data-radiant-linked="${radiantLinked ? '1' : '0'}"
                     ${incomeViewAttr}
@@ -3345,15 +3630,15 @@ $(document).ready(function() {
                     <td>
                         ${incomeTagCell}
                     </td>
-                    <td class="text-nowrap small br-mocdoc-date-cell">
+                    <td class="small br-mocdoc-date-cell br-col-mocdoc">
                         ${
                             incomeTagged && stmt.income_matched_at
                                 ? escapeAttr(formatDateTime(stmt.income_matched_at))
                                 : '<span class="text-muted">—</span>'
                         }
                     </td>
-                    <td>
-                        ${radiantTagCell}
+                    <td class="br-col-radiant-pos">
+                        ${radiantPosTagCell}
                     </td>
                     <td>
                         ${salaryTagCell}
@@ -3380,6 +3665,11 @@ $(document).ready(function() {
                                     <i class="bi bi-brightness-high"></i> Unmatch Radiant
                                 </button>
                             ` : ''}
+                            ${posLinked ? `
+                                <button class="btn btn-sm mt-1 btn-pos-unmatch" style="background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border:none;" data-id="${stmt.id}" title="Remove POS settlement link">
+                                    <i class="bi bi-credit-card"></i> Unmatch POS
+                                </button>
+                            ` : ''}
                             <button class="btn btn-sm btn-danger btn-delete" style="display:none;" data-id="${stmt.id}">
                                     <i class="bi bi-trash"></i>
                                 </button>
@@ -3397,6 +3687,7 @@ $(document).ready(function() {
         tbody.empty();
         window.bankReconIncomeDetailCache = {};
         window.bankReconIncomeBillingCache = {};
+        window.bankReconPageStatements = {};
 
         if (!statements || statements.length === 0) {
             tbody.html(
@@ -3411,6 +3702,7 @@ $(document).ready(function() {
         }
 
         statements.forEach(function (stmt) {
+            window.bankReconPageStatements[String(stmt.id)] = stmt;
             tbody.append(buildStatementRowHtml(stmt));
         });
     }
@@ -3439,6 +3731,9 @@ $(document).ready(function() {
                     return;
                 }
                 var stmt = response.data;
+                if (window.bankReconPageStatements) {
+                    window.bankReconPageStatements[sid] = stmt;
+                }
                 if (window.bankReconIncomeDetailCache) {
                     delete window.bankReconIncomeDetailCache[sid];
                 }
@@ -3472,13 +3767,16 @@ $(document).ready(function() {
             });
     }
     
-    /** 'withdrawal' = bill match tab only; 'deposit' = income tag + radiant only */
+    /** 'withdrawal' = bill match tab only; 'deposit' = income tag + radiant + POS */
     var bankReconModalTxnMode = 'deposit';
     /** When true, deposit modal shows Radiant tab only (no income-tag tab init). */
     var bankReconDepositRadiantOnly = false;
+    /** When true, deposit modal shows POS tab only (MESPOS / POS narrations). */
+    var bankReconDepositPosOnly = false;
 
     function resetMatchModalTabsVisibility() {
         bankReconDepositRadiantOnly = false;
+        bankReconDepositPosOnly = false;
         $('#matchTabs .nav-item').removeClass('d-none');
         $('#matchTabContent .tab-pane').removeClass('d-none');
         $('#matchTabs .nav-link').removeClass('active');
@@ -3489,27 +3787,44 @@ $(document).ready(function() {
 
     function applyMatchModalLayout(mode) {
         bankReconDepositRadiantOnly = false;
+        bankReconDepositPosOnly = false;
         if (mode === 'deposit_radiant_only') {
             bankReconModalTxnMode = 'deposit';
             bankReconDepositRadiantOnly = true;
+        } else if (mode === 'deposit_pos_only') {
+            bankReconModalTxnMode = 'deposit';
+            bankReconDepositPosOnly = true;
         } else {
             bankReconModalTxnMode = mode;
         }
-        var $lis = $('#matchTabs .nav-item');
-        var $matchLi = $lis.eq(0);
-        var $incomeLi = $lis.eq(1);
-        var $radiantLi = $lis.eq(2);
+        var $matchLi = $('#match-tab').closest('.nav-item');
+        var $incomeLi = $('#categorize-tab').closest('.nav-item');
+        var $radiantLi = $('#radiant-match-tab').closest('.nav-item');
+        var $posLi = $('#pos-match-tab').closest('.nav-item');
         $('#matchTabs .nav-link').removeClass('active');
         $('#matchTabContent .tab-pane').removeClass('show active');
 
         if (mode === 'deposit_radiant_only') {
             $matchLi.addClass('d-none');
             $incomeLi.addClass('d-none');
+            $posLi.addClass('d-none');
             $radiantLi.removeClass('d-none');
-            $('#match-content, #categorize-content').addClass('d-none');
+            $('#match-content, #categorize-content, #pos-match-content').addClass('d-none');
             $('#radiant-match-content').removeClass('d-none');
             $('#radiant-match-tab').addClass('active');
             $('#radiant-match-content').addClass('show active');
+            return;
+        }
+
+        if (mode === 'deposit_pos_only') {
+            $matchLi.addClass('d-none');
+            $incomeLi.addClass('d-none');
+            $radiantLi.addClass('d-none');
+            $posLi.removeClass('d-none');
+            $('#match-content, #categorize-content, #radiant-match-content').addClass('d-none');
+            $('#pos-match-content').removeClass('d-none');
+            $('#pos-match-tab').addClass('active');
+            $('#pos-match-content').addClass('show active');
             return;
         }
 
@@ -3517,16 +3832,18 @@ $(document).ready(function() {
             $matchLi.removeClass('d-none');
             $incomeLi.addClass('d-none');
             $radiantLi.addClass('d-none');
+            $posLi.addClass('d-none');
             $('#match-content').removeClass('d-none');
-            $('#categorize-content, #radiant-match-content').addClass('d-none');
+            $('#categorize-content, #radiant-match-content, #pos-match-content').addClass('d-none');
             $('#match-tab').addClass('active');
             $('#match-content').addClass('show active');
         } else {
             $matchLi.addClass('d-none');
             $incomeLi.removeClass('d-none');
             $radiantLi.removeClass('d-none');
+            $posLi.removeClass('d-none');
             $('#match-content').addClass('d-none');
-            $('#categorize-content, #radiant-match-content').removeClass('d-none');
+            $('#categorize-content, #radiant-match-content, #pos-match-content').removeClass('d-none');
             $('#categorize-tab').addClass('active');
             $('#categorize-content').addClass('show active');
         }
@@ -3578,6 +3895,7 @@ $(document).ready(function() {
         var radiantLinkedRow = $row.attr('data-radiant-linked') === '1';
         var descForRouting = String($row.data('description') || $row.attr('data-description') || '');
         var radiantOnlyDesc = bankReconDescriptionRadiantOnlyCashOrCam(descForRouting);
+        var posLikeDesc = bankReconDescriptionLooksPosLike(descForRouting);
 
         if (incomeTaggedRow && !radiantLinkedRow && txnType === 'deposit') {
             currentStatementId = $row.data('id');
@@ -3595,9 +3913,21 @@ $(document).ready(function() {
             $('#pendingAmount').text(formatNumber(currentTxnAmount));
             $('#radiantMatchAgainstInput').val($row.attr('data-radiant-match') || '');
             window._brPendingRadiantPickupId = ($row.attr('data-radiant-pickup-id') || '').toString().trim();
+            $('#posMatchAgainstInput').val($row.attr('data-pos-match') || '');
+            window._brPendingPosSettlementId = ($row.attr('data-pos-settlement-id') || '').toString().trim();
             selectedBills = [];
-            applyMatchModalLayout(radiantOnlyDesc ? 'deposit_radiant_only' : 'deposit');
-            if (radiantOnlyDesc) {
+            if (posLikeDesc) {
+                applyMatchModalLayout('deposit_pos_only');
+                $('#matchTransactionModal').one('shown.bs.modal', function brFocusPosTab() {
+                    var tabEl = document.getElementById('pos-match-tab');
+                    if (tabEl && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                        bootstrap.Tab.getOrCreateInstance(tabEl).show();
+                    } else if (typeof $ !== 'undefined' && $('#pos-match-tab').length) {
+                        $('#pos-match-tab').tab('show');
+                    }
+                });
+            } else if (radiantOnlyDesc) {
+                applyMatchModalLayout('deposit_radiant_only');
                 $('#matchTransactionModal').one('shown.bs.modal', function brFocusRadiantTabCashCam() {
                     var tabEl = document.getElementById('radiant-match-tab');
                     if (tabEl && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
@@ -3606,6 +3936,8 @@ $(document).ready(function() {
                         $('#radiant-match-tab').tab('show');
                     }
                 });
+            } else {
+                applyMatchModalLayout('deposit');
             }
             $('#matchTransactionModal').modal('show');
             clearBankMatchAttachmentStaging();
@@ -3631,6 +3963,8 @@ $(document).ready(function() {
         $('#pendingAmount').text(formatNumber(currentTxnAmount));
         $('#radiantMatchAgainstInput').val($row.attr('data-radiant-match') || '');
         window._brPendingRadiantPickupId = ($row.attr('data-radiant-pickup-id') || '').toString().trim();
+        $('#posMatchAgainstInput').val($row.attr('data-pos-match') || '');
+        window._brPendingPosSettlementId = ($row.attr('data-pos-settlement-id') || '').toString().trim();
 
         selectedBills = [];
 
@@ -3727,51 +4061,86 @@ $(document).ready(function() {
         if (!id) {
             return;
         }
-        var pack = window.bankReconIncomeBillingCache && window.bankReconIncomeBillingCache[id];
-        if (!pack || !pack.rows || !pack.rows.length) {
-            toastr.warning('Billing list data not found. Refresh the list and try again.');
-            return;
-        }
-        var $tb = $('#incomeBillingListModalTableBody');
-        if (!$tb.length) {
-            return;
-        }
-        $tb.empty();
-        pack.rows.forEach(function (r) {
-            $tb.append(
-                '<tr>' +
-                    '<td><code class="small text-break">' +
-                    escapeAttr(r.id) +
-                    '</code></td>' +
-                    '<td class="fw-semibold">' +
-                    escapeAttr(r.billno || '—') +
-                    '</td>' +
-                    '<td class="text-nowrap small">' +
-                    escapeAttr(formatBillingListBillDateRaw(r.billdate)) +
-                    '</td>' +
-                    '<td><span class="badge bg-warning text-dark">' +
-                    escapeAttr(r.paymenttype || '') +
-                    '</span></td>' +
-                    '<td class="small text-muted">' +
-                    escapeAttr(r.type || '—') +
-                    '</td>' +
-                    '<td class="text-end">₹' +
-                    formatNumber(r.amount != null ? r.amount : 0) +
-                    '</td>' +
-                    '</tr>'
-            );
+        bankReconEnsureLazyBillDetails(id, function (ok) {
+            if (!ok) {
+                return;
+            }
+            var stmt = window.bankReconPageStatements && window.bankReconPageStatements[id];
+            if (stmt) {
+                buildIncomeBillingListCardHtml(stmt);
+            }
+            var pack = window.bankReconIncomeBillingCache && window.bankReconIncomeBillingCache[id];
+            if (!pack || !pack.rows || !pack.rows.length) {
+                toastr.warning('Billing list data not found. Refresh the list and try again.');
+                return;
+            }
+            var $tb = $('#incomeBillingListModalTableBody');
+            if (!$tb.length) {
+                return;
+            }
+            $tb.empty();
+            pack.rows.forEach(function (r) {
+                $tb.append(
+                    '<tr>' +
+                        '<td><code class="small text-break">' +
+                        escapeAttr(r.id) +
+                        '</code></td>' +
+                        '<td class="fw-semibold">' +
+                        escapeAttr(r.billno || '—') +
+                        '</td>' +
+                        '<td class="text-nowrap small">' +
+                        escapeAttr(formatBillingListBillDateRaw(r.billdate)) +
+                        '</td>' +
+                        '<td><span class="badge bg-warning text-dark">' +
+                        escapeAttr(r.paymenttype || '') +
+                        '</span></td>' +
+                        '<td class="small text-muted">' +
+                        escapeAttr(r.type || '—') +
+                        '</td>' +
+                        '<td class="text-end">₹' +
+                        formatNumber(r.amount != null ? r.amount : 0) +
+                        '</td>' +
+                        '</tr>'
+                );
+            });
+            $('#incomeBillingListModalBranch').text(pack.branch || '—');
+            $('#incomeBillingListModalCount').text(String(pack.rows.length));
+            var sum =
+                pack.total != null
+                    ? pack.total
+                    : pack.rows.reduce(function (a, x) {
+                          return a + (parseFloat(x.amount) || 0);
+                      }, 0);
+            $('#incomeBillingListModalTotal').text('₹' + formatNumber(sum));
+            bankReconShowModal(document.getElementById('incomeBillingListModal'));
         });
-        $('#incomeBillingListModalBranch').text(pack.branch || '—');
-        $('#incomeBillingListModalCount').text(String(pack.rows.length));
-        var sum =
-            pack.total != null
-                ? pack.total
-                : pack.rows.reduce(function (a, x) {
-                      return a + (parseFloat(x.amount) || 0);
-                  }, 0);
-        $('#incomeBillingListModalTotal').text('₹' + formatNumber(sum));
-        bankReconShowModal(document.getElementById('incomeBillingListModal'));
     }
+
+    $(document).on('click', '.br-load-bill-details', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var $btn = $(this);
+        var sid = $btn.data('stmt-id');
+        if (sid == null || sid === '') {
+            return;
+        }
+        $btn.prop('disabled', true);
+        bankReconEnsureLazyBillDetails(sid, function (ok) {
+            $btn.prop('disabled', false);
+            if (!ok) {
+                return;
+            }
+            var stmt = window.bankReconPageStatements && window.bankReconPageStatements[String(sid)];
+            if (!stmt) {
+                return;
+            }
+            var html = buildStatementRowHtml(stmt);
+            var $tr = $('tr.statement-row-clickable[data-id="' + String(sid) + '"]');
+            if ($tr.length) {
+                $tr.replaceWith(html);
+            }
+        });
+    });
 
     $(document).on('click', '.br-income-billing-card--interactive', function (e) {
         if ($(e.target).closest('.br-income-billing-in-card-ro-btn').length) {
@@ -5023,6 +5392,49 @@ $(document).ready(function() {
     });
 
     // ============================================
+    // POS SETTLEMENT UNMATCH
+    // ============================================
+    $(document).on('click', '.btn-pos-unmatch', function (e) {
+        e.stopPropagation();
+        const id = $(this).data('id');
+        Swal.fire({
+            title: 'Remove POS settlement link?',
+            text: 'The POS note/keyword on this row will be kept when possible. Only the settlement link is cleared.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#0d9488',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, remove link',
+        }).then(function (result) {
+            if (!result.isConfirmed || !routes.posSettlementUnmatch) {
+                return;
+            }
+            const url = routes.posSettlementUnmatch.replace(':id', id);
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: { _token: $('meta[name="csrf-token"]').attr('content') },
+                success: function (response) {
+                    if (response.success) {
+                        toastr.success(response.message || 'POS link removed');
+                        refreshStatementRow(id);
+                        updateStatistics();
+                    } else {
+                        toastr.error(response.message || 'Failed to remove POS link');
+                    }
+                },
+                error: function (xhr) {
+                    var msg =
+                        xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : 'Error removing POS link';
+                    toastr.error(msg);
+                },
+            });
+        });
+    });
+
+    // ============================================
     // DELETE BUTTON
     // ============================================
     $(document).on('click', '.btn-delete', function(e) {
@@ -5231,6 +5643,15 @@ $(document).ready(function() {
             radiantByName: stmt.radiant_matched_by_name || '',
             radiantPickupId: stmt.radiant_cash_pickup_id || '',
             radiantKeyword: stmt.radiant_match_against || '',
+            posMatchStatus: stmt.pos_match_status || '',
+            posSettlementAccountId: stmt.pos_settlement_account_id || '',
+            posMatchAgainst: stmt.pos_match_against || '',
+            posMatchedMid: stmt.pos_matched_mid || '',
+            posMatchedMerchant: stmt.pos_matched_merchant || '',
+            posMatchedSettlementDate: stmt.pos_matched_settlement_date || '',
+            posMatchedAt: stmt.pos_matched_at || '',
+            posMatchedByName: stmt.pos_matched_by_name || '',
+            posExtractedKey: stmt.pos_extracted_key || '',
         };
     }
 
@@ -5339,6 +5760,25 @@ $(document).ready(function() {
             }).filter(Boolean);
         }
 
+        var posMatched = String(payload.posMatchStatus || '').toLowerCase() === 'pos_matched';
+        var posMidMerch = [payload.posMatchedMid, payload.posMatchedMerchant]
+            .map(function (x) {
+                return (x || '').toString().trim();
+            })
+            .filter(Boolean)
+            .join(' · ');
+        var hasPosRo =
+            posMatched ||
+            posMidMerch ||
+            (payload.posMatchAgainst || '').toString().trim() !== '' ||
+            (payload.posSettlementAccountId != null && String(payload.posSettlementAccountId).trim() !== '');
+        var hasRadRo = !!(
+            payload.radiantMatchedAt ||
+            payload.radiantByName ||
+            payload.radiantLocation ||
+            payload.radiantPickupId
+        );
+
         var html = '';
         html += '<div class="br-income-ro">';
         html += '<section class="br-income-ro-summary" aria-label="Bank line summary">';
@@ -5420,7 +5860,7 @@ $(document).ready(function() {
         html += '</div></div>';
         html += '</div>';
 
-        if (payload.radiantMatchedAt || payload.radiantByName || payload.radiantLocation || payload.radiantPickupId) {
+        if (hasRadRo) {
             var slipLine = [payload.radiantLocation, payload.radiantPickupDate]
                 .map(function (x) {
                     return (x || '').toString().trim();
@@ -5468,13 +5908,83 @@ $(document).ready(function() {
             html += '</section>';
         }
 
+        if (hasPosRo) {
+            var sd = payload.posMatchedSettlementDate;
+            var sdDisp = sd ? formatDate(String(sd)) : '—';
+            html += '<section class="br-income-ro-pos-sec" aria-label="POS settlement">';
+            html += '<div class="br-income-ro-radiant-hd" style="color:#0f766e;"><i class="bi bi-credit-card-2-front-fill me-2"></i>POS settlement</div>';
+            html += '<div class="br-income-ro-card">';
+            html += '<label class="income-tag-label br-income-ro-sec-label"><span class="income-tag-label-dot" style="background:#0f766e;"></span>MID / MERCHANT</label>';
+            html +=
+                '<input type="text" class="form-control form-control-sm br-income-ro-input" readonly value="' +
+                escapeAttr(posMidMerch || '—') +
+                '">';
+            html += '</div>';
+            html += '<div class="br-income-ro-card">';
+            html += '<label class="income-tag-label br-income-ro-sec-label"><span class="income-tag-label-dot" style="background:#14b8a6;"></span>SETTLEMENT DATE</label>';
+            html +=
+                '<input type="text" class="form-control form-control-sm br-income-ro-input" readonly value="' +
+                escapeAttr(sdDisp) +
+                '">';
+            html += '</div>';
+            if ((payload.posMatchAgainst || '').toString().trim()) {
+                html += '<div class="br-income-ro-card">';
+                html += '<label class="income-tag-label br-income-ro-sec-label"><span class="income-tag-label-dot" style="background:#14b8a6;"></span>NOTE / KEYWORD</label>';
+                html +=
+                    '<input type="text" class="form-control form-control-sm br-income-ro-input" readonly value="' +
+                    escapeAttr(String(payload.posMatchAgainst).trim()) +
+                    '">';
+                html += '</div>';
+            }
+            if (payload.posSettlementAccountId) {
+                html +=
+                    '<div class="small text-muted mt-1 mb-2">Settlement account ID: <code>' +
+                    escapeAttr(String(payload.posSettlementAccountId)) +
+                    '</code></div>';
+            }
+            if ((payload.posExtractedKey || '').toString().trim()) {
+                html +=
+                    '<div class="small text-muted mb-2">Extracted key: <code>' +
+                    escapeAttr(String(payload.posExtractedKey).trim()) +
+                    '</code></div>';
+            }
+            html += '<div class="br-income-ro-meta-highlight" style="border-color:#99f6e420;background:linear-gradient(135deg,#f0fdfa,#ecfeff);">';
+            html += '<div class="br-income-ro-meta-item">';
+            html += '<span class="br-income-ro-meta-ico" aria-hidden="true"><i class="bi bi-clock-history"></i></span>';
+            html += '<div class="br-income-ro-meta-body">';
+            html += '<span class="br-income-ro-meta-k">POS linked at</span>';
+            html +=
+                '<span class="br-income-ro-meta-v">' +
+                escapeAttr(payload.posMatchedAt ? formatDateTime(payload.posMatchedAt) : '—') +
+                '</span>';
+            html += '</div></div>';
+            html += '<div class="br-income-ro-meta-item">';
+            html += '<span class="br-income-ro-meta-ico" aria-hidden="true"><i class="bi bi-person-check"></i></span>';
+            html += '<div class="br-income-ro-meta-body">';
+            html += '<span class="br-income-ro-meta-k">POS linked by</span>';
+            html += '<span class="br-income-ro-meta-v">' + escapeAttr(payload.posMatchedByName || '—') + '</span>';
+            html += '</div></div>';
+            html += '</div>';
+            html += '</section>';
+        }
+
         html += '</div>';
 
+        var titleHtml =
+            '<span class="br-income-ro-header-icon"><i class="bi bi-shield-lock"></i></span>';
+        if (hasRadRo && hasPosRo) {
+            titleHtml +=
+                '<span>Income, Radiant &amp; POS <span class="small fw-normal opacity-90">(read-only)</span></span>';
+        } else if (hasRadRo) {
+            titleHtml += '<span>Income &amp; Radiant <span class="small fw-normal opacity-90">(read-only)</span></span>';
+        } else if (hasPosRo) {
+            titleHtml += '<span>Income &amp; POS <span class="small fw-normal opacity-90">(read-only)</span></span>';
+        } else {
+            titleHtml += '<span>Income tag <span class="small fw-normal opacity-90">(read-only)</span></span>';
+        }
+
         $('#incomeTagReadonlyBody').html(html);
-        $('#incomeTagReadonlyModal .modal-title').html(
-            '<span class="br-income-ro-header-icon"><i class="bi bi-shield-lock"></i></span>' +
-                '<span>Income &amp; Radiant <span class="small fw-normal opacity-90">(read-only)</span></span>'
-        );
+        $('#incomeTagReadonlyModal .modal-title').html(titleHtml);
         $('#incomeTagReadonlyModal').modal('show');
     }
 
@@ -6056,13 +6566,19 @@ $(document).ready(function() {
         return map;
     }
 
-    // ---- Initialize when modal opens (deposit: income tag + radiant; withdrawal: bill match only) ----
+    // ---- Initialize when modal opens (deposit: income tag + radiant + POS; withdrawal: bill match only) ----
     $('#matchTransactionModal').on('shown.bs.modal', function () {
         if (bankReconModalTxnMode === 'deposit') {
             var preRadiant = window._brPendingRadiantPickupId || '';
             window._brPendingRadiantPickupId = '';
+            var prePos = window._brPendingPosSettlementId || '';
+            window._brPendingPosSettlementId = '';
             if (bankReconDepositRadiantOnly) {
                 loadRadiantCashPickupOptionsForCurrentTxn(preRadiant);
+                return;
+            }
+            if (bankReconDepositPosOnly) {
+                loadPosSettlementOptionsForCurrentTxn(prePos);
                 return;
             }
             loadIncomeTagZones();
@@ -6076,6 +6592,10 @@ $(document).ready(function() {
             }
 
             loadRadiantCashPickupOptionsForCurrentTxn(preRadiant);
+            loadPosSettlementOptionsForCurrentTxn(prePos);
+            setTimeout(function () {
+                syncIncomeTagRadiantPosInlinePanels();
+            }, 0);
         }
     });
 
@@ -6090,9 +6610,73 @@ $(document).ready(function() {
         }).removeAttr('data-auto-locked');
     }
 
+    /** Move Radiant pickup / POS settlement panels back to their tabs (Select2 destroyed separately). */
+    function resetIncomeTagRadiantPosPanelHosts() {
+        var $rPanel = $('#brRadiantPickupPanel');
+        var $pPanel = $('#brPosSettlementPanel');
+        if ($rPanel.length) {
+            $rPanel.appendTo('#brRadiantPickupPanelDefaultHost');
+        }
+        if ($pPanel.length) {
+            $pPanel.appendTo('#brPosSettlementPanelDefaultHost');
+        }
+        $('#incomeTagInlineRadiantWrap').hide();
+        $('#incomeTagInlinePosWrap').hide();
+        $('#brRadiantPickupMovedHint').hide();
+        $('#brPosSettlementMovedHint').hide();
+    }
+
+    /**
+     * When tagging income on a deposit, show Radiant pickup under Income tag if Cash is selected,
+     * POS settlement if Card/UPI — same DOM as the dedicated tabs (avoids duplicate IDs).
+     */
+    function syncIncomeTagRadiantPosInlinePanels() {
+        if (bankReconModalTxnMode !== 'deposit' || bankReconDepositRadiantOnly || bankReconDepositPosOnly) {
+            return;
+        }
+        if (!$('#matchTransactionModal').hasClass('show')) {
+            return;
+        }
+        var needR = incomeTagSelectedModes.has('cash');
+        var needP = incomeTagSelectedModes.has('card') || incomeTagSelectedModes.has('upi');
+        var $rPanel = $('#brRadiantPickupPanel');
+        var $pPanel = $('#brPosSettlementPanel');
+        var rInIncome = $('#incomeTagInlineRadiantMount').children('#brRadiantPickupPanel').length > 0;
+        var pInIncome = $('#incomeTagInlinePosMount').children('#brPosSettlementPanel').length > 0;
+
+        if (needR !== rInIncome) {
+            destroyRadiantPickupSelect2();
+            if (needR && $rPanel.length) {
+                $rPanel.appendTo('#incomeTagInlineRadiantMount');
+            } else if ($rPanel.length) {
+                $rPanel.appendTo('#brRadiantPickupPanelDefaultHost');
+            }
+            setupRadiantPickupSelect2();
+        }
+        $('#incomeTagInlineRadiantWrap').toggle(needR);
+        $('#brRadiantPickupMovedHint').toggle(
+            needR && $('#brRadiantPickupPanelDefaultHost').find('#brRadiantPickupPanel').length === 0
+        );
+
+        if (needP !== pInIncome) {
+            destroyPosSettlementSelect2();
+            if (needP && $pPanel.length) {
+                $pPanel.appendTo('#incomeTagInlinePosMount');
+            } else if ($pPanel.length) {
+                $pPanel.appendTo('#brPosSettlementPanelDefaultHost');
+            }
+            setupPosSettlementSelect2();
+        }
+        $('#incomeTagInlinePosWrap').toggle(needP);
+        $('#brPosSettlementMovedHint').toggle(
+            needP && $('#brPosSettlementPanelDefaultHost').find('#brPosSettlementPanel').length === 0
+        );
+    }
+
     // ---- Reset when modal closes ----
     $('#matchTransactionModal').on('hidden.bs.modal', function () {
         bankReconDepositRadiantOnly = false;
+        bankReconDepositPosOnly = false;
         incomeTagSelectedModes.clear();
         incomeTagInFlight = false; // reset guard so next open works cleanly
         $('#incomeTagZone').val('');
@@ -6133,6 +6717,7 @@ $(document).ready(function() {
         $('#incomeTagBranchFinancialStatus').text('');
         updateIncomeTagSummary();
         resetMatchModalTabsVisibility();
+        resetIncomeTagRadiantPosPanelHosts();
         destroyRadiantPickupSelect2();
         var $rSel = $('#radiantCashPickupSelect');
         if ($rSel.length) {
@@ -6149,6 +6734,24 @@ $(document).ready(function() {
         if ($rMeta.length) {
             $rMeta.hide();
         }
+        destroyPosSettlementSelect2();
+        var $pSel = $('#posSettlementAccountSelect');
+        if ($pSel.length) {
+            $pSel.empty()
+                .append($('<option>', { value: '', text: '— Open a deposit row to load settlements —' }))
+                .prop('disabled', true)
+                .show();
+        }
+        var $pLoad = $('#posSettlementLoading');
+        if ($pLoad.length) {
+            $pLoad.hide();
+        }
+        var $pMeta = $('#posSettlementMeta');
+        if ($pMeta.length) {
+            $pMeta.hide();
+        }
+        $('#posMatchAgainstInput').val('');
+        $('#posSettlementKeyHint').text('');
     });
 
     // ---- When Income Tag tab becomes active (user switches manually) ----
@@ -6345,6 +6948,7 @@ $(document).ready(function() {
 
         scheduleIncomeTagBranchFinancialFetch();
         scheduleIncomeTagMocDateRowFetch();
+        syncIncomeTagRadiantPosInlinePanels();
     }
 
     // ---- Apply Income Tag ----
@@ -6707,6 +7311,9 @@ $(document).ready(function() {
             );
             return;
         }
+        if (!validateIncomeTagRadiantPosBeforeSubmit()) {
+            return;
+        }
 
         if (dates.length > 1) {
             var damap = collectIncomeTagDateAmountsMap();
@@ -6759,6 +7366,21 @@ $(document).ready(function() {
                     : '0'
             );
         });
+
+        if (incomeTagRequiresRadiantPickup()) {
+            fd.append('radiant_cash_pickup_id', ($('#radiantCashPickupSelect').val() || '').trim());
+            var radiantKw = ($('#radiantMatchAgainstInput').val() || '').trim();
+            if (radiantKw) {
+                fd.append('radiant_match_against', radiantKw);
+            }
+        }
+        if (incomeTagRequiresPosSettlement()) {
+            fd.append('settlement_account_id', ($('#posSettlementAccountSelect').val() || '').trim());
+            var posKw = ($('#posMatchAgainstInput').val() || '').trim();
+            if (posKw) {
+                fd.append('pos_match_against', posKw);
+            }
+        }
 
         var $btn = $('#applyIncomeTagBtn');
         incomeTagInFlight = true;
@@ -6921,6 +7543,126 @@ $(document).ready(function() {
             });
     }
 
+    function destroyPosSettlementSelect2() {
+        var $s = $('#posSettlementAccountSelect');
+        if ($s.length && $s.data('select2')) {
+            try {
+                $s.select2('destroy');
+            } catch (ePs) {
+                /* ignore */
+            }
+        }
+    }
+
+    function setupPosSettlementSelect2() {
+        var $s = $('#posSettlementAccountSelect');
+        if (!$s.length || typeof $.fn.select2 !== 'function') {
+            return;
+        }
+        destroyPosSettlementSelect2();
+        var $modal = $('#matchTransactionModal');
+        $s.select2({
+            width: '100%',
+            placeholder: 'Search MID / merchant / amount…',
+            allowClear: true,
+            minimumResultsForSearch: 0,
+            dropdownParent: $modal.length ? $modal : $(document.body),
+        });
+    }
+
+    function loadPosSettlementOptionsForCurrentTxn(preselectSettlementId) {
+        if (typeof routes === 'undefined' || !routes.settlementAccountsForPos) {
+            return;
+        }
+        if (bankReconModalTxnMode !== 'deposit') {
+            return;
+        }
+        if (!currentStatementId) {
+            return;
+        }
+        var $sel = $('#posSettlementAccountSelect');
+        var $loading = $('#posSettlementLoading');
+        var $meta = $('#posSettlementMeta');
+        var $hint = $('#posSettlementKeyHint');
+        if (!$sel.length) {
+            return;
+        }
+
+        destroyPosSettlementSelect2();
+        $sel.prop('disabled', true).hide();
+        if ($meta.length) {
+            $meta.hide();
+        }
+        if ($loading.length) {
+            $loading.show();
+        }
+
+        $.ajax({
+            url: routes.settlementAccountsForPos,
+            type: 'GET',
+            data: { bank_statement_id: currentStatementId },
+        })
+            .done(function (res) {
+                var rows = res && res.data ? res.data : [];
+                var keys = res && res.extracted_keys ? res.extracted_keys : [];
+                $sel.empty();
+                $sel.append($('<option>', { value: '', text: '— None / clear settlement link —' }));
+                rows.forEach(function (r) {
+                    if (!r || r.id == null) {
+                        return;
+                    }
+                    $sel.append(
+                        $('<option></option>').val(String(r.id)).text(r.label || 'Settlement #' + r.id)
+                    );
+                });
+                var pre = (preselectSettlementId || '').toString().trim();
+                if (pre) {
+                    var foundPre = false;
+                    $sel.find('option').each(function () {
+                        if (String($(this).attr('value')) === pre) {
+                            foundPre = true;
+                            return false;
+                        }
+                    });
+                    $sel.val(foundPre ? pre : '');
+                } else {
+                    $sel.val('');
+                }
+                $sel.prop('disabled', false).show();
+                if ($loading.length) {
+                    $loading.hide();
+                }
+                if ($hint.length) {
+                    if (keys && keys.length) {
+                        $hint.text('Keys: ' + keys.join(', '));
+                        if ($meta.length) {
+                            $meta.show();
+                        }
+                    } else {
+                        $hint.text('');
+                        if ($meta.length) {
+                            $meta.hide();
+                        }
+                    }
+                }
+                setupPosSettlementSelect2();
+                if (res && res.message && rows.length === 0) {
+                    toastr.info(res.message);
+                }
+            })
+            .fail(function () {
+                $sel.empty()
+                    .append($('<option>', { value: '', text: '— Could not load settlements —' }))
+                    .prop('disabled', false)
+                    .show();
+                if ($loading.length) {
+                    $loading.hide();
+                }
+                setupPosSettlementSelect2();
+                toastr.warning('Could not load settlement rows for POS match.');
+            });
+    }
+
     // ---- Radiant match keyword (bank_statements.radiant_match_against) ----
     var radiantMatchInFlight = false;
 
@@ -6971,6 +7713,63 @@ $(document).ready(function() {
             $('#clearRadiantMatchBtn').prop('disabled', false);
             radiantMatchInFlight = false;
         });
+    });
+
+    var posMatchInFlight = false;
+    $(document).on('click', '#clearPosMatchBtn', function () {
+        $('#posMatchAgainstInput').val('');
+        var $sel = $('#posSettlementAccountSelect');
+        if ($sel.length) {
+            $sel.val('').trigger('change');
+        }
+    });
+    $(document).on('click', '#savePosMatchBtn', function () {
+        if (posMatchInFlight) return;
+        if (!currentStatementId) {
+            toastr.warning('No bank statement selected');
+            return;
+        }
+        if (!routes.posSettlementMatch) {
+            toastr.error('POS routes not configured');
+            return;
+        }
+        var val = ($('#posMatchAgainstInput').val() || '').trim();
+        var $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving…');
+        $('#clearPosMatchBtn').prop('disabled', true);
+        posMatchInFlight = true;
+        var settlementVal = ($('#posSettlementAccountSelect').val() || '').trim();
+        $.ajax({
+            url: routes.posSettlementMatch,
+            type: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                bank_statement_id: currentStatementId,
+                pos_match_against: val,
+                settlement_account_id: settlementVal,
+            },
+        })
+            .done(function (r) {
+                if (r.success) {
+                    toastr.success(r.message || 'Saved');
+                    refreshStatementRow(currentStatementId);
+                    updateStatistics();
+                } else {
+                    toastr.error(r.message || 'Save failed');
+                }
+            })
+            .fail(function (xhr) {
+                var msg =
+                    xhr.responseJSON && xhr.responseJSON.message
+                        ? xhr.responseJSON.message
+                        : 'Error saving POS settlement match';
+                toastr.error(msg);
+            })
+            .always(function () {
+                $btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-1"></i>Save POS link');
+                $('#clearPosMatchBtn').prop('disabled', false);
+                posMatchInFlight = false;
+            });
     });
 
     // ============================================
