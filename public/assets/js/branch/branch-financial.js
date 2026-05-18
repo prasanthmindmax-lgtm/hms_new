@@ -18,6 +18,22 @@ $(document).ready(function() {
         additional_amounts: []
     };
 
+    let removedExistingFiles = {};
+
+    function clearFileUploadState() {
+        fileStorage = {
+            radiant_collection: [],
+            radiant_ledger_book: [],
+            actual_card: [],
+            upi: [],
+            deposit: [],
+            bank_deposit: [],
+            cashier_info: [],
+            additional_amounts: []
+        };
+        $('#radiant_collection_files, #radiant_ledger_book_files, #actual_card_files, #upi_files, #deposit_files, #bank_deposit_files, #cashier_info_files, #additional_amounts_files').val('');
+    }
+
     /** Public URL for files stored as branch_financial_files/... */
     function publicFileUrl(filePath) {
         if (!filePath) { return '#'; }
@@ -429,6 +445,11 @@ $(document).ready(function() {
         if (editMode && currentEditId) {
             url = updateRoute.replace(':id', currentEditId);
             formData.append('_method', 'PUT');
+            Object.keys(removedExistingFiles).forEach(function(field) {
+                (removedExistingFiles[field] || []).forEach(function(path) {
+                    formData.append('removed_' + field + '_files[]', path);
+                });
+            });
         }
 
         // Show loading
@@ -445,6 +466,9 @@ $(document).ready(function() {
                 $('#submitBtn').prop('disabled', false).html('<i class="fas fa-save"></i> Save Report');
 
                 if (response.success) {
+                    clearFileUploadState();
+                    editMode = false;
+                    currentEditId = null;
                     $('#reportModal').removeClass('active');
                     showAlert('Success', response.message, 'success');
 
@@ -517,6 +541,8 @@ $(document).ready(function() {
     // POPULATE EDIT FORM (UPDATED WITH NEW FIELDS)
     // ================================================
     function populateEditForm(data) {
+        removedExistingFiles = {};
+        clearFileUploadState();
         $('#reportId').val(data.id);
         $('#report_date').val(data.report_date);
 
@@ -612,6 +638,7 @@ $(document).ready(function() {
         if (!files || files.length === 0) return;
 
         $(previewContainer).empty();
+        const fieldKey = String(previewContainer).replace('#', '').replace('_preview', '');
 
         files.forEach((filePath, index) => {
             const ext = filePath.split('.').pop().toLowerCase();
@@ -623,6 +650,9 @@ $(document).ready(function() {
                 previewHtml = `
                     <div class="preview-item existing-file" data-file="${filePath}">
                         <img src="${publicFileUrl(filePath)}" alt="File">
+                        <button type="button" class="remove-existing-file" data-field="${fieldKey}" data-file="${filePath}" title="Remove">
+                            <i class="fas fa-times"></i>
+                        </button>
                         <button type="button" class="view-file-btn" style="position:absolute;bottom:5px;right:5px;background:rgba(102,126,234,0.9);border:none;color:white;padding:5px 10px;border-radius:5px;cursor:pointer;">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -631,6 +661,9 @@ $(document).ready(function() {
             } else {
                 previewHtml = `
                     <div class="preview-item existing-file" data-file="${filePath}" style="display:flex;align-items:center;justify-content:center;background:#f7fafc;flex-direction:column;">
+                        <button type="button" class="remove-existing-file" data-field="${fieldKey}" data-file="${filePath}" title="Remove">
+                            <i class="fas fa-times"></i>
+                        </button>
                         <i class="fas fa-file" style="font-size:30px;color:#667eea;"></i>
                         <button type="button" class="view-file-btn" style="background:#667eea;border:none;color:white;padding:5px 10px;border-radius:5px;cursor:pointer;margin-top:10px;">
                             <i class="fas fa-download"></i> View
@@ -642,6 +675,17 @@ $(document).ready(function() {
             $(previewContainer).append(previewHtml);
         });
     }
+
+    $(document).on('click', '.remove-existing-file', function(e) {
+        e.stopPropagation();
+        const field = $(this).data('field');
+        const filePath = $(this).data('file');
+        if (!removedExistingFiles[field]) {
+            removedExistingFiles[field] = [];
+        }
+        removedExistingFiles[field].push(filePath);
+        $(this).closest('.existing-file').remove();
+    });
 
     // ================================================
     // VIEW EXISTING FILE
@@ -914,27 +958,8 @@ $(document).ready(function() {
         $('#reportId').val('');
         $('.file-preview').empty();
 
-        // Reset file storage
-        fileStorage = {
-            radiant_collection: [],
-            radiant_ledger_book: [],
-            actual_card: [],
-            upi: [],
-            deposit: [],
-            bank_deposit: [],
-            cashier_info: [],
-            additional_amounts: []
-        };
-
-        // Reset file inputs
-        $('#radiant_collection_files').val('');
-        $('#radiant_ledger_book_files').val('');
-        $('#actual_card_files').val('');
-        $('#upi_files').val('');
-        $('#deposit_files').val('');
-        $('#bank_deposit_files').val('');
-        $('#cashier_info_files').val('');
-        $('#additional_amounts_files').val('');
+        clearFileUploadState();
+        removedExistingFiles = {};
 
         // Reset date range
         $('#radiant_date_range').val('');
