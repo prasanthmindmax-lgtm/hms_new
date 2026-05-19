@@ -565,6 +565,30 @@ public function getvendorcreate()
         true
     );
 
+    $partyType = Tblvendor::normalizePartyType($request->input('party_type'));
+    if (! $isUpdate && $partyType === null) {
+        return response()->json([
+            'message' => 'Party Type is required.',
+        ], 422);
+    }
+    if ($request->filled('party_type') && $partyType === null) {
+        return response()->json([
+            'message' => 'Invalid Party Type. Choose Employee, Landlord, or Vendor.',
+        ], 422);
+    }
+
+    $vendorTypeId = trim((string) ($request->input('vendor_type_id') ?? ''));
+    if ($vendorTypeId === '') {
+        return response()->json([
+            'message' => 'Vendor Type is required.',
+        ], 422);
+    }
+    if (! TblVendortype::where('id', $vendorTypeId)->exists()) {
+        return response()->json([
+            'message' => 'Invalid Vendor Type.',
+        ], 422);
+    }
+
     // Get the last vendor row
     $lastVendor = Tblvendor::orderBy('id', 'desc')->first();
 
@@ -592,6 +616,7 @@ public function getvendorcreate()
         'gst_number' => $request->gst_number,
         'vendor_type_name' => $request->vendor_type_name,
         'vendor_type_id' => $request->vendor_type_id,
+        'party_type' => $partyType,
         'opening_balance' => $request->opening_balance,
         'payment_terms' => $request->payment_terms,
         'portal_language' => $request->portal_language,

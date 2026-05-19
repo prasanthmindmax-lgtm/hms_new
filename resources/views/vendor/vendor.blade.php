@@ -385,6 +385,10 @@
                                     <span class="vp-info-val" id="vp-vendor-type">—</span>
                                 </div>
                                 <div class="vp-info-row">
+                                    <span class="vp-info-key"><i class="bi bi-person-badge"></i> Party Type</span>
+                                    <span class="vp-info-val" id="vp-party-type">—</span>
+                                </div>
+                                <div class="vp-info-row">
                                     <span class="vp-info-key"><i class="bi bi-credit-card"></i> PAN</span>
                                     <span class="vp-info-val" id="pannumber">—</span>
                                 </div>
@@ -787,6 +791,7 @@
             const created_at = $(this).data('created_at');
             const all_data = $(this).data('all_data');
             const vendorTypeName = $(this).attr('data-vendor-type') || (all_data && all_data.vendor_type_name) || '';
+            const partyTypeName = $(this).attr('data-party-type') || (all_data && all_data.party_type) || '';
             const created_date = created_at.split(" ")[0];
             const custype=(customerType==0)?'Business':'Individual';
             console.log("all_data",all_data);
@@ -850,6 +855,7 @@
             $('.created_date').text(created_date);
             $('.customerid').text(vendorId);
             $('#vp-vendor-type').text(vendorTypeName && String(vendorTypeName).trim() !== '' ? vendorTypeName : '—');
+            $('#vp-party-type').text(partyTypeName && String(partyTypeName).trim() !== '' ? partyTypeName : '—');
             $('.cust_payment_term').text(customerpayment_terms || '—');
             $('.billing-address').html(billingaddress || '—');
             $('.shipping-address').html(shipping_address || '—');
