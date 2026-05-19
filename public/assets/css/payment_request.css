@@ -1670,6 +1670,75 @@ body.pay-pr-show-page .pr-show-bill-pay-badge--paid {
 .pr-show-section--files {
     padding-bottom: 1.25rem;
 }
+.pay-pr-show-page .pr-show-section-head {
+    flex-wrap: wrap;
+}
+.pay-pr-show-page .pr-show-attach-total-badge {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+}
+.pay-pr-show-page .pr-show-attachments-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    width: 100%;
+}
+.pay-pr-show-page .pr-show-attach-group {
+    width: 100%;
+    padding: 0.85rem 1rem 1rem;
+    border: 1px solid #e8ecf4;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+}
+.pay-pr-show-page .pr-show-attach-group + .pr-show-attach-group {
+    margin-top: 0;
+}
+.pay-pr-show-page .pr-show-attach-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: #334155;
+    margin: 0 0 0.65rem;
+}
+.pay-pr-show-page .pr-show-attach-group-head .bi {
+    color: #4f46e5;
+    font-size: 1rem;
+}
+.pay-pr-show-page .pr-show-attach-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    align-content: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    width: 100%;
+    margin: 0;
+}
+.pay-pr-show-page .pr-show-attach-grid > .pr-show-attach-card {
+    flex: 0 0 132px;
+    width: 132px;
+    max-width: 132px;
+    margin: 0;
+}
+.pay-pr-show-page .pr-show-attach-card .pr-gmail-attach-thumb {
+    width: 100%;
+}
+.pay-pr-show-page .pr-show-attach-card .pr-gmail-attach-foot {
+    width: 100%;
+    box-sizing: border-box;
+}
 .pr-show-section-head {
     display: flex;
     align-items: center;
@@ -4033,4 +4102,204 @@ body.pay-pr-show-page .pr-show-history-note {
         border-left: 0;
         border-top: 1px dashed #e2e8f0;
     }
+}
+.pr-gmail-attach-section-head {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+.pr-gmail-attach-grid,
+.pr-gmail-attach-grid--row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+    margin-top: 0.35rem;
+    width: 100%;
+}
+.pr-form-page.pr-pay-form-page .pr-pay-attachment-zone .pr-gmail-attach-grid {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+}
+.pr-gmail-attach-grid > .pr-gmail-attach-card {
+    flex: 0 0 132px;
+    width: 132px;
+    max-width: 132px;
+}
+.pr-gmail-attach-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 132px;
+    min-width: 132px;
+    max-width: 132px;
+    flex: 0 0 132px;
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
+    transition: box-shadow 0.15s ease, opacity 0.2s ease, transform 0.15s ease;
+}
+.pr-gmail-attach-card:hover {
+    box-shadow: 0 2px 6px rgba(60, 64, 67, 0.18);
+}
+.pr-gmail-attach-card.pr-gmail-attach-card--removed {
+    opacity: 0;
+    transform: scale(0.92);
+    pointer-events: none;
+    max-height: 0;
+    margin: 0;
+    border-width: 0;
+}
+.pr-gmail-attach-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 4;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(32, 33, 36, 0.72);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease;
+}
+.pr-gmail-attach-card:hover .pr-gmail-attach-remove,
+.pr-gmail-attach-card:focus-within .pr-gmail-attach-remove {
+    opacity: 1;
+}
+.pr-gmail-attach-remove:hover {
+    background: #d93025;
+}
+.pr-gmail-attach-thumb {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: #f8f9fa;
+    cursor: pointer;
+    text-align: left;
+}
+.pr-gmail-attach-thumb-inner {
+    display: block;
+    width: 100%;
+    height: 118px;
+    overflow: hidden;
+    background: #fff;
+    position: relative;
+}
+.pr-gmail-attach-thumb--pdf .pr-gmail-attach-thumb-media {
+    width: 200%;
+    height: 200%;
+    border: 0;
+    transform: scale(0.5);
+    transform-origin: top left;
+    pointer-events: none;
+}
+.pr-gmail-attach-thumb--image .pr-gmail-attach-thumb-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+}
+.pr-gmail-attach-thumb-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #5f6368;
+    font-size: 2.25rem;
+    background: linear-gradient(180deg, #f8f9fa 0%, #e8eaed 100%);
+}
+.pr-gmail-attach-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 6px;
+    background: #f1f3f4;
+    border-top: 1px solid #e8eaed;
+}
+.pr-gmail-type-badge {
+    flex-shrink: 0;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 3px 4px;
+    border-radius: 2px;
+    color: #fff;
+    text-transform: uppercase;
+}
+.pr-gmail-type-pdf {
+    background: #d93025;
+}
+.pr-gmail-type-doc {
+    background: #1a73e8;
+}
+.pr-gmail-type-img {
+    background: #188038;
+}
+.pr-gmail-type-file {
+    background: #5f6368;
+}
+.pr-gmail-attach-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #3c4043;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pr-gmail-attach-fold {
+    position: absolute;
+    right: 0;
+    bottom: 28px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 12px 12px;
+    border-color: transparent transparent #f1f3f4 transparent;
+    pointer-events: none;
+    z-index: 2;
+}
+.pr-gmail-attach-fold::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -12px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 12px 12px;
+    border-color: transparent transparent #d93025 transparent;
+    opacity: 0.85;
+}
+.pr-pay-attachment-zone .pr-gmail-attach-section {
+    width: 100%;
+}
+.pr-gmail-attach-section .pr-gmail-attach-grid:empty {
+    display: none !important;
+    margin: 0;
+    min-height: 0;
+}
+.pr-gmail-attach-section .pr-gmail-attach-grid:not(:empty) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
 }

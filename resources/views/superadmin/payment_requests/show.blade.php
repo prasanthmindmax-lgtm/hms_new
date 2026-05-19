@@ -36,16 +36,40 @@
   $canEditResubmit = $r->canBeEdited() && ($isAdminScope || $isOwner);
   $canApproveReject = $pending && (int) (($admin->access_limits ?? 0)) === 1;
   $payPrBackListFrom = (string) request()->query('from', '');
-  $payPrBackListUrl = $payPrBackListFrom === 'approved-payments'
+  $payPrFromApprovedPayments = $payPrBackListFrom === 'approved-payments';
+  $payPrBackListUrl = $payPrFromApprovedPayments
     ? route('superadmin.approved-payments.index')
     : route('superadmin.payment-requests.index');
-  $payPrBackListLabel = $payPrBackListFrom === 'approved-payments'
-    ? 'Back to list'
-    : 'Back to list';
+  $payPrBackListLabel = 'Back to list';
+  if ($payPrFromApprovedPayments) {
+    $canEditResubmit = false;
+    $canApproveReject = false;
+  }
   $requestHistoryEntries = collect(is_array($r->edit_history) ? $r->edit_history : [])
     ->filter(fn ($entry) => is_array($entry))
     ->reverse()
     ->values();
+
+  $payPrAttFileMeta = function (string $name): array {
+      $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+      return match ($ext) {
+          'pdf' => ['badge' => 'PDF', 'class' => 'pr-gmail-type-pdf', 'kind' => 'pdf'],
+          'doc', 'docx' => ['badge' => 'DOC', 'class' => 'pr-gmail-type-doc', 'kind' => 'doc'],
+          'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp' => ['badge' => strtoupper($ext === 'jpeg' ? 'JPG' : $ext), 'class' => 'pr-gmail-type-img', 'kind' => 'image'],
+          default => ['badge' => $ext !== '' ? strtoupper($ext) : 'FILE', 'class' => 'pr-gmail-type-file', 'kind' => 'other'],
+      };
+  };
+
+  $payPrShowAttachSlots = [
+      \App\Models\PaymentRequest::SLOT_PO => ['label' => 'PO attachment', 'icon' => 'bi-file-earmark-pdf'],
+      \App\Models\PaymentRequest::SLOT_DOCUMENT => ['label' => 'Supporting document', 'icon' => 'bi-paperclip'],
+      \App\Models\PaymentRequest::SLOT_BANK => ['label' => 'Bank document', 'icon' => 'bi-bank'],
+  ];
+  $payPrShowAttachTotal = 0;
+  foreach (array_keys($payPrShowAttachSlots) as $__slot) {
+      $payPrShowAttachTotal += count($r->filesForSlot($__slot));
+  }
 @endphp
 <div class="pr-pay-module w-100 mb-4">
   <div class="qd-card tk-tickets-page pr-show-surface">
@@ -340,12 +364,12 @@
             $__poBillTot = round(array_sum(array_column($__poBillRows, 'amount')), 2);
           @endphp
           <div class="pr-show-po-panel pr-pay-overview-panel" id="pay-po-balance-panel">
-            @if($st === \App\Models\PaymentRequest::STATUS_REJECTED)
+            {{--  @if($st === \App\Models\PaymentRequest::STATUS_REJECTED)
               <p class="small text-danger mb-2">
                 <i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>
                 This request was <strong>rejected</strong>. Figures are from submission; rejected lines do not reduce the live PO balance.
               </p>
-            @endif
+            @endif  --}}
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pr-show-po-title-row">
               <div class="pr-show-po-settlement-title">PO settlement</div>
               <div class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
@@ -514,7 +538,7 @@
         </p>
       @endif
 
-      @if($r->bank_account_number || $r->bank_ifsc_code || $r->bank_branch_details || $r->bank_document_path)
+      @if($r->bank_account_number || $r->bank_ifsc_code || $r->bank_branch_details || $r->filesForSlot(\App\Models\PaymentRequest::SLOT_BANK) !== [])
         <section class="pr-show-section" aria-labelledby="pr-show-bank-heading">
           <h2 id="pr-show-bank-heading" class="pr-show-section-head">
             <span class="pr-show-section-head-ic" aria-hidden="true"><i class="bi bi-bank"></i></span>
@@ -543,61 +567,61 @@
         </section>
       @endif
 
-      @if($r->po_attachment_path || $r->document_attachment_path || $r->bank_document_path)
+      @if($payPrShowAttachTotal > 0)
       <section class="pr-show-section pr-show-section--files" aria-labelledby="pr-show-files-heading">
         <h2 id="pr-show-files-heading" class="pr-show-section-head">
           <span class="pr-show-section-head-ic" aria-hidden="true"><i class="bi bi-paperclip"></i></span>
           <span class="pr-show-section-head-text">Attachments</span>
+          <span class="pr-show-attach-total-badge">{{ $payPrShowAttachTotal }} {{ $payPrShowAttachTotal === 1 ? 'file' : 'files' }}</span>
         </h2>
-        <div class="d-flex flex-wrap gap-3 pr-show-files">
-          @if($r->po_attachment_path)
-            @php
-              $poAttUrl = \App\Models\PaymentRequest::attachmentPublicUrl($r->po_attachment_path);
-              $poAttName = basename(str_replace('\\', '/', $r->po_attachment_path));
-            @endphp
-            @if($poAttUrl)
-            <button type="button" class="pr-show-file-tile" data-pr-file-preview-url="{{ $poAttUrl }}" data-pr-file-preview-title="{{ $poAttName !== '' ? $poAttName : 'PO attachment' }}">
-              <span class="pr-show-file-ic" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
-              <span>
-                <span class="pr-show-file-title">PO attachment</span>
-                <span class="pr-show-file-sub text-truncate d-inline-block" style="max-width: 12rem;">{{ $poAttName !== '' ? $poAttName : 'View in window' }}</span>
-              </span>
-              <i class="bi bi-arrows-fullscreen pr-show-file-go" aria-hidden="true"></i>
-            </button>
+        <div class="pr-show-attachments-wrap">
+          @foreach($payPrShowAttachSlots as $slot => $slotMeta)
+            @php $slotFiles = $r->filesForSlot($slot); @endphp
+            @if(count($slotFiles) > 0)
+            <div class="pr-show-attach-group">
+              <p class="pr-show-attach-group-head mb-2">
+                <i class="bi {{ $slotMeta['icon'] }}" aria-hidden="true"></i>
+                <span class="fw-semibold">{{ $slotMeta['label'] }}</span>
+                <span class="text-muted">· {{ count($slotFiles) }} {{ count($slotFiles) === 1 ? 'file' : 'files' }}</span>
+              </p>
+              <div class="pr-gmail-attach-grid pr-gmail-attach-grid--row pr-show-attach-grid" role="list">
+                @foreach($slotFiles as $file)
+                  @php
+                    $path = (string) ($file['path'] ?? '');
+                    $name = (string) ($file['name'] ?? basename(str_replace('\\', '/', $path)));
+                    $url = \App\Models\PaymentRequest::attachmentPublicUrl($path);
+                    $meta = $payPrAttFileMeta($name);
+                    $previewTitle = $name !== '' ? $name : $slotMeta['label'];
+                  @endphp
+                  @if($url)
+                  <div class="pr-gmail-attach-card pr-show-attach-card" role="listitem">
+                    <button type="button"
+                            class="pr-gmail-attach-thumb"
+                            data-pr-file-preview-url="{{ $url }}"
+                            data-pr-file-preview-title="{{ $previewTitle }}"
+                            title="Preview {{ $previewTitle }}">
+                      <span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--{{ $meta['kind'] }}">
+                        @if($meta['kind'] === 'image')
+                          <img src="{{ $url }}" alt="" loading="lazy" class="pr-gmail-attach-thumb-media">
+                        @elseif($meta['kind'] === 'pdf')
+                          <iframe src="{{ $url }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media" loading="lazy"></iframe>
+                        @else
+                          <span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                        @endif
+                      </span>
+                    </button>
+                    <div class="pr-gmail-attach-foot">
+                      <span class="pr-gmail-type-badge {{ $meta['class'] }}">{{ $meta['badge'] }}</span>
+                      <span class="pr-gmail-attach-name" title="{{ $name }}">{{ $name }}</span>
+                    </div>
+                    <span class="pr-gmail-attach-fold" aria-hidden="true"></span>
+                  </div>
+                  @endif
+                @endforeach
+              </div>
+            </div>
             @endif
-          @endif
-          @if($r->document_attachment_path)
-            @php
-              $docAttUrl = \App\Models\PaymentRequest::attachmentPublicUrl($r->document_attachment_path);
-              $docAttName = basename(str_replace('\\', '/', $r->document_attachment_path));
-            @endphp
-            @if($docAttUrl)
-            <button type="button" class="pr-show-file-tile" data-pr-file-preview-url="{{ $docAttUrl }}" data-pr-file-preview-title="{{ $docAttName !== '' ? $docAttName : 'Supporting document' }}">
-              <span class="pr-show-file-ic" aria-hidden="true"><i class="bi bi-paperclip"></i></span>
-              <span>
-                <span class="pr-show-file-title">Supporting document</span>
-                <span class="pr-show-file-sub text-truncate d-inline-block" style="max-width: 12rem;">{{ $docAttName !== '' ? $docAttName : 'View in window' }}</span>
-              </span>
-              <i class="bi bi-arrows-fullscreen pr-show-file-go" aria-hidden="true"></i>
-            </button>
-            @endif
-          @endif
-          @if($r->bank_document_path)
-            @php
-              $bankAttUrl = \App\Models\PaymentRequest::attachmentPublicUrl($r->bank_document_path);
-              $bankAttName = basename(str_replace('\\', '/', $r->bank_document_path));
-            @endphp
-            @if($bankAttUrl)
-            <button type="button" class="pr-show-file-tile" data-pr-file-preview-url="{{ $bankAttUrl }}" data-pr-file-preview-title="{{ $bankAttName !== '' ? $bankAttName : 'Bank document' }}">
-              <span class="pr-show-file-ic" aria-hidden="true"><i class="bi bi-bank"></i></span>
-              <span>
-                <span class="pr-show-file-title">Bank document</span>
-                <span class="pr-show-file-sub text-truncate d-inline-block" style="max-width: 12rem;">{{ $bankAttName !== '' ? $bankAttName : 'View in window' }}</span>
-              </span>
-              <i class="bi bi-arrows-fullscreen pr-show-file-go" aria-hidden="true"></i>
-            </button>
-            @endif
-          @endif
+          @endforeach
         </div>
       </section>
       @endif

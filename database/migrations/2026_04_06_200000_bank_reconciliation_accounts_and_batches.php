@@ -33,7 +33,7 @@ return new class extends Migration
                 $table->unsignedInteger('duplicates')->default(0);
                 $table->unsignedInteger('skipped')->default(0);
                 $table->unsignedBigInteger('user_id')->nullable();
-                $table->foreign('user_id')
+                $table->foreignId('user_id')
                     ->references('id')
                     ->on('users')
                     ->nullOnDelete();

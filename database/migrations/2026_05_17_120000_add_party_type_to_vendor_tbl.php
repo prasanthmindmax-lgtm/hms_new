@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('vendor_tbl', function (Blueprint $table) {
             if (! Schema::hasColumn('vendor_tbl', 'party_type')) {
-                $table->string('party_type', 32)->nullable()->after('vendor_type_name');
+                $table->string('party_type')->nullable()->after('vendor_type_name');
             }
         });
     }
