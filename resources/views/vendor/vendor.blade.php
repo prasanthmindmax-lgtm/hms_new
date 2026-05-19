@@ -308,10 +308,12 @@
                 </div>
             </div>
             <div class="vp-header-right">
-                @if ($limit_access === 1)
+                @if ($limit_access === 1 || $limit_access === 4)
                     <button class="btn btn-sm btn-outline-secondary edit_btn">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
+                @endif
+                @if ($limit_access === 1)
                     <button class="btn btn-sm btn-outline-danger delete_btn">
                         <i class="bi bi-trash"></i> Delete
                     </button>
