@@ -257,6 +257,15 @@ class BranchFinancialController extends Controller
             $additionalAmountsFiles = json_decode($existing->additional_amounts_files, true) ?? [];
         }
 
+        $radiantFiles = $this->applyRemovedFiles($request, 'removed_radiant_collection_files', $radiantFiles);
+        $radiantLedgerFiles = $this->applyRemovedFiles($request, 'removed_radiant_ledger_book_files', $radiantLedgerFiles);
+        $actualCardFiles = $this->applyRemovedFiles($request, 'removed_actual_card_files', $actualCardFiles);
+        $upiFiles = $this->applyRemovedFiles($request, 'removed_upi_files', $upiFiles);
+        $depositFiles = $this->applyRemovedFiles($request, 'removed_deposit_files', $depositFiles);
+        $bankDepositFiles = $this->applyRemovedFiles($request, 'removed_bank_deposit_files', $bankDepositFiles);
+        $cashierInfoFiles = $this->applyRemovedFiles($request, 'removed_cashier_info_files', $cashierInfoFiles);
+        $additionalAmountsFiles = $this->applyRemovedFiles($request, 'removed_additional_amounts_files', $additionalAmountsFiles);
+
         $this->validateBranchFinancialRequiredAttachments(
             $request,
             $radiantFiles,
@@ -435,6 +444,32 @@ class BranchFinancialController extends Controller
         throw new HttpResponseException(
             response()->json(['success' => false, 'message' => $message], 422)
         );
+    }
+
+    private function applyRemovedFiles(Request $request, string $removedField, array $files): array
+    {
+        $removed = $request->input($removedField, []);
+        if (! is_array($removed)) {
+            $removed = $removed ? [$removed] : [];
+        }
+        if ($removed === []) {
+            return $files;
+        }
+
+        $removed = array_map(static fn ($p) => str_replace('\\', '/', trim((string) $p)), $removed);
+
+        return array_values(array_filter($files, static function ($path) use ($removed) {
+            $norm = str_replace('\\', '/', trim((string) $path));
+            if (! in_array($norm, $removed, true)) {
+                return true;
+            }
+            $disk = public_path(ltrim(preg_replace('#^public/#i', '', $norm), '/'));
+            if (is_file($disk)) {
+                @unlink($disk);
+            }
+
+            return false;
+        }));
     }
 
     /**

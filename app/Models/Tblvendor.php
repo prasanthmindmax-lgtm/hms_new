@@ -12,6 +12,19 @@ class Tblvendor extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    public const PARTY_VENDOR = 'Vendor';
+
+    public const PARTY_EMPLOYEE = 'Employee';
+
+    public const PARTY_LANDLORD = 'Landlord';
+
+
+    /** @var list<string> */
+    public const PARTY_TYPES = [
+        self::PARTY_VENDOR,
+        self::PARTY_EMPLOYEE,
+        self::PARTY_LANDLORD,
+    ];
 
     protected $table = 'vendor_tbl';
 
@@ -32,6 +45,7 @@ class Tblvendor extends Authenticatable
         'gst_number',
         'vendor_type_id',
         'vendor_type_name',
+        'party_type',
         'reference',
         'opening_balance',
         'payment_terms',
@@ -82,5 +96,21 @@ class Tblvendor extends Authenticatable
     public function creator()
     {
         return $this->belongsTo(usermanagementdetails::class, 'user_id');
+    }
+
+    public static function normalizePartyType(?string $type): ?string
+    {
+        $type = trim((string) $type);
+        if ($type === '') {
+            return null;
+        }
+
+        foreach (self::PARTY_TYPES as $allowed) {
+            if (strcasecmp($type, $allowed) === 0) {
+                return $allowed;
+            }
+        }
+
+        return null;
     }
 }

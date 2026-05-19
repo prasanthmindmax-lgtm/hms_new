@@ -182,30 +182,56 @@
                                             </div>
                                         </div>
                                         <div class="row form-section">
-                                            <div class="col-12 col-md-6 row align-items-center mb-3">
+                                            <div class="col-12 col-md-6 row align-items-start mb-3">
                                                 <div class="section-title col-md-4">
-                                                    <span>Vendor Type</span>
+                                                    <span>Party Type <span style="color:red;">*</span>n</span>
                                                 </div>
-                                                <div class="tax-dropdown-wrapper tds-tax-section" style="width:340px;">
-                                                    <input type="text" class="form-control vendor-search-input" name="tds_tax_name" placeholder="Select a Vendor Type" autocomplete="off" autocorrect="off" value={{$vendor->vendor_type_name}}  readonly>
-                                                    <input type="hidden" name="vendor_type_name" class="vendor_type_name" id="vendor_type_name" >
-                                                    <input type="hidden" name="vendor_type_id" class="vendor_type_id" value={{$vendor->vendor_type_id}}>
+                                                <div class="form-group col-md-8 vendor-field-col">
+                                                    <div class="tax-dropdown-wrapper tds-tax-section party-type-section" style="width:100%;max-width:340px;">
+                                                    <input type="text" class="form-control vendor-search-input party-search-input" name="party_type_display" placeholder="Select Party Type" autocomplete="off" autocorrect="off" value="{{ $vendor->party_type ?? '' }}" data-saved-party-type="{{ $vendor->party_type ?? '' }}" readonly>
+                                                    <input type="hidden" name="party_type" class="party_type_field" value="{{ $vendor->party_type ?? '' }}">
+                                                    <div class="dropdown-menu tax-dropdown">
+                                                        <div class="party-list">
+                                                            @foreach (\App\Models\Tblvendor::PARTY_TYPES as $partyTypeOption)
+                                                                <div data-value="{{ $partyTypeOption }}">{{ $partyTypeOption }}</div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                    <span class="error_party_type vendor-field-error" style="color:red"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row form-section">
+                                            <div class="col-12 col-md-6 row align-items-start mb-3">
+                                                <div class="section-title col-md-4">
+                                                    <span>Vendor Type <span style="color:red;">*</span></span>
+                                                </div>
+                                                <div class="form-group col-md-8 vendor-field-col">
+                                                    <div class="tax-dropdown-wrapper tds-tax-section vendor-type-section" style="width:100%;max-width:340px;">
+                                                    <input type="text" class="form-control vendor-search-input" name="vendor_type_display" placeholder="Select a Vendor Type" autocomplete="off" autocorrect="off" value="{{ $vendor->vendor_type_name ?? '' }}" data-saved-vendor-type="{{ $vendor->vendor_type_name ?? '' }}" data-saved-vendor-type-id="{{ $vendor->vendor_type_id ?? '' }}" readonly>
+                                                    <input type="hidden" name="vendor_type_name" class="vendor_type_name" id="vendor_type_name" value="{{ $vendor->vendor_type_name ?? '' }}">
+                                                    <input type="hidden" name="vendor_type_id" class="vendor_type_id" value="{{ $vendor->vendor_type_id ?? '' }}">
                                                     <div class="dropdown-menu tax-dropdown">
                                                     <div class="vendor-list">
 
                                                     </div>
                                                     {{-- <div class="manage-tds-link">⚙️ Manage TDS</div> --}}
                                                     </div>
+                                                    </div>
+                                                    <span class="error_vendor_type vendor-field-error" style="color:red"></span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-12 col-md-6 row align-items-center mb-3">
-                                            <div class="section-title col-md-4">
-                                                <span>GST</span>
-                                            </div>
-                                            <div class="form-group col-md-8">
-                                                <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off" value={{$vendor->gst_number}}>
-                                                <span class="error_gst_number" style="color:red"></span>
+                                        <div class="row form-section">
+                                            <div class="col-12 col-md-6 row align-items-start mb-3">
+                                                <div class="section-title col-md-4">
+                                                    <span>GST</span>
+                                                </div>
+                                                <div class="form-group col-md-8 vendor-field-col">
+                                                    <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off" value={{$vendor->gst_number}}>
+                                                    <span class="error_gst_number vendor-field-error" style="color:red"></span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -752,31 +778,52 @@
                                     </div>
                                 </div>
                                 <div class="row form-section">
-                                    <div class="col-12 col-md-6 row align-items-center mb-3">
+                                    <div class="col-12 col-md-6 row align-items-start mb-3">
                                         <div class="section-title col-md-4">
-                                            <span>Vendor Type <span style="color:red;">*</span></span>
+                                            <span>Party Type <span style="color:red;">*</span></span>
                                         </div>
-                                        <div class="tax-dropdown-wrapper tds-tax-section" style="width:340px;">
-                                            <input type="text" class="form-control vendor-search-input" name="tds_tax_name" autocomplete="off" autocorrect="off" placeholder="Select a Vendor Type"  readonly>
-                                            <input type="hidden" name="vendor_type_name" class="vendor_type_name" id="vendor_type_name" >
-                                            <input type="hidden" name="vendor_type_id" class="vendor_type_id" >
-                                            <div class="dropdown-menu tax-dropdown">
-                                            <div class="vendor-list">
-
+                                        <div class="form-group col-md-8 vendor-field-col">
+                                            <div class="tax-dropdown-wrapper tds-tax-section party-type-section" style="width:100%;max-width:340px;">
+                                                <input type="text" class="form-control vendor-search-input party-search-input" name="party_type_display" placeholder="Select Party Type" autocomplete="off" autocorrect="off" value="{{ old('party_type') }}" data-saved-party-type="{{ old('party_type') }}" readonly>
+                                                <input type="hidden" name="party_type" class="party_type_field" value="{{ old('party_type') }}">
+                                                <div class="dropdown-menu tax-dropdown">
+                                                    <div class="party-list">
+                                                        @foreach (\App\Models\Tblvendor::PARTY_TYPES as $partyTypeOption)
+                                                            <div data-value="{{ $partyTypeOption }}">{{ $partyTypeOption }}</div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
                                             </div>
-                                            {{-- <div class="manage-tds-link">⚙️ Manage TDS</div> --}}
-                                            </div>
+                                            <span class="error_party_type vendor-field-error" style="color:red"></span>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="row form-section">
-                                    <div class="col-12 col-md-6 row align-items-center mb-3">
+                                    <div class="col-12 col-md-6 row align-items-start mb-3">
+                                        <div class="section-title col-md-4">
+                                            <span>Vendor Type <span style="color:red;">*</span></span>
+                                        </div>
+                                        <div class="form-group col-md-8 vendor-field-col">
+                                            <div class="tax-dropdown-wrapper tds-tax-section vendor-type-section" style="width:100%;max-width:340px;">
+                                                <input type="text" class="form-control vendor-search-input" name="vendor_type_display" autocomplete="off" autocorrect="off" placeholder="Select a Vendor Type" readonly>
+                                                <input type="hidden" name="vendor_type_name" class="vendor_type_name" id="vendor_type_name_create">
+                                                <input type="hidden" name="vendor_type_id" class="vendor_type_id">
+                                                <div class="dropdown-menu tax-dropdown">
+                                                    <div class="vendor-list"></div>
+                                                </div>
+                                            </div>
+                                            <span class="error_vendor_type vendor-field-error" style="color:red"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row form-section">
+                                    <div class="col-12 col-md-6 row align-items-start mb-3">
                                         <div class="section-title col-md-4">
                                             <span>GST <span class="" style="color:red;">*</span></span>
                                         </div>
-                                        <div class="form-group col-md-8">
+                                        <div class="form-group col-md-8 vendor-field-col">
                                             <input type="text" name="gst_number" id="gst_number" autocomplete="off" autocorrect="off">
-                                            <span class="error_gst_number" style="color:red"></span>
+                                            <span class="error_gst_number vendor-field-error" style="color:red"></span>
                                         </div>
                                     </div>
                                 </div>
@@ -2424,6 +2471,14 @@
                 $('.error_display_name').text('');
             });
 
+            $(document).on('input', '.party-type-section .party-search-input', function () {
+                $(this).closest('.vendor-field-col').find('.error_party_type').text('');
+            });
+
+            $(document).on('input', '.vendor-type-section .vendor-search-input', function () {
+                $(this).closest('.vendor-field-col').find('.error_vendor_type').text('');
+            });
+
             $('.vendor-uppercase-only').each(function () {
                 $(this).val(normalizeVendorUppercaseOnly($(this).val()));
             });
@@ -2470,18 +2525,38 @@
                     } else {
                         $('.error_pan_number').text('');
                     }
-                    let vendorType = $('#vendor_type_name').val();
+
+                    const $partyFieldCol = $('#other-details .party-type-section').closest('.vendor-field-col');
+                    const partyType = ($partyFieldCol.find('.party_type_field').val() || '').trim();
+                    if (partyType === '') {
+                        $partyFieldCol.find('.error_party_type').text('Party Type is required');
+                        isValid = false;
+                    } else {
+                        $partyFieldCol.find('.error_party_type').text('');
+                    }
+
+                    const $vendorTypeFieldCol = $('#other-details .vendor-type-section').closest('.vendor-field-col');
+                    const vendorTypeId = ($vendorTypeFieldCol.find('.vendor_type_id').val() || '').trim();
+                    if (vendorTypeId === '') {
+                        $vendorTypeFieldCol.find('.error_vendor_type').text('Vendor Type is required');
+                        isValid = false;
+                    } else {
+                        $vendorTypeFieldCol.find('.error_vendor_type').text('');
+                    }
+
+                    let vendorType = ($vendorTypeFieldCol.find('.vendor_type_name').val() || $('.vendor_type_name').first().val() || $('#vendor_type_name').val() || '').trim();
                     let gst = $('#gst_number').val().trim();
 
+                    const $gstFieldCol = $('#gst_number').closest('.vendor-field-col');
                     if (vendorType === 'GST Registered Party') {
                         if (gst === "") {
-                            $('.error_gst_number').text('GST Number is required');
+                            $gstFieldCol.find('.error_gst_number').text('GST Number is required');
                             isValid = false;
                         } else {
-                            $('.error_gst_number').text('');
+                            $gstFieldCol.find('.error_gst_number').text('');
                         }
                     } else {
-                        $('.error_gst_number').text('');
+                        $gstFieldCol.find('.error_gst_number').text('');
                     }
                     let bankAccountValid = true;
                     $('input[name*="[account_number]"]').each(function() {
@@ -2889,33 +2964,199 @@
                     $dropdown.hide();
                 });
 
-                $(document).on('click', '.vendor-search-input', function (e) {
-                    e.stopPropagation();
-                    $(this).val('');
-                    $('.dropdown-menu.tax-dropdown').hide();
+                function syncVendorTypeGstRequired(typeName) {
+                    let gstLabel = $('#gst_number').closest('.col-md-6, .row').find('.section-title span').first();
+                    if (!gstLabel.length) {
+                        gstLabel = $('#gst_number').closest('.form-group, .row').siblings('.section-title').find('span').first();
+                    }
+                    if (typeName === 'GST Registered Party') {
+                        if (gstLabel.length && gstLabel.find('span').length === 0) {
+                            gstLabel.append(' <span style="color:red;">*</span>');
+                        }
+                        $('#gst_number').prop('required', true);
+                    } else {
+                        if (gstLabel.length) {
+                            gstLabel.find('span').remove();
+                        }
+                        $('#gst_number').prop('required', false);
+                    }
+                }
 
-                    const $input = $(this);
-                    let $dropdown = $input.data('dropdown');
+                function getSavedVendorType(wrapper, $input) {
+                    const fromHidden = (wrapper.find('.vendor_type_name').val() || '').trim();
+                    const fromData = ($input.data('savedVendorType') || $input.attr('data-saved-vendor-type') || '').trim();
+                    const fromValue = ($input.attr('value') || $input.val() || '').trim();
+                    return fromHidden || fromData || fromValue;
+                }
 
-                    if (!$dropdown) {
-                        // Clone so each row keeps its own dropdown
-                        $dropdown = $input.siblings('.dropdown-menu').clone(true);
-                        $('body').append($dropdown);
-                        $input.data('dropdown', $dropdown);
+                function markVendorTypeDropdownSelection($dropdown, wrapper) {
+                    if (!$dropdown || !$dropdown.length) return;
+                    const $field = wrapper.find('.vendor-search-input');
+                    const savedName = getSavedVendorType(wrapper, $field);
+                    const savedId = (wrapper.find('.vendor_type_id').val() || $field.attr('data-saved-vendor-type-id') || '').toString();
+                    $dropdown.find('.vendor-list div').each(function () {
+                        const $item = $(this);
+                        const id = ($item.data('id') || '').toString();
+                        const val = ($item.data('value') || '').toString();
+                        const isSelected = (savedId && id === savedId) || (savedName && val === savedName);
+                        $item.toggleClass('selected', isSelected);
+                        $item.show();
+                    });
+                }
+
+                function openVendorTypeDropdown($input) {
+                    const $inputEl = $($input);
+                    const wrapper = $inputEl.closest('.vendor-type-section');
+                    if (!wrapper.length) return;
+
+                    const savedName = getSavedVendorType(wrapper, $inputEl);
+                    const savedId = (wrapper.find('.vendor_type_id').val() || $inputEl.attr('data-saved-vendor-type-id') || '').toString();
+
+                    if (savedName) {
+                        $inputEl.val(savedName);
+                        wrapper.find('.vendor_type_name').val(savedName);
+                        $inputEl.data('savedVendorType', savedName);
                     }
 
-                    $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper'));
-                    $dropdown.data('row', $input.closest('tr'));
+                    $('.dropdown-menu.tax-dropdown').hide();
 
-                    const offset = $input.offset();
+                    let $dropdown = $inputEl.data('dropdown');
+                    if (!$dropdown || !$dropdown.length) {
+                        $dropdown = $inputEl.siblings('.dropdown-menu.tax-dropdown').clone(true, true);
+                        $('body').append($dropdown);
+                        $inputEl.data('dropdown', $dropdown);
+                    }
+
+                    $dropdown.data('wrapper', wrapper);
+                    markVendorTypeDropdownSelection($dropdown, wrapper);
+
+                    const offset = $inputEl.offset();
                     $dropdown.css({
                         position: 'absolute',
-                        top: offset.top + $input.outerHeight(),
+                        top: offset.top + $inputEl.outerHeight(),
                         left: offset.left,
-                        width: $input.outerWidth(),
+                        width: $inputEl.outerWidth(),
                         zIndex: 999
                     }).show();
-                    $(this).removeAttr('readonly');
+
+                    $inputEl.removeAttr('readonly');
+                }
+
+                $('.vendor-type-section').each(function () {
+                    const wrapper = $(this);
+                    const $input = wrapper.find('.vendor-search-input');
+                    const savedName = getSavedVendorType(wrapper, $input);
+                    const savedId = (wrapper.find('.vendor_type_id').val() || $input.attr('data-saved-vendor-type-id') || '').toString();
+                    if (savedName) {
+                        $input.val(savedName);
+                        wrapper.find('.vendor_type_name').val(savedName);
+                        $input.data('savedVendorType', savedName);
+                        if (savedId) {
+                            wrapper.find('.vendor_type_id').val(savedId);
+                        }
+                        syncVendorTypeGstRequired(savedName);
+                    }
+                });
+
+                $(document).on('click focus', '.vendor-type-section .vendor-search-input', function (e) {
+                    e.stopPropagation();
+                    openVendorTypeDropdown(this);
+                });
+
+                function getSavedPartyType(wrapper, $input) {
+                    const fromHidden = (wrapper.find('.party_type_field').val() || '').trim();
+                    const fromData = ($input.data('savedPartyType') || $input.attr('data-saved-party-type') || '').trim();
+                    const fromValue = ($input.attr('value') || $input.val() || '').trim();
+                    return fromHidden || fromData || fromValue;
+                }
+
+                function markPartyTypeDropdownSelection($dropdown, wrapper) {
+                    if (!$dropdown || !$dropdown.length) {
+                        return;
+                    }
+                    const $field = wrapper.find('.party-search-input');
+                    const savedName = getSavedPartyType(wrapper, $field);
+                    $dropdown.find('.party-list div').each(function () {
+                        const $item = $(this);
+                        const val = ($item.data('value') || '').toString();
+                        const isSelected = savedName && val === savedName;
+                        $item.toggleClass('selected', isSelected);
+                        $item.show();
+                    });
+                }
+
+                function openPartyTypeDropdown($input) {
+                    const $inputEl = $($input);
+                    const wrapper = $inputEl.closest('.party-type-section');
+                    if (!wrapper.length) {
+                        return;
+                    }
+
+                    const savedName = getSavedPartyType(wrapper, $inputEl);
+                    if (savedName) {
+                        $inputEl.val(savedName);
+                        wrapper.find('.party_type_field').val(savedName);
+                        $inputEl.data('savedPartyType', savedName);
+                    }
+
+                    $('.dropdown-menu.tax-dropdown').hide();
+
+                    let $dropdown = $inputEl.data('dropdown');
+                    if (!$dropdown || !$dropdown.length) {
+                        $dropdown = $inputEl.siblings('.dropdown-menu.tax-dropdown').clone(true, true);
+                        $('body').append($dropdown);
+                        $inputEl.data('dropdown', $dropdown);
+                    }
+
+                    $dropdown.data('wrapper', wrapper);
+                    markPartyTypeDropdownSelection($dropdown, wrapper);
+
+                    const offset = $inputEl.offset();
+                    $dropdown.css({
+                        position: 'absolute',
+                        top: offset.top + $inputEl.outerHeight(),
+                        left: offset.left,
+                        width: $inputEl.outerWidth(),
+                        zIndex: 999
+                    }).show();
+
+                    $inputEl.removeAttr('readonly');
+                }
+
+                $('.party-type-section').each(function () {
+                    const wrapper = $(this);
+                    const $input = wrapper.find('.party-search-input');
+                    const savedName = getSavedPartyType(wrapper, $input);
+                    if (savedName) {
+                        $input.val(savedName);
+                        wrapper.find('.party_type_field').val(savedName);
+                        $input.data('savedPartyType', savedName);
+                    }
+                });
+
+                $(document).on('click focus', '.party-type-section .party-search-input', function (e) {
+                    e.stopPropagation();
+                    openPartyTypeDropdown(this);
+                });
+
+                $(document).on('click', '.party-list div', function () {
+                    const selectedText = $(this).text().trim();
+                    const selectedValue = ($(this).data('value') || selectedText).toString();
+                    const $dropdown = $(this).closest('.dropdown-menu.tax-dropdown');
+                    const wrapper = $dropdown.data('wrapper');
+                    if (!wrapper || !wrapper.hasClass('party-type-section')) {
+                        return;
+                    }
+
+                    wrapper.find('.party-search-input').val(selectedText);
+                    wrapper.find('.party_type_field').val(selectedValue);
+                    wrapper.find('.party-search-input')
+                        .data('savedPartyType', selectedValue)
+                        .attr('data-saved-party-type', selectedValue);
+
+                    wrapper.find('.error_party_type').text('');
+                    $dropdown.hide();
+                    wrapper.find('.party-search-input').attr('readonly', 'readonly');
                 });
 
                 // Select GST item
@@ -2933,28 +3174,19 @@
                         return;
                     }
                     wrapper.find('.vendor-search-input').val(selectedText);
-                    if (wrapper.hasClass('tds-tax-section')) {
-                        wrapper.find('.selected-tds-tax').val(selecteddata);
+                    if (!wrapper.hasClass('vendor-type-section')) {
+                        $dropdown.hide();
+                        return;
                     }
-                    if (wrapper.hasClass('tds-tax-section')) {
-                        wrapper.find('.vendor_type_name').val(selecteddata);
-                    }
+                    wrapper.find('.vendor_type_name').val(selecteddata);
                     wrapper.find('.vendor_type_id').val(selectedid);
+                    wrapper.find('.vendor-search-input')
+                        .data('savedVendorType', selecteddata)
+                        .attr('data-saved-vendor-type', selecteddata)
+                        .attr('data-saved-vendor-type-id', selectedid);
 
-                    let gstLabel = $('#gst_number').closest('.col-md-6')
-                        .find('.section-title span')
-                        .first();
-
-                    if (selecteddata === 'GST Registered Party') {
-                        if (gstLabel.find('span').length === 0) {
-                            gstLabel.append(' <span style="color:red;">*</span>');
-                        }
-                        $('#gst_number').prop('required', true);
-
-                    } else {
-                        gstLabel.find('span').remove();
-                        $('#gst_number').prop('required', false);
-                    }
+                    wrapper.closest('.vendor-field-col').find('.error_vendor_type').text('');
+                    syncVendorTypeGstRequired(selecteddata);
 
                     $dropdown.hide();
                 });
@@ -3041,12 +3273,24 @@
                       });
                     }
                   });
-                  $('.vendor-search-input').on('keyup', function () {
+                  $(document).on('keyup', '.vendor-type-section .vendor-search-input', function () {
                     const searchText = $(this).val().toLowerCase();
                     const $dropdown = $(this).data('dropdown');
 
                     if ($dropdown) {
                       const list = $dropdown.find('.vendor-list div');
+                      list.each(function () {
+                        const itemText = $(this).text().toLowerCase();
+                        $(this).toggle(itemText.includes(searchText));
+                      });
+                    }
+                  });
+                  $(document).on('keyup', '.party-type-section .party-search-input', function () {
+                    const searchText = $(this).val().toLowerCase();
+                    const $dropdown = $(this).data('dropdown');
+
+                    if ($dropdown) {
+                      const list = $dropdown.find('.party-list div');
                       list.each(function () {
                         const itemText = $(this).text().toLowerCase();
                         $(this).toggle(itemText.includes(searchText));

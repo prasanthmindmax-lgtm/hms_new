@@ -56,6 +56,8 @@
                   data-balance="{{ $v->opening_balance ?? 0 }}"
                   data-currency="INR"
                   data-pan="{{ $v->pan_number ?? '' }}"
+                  data-vendor-type="{{ $v->vendor_type_name ?? '' }}"
+                  data-party-type="{{ $v->party_type ?? '' }}"
                   data-payment_terms="{{ $v->payment_terms }}"
                   data-portal_language="{{ $v->portal_language }}"
                   data-type="{{ $v->customer_type }}"

@@ -512,7 +512,8 @@
     object-fit: cover;
 }
 
-.preview-item .remove-file {
+.preview-item .remove-file,
+.preview-item .remove-existing-file {
     position: absolute;
     top: 5px;
     right: 5px;
