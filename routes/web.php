@@ -24,6 +24,8 @@ use App\Http\Controllers\PharmacyAuditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadiantCashPickupController;
 use App\Http\Controllers\RadiantMismatchAlertController;
+use App\Http\Controllers\RentalAgreementController;
+use App\Http\Controllers\RentalPaymentsController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\IndentController;
 use App\Http\Controllers\TicketController;
@@ -992,6 +994,19 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('pharmacy-audits/{pharmacyAudit}', [PharmacyAuditController::class, 'show'])->name('pharmacy-audits.show');
     Route::get('pharmacy-audits/{pharmacyAudit}/edit', [PharmacyAuditController::class, 'edit'])->name('pharmacy-audits.edit');
     Route::put('pharmacy-audits/{pharmacyAudit}', [PharmacyAuditController::class, 'update'])->name('pharmacy-audits.update');
+
+    Route::get('rental-agreements', [RentalAgreementController::class, 'index'])->name('rental-agreements.index');
+    Route::get('rental-agreements/create', [RentalAgreementController::class, 'create'])->name('rental-agreements.create');
+    Route::post('rental-agreements', [RentalAgreementController::class, 'store'])->name('rental-agreements.store');
+    Route::get('rental-agreements/vendors/{vendor}/owner-payments', [RentalAgreementController::class, 'vendorOwnerPayments'])->name('rental-agreements.vendor-owner-payments');
+    Route::get('rental-agreements/{rentalAgreement}/owner-payments', [RentalAgreementController::class, 'ownerPayments'])->name('rental-agreements.owner-payments');
+    Route::get('rental-agreements/{rentalAgreement}', [RentalAgreementController::class, 'show'])->name('rental-agreements.show');
+    Route::get('rental-agreements/{rentalAgreement}/edit', [RentalAgreementController::class, 'edit'])->name('rental-agreements.edit');
+    Route::put('rental-agreements/{rentalAgreement}', [RentalAgreementController::class, 'update'])->name('rental-agreements.update');
+    
+    Route::get('rental-payments/charts', [RentalPaymentsController::class, 'chart'])->name('rental-payments.charts');
+    Route::get('rental-payments/export', [RentalPaymentsController::class, 'export'])->name('rental-payments.export');
+    Route::get('rental-payments', [RentalPaymentsController::class, 'index'])->name('rental-payments');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {

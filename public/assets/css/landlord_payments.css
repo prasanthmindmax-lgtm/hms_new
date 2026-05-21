@@ -1,0 +1,1845 @@
+﻿/*
+ * Landlord payments â€” module UI
+ * Scope everything under body.llp-page so we donâ€™t bleed into the rest of the app.
+ */
+
+/* â”€â”€ Base / page shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(99, 102, 241, 0.07), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(16, 185, 129, 0.05), transparent),
+    #f8fafc;
+}
+
+body.llp-page .pc-container .pc-content {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 1rem;
+  padding-right: 1.25rem;
+}
+
+@media (min-width: 992px) {
+  body.llp-page .pc-container .pc-content {
+    padding-left: 1.25rem;
+    padding-right: 1.5rem;
+  }
+}
+
+body.llp-page .llp-wrap {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: 2rem;
+}
+
+/* â”€â”€ Top navigation (sub-module) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-subnav {
+  position: relative;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.98);
+  background: linear-gradient(165deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 14px 44px rgba(49, 46, 129, 0.07);
+  overflow: hidden;
+}
+
+body.llp-page .llp-subnav-accent {
+  display: block;
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, #4f46e5 0%, #6366f1 40%, #0d9488 100%);
+}
+
+body.llp-page .llp-subnav-body {
+  position: relative;
+  z-index: 1;
+}
+
+body.llp-page .llp-subnav .llp-subnav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+body.llp-page .llp-subnav-brand-ic {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #4f46e5 0%, #4338ca 52%, #312e81 100%);
+  color: #fff;
+  font-size: 1.12rem;
+  box-shadow:
+    0 4px 14px rgba(79, 70, 229, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+body.llp-page .llp-subnav-brand-txt strong {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+body.llp-page .llp-subnav-brand-txt span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+body.llp-page .llp-subnav-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.75rem;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.llp-page .llp-subnav-pillstrip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  padding: 4px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eef2f7 0%, #e2e8f0 100%);
+  border: 1px solid #dbe2eb;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+body.llp-page .llp-subnav-pillstrip .llp-nav-pill {
+  border: none;
+  background: transparent;
+  border-radius: 11px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  box-shadow: none;
+  gap: 0.4rem;
+}
+
+body.llp-page .llp-subnav-pillstrip .llp-nav-pill:hover {
+  background: rgba(255, 255, 255, 0.72);
+  color: #334155;
+}
+
+body.llp-page .llp-subnav-pillstrip .llp-nav-pill.llp-nav-link--active {
+  background: #fff;
+  color: #3730a3;
+  box-shadow:
+    0 1px 4px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(199, 210, 254, 0.95);
+}
+
+body.llp-page .llp-subnav-pillstrip .llp-nav-pill.llp-nav-link--active i {
+  color: #4f46e5;
+}
+
+body.llp-page .llp-subnav-pillstrip .llp-nav-pill:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.55);
+  outline-offset: 2px;
+}
+
+body.llp-page .llp-subnav-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 2.35rem;
+  background: linear-gradient(180deg, transparent 0%, #cbd5e1 35%, #cbd5e1 65%, transparent 100%);
+  flex-shrink: 0;
+}
+
+body.llp-page .llp-subnav-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 991.98px) {
+  body.llp-page .llp-subnav-links {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  body.llp-page .llp-subnav-pillstrip {
+    flex: 1 1 auto;
+    min-width: min(100%, 16rem);
+  }
+
+  body.llp-page .llp-subnav-pillstrip .llp-nav-pill {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  body.llp-page .llp-subnav-secondary {
+    justify-content: flex-start;
+    flex-basis: 100%;
+    padding-top: 0.15rem;
+    border-top: 1px dashed #e2e8f0;
+    margin-top: 0.15rem;
+  }
+}
+
+body.llp-page .llp-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.72rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+body.llp-page .llp-nav-link:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+body.llp-page .llp-nav-link.llp-nav-link--active {
+  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+  border-color: #c7d2fe;
+  color: #3730a3;
+  box-shadow: 0 1px 2px rgba(67, 56, 202, 0.08);
+}
+
+body.llp-page .llp-nav-link.llp-nav-link--ghost {
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+body.llp-page .llp-nav-dd .dropdown-toggle.llp-nav-link {
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+body.llp-page .llp-nav-dd .dropdown-menu {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.1);
+  padding: 0.35rem;
+  min-width: 13rem;
+}
+
+body.llp-page .llp-nav-dd .dropdown-item {
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.45rem 0.65rem;
+  color: #334155;
+}
+
+body.llp-page .llp-nav-dd .dropdown-item:hover {
+  background: #f1f5ff;
+  color: #4338ca;
+}
+
+body.llp-page .llp-subnav-footer {
+  font-size: 0.8125rem;
+  color: #64748b;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-top: 1px solid #e2e8f0;
+}
+
+/* â”€â”€ Hero & page headings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-hero {
+  padding: 0.35rem 0 0.25rem;
+}
+
+body.llp-page .llp-badge-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6366f1;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  margin-bottom: 0.65rem;
+}
+
+body.llp-page .llp-page-title {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  margin-bottom: 0.35rem;
+}
+
+body.llp-page .llp-page-lead {
+  font-size: 0.9375rem;
+  color: #64748b;
+  margin: 0;
+  max-width: 52rem;
+  line-height: 1.55;
+}
+
+body.llp-page .llp-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.35rem;
+}
+
+/* â”€â”€ Filter strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+body.llp-page .llp-filter-strip .form-label.llp-filter-label {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+body.llp-page .llp-filter-strip .form-select,
+body.llp-page .llp-filter-strip .form-control {
+  min-width: 11rem;
+  border-radius: 10px;
+  border-color: #e2e8f0;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+body.llp-page .llp-filter-strip .form-select:focus,
+body.llp-page .llp-filter-strip .form-control:focus {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.12);
+}
+
+body.llp-page .llp-filter-strip--report {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.llp-page .llp-filter-strip--report .llp-filter-strip-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+}
+
+body.llp-page .llp-filter-strip--report .llp-filter-strip-fields > div {
+  flex: 0 1 auto;
+  min-width: 10rem;
+}
+
+/* â”€â”€ Stat cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-stat {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+body.llp-page .llp-stat:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 12px 28px rgba(49, 46, 129, 0.05);
+}
+
+body.llp-page .llp-stat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--llp-accent, #6366f1);
+}
+
+body.llp-page .llp-stat .llp-stat-inner {
+  padding: 1rem 1.1rem;
+}
+
+body.llp-page .llp-stat.llp-stat--indigo {
+  --llp-accent: #6366f1;
+}
+body.llp-page .llp-stat.llp-stat--emerald {
+  --llp-accent: #059669;
+}
+body.llp-page .llp-stat.llp-stat--amber {
+  --llp-accent: #d97706;
+}
+body.llp-page .llp-stat.llp-stat--rose {
+  --llp-accent: #e11d48;
+}
+body.llp-page .llp-stat.llp-stat--violet {
+  --llp-accent: #7c3aed;
+}
+body.llp-page .llp-stat.llp-stat--slate {
+  --llp-accent: #475569;
+}
+
+body.llp-page .llp-stat-lbl {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #64748b;
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+}
+
+body.llp-page .llp-stat-val {
+  font-size: 1.28rem;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+body.llp-page .llp-stat-foot {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+
+/* â”€â”€ Panels & quick links â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-panel {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  overflow: hidden;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.05),
+    0 10px 32px rgba(49, 46, 129, 0.04);
+}
+
+body.llp-page .llp-panel-head {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 3.1rem;
+  padding: 0.95rem 1.15rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+  background: linear-gradient(180deg, #fafbfc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+body.llp-page .llp-panel.d-flex.flex-column > .llp-panel-body {
+  flex: 1 1 auto;
+}
+
+body.llp-page .llp-panel-head--hos {
+  border-left: 4px solid #4f46e5;
+}
+
+body.llp-page .llp-panel-head--hostel {
+  border-left: 4px solid #0d9488;
+}
+
+body.llp-page .llp-panel-body {
+  padding: 1rem 1.1rem;
+}
+
+body.llp-page .llp-quick-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+body.llp-page .llp-quick-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    transform 0.14s ease;
+}
+
+body.llp-page .llp-quick-link:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.1);
+  color: #4338ca;
+  transform: translateY(-1px);
+}
+
+body.llp-page .llp-quick-link-ic {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* â”€â”€ Form card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-form-card {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+body.llp-page .llp-form-card-body {
+  padding: 1.35rem 1.4rem 1.5rem;
+}
+
+body.llp-page .llp-form-card .form-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+body.llp-page .llp-form-card .form-control,
+body.llp-page .llp-form-card .form-select {
+  border-radius: 10px;
+  border-color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+body.llp-page .llp-form-card .form-control:focus,
+body.llp-page .llp-form-card .form-select:focus {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.12);
+}
+
+body.llp-page .llp-form-card .form-text {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+
+body.llp-page .llp-btn:active {
+  transform: scale(0.98);
+}
+
+body.llp-page .llp-btn-primary {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+}
+
+body.llp-page .llp-btn-primary:hover {
+  color: #fff;
+  filter: brightness(1.03);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+}
+
+body.llp-page .llp-btn-secondary {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+body.llp-page .llp-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+body.llp-page .llp-btn-ghost {
+  background: transparent;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+body.llp-page .llp-btn-ghost:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+body.llp-page .llp-btn-xs {
+  font-size: 0.75rem;
+  padding: 0.32rem 0.58rem;
+  border-radius: 8px;
+}
+
+body.llp-page .llp-btn-wide {
+  width: 100%;
+}
+
+/* â”€â”€ Back link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-back {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #64748b;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+body.llp-page .llp-back:hover {
+  color: #4f46e5;
+}
+
+/* â”€â”€ Data tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-table-shell {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  overflow: hidden;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 14px 40px rgba(49, 46, 129, 0.045);
+}
+
+body.llp-page .llp-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.llp-page .llp-table {
+  width: 100%;
+  font-size: 0.875rem;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+body.llp-page .llp-table thead th {
+  background: #1a2232;
+  color: #c8d0e7;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.85rem 1rem;
+  border: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+body.llp-page .llp-table tbody td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e8edf5;
+  color: #1e293b;
+  vertical-align: middle;
+}
+
+body.llp-page .llp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+body.llp-page .llp-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+body.llp-page .llp-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+body.llp-page .llp-table a {
+  color: #4f46e5;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+body.llp-page .llp-table a:hover {
+  text-decoration: underline;
+}
+
+body.llp-page .llp-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+body.llp-page .llp-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-weight: 600;
+  padding: 2.5rem 1rem !important;
+  font-size: 0.9rem;
+}
+
+/* â”€â”€ Status pills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+body.llp-page .llp-pill-muted {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+body.llp-page .llp-pill-hospital {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+body.llp-page .llp-pill-hostel {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+body.llp-page .llp-pill-draft {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+body.llp-page .llp-pill-ready {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+
+body.llp-page .llp-pill-paid,
+body.llp-payments-page .llp-type-pill {
+  display: inline-block;
+  max-width: 9.5rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+body.llp-payments-page .llp-type-pill--rent_expenses {
+  background: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+body.llp-payments-page .llp-type-pill--rent_advance {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+body.llp-payments-page .llp-type-pill--maintenance_charges {
+  background: #f5f3ff;
+  color: #6d28d9;
+  border-color: #ddd6fe;
+}
+
+body.llp-payments-page .llp-type-pill--eb_charges {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+body.llp-page .llp-pill-complete {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+/* â”€â”€ Pagination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-pager {
+  margin-top: 1rem;
+}
+
+body.llp-page .llp-pager nav {
+  display: flex;
+  justify-content: center;
+}
+
+body.llp-page .llp-pager .pagination {
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+
+body.llp-page .llp-pager .page-link {
+  border-radius: 10px !important;
+  border: 1px solid #e2e8f0;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: #5b21b6;
+}
+
+body.llp-page .llp-pager .page-item.active .page-link {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  border-color: #4f46e5;
+}
+
+/* â”€â”€ Alerts / ledger note â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-note {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #fafbfd 0%, #fff 100%);
+  padding: 0.85rem 1rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+body.llp-page .llp-amount-neft {
+  color: #065f46 !important;
+  font-weight: 800;
+}
+
+/* â”€â”€ S.No, location, category columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-th-sno,
+body.llp-page .llp-td-sno,
+body.ra-page .pay-pr-th-sno,
+body.ra-page .pay-pr-td-sno {
+  width: 3.25rem;
+  min-width: 3.25rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+body.llp-page .llp-td-loc .llp-loc-zone {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #6366f1;
+}
+
+body.llp-page .llp-td-loc .llp-loc-branch {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* â”€â”€ Dashboard charge-type filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-dash-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+body.llp-page .llp-dash-filter-bar__scope {
+  min-width: 11rem;
+}
+
+body.llp-page .llp-dash-filter-bar__scope .form-select {
+  max-width: 14rem;
+}
+
+body.llp-page .llp-dash-filter-bar__charges {
+  flex: 1 1 16rem;
+}
+
+body.llp-page .llp-charge-filters--bar {
+  margin-top: 0.35rem;
+}
+
+body.llp-page .llp-payments-tabs .llp-charge-filters--bar {
+  margin-top: 0;
+}
+
+body.llp-page .llp-dash-table-filter-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #4338ca;
+  background: #eef2ff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+}
+
+body.llp-page .llp-stat--filterable .llp-stat-inner {
+  min-height: 100%;
+}
+
+body.llp-page .llp-charge-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+body.llp-page .llp-charge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  color: #4338ca;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1.3;
+}
+
+body.llp-page .llp-charge-chip:hover {
+  background: #eef2ff;
+  color: #312e81;
+}
+
+body.llp-page .llp-charge-chip.is-active {
+  background: linear-gradient(145deg, #4f46e5, #4338ca);
+  border-color: transparent;
+  color: #fff;
+}
+
+body.llp-page .llp-charge-chip-hint {
+  font-size: 0.6rem;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+body.llp-page .llp-charge-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+body.llp-page .llp-stat-tds-tag {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.12);
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #4338ca;
+}
+
+body.llp-page .llp-quick-link-note {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #d97706;
+  margin-left: 0.25rem;
+}
+
+body.llp-page .llp-bill-link {
+  color: #4f46e5;
+  font-size: 1rem;
+}
+
+body.llp-page .llp-bill-link:hover {
+  color: #312e81;
+}
+
+body.llp-page .llp-page-title--sm {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+body.llp-page .llp-page-toolbar--compact {
+  margin-bottom: 0.5rem !important;
+}
+
+[data-field].is-invalid .form-control,
+[data-field].is-invalid .form-select {
+  border-color: #dc3545;
+}
+
+[data-field] .invalid-feedback,
+[data-field] .js-field-feedback {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #dc3545;
+}
+
+
+/* â”€â”€ Fix duplicate rule cleanup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-page .llp-panel-head--hos {
+  border-left-width: 4px;
+}
+
+/* â”€â”€ Rental payments overview (single-panel layout) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+body.llp-payments-page .llp-payments-workspace {
+  margin-top: 0;
+}
+
+body.llp-payments-page .llp-payments-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 40px rgba(49, 46, 129, 0.07);
+  overflow: hidden;
+}
+
+body.llp-payments-page .llp-payments-card__head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  padding: 1.25rem 1.35rem 1rem;
+  background: linear-gradient(180deg, #fafbff 0%, #fff 85%);
+  border-bottom: 1px solid #eef2f7;
+}
+
+body.llp-payments-page .llp-payments-card__head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+  width: 100%;
+}
+
+body.llp-payments-page .llp-payments-card__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Report / export action strip */
+body.llp-payments-page .llp-report-actions {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+body.llp-payments-page .llp-report-actions__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+body.llp-payments-page .llp-report-actions__label i {
+  font-size: 0.8rem;
+  color: #6366f1;
+}
+
+body.llp-payments-page .llp-report-actions__strip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding: 0.35rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+body.llp-payments-page .llp-report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3.1rem;
+  padding: 0.45rem 0.85rem 0.45rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0f172a;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+body.llp-payments-page .llp-report-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+body.llp-payments-page .llp-report-btn__ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 9px;
+  font-size: 1.05rem;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+body.llp-payments-page .llp-report-btn__txt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+  line-height: 1.15;
+  text-align: left;
+}
+
+body.llp-payments-page .llp-report-btn__title {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+
+body.llp-payments-page .llp-report-btn__hint {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+body.llp-payments-page .llp-report-btn--chart {
+  color: #fff;
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #818cf8 100%);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.28);
+}
+
+body.llp-payments-page .llp-report-btn--chart .llp-report-btn__ic {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+body.llp-payments-page .llp-report-btn--chart .llp-report-btn__hint {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+body.llp-payments-page .llp-report-btn--chart:hover {
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(79, 70, 229, 0.38);
+}
+
+body.llp-payments-page .llp-report-btn--excel {
+  border-color: #bbf7d0;
+}
+
+body.llp-payments-page .llp-report-btn--excel .llp-report-btn__ic--excel,
+body.llp-payments-page .llp-report-btn__ic--excel {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+body.llp-payments-page .llp-report-btn--excel:hover {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+body.llp-payments-page .llp-report-btn--csv {
+  border-color: #cbd5e1;
+}
+
+body.llp-payments-page .llp-report-btn--csv .llp-report-btn__ic--csv,
+body.llp-payments-page .llp-report-btn__ic--csv {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+body.llp-payments-page .llp-report-btn--csv:hover {
+  border-color: #93c5fd;
+  background: #f8fafc;
+}
+
+body.llp-payments-page .llp-report-btn--back {
+  border-color: #dbe3ef;
+}
+
+body.llp-payments-page .llp-report-btn--back .llp-report-btn__ic {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+@media (max-width: 767.98px) {
+  body.llp-payments-page .llp-report-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  body.llp-payments-page .llp-report-actions__strip {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  body.llp-payments-page .llp-report-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
+    padding-right: 0.65rem;
+  }
+
+  body.llp-payments-page .llp-report-btn__hint {
+    display: none;
+  }
+}
+
+body.llp-payments-page .llp-payments-card__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+body.llp-payments-page .llp-payments-card__meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+body.llp-payments-page .llp-payments-card__dot {
+  margin: 0 0.2rem;
+  opacity: 0.5;
+}
+
+body.llp-payments-page .llp-payments-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+body.llp-payments-page .llp-payments-seg__item {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 9px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #64748b;
+  text-decoration: none;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.18s;
+  white-space: nowrap;
+}
+
+body.llp-payments-page .llp-payments-seg__item:hover {
+  color: #334155;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+body.llp-payments-page .llp-payments-seg__item.is-active {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+}
+
+/* Stats wrapper — avoid global `section { padding: 100px 0 }` from theme */
+body.llp-payments-page .llp-payments-stats,
+body.llp-payments-page .llp-payments-stats section {
+  padding: 0;
+  margin: 0;
+}
+
+/* Premium KPI cards */
+body.llp-payments-page .llp-pay-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem 0.85rem;
+  background:
+    radial-gradient(900px 280px at 0% 0%, rgba(99, 102, 241, 0.05), transparent 55%),
+    radial-gradient(700px 240px at 100% 100%, rgba(16, 185, 129, 0.04), transparent 50%),
+    #f8fafc;
+  border-bottom: 1px solid #eef2f7;
+}
+
+body.llp-payments-page .llp-pay-kpi-grid > .llp-pay-kpi,
+body.llp-payments-page .llp-pay-kpi-grid > button.llp-pay-kpi {
+  height: 100%;
+}
+
+body.llp-payments-page .llp-pay-kpi {
+  --llp-kpi-accent: #6366f1;
+  --llp-kpi-bg: #fff;
+  --llp-kpi-glow: rgba(99, 102, 241, 0.12);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.85rem 0.9rem 0.8rem;
+  min-height: 6.25rem;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: var(--llp-kpi-bg);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px var(--llp-kpi-glow);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.llp-payments-page .llp-pay-kpi::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--llp-kpi-accent), color-mix(in srgb, var(--llp-kpi-accent) 40%, transparent));
+}
+
+body.llp-payments-page .llp-pay-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 14px 32px var(--llp-kpi-glow);
+}
+
+body.llp-payments-page .llp-pay-kpi--featured {
+  border-color: color-mix(in srgb, var(--llp-kpi-accent) 28%, #e2e8f0);
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.05),
+    0 16px 36px var(--llp-kpi-glow);
+}
+
+body.llp-payments-page button.llp-pay-kpi--filter {
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 0.9rem 0.8rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  box-sizing: border-box;
+}
+
+body.llp-payments-page button.llp-pay-kpi--filter:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+body.llp-payments-page button.llp-pay-kpi--filter.is-active {
+  border-color: color-mix(in srgb, var(--llp-kpi-accent) 45%, #2563eb);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--llp-kpi-accent) 18%, #fff),
+    0 14px 32px var(--llp-kpi-glow);
+}
+
+body.llp-payments-page button.llp-pay-kpi--filter.is-active .llp-pay-kpi__lbl {
+  color: #2563eb;
+}
+
+body.llp-payments-page .llp-payments-stats.is-loading,
+body.llp-payments-page .llp-payments-panel.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+body.llp-payments-page .llp-pay-kpi__icon {
+  flex-shrink: 0;
+  width: 2.65rem;
+  height: 2.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 1.15rem;
+  color: var(--llp-kpi-accent);
+  background: color-mix(in srgb, var(--llp-kpi-accent) 12%, #fff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--llp-kpi-accent) 22%, transparent);
+}
+
+body.llp-payments-page .llp-pay-kpi__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding-top: 0.1rem;
+}
+
+body.llp-payments-page .llp-pay-kpi__lbl {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #94a3b8;
+}
+
+body.llp-payments-page .llp-pay-kpi__val {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+body.llp-payments-page .llp-pay-kpi__hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1.35;
+  min-height: 2.7em;
+  margin-top: auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+body.llp-payments-page .llp-pay-kpi__hint--tax {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 2.7em;
+  margin-top: auto;
+  overflow: hidden;
+  -webkit-line-clamp: unset;
+}
+
+body.llp-payments-page .llp-pay-kpi__tax-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.45rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #94a3b8;
+}
+
+body.llp-payments-page .llp-pay-kpi__tax-split > span {
+  white-space: nowrap;
+}
+
+body.llp-payments-page .llp-pay-kpi__tax-action {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #64748b;
+}
+
+body.llp-payments-page button.llp-pay-kpi--filter.is-active .llp-pay-kpi__tax-action {
+  color: #2563eb;
+}
+
+body.llp-payments-page .llp-pay-kpi--records {
+  --llp-kpi-accent: #475569;
+  --llp-kpi-glow: rgba(71, 85, 105, 0.1);
+}
+
+body.llp-payments-page .llp-pay-kpi--rent {
+  --llp-kpi-accent: #4f46e5;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #f5f3ff 100%);
+  --llp-kpi-glow: rgba(79, 70, 229, 0.16);
+}
+
+body.llp-payments-page .llp-pay-kpi--maintenance {
+  --llp-kpi-accent: #7c3aed;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #f5f3ff 100%);
+  --llp-kpi-glow: rgba(124, 58, 237, 0.14);
+}
+
+body.llp-payments-page .llp-pay-kpi--eb {
+  --llp-kpi-accent: #d97706;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #fffbeb 100%);
+  --llp-kpi-glow: rgba(217, 119, 6, 0.14);
+}
+
+body.llp-payments-page .llp-pay-kpi--gross {
+  --llp-kpi-accent: #0284c7;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #f0f9ff 100%);
+  --llp-kpi-glow: rgba(2, 132, 199, 0.12);
+}
+
+body.llp-payments-page .llp-pay-kpi--gst {
+  --llp-kpi-accent: #0d9488;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #f0fdfa 100%);
+  --llp-kpi-glow: rgba(13, 148, 136, 0.14);
+}
+
+body.llp-payments-page .llp-pay-kpi--tds {
+  --llp-kpi-accent: #b45309;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #fffbeb 100%);
+  --llp-kpi-glow: rgba(180, 83, 9, 0.14);
+}
+
+body.llp-payments-page .llp-pay-kpi--neft {
+  --llp-kpi-accent: #059669;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #ecfdf5 100%);
+  --llp-kpi-glow: rgba(5, 150, 105, 0.14);
+}
+
+body.llp-payments-page .llp-pay-kpi--paid {
+  --llp-kpi-accent: #059669;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #ecfdf5 100%);
+  --llp-kpi-glow: rgba(5, 150, 105, 0.14);
+}
+
+body.llp-payments-page .llp-pay-kpi--balance {
+  --llp-kpi-accent: #e11d48;
+  --llp-kpi-bg: linear-gradient(165deg, #fff 0%, #fff1f2 100%);
+  --llp-kpi-glow: rgba(225, 29, 72, 0.12);
+}
+
+/* Rental payments â€” filter shell (matches rental agreements register) */
+body.llp-payments-page .llp-payments-filters-slot {
+  border-bottom: 1px solid #eef2f7;
+}
+
+body.llp-payments-page .llp-payments-card .tk-filter-shell.tk-filter-qd {
+  margin-bottom: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.llp-payments-page .llp-payments-card .tk-filter-shell.tk-filter-qd > .tk-filter-head {
+  padding: 0.95rem 1.35rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+body.llp-payments-page .llp-payments-card .pay-pr-filter-shell .qd-filters.pay-pr-qd-filters {
+  background: #fff;
+  border-bottom: none;
+  padding: 0.75rem 1.35rem 0.85rem;
+}
+
+body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+  display: grid !important;
+  gap: 8px 16px;
+  align-items: end;
+  margin-bottom: 0;
+}
+
+body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .llp-payments-filter-row--primary {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .llp-payments-filter-row--secondary {
+  margin-top: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  max-width: 66.666%;
+}
+
+body.llp-payments-page .llp-chart-report-btn {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+body.llp-payments-page .llp-chart-report-btn:hover,
+body.llp-payments-page .llp-chart-report-btn[aria-expanded='true'] {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .llp-payments-filter-cell {
+  min-width: 0;
+}
+
+body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .qd-date-wrap {
+  min-height: 36px;
+}
+
+body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .qd-date-wrap #llpPaymentsDateLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+body.llp-payments-page .llp-payments-card .qd-applied-bar.pay-pr-applied-bar {
+  margin: 0;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+@media (max-width: 991.98px) {
+  body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .llp-payments-filter-row--primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .llp-payments-filter-row--secondary {
+    max-width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body.llp-payments-page #llp-payments-filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+body.llp-payments-page .llp-payments-card__body {
+  padding: 0;
+}
+
+body.llp-payments-page .llp-table-shell--flush {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.llp-payments-page .llp-table-wrap--payments-detail {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.llp-payments-page .llp-table--payments-detail {
+  min-width: 1180px;
+}
+
+body.llp-payments-page .llp-table--payments thead th {
+  font-size: 0.6875rem;
+  padding: 0.65rem 0.75rem;
+  white-space: nowrap;
+}
+
+body.llp-payments-page .llp-table--payments tbody td {
+  padding: 0.7rem 0.75rem;
+  font-size: 0.8125rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+body.llp-payments-page .llp-table--payments-detail .llp-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.llp-payments-page .llp-cell-agreement {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+body.llp-payments-page .llp-cell-ref__sub {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+body.llp-payments-page .llp-payments-card__foot {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  background: #fafbfc;
+}
+
+@media (max-width: 767.98px) {
+  body.llp-payments-page .llp-payments-card__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.llp-payments-page .llp-payments-seg {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.llp-payments-page .llp-pay-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body.llp-payments-page .llp-pay-kpi--featured {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 479.98px) {
+  body.llp-payments-page .llp-pay-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.llp-payments-page .llp-payments-chart-layout.ra-chart-layout--open {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  border-top: 1px solid #eef2f7;
+}
+
+body.llp-payments-page .llp-payments-chart-layout .ra-chart-panel:not(.d-none) {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 1rem;
+  min-height: 320px;
+}
+
+body.llp-payments-page .llp-payments-chart-layout {
+  margin-top: 0;
+}
+
+body.llp-payments-page .llp-payments-register-main {
+  min-width: 0;
+}
+
+body.llp-payments-page .llp-chart-toggle {
+  flex-shrink: 0;
+}
+
+body.llp-payments-page .pay-pr-filter-head-meta .tk-btn-export {
+  font-size: 0.8125rem;
+  padding: 0.35rem 0.75rem;
+}
+
+body.llp-payments-page .llp-payments-panel.is-loading,
+body.llp-payments-page .llp-payments-stats.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* Dedicated chart report page */
+body.llp-chart-report-page .llp-chart-report-body {
+  background: #f8fafc;
+}
+
+body.llp-chart-report-page .llp-chart-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+body.llp-chart-report-page .llp-chart-report-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  padding: 1rem 1.1rem 1.15rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+body.llp-chart-report-page .llp-chart-report-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+body.llp-chart-report-page .llp-chart-report-card__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 260px;
+}
+
+body.llp-chart-report-page .llp-chart-report-empty {
+  line-height: 1.5;
+}
+
+body.llp-chart-report-page .llp-chart-report-filters .badge {
+  font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+  body.llp-chart-report-page .llp-chart-report-grid {
+    grid-template-columns: 1fr;
+  }
+}

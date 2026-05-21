@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -62,7 +63,7 @@ class Tblvendor extends Authenticatable
         'remarks',
         'documents',
     ];
-    
+
     public function billingAddress()
     {
         return $this->hasOne(TblBilling::class, 'vendor_id');
@@ -112,5 +113,12 @@ class Tblvendor extends Authenticatable
         }
 
         return null;
+    }
+
+    public function scopeActiveLandlords(Builder $query): Builder
+    {
+        return $query
+            ->where('active_status', 0)
+            ->where('party_type', self::PARTY_LANDLORD);
     }
 }
