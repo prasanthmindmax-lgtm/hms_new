@@ -273,6 +273,7 @@
                           'miscellaneous' => 'Miscellaneous Payment',
                           'rent' => 'Rent Payment',
                           'electricity' => 'Electricity Payment',
+                          'donor_payment' => 'Donor Payment',
                       ];
                       $ptDisp = $ptOld && isset($ptLabels[$ptOld]) ? $ptLabels[$ptOld] : '';
                     @endphp
@@ -552,7 +553,7 @@
                 <div class="pr-pay-form-section-title mb-2">
                   <i class="bi bi-bank" aria-hidden="true"></i> Payee bank details
                 </div>
-                <p class="text-muted small mb-3">Required for Petty Cash Advance, Reimbursement, Ref Payment, Patient Refund, Insta Payment, Miscellaneous, Rent Payment, and Electricity Payment.</p>
+                <p class="text-muted small mb-3">Required for Petty Cash Advance, Reimbursement, Ref Payment, Patient Refund, Insta Payment, Miscellaneous, Rent Payment, Electricity Payment, and Donor Payment.</p>
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label" for="pay_bank_account">Bank account number <span class="text-danger pay-bank-req">*</span></label>

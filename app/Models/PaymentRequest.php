@@ -32,6 +32,8 @@ class PaymentRequest extends Model
 
     public const TYPE_ELECTRICITY = 'electricity';
 
+    public const TYPE_DONOR_PAYMENT = 'donor_payment';
+
     public const TYPES = [
         self::TYPE_ADVANCE,
         self::TYPE_PART_PAYMENT,
@@ -44,6 +46,7 @@ class PaymentRequest extends Model
         self::TYPE_MISCELLANEOUS,
         self::TYPE_RENT,
         self::TYPE_ELECTRICITY,
+        self::TYPE_DONOR_PAYMENT,
     ];
 
     /** @var array<string, string> */
@@ -59,6 +62,7 @@ class PaymentRequest extends Model
         self::TYPE_MISCELLANEOUS => 'Miscellaneous Payment',
         self::TYPE_RENT => 'Rent Payment',
         self::TYPE_ELECTRICITY => 'Electricity Payment',
+        self::TYPE_DONOR_PAYMENT => 'Donor Payment',
     ];
 
     public const PAYOUT_ONLY_TYPES = [
@@ -70,6 +74,7 @@ class PaymentRequest extends Model
         self::TYPE_MISCELLANEOUS,
         self::TYPE_RENT,
         self::TYPE_ELECTRICITY,
+        self::TYPE_DONOR_PAYMENT,
     ];
 
     public const PO_LINKED_TYPES = [
@@ -204,6 +209,7 @@ class PaymentRequest extends Model
             self::TYPE_MISCELLANEOUS => 'text-bg-light',
             self::TYPE_RENT => 'text-bg-info',
             self::TYPE_ELECTRICITY => 'text-bg-primary',
+            self::TYPE_DONOR_PAYMENT => 'text-bg-success',
             default => 'text-bg-secondary',
         };
 
