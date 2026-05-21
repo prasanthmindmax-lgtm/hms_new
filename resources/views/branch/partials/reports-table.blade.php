@@ -20,14 +20,20 @@
     </div>
 
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover table-striped mb-0">
+        <div class="table-responsive fr-reports-table-wrap">
+            <table class="table table-hover table-striped mb-0 fr-reports-table">
+                <colgroup>
+                    <col class="fr-col-sno">
+                    <col class="fr-col-date">
+                    <col class="fr-col-zone">
+                    <col class="fr-col-branch">
+                </colgroup>
                 <thead class="table-dark">
                     <tr>
-                        <th class="text-center" style="width: 60px;">#</th>
-                        <th>Date</th>
-                        <th>Zone</th>
-                        <th>Branch</th>
+                        <th class="text-center col-sticky-sno">#</th>
+                        <th class="col-sticky-date">Date</th>
+                        <th class="col-sticky-zone">Zone</th>
+                        <th class="col-sticky-branch">Branch</th>
                         <th class="text-end">Radiant</th>
                         <th class="text-end">Card</th>
                         <th class="text-end">UPI</th>
@@ -48,8 +54,8 @@
                 <tbody>
                     @forelse($reports as $index => $report)
                     <tr id="report-row-{{ $report->id }}">
-                        <td class="text-center">{{ $reports->firstItem() + $index }}</td>
-                        <td>
+                        <td class="text-center col-sticky-sno">{{ $reports->firstItem() + $index }}</td>
+                        <td class="col-sticky-date">
                             @php
                                 $reportDate = $report->report_date;
                                 if (is_string($reportDate)) {
@@ -57,7 +63,7 @@
                                 }
                             @endphp
                             <strong>{{ $reportDate ? $reportDate->format('d M Y') : 'N/A' }}</strong>
-                            
+
                             {{-- Show Radiant Collection Date Range if available --}}
                             @if($report->radiant_collection_from_date && $report->radiant_collection_to_date)
                                 @php
@@ -80,7 +86,7 @@
                                 @endphp
                                 <br><small class="text-muted">RC: {{ $radiantDate->format('d M Y') }}</small>
                             @endif
-                            
+
                             {{-- Show Deposit Date if available --}}
                             @if($report->deposit_date)
                                 @php
@@ -92,11 +98,11 @@
                                 <br><small class="text-info">Dep: {{ $depositDate->format('d M Y') }}</small>
                             @endif
                         </td>
-                        <td>
+                        <td class="col-sticky-zone">
                             <span class="badge bg-info">{{ $report->zone_name ?? 'N/A' }}</span>
                         </td>
-                        <td>{{ $report->branch_name ?? 'N/A' }}</td>
-                        
+                        <td class="col-sticky-branch">{{ $report->branch_name ?? 'N/A' }}</td>
+
                         {{-- Radiant Collection Amount with "Not Collected" indicator --}}
                         <td class="text-end">
                             @if($report->radiant_not_collected)
@@ -107,7 +113,7 @@
                                 <span class="text-success fw-bold">₹{{ number_format($report->radiant_collection_amount ?? 0, 2) }}</span>
                             @endif
                         </td>
-                        
+
                         <td class="text-end text-primary fw-bold">₹{{ number_format($report->actual_card_amount ?? 0, 2) }}</td>
                         <td class="text-end text-info fw-bold">₹{{ number_format($report->upi_amount ?? 0, 2) }}</td>
                         <td class="text-end text-teal fw-bold">₹{{ number_format($report->deposit_amount ?? 0, 2) }}</td>
@@ -192,7 +198,7 @@
                                 @endif
                             @endif
                         </td>
-                        
+
                         <!-- Management Approval Status -->
                         <td class="text-center management-approval-cell">
                             @if($report->auditor_approval_status != 1)
@@ -242,36 +248,36 @@
                         <td class="text-center">
                             @php
                                 // Decode JSON strings to arrays if needed
-                                $radiantFiles = is_string($report->radiant_collection_files) 
-                                    ? json_decode($report->radiant_collection_files, true) 
+                                $radiantFiles = is_string($report->radiant_collection_files)
+                                    ? json_decode($report->radiant_collection_files, true)
                                     : ($report->radiant_collection_files ?? []);
-                                $cardFiles = is_string($report->actual_card_files) 
-                                    ? json_decode($report->actual_card_files, true) 
+                                $cardFiles = is_string($report->actual_card_files)
+                                    ? json_decode($report->actual_card_files, true)
                                     : ($report->actual_card_files ?? []);
-                                $bankFiles = is_string($report->bank_deposit_files) 
-                                    ? json_decode($report->bank_deposit_files, true) 
+                                $bankFiles = is_string($report->bank_deposit_files)
+                                    ? json_decode($report->bank_deposit_files, true)
                                     : ($report->bank_deposit_files ?? []);
-                                $depositFiles = is_string($report->deposit_files) 
-                                    ? json_decode($report->deposit_files, true) 
+                                $depositFiles = is_string($report->deposit_files)
+                                    ? json_decode($report->deposit_files, true)
                                     : ($report->deposit_files ?? []);
-                                $upiFiles = is_string($report->upi_files) 
-                                    ? json_decode($report->upi_files, true) 
+                                $upiFiles = is_string($report->upi_files)
+                                    ? json_decode($report->upi_files, true)
                                     : ($report->upi_files ?? []);
-                                
+
                                 // Ensure they're arrays
                                 $radiantFiles = is_array($radiantFiles) ? $radiantFiles : [];
                                 $cardFiles = is_array($cardFiles) ? $cardFiles : [];
                                 $bankFiles = is_array($bankFiles) ? $bankFiles : [];
                                 $depositFiles = is_array($depositFiles) ? $depositFiles : [];
                                 $upiFiles = is_array($upiFiles) ? $upiFiles : [];
-                                
+
                                 $hasFiles = (count($radiantFiles) > 0) ||
                                             (count($cardFiles) > 0) ||
                                             (count($bankFiles) > 0) ||
                                             (count($depositFiles) > 0) ||
                                             (count($upiFiles) > 0);
-                                $fileCount = count($radiantFiles) + 
-                                             count($cardFiles) + 
+                                $fileCount = count($radiantFiles) +
+                                             count($cardFiles) +
                                              count($bankFiles) +
                                              count($depositFiles) +
                                              count($upiFiles);
@@ -295,6 +301,9 @@
                             <div class="btn-group" role="group">
                                 <button type="button" class="btn btn-sm btn-info" onclick="viewReport({{ $report->id }})" title="View Details">
                                     <i class="fas fa-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning btn-edit" data-id="{{ $report->id }}" title="Edit Report">
+                                    <i class="fas fa-edit"></i>
                                 </button>
                                 @php
                                     $zonalBranchIds = $allowedBranchIdsForZonalApprove ?? [];
@@ -330,7 +339,7 @@
                 @if($reports->isNotEmpty())
                 <tfoot class="table-light fw-bold">
                     <tr>
-                        <td colspan="4" class="text-end">TOTALS (Filtered):</td>
+                        <td colspan="4" class="text-end col-sticky-totals">TOTALS (Filtered):</td>
                         <td class="text-end text-success">₹{{ number_format($summary['total_radiant'] ?? 0, 2) }}</td>
                         <td class="text-end text-primary">₹{{ number_format($summary['total_card'] ?? 0, 2) }}</td>
                         <td class="text-end text-info">₹{{ number_format($summary['total_upi'] ?? 0, 2) }}</td>

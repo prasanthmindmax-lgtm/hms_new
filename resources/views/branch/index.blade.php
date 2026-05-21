@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ asset('/assets/css/branch-financial.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
         .header-card {
@@ -454,6 +455,8 @@
 
             </div>
 
+            @include('branch.partials.financial-report-form-modal', ['zones' => $zones, 'locations' => $branches])
+
             <!-- ===================== VIEW REPORT MODAL ===================== -->
             <div class="modal fade" id="viewReportModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-xl">
@@ -582,7 +585,7 @@
 <script>
     // ==================== ROUTE VARIABLES ====================
     const indexRoute             = "{{ route('financial-reports.index') }}";
-    const showRoute              = "{{ route('financial-reports.show', ':id') }}";
+    const viewReportRoute        = "{{ route('financial-reports.show', ':id') }}";
     const attachmentsRoute       = "{{ route('financial-reports.attachments', ':id') }}";
     const approveAuditorRoute    = "{{ route('financial-reports.approve.auditor', ':id') }}";
     const rejectAuditorRoute     = "{{ route('financial-reports.reject.auditor', ':id') }}";
@@ -590,6 +593,9 @@
     const rejectManagementRoute  = "{{ route('financial-reports.reject.management', ':id') }}";
     const exportExcelRoute       = "{{ route('financial-reports.export.excel') }}";
     const exportCsvRoute         = "{{ route('financial-reports.export.csv') }}";
+    const storeRoute             = "{{ route('branch-financial.store') }}";
+    const showRoute              = "{{ route('branch-financial.show', ':id') }}";
+    const updateRoute            = "{{ route('branch-financial.update', ':id') }}";
 
     const userAccessLevel = {{ $admin->access_limits }};
     const hasZoneFilter   = {{ ($admin->access_limits !== 6) ? 'true' : 'false' }};
@@ -937,7 +943,7 @@
         modal.show();
 
         $.ajax({
-            url: showRoute.replace(':id', reportId),
+            url: viewReportRoute.replace(':id', reportId),
             method: 'GET',
             dataType: 'json',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -1330,7 +1336,14 @@
         currentPerPage = $(this).val();
         applyFilters(1, currentPerPage);
     });
+
+    function reloadTable() {
+        applyFilters(1, currentPerPage);
+    }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="{{ asset('/assets/js/branch/branch-financial.js') }}?v={{ @filemtime(public_path('assets/js/branch/branch-financial.js')) }}"></script>
 
 @include('superadmin.superadminfooter')
 </body>

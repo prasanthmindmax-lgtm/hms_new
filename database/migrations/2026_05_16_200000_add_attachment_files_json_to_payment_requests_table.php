@@ -5,11 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Payment request attachments: multiple files stored as JSON in *_path columns.
- * - Widens po_attachment_path, document_attachment_path, bank_document_path (VARCHAR 500 → TEXT)
- * - Normalizes existing single paths to [{"path":"..."}, ...]
- */
 return new class extends Migration
 {
     private const PATH_COLUMNS = [

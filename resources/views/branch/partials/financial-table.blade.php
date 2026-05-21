@@ -18,14 +18,20 @@
     </div>
 
     <!-- Main Table -->
-    <div class="table-responsive">
+    <div class="table-responsive bf-reports-table-wrap">
         <table class="financial-reports-table" id="reportsTable">
+            <colgroup>
+                <col class="bf-col-sno">
+                <col class="bf-col-date">
+                <col class="bf-col-zone">
+                <col class="bf-col-branch">
+            </colgroup>
             <thead>
                 <tr>
-                    <th class="col-sno">S.No</th>
-                    <th class="col-date">Date</th>
-                    <th class="col-zone">Zone</th>
-                    <th class="col-branch">Branch</th>
+                    <th class="col-sno col-sticky-sno">S.No</th>
+                    <th class="col-date col-sticky-date">Date</th>
+                    <th class="col-zone col-sticky-zone">Zone</th>
+                    <th class="col-branch col-sticky-branch">Branch</th>
                     <th class="col-amount">Radiant </br>Collection</th>
                     <th class="col-amount">Actual Card</th>
                     <th class="col-amount">UPI</th>
@@ -67,20 +73,20 @@
                 @endphp
                 <tr class="report-row">
                     <!-- S.No -->
-                    <td class="text-center">{{ $reports->firstItem() + $index }}</td>
+                    <td class="text-center col-sticky-sno">{{ $reports->firstItem() + $index }}</td>
                     
                     <!-- Date -->
-                    <td class="date-cell">
+                    <td class="date-cell col-sticky-date">
                         {{ \Carbon\Carbon::parse($report->report_date)->format('d M Y') }}
                     </td>
                     
                     <!-- Zone -->
-                    <td class="zone-cell">
+                    <td class="zone-cell col-sticky-zone">
                         <span class="zone-badge">{{ $report->zone_name }}</span>
                     </td>
                     
                     <!-- Branch -->
-                    <td class="branch-cell">{{ $report->branch_name }}</td>
+                    <td class="branch-cell col-sticky-branch">{{ $report->branch_name }}</td>
                     
                     <!-- Radiant Collection -->
                     <td class="amount-cell">
