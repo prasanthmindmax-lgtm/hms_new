@@ -36,41 +36,23 @@ class RentalAgreementOwnerPaymentHistory
                 RentalAgreement::normalizeType((string) $agreement->agreement_type),
                 null,
                 collect([$agreement]),
-                applyBillLocationFilter: false,
+                applyBillLocationFilter: true,
             );
 
-            $agreementId = (int) $agreement->id;
-            $agreementNumber = (string) $agreement->agreement_number;
-            $filteredRows = collect($payload['rows'] ?? [])
-                ->filter(function (array $row) use ($agreementId, $agreementNumber): bool {
-                    $rowAgreementId = (int) ($row['rental_agreement_id'] ?? 0);
-                    if ($rowAgreementId > 0) {
-                        return $rowAgreementId === $agreementId;
-                    }
-
-                    $rowNumber = trim((string) ($row['agreement_number'] ?? ''));
-
-                    return $rowNumber !== '' && $rowNumber !== '—' && $rowNumber === $agreementNumber;
-                })
-                ->values()
-                ->all();
-
-            if ($filteredRows !== []) {
-                return $this->packageHistory(
-                    scope: 'agreement',
-                    ownerName: trim((string) $agreement->owner_name) ?: (string) ($payload['owner_name'] ?? ''),
-                    agreementNumber: $agreementNumber,
-                    agreementId: $agreementId,
-                    vendorId: (int) $vendor->id,
-                    agreements: [[
-                        'id' => $agreementId,
-                        'agreement_number' => $agreementNumber,
-                        'agreement_type' => RentalAgreement::normalizeType((string) $agreement->agreement_type),
-                    ]],
-                    sortedRows: $filteredRows,
-                    dataSource: (string) ($payload['data_source'] ?? 'bill_module'),
-                );
-            }
+            return $this->packageHistory(
+                scope: 'agreement',
+                ownerName: trim((string) $agreement->owner_name) ?: (string) ($payload['owner_name'] ?? ''),
+                agreementNumber: (string) $agreement->agreement_number,
+                agreementId: (int) $agreement->id,
+                vendorId: (int) $vendor->id,
+                agreements: [[
+                    'id' => (int) $agreement->id,
+                    'agreement_number' => (string) $agreement->agreement_number,
+                    'agreement_type' => RentalAgreement::normalizeType((string) $agreement->agreement_type),
+                ]],
+                sortedRows: $payload['rows'] ?? [],
+                dataSource: (string) ($payload['data_source'] ?? 'bill_module'),
+            );
         }
 
         return $this->emptyAgreementHistory($agreement);
@@ -134,6 +116,8 @@ class RentalAgreementOwnerPaymentHistory
         $rentExpense = $sections[LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES]['summary'] ?? [];
         $maintenance = $sections[LandlordAdvanceVendorDashboard::NATURE_MAINTENANCE]['summary'] ?? [];
         $pendingLines = collect($sortedRows)->filter(fn (array $row) => (float) ($row['pending_balance'] ?? 0) > 0.009);
+        $rentSectionRows = collect($sortedRows)->where('nature_key', LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES);
+        $rentBillRows = $rentSectionRows->where('line_type', 'bill');
 
         $advanceBalance = $advanceBalanceOverride;
         if ($advanceBalance === null) {
@@ -151,7 +135,7 @@ class RentalAgreementOwnerPaymentHistory
             'agreements' => $agreements,
             'data_source' => $dataSource,
             'sections' => $sections,
-            'summary' => [
+            'summary' => array_merge([
                 'advance_balance' => round((float) $advanceBalance, 2),
                 'rent_expense_pending' => (float) ($rentExpense['pending_balance'] ?? 0),
                 'maintenance_pending' => (float) ($maintenance['pending_balance'] ?? 0),
@@ -160,7 +144,14 @@ class RentalAgreementOwnerPaymentHistory
                 'completed_payments' => (int) ($rentExpense['completed_count'] ?? 0),
                 'pending_lines' => $pendingLines->count(),
                 'agreement_count' => count($agreements),
-            ],
+                'rent_ledger' => [
+                    'line_count' => (int) $rentSectionRows->count(),
+                    'bill_count' => (int) $rentBillRows->count(),
+                    'bill_gross_total' => round((float) $rentBillRows->sum(fn (array $row) => (float) ($row['pending_balance'] ?? 0) + (float) ($row['amount_sent'] ?? 0)), 2),
+                    'bill_paid_total' => round((float) $rentSectionRows->sum('amount_sent'), 2),
+                    'pending_total' => round((float) $rentSectionRows->sum('pending_balance'), 2),
+                ],
+            ], $vendorId !== null && $vendorId > 0 ? ['vendor_bills' => $this->billLedger->vendorBillSummary($vendorId)] : []),
             'rows' => $sortedRows,
         ];
     }

@@ -21,15 +21,35 @@
   $isBillModule = $dataSource === 'bill_module';
   $categoryQs = array_filter(['category' => request()->query('category')]);
   $agreementCount = (int) ($summary['agreement_count'] ?? count($agreementsList));
-  $rentPending = (float) ($summary['rent_expense_pending'] ?? 0);
+  $vendorBills = $summary['vendor_bills'] ?? null;
+  $rentLedger = $summary['rent_ledger'] ?? [];
   $advancePending = (float) ($summary['advance_balance'] ?? 0);
   $maintenancePending = (float) ($summary['maintenance_pending'] ?? 0);
-  $totalPending = $rentPending + $advancePending + $maintenancePending;
+  $rentPendingLedger = (float) ($summary['rent_expense_pending'] ?? ($rentLedger['pending_total'] ?? 0));
+  $billCount = (int) ($rentLedger['bill_count'] ?? ($vendorBills['bill_count'] ?? 0));
+  $billGross = (float) ($rentLedger['bill_gross_total'] ?? ($vendorBills['bill_gross_total'] ?? 0));
+  $billPaid = (float) ($rentLedger['bill_paid_total'] ?? ($vendorBills['bill_paid_total'] ?? 0));
+  $billDue = (float) ($rentLedger['pending_total'] ?? $rentPendingLedger);
+  $paymentCount = (int) ($vendorBills['payment_count'] ?? 0);
+  $vendorBillDue = (float) ($vendorBills['bill_due_total'] ?? 0);
+  $rentPending = $rentPendingLedger;
+  $totalPending = (float) ($summary['total_pending'] ?? ($rentPending + $advancePending + $maintenancePending));
 
   $ledgerSections = $sections;
   if ($ledgerSections === [] && $rows !== []) {
       $ledgerSections = LandlordAdvanceVendorDashboard::buildLedgerSections($rows);
   }
+
+  $rentExpenseSectionSummary = $ledgerSections[LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES]['summary'] ?? [];
+  $rentTotalAmount = $billGross > 0.009
+      ? $billGross
+      : round((float) ($rentExpenseSectionSummary['amount_sent'] ?? 0) + (float) ($rentExpenseSectionSummary['pending_balance'] ?? 0), 2);
+  $rentPaidAmount = ($billGross > 0.009 || $billPaid > 0.009)
+      ? $billPaid
+      : (float) ($rentExpenseSectionSummary['amount_sent'] ?? 0);
+  $rentBalanceAmount = $billGross > 0.009
+      ? $billDue
+      : (float) ($rentExpenseSectionSummary['pending_balance'] ?? $rentPending);
 
   $sectionMeta = function (string $key) use ($ledgerSections): array {
       $section = $ledgerSections[$key] ?? null;
@@ -105,8 +125,8 @@
 <link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="{{ asset('/assets/css/tickets.css') }}" />
-<link rel="stylesheet" href="{{ asset('assets/css/rental_agreement.css') }}?v={{ @filemtime(public_path('assets/css/rental_agreement.css')) }}" />
-<link rel="stylesheet" href="{{ asset('assets/css/vendor_ledger.css') }}" />
+<link rel="stylesheet" href="{{ asset('/assets/css/rental_agreement.css') }}?v={{ @filemtime(public_path('assets/css/rental_agreement.css')) }}" />
+<link rel="stylesheet" href="{{ asset('/assets/css/vendor_ledger.css') }}" />
 
 <body class="ra-page ra-owner-payments-page vl-dashboard-page" style="overflow-x: hidden;">
   @include('superadmin.superadminnav')
@@ -176,14 +196,29 @@
               <div class="vl-stat-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div>
               <div class="vl-stat-body">
                 <span class="vl-stat-label">Rent Expense</span>
-                <span class="vl-stat-value">&#8377;{{ number_format($rentPending, 2) }}</span>
+                <div class="vl-stat-breakdown">
+                  <div class="vl-stat-breakdown-item">
+                    <span class="vl-stat-breakdown-label">Total</span>
+                    <span class="vl-stat-breakdown-value">&#8377;{{ number_format($rentTotalAmount, 2) }}</span>
+                  </div>
+                  <div class="vl-stat-breakdown-item vl-stat-breakdown-item--paid">
+                    <span class="vl-stat-breakdown-label">Paid</span>
+                    <span class="vl-stat-breakdown-value">&#8377;{{ number_format($rentPaidAmount, 2) }}</span>
+                  </div>
+                  <div class="vl-stat-breakdown-item vl-stat-breakdown-item--balance">
+                    <span class="vl-stat-breakdown-label">Balance</span>
+                    <span class="vl-stat-breakdown-value">&#8377;{{ number_format($rentBalanceAmount, 2) }}</span>
+                  </div>
+                </div>
                 <span class="vl-stat-meta">
-                  @if ($rentMeta['next_due'])
+                  @if ($billCount > 0)
+                    {{ $billCount }} {{ $billCount === 1 ? 'Bill' : 'Bills' }}
+                  @elseif ($rentMeta['next_due'])
                     Next Due: {{ $rentMeta['next_due'] }}
+                    &middot; {{ $rentMeta['line_count'] }} {{ $rentMeta['line_count'] === 1 ? 'Record' : 'Records' }}
                   @else
-                    No pending due
+                    {{ $rentMeta['line_count'] }} {{ $rentMeta['line_count'] === 1 ? 'Record' : 'Records' }}
                   @endif
-                  &middot; {{ $rentMeta['line_count'] }} {{ $rentMeta['line_count'] === 1 ? 'Record' : 'Records' }}
                 </span>
               </div>
             </article>
@@ -221,7 +256,16 @@
               <div class="vl-stat-body">
                 <span class="vl-stat-label">Total Pending</span>
                 <span class="vl-stat-value">&#8377;{{ number_format($totalPending, 2) }}</span>
-                <span class="vl-stat-meta">Overall Outstanding</span>
+                <span class="vl-stat-meta">
+                  @if ($vendorBills && $vendorBillDue > 0.009)
+                    All vendor bills due: &#8377;{{ number_format($vendorBillDue, 2) }}
+                    @if ($paymentCount > 0)
+                      &middot; {{ $paymentCount }} {{ $paymentCount === 1 ? 'payment' : 'payments' }}
+                    @endif
+                  @else
+                    Overall Outstanding
+                  @endif
+                </span>
               </div>
             </article>
           </div>

@@ -21,6 +21,9 @@ class VendorBillRentLedgerService
     /** @var list<int>|null */
     private ?array $ledgerAccountIds = null;
 
+    /** @var array<int, string> */
+    private array $accountNameCache = [];
+
     /** @var Collection<int, RentalAgreement>|null */
     private ?Collection $agreementsForRows = null;
 
@@ -123,9 +126,15 @@ class VendorBillRentLedgerService
     protected function collectBillModuleRows(int $vendorId, ?array $locationFilter): array
     {
         $rows = collect();
-        $seenNeft = [];
-        $seenBillPay = [];
-        $seenBill = [];
+
+        $bills = $this->billQuery($vendorId, $locationFilter)
+            ->with(['BillLines', 'TblTDSsection'])
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($bills as $bill) {
+            $rows->push($this->rowFromBill($bill));
+        }
 
         $nefts = $this->neftQuery($vendorId, $locationFilter)
             ->with(['BillLines.Bill.BillLines', 'BillLines.Bill.TblTDSsection', 'Tblbillpay'])
@@ -133,14 +142,9 @@ class VendorBillRentLedgerService
             ->get();
 
         foreach ($nefts as $neft) {
-            $seenNeft[(int) $neft->id] = true;
-            if ($neft->bill_pay_id) {
-                $seenBillPay[(int) $neft->bill_pay_id] = true;
-            }
-            foreach ($neft->BillLines as $line) {
-                if ($line->bill_id) {
-                    $seenBill[(int) $line->bill_id] = true;
-                }
+            $natureKey = $this->natureKeyFromLabel((string) $neft->nature_payment);
+            if ($natureKey === LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES) {
+                continue;
             }
             $rows->push($this->rowFromNeft($neft));
         }
@@ -151,45 +155,128 @@ class VendorBillRentLedgerService
             ->get();
 
         foreach ($billPays as $billPay) {
-            if (isset($seenBillPay[(int) $billPay->id])) {
-                continue;
-            }
             if (! $this->billPayHasRentNature($billPay)) {
                 continue;
             }
+            $natureKey = $this->natureKeyFromBillPay($billPay);
+            if ($natureKey === LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES) {
+                continue;
+            }
             $rows->push($this->rowFromBillPay($billPay));
-            foreach ($billPay->BillLines as $line) {
-                if ($line->bill_id) {
-                    $seenBill[(int) $line->bill_id] = true;
-                }
-            }
-        }
-
-        $bills = $this->billQuery($vendorId, $locationFilter)
-            ->with(['BillLines', 'TblTDSsection'])
-            ->orderByDesc('id')
-            ->get();
-
-        foreach ($bills as $bill) {
-            if (isset($seenBill[(int) $bill->id])) {
-                continue;
-            }
-            if (! $this->billHasRentNature($bill)) {
-                continue;
-            }
-            $due = round((float) $bill->grand_total_amount - (float) ($bill->partially_payment ?? 0), 2);
-            if ($due <= 0.009) {
-                continue;
-            }
-            foreach ($this->openBillRowsByNature($bill, $due) as $openRow) {
-                $rows->push($openRow);
-            }
         }
 
         return $rows
             ->sortByDesc(fn (array $row) => (int) ($row['sort_key'] ?? 0))
             ->values()
             ->all();
+    }
+
+    /**
+     * Vendor-wide bill totals (matches vendor Transactions tab).
+     *
+     * @return array{bill_count: int, bill_gross_total: float, bill_paid_total: float, bill_due_total: float, payment_count: int, payment_total: float}
+     */
+    public function vendorBillSummary(int $vendorId): array
+    {
+        $billBase = Tblbill::query()
+            ->where('vendor_id', $vendorId)
+            ->where('delete_status', 0);
+
+        $billGross = round((float) (clone $billBase)->sum('grand_total_amount'), 2);
+        $billPaid = round((float) (clone $billBase)->sum('partially_payment'), 2);
+
+        $payBase = Tblbillpay::query()
+            ->where('vendor_id', $vendorId)
+            ->where('delete_status', 0);
+
+        return [
+            'bill_count' => (int) (clone $billBase)->count(),
+            'bill_gross_total' => $billGross,
+            'bill_paid_total' => $billPaid,
+            'bill_due_total' => round($billGross - $billPaid, 2),
+            'payment_count' => (int) (clone $payBase)->count(),
+            'payment_total' => round((float) (clone $payBase)->sum('amount_used'), 2),
+        ];
+    }
+
+    protected function rowFromBill(Tblbill $bill): array
+    {
+        $billDate = $this->parseBillModuleDate($bill->bill_date) ?? $bill->created_at;
+        $billRef = trim((string) ($bill->bill_gen_number ?: $bill->bill_number ?: '—'));
+        $grand = round((float) $bill->grand_total_amount, 2);
+        $paid = round((float) ($bill->partially_payment ?? 0), 2);
+        $due = round(max(0.0, $grand - $paid), 2);
+        $natureKey = $this->natureKeyFromBill($bill);
+        $isPaid = $due <= 0.009;
+        $statusLabel = trim((string) ($bill->bill_status ?? ''));
+        if ($statusLabel === '') {
+            $statusLabel = $isPaid ? 'Paid' : 'Due to pay';
+        }
+
+        return array_merge($this->agreementMetaFromLocation(
+            (int) $bill->zone_id,
+            (int) $bill->branch_id,
+            (int) $bill->company_id,
+        ), [
+            'sort_key' => $billDate instanceof Carbon ? $billDate->timestamp : 0,
+            'line_type' => 'bill',
+            'payment_month' => $billDate instanceof Carbon ? $billDate->format('M Y') : '—',
+            'payment_purpose' => $this->natureLabel($natureKey).' (Bill)',
+            'nature_key' => $natureKey,
+            'amount_sent' => $paid,
+            'bill_payment_made' => $paid > 0.009 && $billDate instanceof Carbon ? $billDate->format('d M Y') : '—',
+            'pending_balance' => $due,
+            'status' => $isPaid ? 'completed' : 'pending',
+            'status_label' => $statusLabel,
+            'payment_mode' => '—',
+            'utr' => '—',
+            'detail_url' => route('superadmin.getbillprint', ['id' => $bill->id]),
+            'bill_ref' => $billRef,
+            'bill_id' => (int) $bill->id,
+            'data_source' => 'bill',
+            'due_date' => $this->formatBillDueDate($bill),
+        ], $this->financialsForBill($bill, $grand));
+    }
+
+    protected function financialsForBill(Tblbill $bill, float $netPayable): array
+    {
+        $scopedLines = $bill->BillLines->filter(
+            fn (TblBillLines $line) => $this->lineMatchesLedgerScope($line)
+        );
+
+        if ($scopedLines->isEmpty()) {
+            $fin = $this->emptyFinancials();
+            $fin['net_payable'] = $netPayable;
+
+            return $fin;
+        }
+
+        $lineSub = round((float) $scopedLines->sum('amount'), 2);
+        $gst = round((float) $scopedLines->sum(fn (TblBillLines $line) => $this->lineGstAmount($line)), 2);
+        $cgst = round((float) $scopedLines->sum('cgst_amount'), 2);
+        $sgst = round((float) $scopedLines->sum('sgst_amount'), 2);
+        $tds = round((float) ($bill->tax_amount ?? 0), 2);
+        $esi = round((float) ($bill->esi_amount ?? 0), 2);
+        $pf = round((float) ($bill->pf_amount ?? 0), 2);
+        $other = round((float) ($bill->other_amount ?? 0), 2);
+        $gross = round($lineSub + $gst, 2);
+        $igst = max(0.0, round($gst - $cgst - $sgst, 2));
+
+        return [
+            'sub_total' => $lineSub,
+            'gst_amount' => $gst,
+            'cgst_amount' => $cgst,
+            'sgst_amount' => $sgst,
+            'igst_amount' => $igst,
+            'tds_amount' => $tds,
+            'tds_label' => $this->tdsLabelFromBill($bill),
+            'tax_rate' => (float) ($bill->tax_rate ?? 0),
+            'gross_amount' => $gross,
+            'net_payable' => $netPayable,
+            'other_deductions' => round($other + $esi + $pf, 2),
+            'esi_amount' => $esi,
+            'pf_amount' => $pf,
+        ];
     }
 
     protected function neftQuery(int $vendorId, ?array $locationFilter): Builder
@@ -516,7 +603,36 @@ class VendorBillRentLedgerService
         if ($ids !== [] && in_array((int) $line->account_id, $ids, true)) {
             return true;
         }
+
+        return $this->accountLabelMatchesLedgerScope($this->normalizedAccountLabel($line));
+    }
+
+    protected function normalizedAccountLabel(TblBillLines $line): string
+    {
         $account = strtoupper(trim((string) ($line->account ?? '')));
+        if ($account !== '') {
+            return $account;
+        }
+
+        $accountId = (int) ($line->account_id ?? 0);
+        if ($accountId <= 0) {
+            return '';
+        }
+
+        if (! array_key_exists($accountId, $this->accountNameCache)) {
+            $this->accountNameCache[$accountId] = strtoupper(trim((string) Tblaccount::query()
+                ->where('id', $accountId)
+                ->value('name')));
+        }
+
+        return $this->accountNameCache[$accountId];
+    }
+
+    protected function accountLabelMatchesLedgerScope(string $account): bool
+    {
+        if ($account === '') {
+            return false;
+        }
 
         return str_contains($account, 'RENT ADVANCE')
             || str_contains($account, 'RENT EXPENSE')
@@ -527,7 +643,7 @@ class VendorBillRentLedgerService
 
     protected function lineNatureKey(TblBillLines $line): string
     {
-        $account = strtoupper(trim((string) ($line->account ?? '')));
+        $account = $this->normalizedAccountLabel($line);
 
         if (str_contains($account, 'RENT ADVANCE')) {
             return LandlordAdvanceVendorDashboard::NATURE_RENT_ADVANCE;
@@ -941,6 +1057,8 @@ class VendorBillRentLedgerService
         $rentExpense = $sections[LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES]['summary'] ?? [];
         $rentAdvance = $sections[LandlordAdvanceVendorDashboard::NATURE_RENT_ADVANCE]['summary'] ?? [];
         $maintenance = $sections[LandlordAdvanceVendorDashboard::NATURE_MAINTENANCE]['summary'] ?? [];
+        $rentSectionRows = collect($rows)->where('nature_key', LandlordAdvanceVendorDashboard::NATURE_RENT_EXPENSES);
+        $rentBillRows = $rentSectionRows->where('line_type', 'bill');
 
         return [
             'scope' => $scope,
@@ -951,7 +1069,7 @@ class VendorBillRentLedgerService
             'agreements' => $agreements,
             'data_source' => 'bill_module',
             'sections' => $sections,
-            'summary' => [
+            'summary' => array_merge([
                 'advance_balance' => (float) ($rentAdvance['pending_balance'] ?? 0),
                 'rent_expense_pending' => (float) ($rentExpense['pending_balance'] ?? 0),
                 'maintenance_pending' => (float) ($maintenance['pending_balance'] ?? 0),
@@ -960,7 +1078,14 @@ class VendorBillRentLedgerService
                 'completed_payments' => (int) ($rentExpense['completed_count'] ?? 0),
                 'pending_lines' => collect($rows)->filter(fn (array $row) => (float) ($row['pending_balance'] ?? 0) > 0.009)->count(),
                 'agreement_count' => count($agreements),
-            ],
+                'rent_ledger' => [
+                    'line_count' => (int) $rentSectionRows->count(),
+                    'bill_count' => (int) $rentBillRows->count(),
+                    'bill_gross_total' => round((float) $rentBillRows->sum(fn (array $row) => (float) ($row['pending_balance'] ?? 0) + (float) ($row['amount_sent'] ?? 0)), 2),
+                    'bill_paid_total' => round((float) $rentSectionRows->sum('amount_sent'), 2),
+                    'pending_total' => round((float) $rentSectionRows->sum('pending_balance'), 2),
+                ],
+            ], $vendorId > 0 ? ['vendor_bills' => $this->vendorBillSummary($vendorId)] : []),
             'rows' => $rows,
         ];
     }

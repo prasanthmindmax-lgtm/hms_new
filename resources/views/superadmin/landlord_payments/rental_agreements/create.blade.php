@@ -46,6 +46,22 @@
   $currentAttachmentName = $r?->attachment_original_name ?: ($r?->attachment_path ? basename((string) $r->attachment_path) : '');
   $currentBuildingPhotoUrl = $r ? \App\Models\RentalAgreement::buildingPhotoPublicUrl($r->building_photo_path) : null;
   $currentBuildingPhotoName = $r?->building_photo_original_name ?: ($r?->building_photo_path ? basename((string) $r->building_photo_path) : '');
+  if ($currentAttachmentUrl && ! str_contains($currentAttachmentUrl, '/public/')) {
+      $currentAttachmentUrl = str_replace('/rental_agreement_attachments/', '/public/rental_agreement_attachments/', $currentAttachmentUrl);
+  }
+  if ($currentBuildingPhotoUrl && ! str_contains($currentBuildingPhotoUrl, '/public/')) {
+      $currentBuildingPhotoUrl = str_replace('/rental_agreement_attachments/', '/public/rental_agreement_attachments/', $currentBuildingPhotoUrl);
+  }
+  $raAttFileMeta = function (string $name): array {
+      $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+      return match ($ext) {
+          'pdf' => ['badge' => 'PDF', 'class' => 'ra-attach-type-pdf', 'kind' => 'pdf'],
+          'doc', 'docx' => ['badge' => 'DOC', 'class' => 'ra-attach-type-doc', 'kind' => 'doc'],
+          'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp' => ['badge' => strtoupper($ext === 'jpeg' ? 'JPG' : $ext), 'class' => 'ra-attach-type-img', 'kind' => 'image'],
+          default => ['badge' => $ext !== '' ? strtoupper($ext) : 'FILE', 'class' => 'ra-attach-type-file', 'kind' => 'other'],
+      };
+  };
   $selectedOwnerName = trim((string) $o('owner_name'));
   $selectedVendorId = old('vendor_id', $r?->vendor_id ?? '');
   $rcmApplicable = (string) $o('rcm_applicable', $r && $r->rcm_applicable ? '1' : '0');
@@ -89,7 +105,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
-<link rel="stylesheet" href="{{ asset('assets/css/rental_agreement.css') }}?v={{ @filemtime(public_path('assets/css/rental_agreement.css')) }}">
+<link rel="stylesheet" href="{{ asset('/assets/css/rental_agreement.css') }}?v={{ @filemtime(public_path('assets/css/rental_agreement.css')) }}">
 
 <body class="ra-page" style="overflow-x: hidden;">
 @include('superadmin.superadminnav')
@@ -320,14 +336,14 @@
                   <input type="text" name="date_of_rent_payment" class="ra-form-control @error('date_of_rent_payment') is-invalid @enderror" maxlength="120" value="{{ $o('date_of_rent_payment') }}" placeholder="e.g. 5th of every month">
                 </div>
                 <div class="row g-3">
-                <div class="col-6">
+                <!-- <div class="col-6">
                   <label class="ra-field-label">Other parties (additional names)</label>
                   <textarea name="additional_party_names" class="ra-textarea @error('additional_party_names') is-invalid @enderror" rows="3" placeholder="One name per line (e.g. joint owners, co-lessors)">{{ $o('additional_party_names') }}</textarea>
                   @error('additional_party_names')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                   @enderror
-                </div>
-                <div class="col-6" data-field="address">
+                </div> -->
+                <div class="col-12" data-field="address">
                   <label class="ra-field-label">Address <span class="text-danger">*</span></label>
                   <textarea name="address" class="ra-textarea @error('address') is-invalid @enderror" placeholder="Enter complete address">{{ $o('address') }}</textarea>
                   @error('address')
@@ -419,7 +435,7 @@
             <label class="ra-field-label" for="ra_advance_amount">Advance amount (refundable advance paid) <span class="text-danger">*</span></label>
             <div class="ra-rent-input-wrap">
             <span class="ra-rent-input-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="advance_amount" id="ra_advance_amount" class="ra-form-control ra-rent-input @error('advance_amount') is-invalid @enderror" value="{{ $o('advance_amount') }}" placeholder="0.00">
+            <input type="number" step="0.01" min="0" name="advance_amount" id="ra_advance_amount" class="ra-form-control ra-rent-input @error('advance_amount') is-invalid @enderror" value="{{ $o('advance_amount') }}" placeholder="0.00" required>
             </div>
             @error('advance_amount')
               <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -436,11 +452,14 @@
             @enderror
             </div>
             <div>
-            <label class="ra-field-label" for="ra_maintenance_amount">Maintenance Amount</label>
+            <label class="ra-field-label" for="ra_maintenance_amount">Maintenance Amount <span class="text-danger">*</span></label>
             <div class="ra-rent-input-wrap">
             <span class="ra-rent-input-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="maintenance_amount" id="ra_maintenance_amount" class="ra-form-control ra-rent-input @error('maintenance_amount') is-invalid @enderror" value="{{ $o('maintenance_amount') }}" placeholder="0.00">
+            <input type="number" step="0.01" min="0" name="maintenance_amount" id="ra_maintenance_amount" class="ra-form-control ra-rent-input @error('maintenance_amount') is-invalid @enderror" value="{{ $o('maintenance_amount') }}" placeholder="0.00" required>
             </div>
+            @error('maintenance_amount')
+              <div class="invalid-feedback d-block">{{ $message }}</div>
+            @enderror
             </div>
             </div>
             </section>
@@ -684,66 +703,96 @@
                   <label class="ra-field-label">Contact Person Number</label>
                   <input type="text" name="contact_person_number" class="ra-form-control @error('contact_person_number') is-invalid @enderror" maxlength="30" value="{{ $o('contact_person_number') }}" placeholder="Enter contact number">
                 </div>
-                <div class="col-12">
-                  <label class="ra-field-label">Building photo</label>
+                <div class="row g-3">
+                <div class="col-6">
+                  <label class="ra-field-label">Building photo @if (! $isEdit || ! $currentBuildingPhotoUrl)<span class="text-danger">*</span>@endif</label>
                   <div class="pr-pay-attachment-zone">
                     <div class="pr-pay-upload-box @error('building_photo') border border-danger @enderror" id="rental-building-photo-upload-box">
                       <div class="pr-pay-upload-icon"><i class="bi bi-image"></i></div>
                       <div class="pr-pay-upload-text">Drag &amp; drop or <span>browse image</span></div>
                       <p class="pr-pay-upload-hint">JPG, PNG or WebP up to 5 MB</p>
-                      <input type="file" name="building_photo" id="rental_building_photo_file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                      <input type="file" name="building_photo" id="rental_building_photo_file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" @if (! $isEdit || ! $currentBuildingPhotoUrl) required @endif>
                     </div>
-                    <div class="pr-pay-preview-bar-custom" id="rental-building-photo-preview-bar" hidden>
-                      <div class="preview-icon-wrap"><i class="bi bi-image"></i></div>
-                      <div class="file-info">
-                        <span class="file-name" id="rental-building-photo-preview-name" title=""></span>
-                        <div class="file-meta">
-                          <span class="file-size" id="rental-building-photo-preview-size"></span>
+                  </div>
+                  <div class="ra-attach-section mt-3" id="rental-building-photo-attach-area" data-ra-attach-section>
+                    @php $buildingHasExisting = filled($currentBuildingPhotoUrl); @endphp
+                    <p class="ra-attach-section-head mb-2 {{ $buildingHasExisting ? '' : 'd-none' }}" data-ra-attach-count>
+                      <span class="fw-semibold text-dark">{{ $buildingHasExisting ? '1 attachment' : '0 attachments' }}</span>
+                      <span class="text-muted"> · building photo</span>
+                    </p>
+                    <div class="ra-attach-grid" id="rental-building-photo-gallery" role="list" aria-live="polite">
+                      @if ($buildingHasExisting)
+                        @php $buildingMeta = $raAttFileMeta($currentBuildingPhotoName); @endphp
+                        <div class="ra-attach-card" role="listitem" data-ra-existing-attach-card data-file-name="{{ $currentBuildingPhotoName }}">
+                          <button type="button" class="ra-attach-thumb" data-ra-preview-url="{{ $currentBuildingPhotoUrl }}" title="Preview {{ $currentBuildingPhotoName }}">
+                            <span class="ra-attach-thumb-inner ra-attach-thumb--{{ $buildingMeta['kind'] }}">
+                              @if ($buildingMeta['kind'] === 'image')
+                                <img src="{{ $currentBuildingPhotoUrl }}" alt="" loading="lazy" class="ra-attach-thumb-media">
+                              @elseif ($buildingMeta['kind'] === 'pdf')
+                                <iframe src="{{ $currentBuildingPhotoUrl }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="ra-attach-thumb-media" loading="lazy"></iframe>
+                              @else
+                                <span class="ra-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                              @endif
+                            </span>
+                          </button>
+                          <div class="ra-attach-foot">
+                            <span class="ra-attach-type-badge {{ $buildingMeta['class'] }}">{{ $buildingMeta['badge'] }}</span>
+                            <span class="ra-attach-name" title="{{ $currentBuildingPhotoName }}">{{ $currentBuildingPhotoName }}</span>
+                          </div>
+                          <span class="ra-attach-fold" aria-hidden="true"></span>
                         </div>
-                      </div>
+                      @endif
                     </div>
                   </div>
                   @error('building_photo')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                   @enderror
-                  @if ($currentBuildingPhotoUrl)
-                    <div class="mt-2 d-flex align-items-center gap-3 flex-wrap">
-                      <a href="{{ $currentBuildingPhotoUrl }}" target="_blank" rel="noopener" class="ra-file-chip">
-                        <i class="bi bi-image"></i>
-                        Current photo: {{ $currentBuildingPhotoName }}
-                      </a>
-                      <img src="{{ $currentBuildingPhotoUrl }}" alt="" class="ra-building-thumb-preview" width="80" height="60" loading="lazy">
-                    </div>
-                  @endif
                 </div>
-                <div class="col-12">
-                  <label class="ra-field-label">File attachment</label>
+                <div class="col-6">
+                  <label class="ra-field-label">Rental Agreement Document @if (! $isEdit || ! $currentAttachmentUrl)<span class="text-danger">*</span>@endif</label>
                   <div class="pr-pay-attachment-zone">
                     <div class="pr-pay-upload-box @error('attachment') border border-danger @enderror" id="rental-attachment-upload-box">
                       <div class="pr-pay-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
                       <div class="pr-pay-upload-text">Drag &amp; drop or <span>browse files</span></div>
                       <p class="pr-pay-upload-hint">Support for PDF, images, Word, and Excel files up to 10 MB</p>
-                      <input type="file" name="attachment" id="rental_attachment_file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,application/pdf,image/*">
+                      <input type="file" name="attachment" id="rental_attachment_file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,application/pdf,image/*" @if (! $isEdit || ! $currentAttachmentUrl) required @endif>
                     </div>
-                    <div class="pr-pay-preview-bar-custom" id="rental-attachment-preview-bar" hidden>
-                      <div class="preview-icon-wrap"><i class="bi bi-file-earmark-check"></i></div>
-                      <div class="file-info">
-                        <span class="file-name" id="rental-attachment-preview-name" title=""></span>
-                        <div class="file-meta">
-                          <span class="file-size" id="rental-attachment-preview-size"></span>
+                  </div>
+                  <div class="ra-attach-section mt-3" id="rental-attachment-attach-area" data-ra-attach-section>
+                    @php $attachmentHasExisting = filled($currentAttachmentUrl); @endphp
+                    <p class="ra-attach-section-head mb-2 {{ $attachmentHasExisting ? '' : 'd-none' }}" data-ra-attach-count>
+                      <span class="fw-semibold text-dark">{{ $attachmentHasExisting ? '1 attachment' : '0 attachments' }}</span>
+                      <span class="text-muted"> · agreement document</span>
+                    </p>
+                    <div class="ra-attach-grid" id="rental-attachment-gallery" role="list" aria-live="polite">
+                      @if ($attachmentHasExisting)
+                        @php $attachmentMeta = $raAttFileMeta($currentAttachmentName); @endphp
+                        <div class="ra-attach-card" role="listitem" data-ra-existing-attach-card data-file-name="{{ $currentAttachmentName }}">
+                          <button type="button" class="ra-attach-thumb" data-ra-preview-url="{{ $currentAttachmentUrl }}" title="Preview {{ $currentAttachmentName }}">
+                            <span class="ra-attach-thumb-inner ra-attach-thumb--{{ $attachmentMeta['kind'] }}">
+                              @if ($attachmentMeta['kind'] === 'image')
+                                <img src="{{ $currentAttachmentUrl }}" alt="" loading="lazy" class="ra-attach-thumb-media">
+                              @elseif ($attachmentMeta['kind'] === 'pdf')
+                                <iframe src="{{ $currentAttachmentUrl }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="ra-attach-thumb-media" loading="lazy"></iframe>
+                              @else
+                                <span class="ra-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                              @endif
+                            </span>
+                          </button>
+                          <div class="ra-attach-foot">
+                            <span class="ra-attach-type-badge {{ $attachmentMeta['class'] }}">{{ $attachmentMeta['badge'] }}</span>
+                            <span class="ra-attach-name" title="{{ $currentAttachmentName }}">{{ $currentAttachmentName }}</span>
+                          </div>
+                          <span class="ra-attach-fold" aria-hidden="true"></span>
                         </div>
-                      </div>
+                      @endif
                     </div>
                   </div>
                   <div class="ra-help">Accepted formats: PDF, image, Word, and Excel files up to 10 MB.</div>
-                  @if ($currentAttachmentUrl)
-                    <div class="mt-2">
-                      <a href="{{ $currentAttachmentUrl }}" target="_blank" rel="noopener" class="ra-file-chip">
-                        <i class="bi bi-paperclip"></i>
-                        Current file: {{ $currentAttachmentName }}
-                      </a>
-                    </div>
-                  @endif
+                  @error('attachment')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
+                </div>
                 </div>
               </div>
             </div>
@@ -761,6 +810,26 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="raUploadPreviewModal" tabindex="-1" aria-labelledby="raPreviewModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable pay-upload-preview-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="raPreviewModalTitle">Document preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0 bg-body-secondary text-center pay-upload-preview-body position-relative" style="min-height: 200px;">
+        <iframe class="d-none w-100 pay-preview-frame" id="raPreviewIframe" title="Document preview"></iframe>
+        <img class="d-none img-fluid p-2 pay-preview-img" id="raPreviewImg" alt="" style="max-height: 75vh; object-fit: contain;" />
+        <div class="d-none p-4 pay-preview-fallback" id="raPreviewFallback">
+          <i class="bi bi-file-earmark-zip display-4 text-secondary d-block mb-2" aria-hidden="true"></i>
+          <p class="mb-1 fw-semibold">In-browser preview is not available for this file type</p>
+          <p class="text-muted small mb-0" id="raPreviewFallbackName"></p>
         </div>
       </div>
     </div>

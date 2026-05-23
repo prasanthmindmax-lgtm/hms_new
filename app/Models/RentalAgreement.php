@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\FileUploadService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RentalAgreement extends Model
 {
+    public const FILE_STORAGE_FOLDER = 'rental_agreement_attachments';
+
     public const TYPE_HOSPITAL = 'hospital';
 
     public const TYPE_HOSTEL = 'hostel';
@@ -470,65 +473,12 @@ class RentalAgreement extends Model
 
     public static function attachmentPublicUrl(?string $storedPath): ?string
     {
-        if ($storedPath === null || $storedPath === '') {
-            return null;
-        }
-
-        $path = str_replace('\\', '/', trim((string) $storedPath));
-        $path = trim($path, '/');
-
-        if ($path === '' || $path === '.' || $path === '..') {
-            return null;
-        }
-
-        if (str_starts_with($path, 'uploads/')) {
-            return asset($path);
-        }
-
-        if (str_starts_with($path, 'public/')) {
-            return asset($path);
-        }
-
-        if (str_starts_with($path, 'rental_agreement_attachments/')) {
-            return asset('public/'.$path);
-        }
-
-        $name = basename($path);
-        if ($name === '' || $name === '.' || $name === '..') {
-            return null;
-        }
-
-        return asset('public/rental_agreement_attachments/'.rawurlencode($name));
+        return app(FileUploadService::class)->getFileUrl($storedPath, self::FILE_STORAGE_FOLDER);
     }
 
     public static function buildingPhotoPublicUrl(?string $storedPath): ?string
     {
-        return self::attachmentPublicUrl($storedPath);
-    }
-
-    /**
-     * @return array{badge: string, icon: string, kind: string, tone: string}
-     */
-    public static function attachmentFileMeta(string $fileName): array
-    {
-        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-        return match ($ext) {
-            'pdf' => ['badge' => 'PDF', 'icon' => 'bi-file-earmark-pdf', 'kind' => 'pdf', 'tone' => 'pdf'],
-            'doc', 'docx' => ['badge' => 'DOC', 'icon' => 'bi-file-earmark-word', 'kind' => 'doc', 'tone' => 'doc'],
-            'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp' => [
-                'badge' => $ext === 'jpeg' ? 'JPG' : strtoupper($ext),
-                'icon' => 'bi-file-earmark-image',
-                'kind' => 'image',
-                'tone' => 'image',
-            ],
-            default => [
-                'badge' => $ext !== '' ? strtoupper($ext) : 'FILE',
-                'icon' => 'bi-file-earmark-text',
-                'kind' => 'other',
-                'tone' => 'file',
-            ],
-        };
+        return app(FileUploadService::class)->getFileUrl($storedPath, self::FILE_STORAGE_FOLDER);
     }
 
     /**

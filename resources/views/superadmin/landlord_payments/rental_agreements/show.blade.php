@@ -4,6 +4,12 @@
   $attachmentName = $r->attachment_original_name ?: ($r->attachment_path ? basename((string) $r->attachment_path) : '');
   $buildingPhotoUrl = \App\Models\RentalAgreement::buildingPhotoPublicUrl($r->building_photo_path);
   $buildingPhotoName = $r->building_photo_original_name ?: ($r->building_photo_path ? basename((string) $r->building_photo_path) : '');
+  if ($attachmentUrl && ! str_contains($attachmentUrl, '/public/')) {
+      $attachmentUrl = str_replace('/rental_agreement_attachments/', '/public/rental_agreement_attachments/', $attachmentUrl);
+  }
+  if ($buildingPhotoUrl && ! str_contains($buildingPhotoUrl, '/public/')) {
+      $buildingPhotoUrl = str_replace('/rental_agreement_attachments/', '/public/rental_agreement_attachments/', $buildingPhotoUrl);
+  }
   $mapUrlShow = \App\Models\RentalAgreement::googleMapsSearchUrl($r->zone?->name, $r->branch?->name, (string) $r->address);
   $agreementPeriodDisplay = trim((string) $r->agreement_period);
   if ($agreementPeriodDisplay !== '' && stripos($agreementPeriodDisplay, ' to ') === false) {
@@ -24,7 +30,7 @@
 <link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
-<link rel="stylesheet" href="{{ asset('assets/css/rental_agreement.css') }}?v={{ @filemtime(public_path('assets/css/rental_agreement.css')) }}">
+<link rel="stylesheet" href="{{ asset('/assets/css/rental_agreement.css') }}?v={{ @filemtime(public_path('assets/css/rental_agreement.css')) }}">
 
 <body class="ra-page" style="overflow-x: hidden;">
 @include('superadmin.superadminnav')

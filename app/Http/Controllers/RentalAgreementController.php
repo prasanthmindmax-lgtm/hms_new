@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\RentalAgreement;
+use App\Services\FileUploadService;
 use App\Services\RentalAgreementOwnerPaymentHistory;
 use App\Models\Tblgsttax;
 use App\Models\Tbltdstax;
@@ -16,14 +17,21 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class RentalAgreementController extends Controller
 {
+    /**
+     * File upload service
+     */
+    private function fileUploads(): FileUploadService
+    {
+        return app(FileUploadService::class);
+    }
+
     private function userRow(): object
     {
         $u = auth()->user();
@@ -600,7 +608,7 @@ class RentalAgreementController extends Controller
             'tds_amount' => 'nullable|numeric|min:0',
             'rcm_applicable' => 'required|in:0,1',
             'rcm_value' => 'nullable|required_if:rcm_applicable,1|numeric|min:0',
-            'maintenance_amount' => 'nullable|numeric|min:0',
+            'maintenance_amount' => 'required|numeric|min:0',
             'eb_number' => 'nullable|string|max:120',
             'sq_ft_area' => 'nullable|numeric|min:0',
             'rent_revision' => 'nullable|string|max:120',
@@ -620,8 +628,8 @@ class RentalAgreementController extends Controller
                         ->where('party_type', Tblvendor::PARTY_LANDLORD);
                 }),
             ],
-            'attachment' => ($isEdit ? 'nullable' : 'nullable').'|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx',
-            'building_photo' => 'nullable|file|max:5120|mimes:jpg,jpeg,png,webp',
+            'attachment' => ($isEdit ? 'nullable' : 'required').'|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx',
+            'building_photo' => ($isEdit ? 'nullable' : 'required').'|file|max:5120|mimes:jpg,jpeg,png,webp',
         ];
 
         if (! $isEdit) {
@@ -768,7 +776,10 @@ class RentalAgreementController extends Controller
             'agreement_period_end.required' => 'Select the agreement period end date.',
             'agreement_period_end.after_or_equal' => 'Agreement period end date must be the same as or after the start date.',
             'advance_amount.required' => 'Advance amount is required.',
+            'maintenance_amount.required' => 'Maintenance amount is required.',
             'monthly_rent_amount.required' => 'Monthly rent amount is required.',
+            'attachment.required' => 'File attachment is required.',
+            'building_photo.required' => 'Building photo is required.',
             'gst_applicable.required' => 'Select whether GST is applicable (Yes or No).',
             'gst_type.required_if' => 'Select tax mode (Including or Excluding GST).',
             'gst_tax_id.required_if' => 'Select a GST rate from the list.',
@@ -790,47 +801,6 @@ class RentalAgreementController extends Controller
             'agreement_type.required' => 'Select a category (Hospital or Hostel).',
             'agreement_type.in' => 'Selected category is not valid.',
         ];
-    }
-
-    private function saveUploaded(UploadedFile $file): array
-    {
-        $uploadPath = public_path('rental_agreement_attachments');
-        if (! File::isDirectory($uploadPath)) {
-            File::makeDirectory($uploadPath, 0755, true);
-        }
-
-        $originalName = $file->getClientOriginalName();
-        $safeName = time().'_'.mt_rand(1000, 9999).'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
-        $safeName = basename(str_replace(["\0", '/', '\\'], '', $safeName));
-        $file->move($uploadPath, $safeName);
-
-        return [
-            'path' => 'rental_agreement_attachments/'.$safeName,
-            'name' => $originalName,
-        ];
-    }
-
-    private function deleteAttachmentFile(?string $storedPath): void
-    {
-        if ($storedPath === null || $storedPath === '' || str_starts_with($storedPath, 'uploads/')) {
-            return;
-        }
-
-        $name = basename(str_replace('\\', '/', $storedPath));
-        if ($name === '' || $name === '.' || $name === '..') {
-            return;
-        }
-
-        $absolutePath = public_path('rental_agreement_attachments/'.$name);
-        if (! File::exists($absolutePath)) {
-            return;
-        }
-
-        try {
-            File::delete($absolutePath);
-        } catch (\Throwable $e) {
-            // Best-effort cleanup only.
-        }
     }
 
     /**
@@ -1238,6 +1208,7 @@ class RentalAgreementController extends Controller
     {
         $this->userRow();
         $validated = $this->normalizeGstValidated($request->validate($this->rules($request), $this->messages()));
+        $this->assertRequiredUploadedFiles($request);
         $agreementType = RentalAgreement::normalizeType((string) $validated['agreement_type']);
         $vendorId = $this->resolveVendorIdFromRequest($request);
         if ($vendorId <= 0) {
@@ -1267,7 +1238,7 @@ class RentalAgreementController extends Controller
             ...$this->gstPayloadFromValidated($validated),
             ...$this->tdsPayloadFromValidated($validated),
             ...$this->rcmPayloadFromValidated($validated),
-            'maintenance_amount' => $validated['maintenance_amount'] ?? null,
+            'maintenance_amount' => $validated['maintenance_amount'],
             'eb_number' => $validated['eb_number'] ?? null,
             'sq_ft_area' => $validated['sq_ft_area'] ?? null,
             'rent_revision' => $validated['rent_revision'] ?? null,
@@ -1281,16 +1252,22 @@ class RentalAgreementController extends Controller
             'created_by' => (int) auth()->id(),
         ];
 
+        $folder = RentalAgreement::FILE_STORAGE_FOLDER;
+
         if ($request->hasFile('attachment')) {
-            $upload = $this->saveUploaded($request->file('attachment'));
-            $payload['attachment_path'] = $upload['path'];
-            $payload['attachment_original_name'] = $upload['name'];
+            $upload = $this->fileUploads()->upload($request->file('attachment'), $folder);
+            if ($upload !== null) {
+                $payload['attachment_path'] = $upload['path'];
+                $payload['attachment_original_name'] = $upload['name'];
+            }
         }
 
         if ($request->hasFile('building_photo')) {
-            $upload = $this->saveUploaded($request->file('building_photo'));
-            $payload['building_photo_path'] = $upload['path'];
-            $payload['building_photo_original_name'] = $upload['name'];
+            $upload = $this->fileUploads()->upload($request->file('building_photo'), $folder);
+            if ($upload !== null) {
+                $payload['building_photo_path'] = $upload['path'];
+                $payload['building_photo_original_name'] = $upload['name'];
+            }
         }
 
         RentalAgreement::query()->create($payload);
@@ -1337,6 +1314,7 @@ class RentalAgreementController extends Controller
         $this->userRow();
         $agreementType = $this->resolveAgreementType($request, $rentalAgreement);
         $validated = $this->normalizeGstValidated($request->validate($this->rules($request, true), $this->messages()));
+        $this->assertRequiredUploadedFiles($request, $rentalAgreement);
         $vendorId = $this->resolveVendorIdFromRequest($request);
         if ($vendorId <= 0) {
             return back()->withInput()->withErrors(['vendor_id' => 'Please select a landlord from the list.']);
@@ -1363,7 +1341,7 @@ class RentalAgreementController extends Controller
             ...$this->gstPayloadFromValidated($validated),
             ...$this->tdsPayloadFromValidated($validated),
             ...$this->rcmPayloadFromValidated($validated),
-            'maintenance_amount' => $validated['maintenance_amount'] ?? null,
+            'maintenance_amount' => $validated['maintenance_amount'],
             'eb_number' => $validated['eb_number'] ?? null,
             'sq_ft_area' => $validated['sq_ft_area'] ?? null,
             'rent_revision' => $validated['rent_revision'] ?? null,
@@ -1376,18 +1354,24 @@ class RentalAgreementController extends Controller
             'contact_person_number' => $validated['contact_person_number'] ?? null,
         ];
 
+        $folder = RentalAgreement::FILE_STORAGE_FOLDER;
+
         if ($request->hasFile('attachment')) {
-            $upload = $this->saveUploaded($request->file('attachment'));
-            $this->deleteAttachmentFile($rentalAgreement->attachment_path);
-            $payload['attachment_path'] = $upload['path'];
-            $payload['attachment_original_name'] = $upload['name'];
+            $upload = $this->fileUploads()->upload($request->file('attachment'), $folder);
+            if ($upload !== null) {
+                $this->fileUploads()->delete($rentalAgreement->attachment_path, $folder);
+                $payload['attachment_path'] = $upload['path'];
+                $payload['attachment_original_name'] = $upload['name'];
+            }
         }
 
         if ($request->hasFile('building_photo')) {
-            $upload = $this->saveUploaded($request->file('building_photo'));
-            $this->deleteAttachmentFile($rentalAgreement->building_photo_path);
-            $payload['building_photo_path'] = $upload['path'];
-            $payload['building_photo_original_name'] = $upload['name'];
+            $upload = $this->fileUploads()->upload($request->file('building_photo'), $folder);
+            if ($upload !== null) {
+                $this->fileUploads()->delete($rentalAgreement->building_photo_path, $folder);
+                $payload['building_photo_path'] = $upload['path'];
+                $payload['building_photo_original_name'] = $upload['name'];
+            }
         }
 
         $rentalAgreement->update($payload);
@@ -1395,5 +1379,22 @@ class RentalAgreementController extends Controller
         return redirect()
             ->route('rental-agreements.index', $this->indexRedirectQuery($request, $agreementType))
             ->with('success', RentalAgreement::typeLabel($agreementType).' updated.');
+    }
+
+    private function assertRequiredUploadedFiles(Request $request, ?RentalAgreement $record = null): void
+    {
+        $errors = [];
+
+        if (! $request->hasFile('attachment') && ! filled($record?->attachment_path)) {
+            $errors['attachment'] = 'File attachment is required.';
+        }
+
+        if (! $request->hasFile('building_photo') && ! filled($record?->building_photo_path)) {
+            $errors['building_photo'] = 'Building photo is required.';
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 }

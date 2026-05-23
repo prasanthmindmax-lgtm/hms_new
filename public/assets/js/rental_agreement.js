@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Rental agreements & landlord payments — consolidated client scripts.
  * Requires jQuery, moment/daterangepicker (filters/create/register), Chart.js (register & chart report), FormFieldValidation (create).
  */
@@ -1709,82 +1709,242 @@
 })(jQuery);
 
 
-/* ========== Register attachment modal ========== */
-/**
- * Rental agreement register — attachment preview modal.
- */
+/* ========== Rental agreement modal ========== */
 (function () {
   'use strict';
 
-  const modalEl = document.getElementById('raRegisterAttachmentModal');
-  if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
-    return;
+  var raPreviewModalEl = document.getElementById('raUploadPreviewModal');
+  var raPreviewBlob = null;
+  var raBlobUrls = [];
+
+  function raRevokePreviewBlob() {
+    if (raPreviewBlob) {
+      try { URL.revokeObjectURL(raPreviewBlob); } catch (err) {}
+      raPreviewBlob = null;
+    }
   }
 
-  const iframe = document.getElementById('raRegisterAttachmentIframe');
-  const img = document.getElementById('raRegisterAttachmentImg');
-  const fallback = document.getElementById('raRegisterAttachmentFallback');
-  const openLink = document.getElementById('raRegisterAttachmentOpenLink');
-  const footerLink = document.getElementById('raRegisterAttachmentFooterLink');
-  const titleEl = document.getElementById('raRegisterAttachmentModalLabel');
-  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  function raRevokeCardBlob(thumbBtn) {
+    if (thumbBtn && thumbBtn._raBlobUrl) {
+      try { URL.revokeObjectURL(thumbBtn._raBlobUrl); } catch (err) {}
+      thumbBtn._raBlobUrl = null;
+    }
+  }
 
-  const hideAll = function () {
-    if (iframe) {
-      iframe.classList.add('d-none');
-      iframe.removeAttribute('src');
-    }
-    if (img) {
-      img.classList.add('d-none');
-      img.removeAttribute('src');
-      img.alt = '';
-    }
-    if (fallback) {
-      fallback.classList.add('d-none');
-    }
-  };
+  function raPreviewFileKind(file) {
+    if (!file) return 'other';
+    var type = String(file.type || '');
+    var name = String(file.name || '').toLowerCase();
+    if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+    if (type.indexOf('image/') === 0 || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(name)) return 'image';
+    return 'other';
+  }
 
-  const openPreview = function (url, kind, title) {
-    if (!url) {
+  function raFileTypeMeta(name) {
+    var n = String(name || '').toLowerCase();
+    var ext = n.indexOf('.') !== -1 ? n.split('.').pop() : '';
+    if (ext === 'pdf') return { badge: 'PDF', cls: 'ra-attach-type-pdf', kind: 'pdf' };
+    if (ext === 'doc' || ext === 'docx') return { badge: 'DOC', cls: 'ra-attach-type-doc', kind: 'doc' };
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1) {
+      return { badge: ext === 'jpeg' ? 'JPG' : ext.toUpperCase(), cls: 'ra-attach-type-img', kind: 'image' };
+    }
+    return { badge: ext ? ext.toUpperCase() : 'FILE', cls: 'ra-attach-type-file', kind: 'other' };
+  }
+
+  function raShowUrlPreview(url, title) {
+    if (!url) { if (window.toastr) toastr.error('Preview is unavailable.'); return; }
+    if (!raPreviewModalEl) { if (window.toastr) toastr.error('Preview is unavailable on this page.'); return; }
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      if (window.toastr) toastr.error('UI library not loaded. Please refresh the page.');
       return;
     }
-    hideAll();
-    if (titleEl) {
-      titleEl.textContent = title || 'Attachment preview';
-    }
-    if (footerLink) {
-      footerLink.href = url;
-    }
-    if (openLink) {
-      openLink.href = url;
-    }
-    if (kind === 'image' && img) {
-      img.src = url;
-      img.alt = title || 'Attachment';
-      img.classList.remove('d-none');
-    } else if (kind === 'pdf' && iframe) {
-      iframe.src = url;
-      iframe.classList.remove('d-none');
-    } else if (fallback) {
-      fallback.classList.remove('d-none');
-    }
-    modal.show();
-  };
+    raRevokePreviewBlob();
+    var n = String(title || url || '').toLowerCase();
+    var kind = 'other';
+    if (/\.pdf($|\?)/i.test(n) || n.indexOf('.pdf') !== -1) kind = 'pdf';
+    else if (/\.(jpe?g|png|gif|webp|bmp|svg)($|\?)/i.test(n)) kind = 'image';
+    var mt = document.getElementById('raPreviewModalTitle');
+    if (mt) mt.textContent = title || 'Document preview';
+    var iframe = document.getElementById('raPreviewIframe');
+    var img = document.getElementById('raPreviewImg');
+    var fb = document.getElementById('raPreviewFallback');
+    var fbname = document.getElementById('raPreviewFallbackName');
+    if (iframe) { iframe.classList.add('d-none'); iframe.removeAttribute('src'); }
+    if (img) { img.classList.add('d-none'); img.removeAttribute('src'); }
+    if (fb) fb.classList.add('d-none');
+    if (kind === 'pdf' && iframe) { iframe.classList.remove('d-none'); iframe.src = url; }
+    else if (kind === 'image' && img) { img.classList.remove('d-none'); img.src = url; img.alt = title || ''; }
+    else if (fb) { fb.classList.remove('d-none'); if (fbname) fbname.textContent = title || ''; }
+    try { bootstrap.Modal.getOrCreateInstance(raPreviewModalEl).show(); }
+    catch (err) { if (window.toastr) toastr.error('Could not open the preview window.'); }
+  }
 
-  modalEl.addEventListener('hidden.bs.modal', hideAll);
-
-  document.addEventListener('click', function (e) {
-    const btn = e.target.closest('[data-ra-attach-preview]');
-    if (!btn) {
+  function raShowFilePreview(file) {
+    if (!file) { if (window.toastr) toastr.error('No file selected.'); return; }
+    if (!raPreviewModalEl) { if (window.toastr) toastr.error('Preview is unavailable on this page.'); return; }
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      if (window.toastr) toastr.error('UI library not loaded. Please refresh the page.');
       return;
     }
-    e.preventDefault();
-    e.stopPropagation();
-    openPreview(
-      btn.getAttribute('data-ra-attach-preview-url') || '',
-      btn.getAttribute('data-ra-attach-preview-kind') || 'other',
-      btn.getAttribute('data-ra-attach-preview-title') || 'Attachment'
-    );
+    raRevokePreviewBlob();
+    var kind = raPreviewFileKind(file);
+    if (kind === 'pdf' || kind === 'image') raPreviewBlob = URL.createObjectURL(file);
+    var mt = document.getElementById('raPreviewModalTitle');
+    if (mt) mt.textContent = file.name || 'Document preview';
+    var iframe = document.getElementById('raPreviewIframe');
+    var img = document.getElementById('raPreviewImg');
+    var fb = document.getElementById('raPreviewFallback');
+    var fbname = document.getElementById('raPreviewFallbackName');
+    if (iframe) { iframe.classList.add('d-none'); iframe.removeAttribute('src'); }
+    if (img) { img.classList.add('d-none'); img.removeAttribute('src'); }
+    if (fb) fb.classList.add('d-none');
+    if (kind === 'pdf' && iframe) { iframe.classList.remove('d-none'); iframe.src = raPreviewBlob; }
+    else if (kind === 'image' && img) { img.classList.remove('d-none'); img.src = raPreviewBlob; img.alt = file.name || ''; }
+    else if (fb) { fb.classList.remove('d-none'); if (fbname) fbname.textContent = file.name || ''; }
+    try { bootstrap.Modal.getOrCreateInstance(raPreviewModalEl).show(); }
+    catch (err) { raRevokePreviewBlob(); if (window.toastr) toastr.error('Could not open the preview window.'); }
+  }
+
+  function raBuildAttachCard(opts) {
+    var meta = raFileTypeMeta(opts.name);
+    var card = document.createElement('div');
+    card.className = 'ra-attach-card';
+    card.setAttribute('role', 'listitem');
+    card.setAttribute('data-ra-new-attach-card', '');
+    card.dataset.fileName = opts.name || '';
+    var thumbHtml = '';
+    if (meta.kind === 'image' && opts.previewSrc) {
+      thumbHtml = '<img src="' + opts.previewSrc + '" alt="" class="ra-attach-thumb-media">';
+    } else if (meta.kind === 'pdf' && opts.previewSrc) {
+      thumbHtml = '<iframe src="' + opts.previewSrc + '#toolbar=0&navpanes=0&scrollbar=0" title="" class="ra-attach-thumb-media"></iframe>';
+    } else {
+      thumbHtml = '<span class="ra-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>';
+    }
+    card.innerHTML =
+      '<button type="button" class="ra-attach-remove" title="Remove attachment" aria-label="Remove ' + String(opts.name || 'file').replace(/"/g, '&quot;') + '">' +
+      '<i class="bi bi-x-lg" aria-hidden="true"></i></button>' +
+      '<button type="button" class="ra-attach-thumb">' +
+      '<span class="ra-attach-thumb-inner ra-attach-thumb--' + meta.kind + '">' + thumbHtml + '</span></button>' +
+      '<div class="ra-attach-foot"><span class="ra-attach-type-badge ' + meta.cls + '">' + meta.badge + '</span>' +
+      '<span class="ra-attach-name" title="' + String(opts.name || '').replace(/"/g, '&quot;') + '">' + (opts.name || 'File') + '</span></div>' +
+      '<span class="ra-attach-fold" aria-hidden="true"></span>';
+    card.querySelector('.ra-attach-remove').addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (typeof opts.onRemove === 'function') opts.onRemove();
+    });
+    var thumbBtn = card.querySelector('.ra-attach-thumb');
+    if (thumbBtn) {
+      if (opts.previewSrc) { thumbBtn._raBlobUrl = opts.previewSrc; raBlobUrls.push(opts.previewSrc); }
+      thumbBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (opts.file) raShowFilePreview(opts.file);
+        else if (opts.previewSrc) raShowUrlPreview(opts.previewSrc, opts.name);
+      });
+    }
+    return card;
+  }
+
+  function raUpdateAttachCount(sectionEl) {
+    if (!sectionEl) return;
+    var countEl = sectionEl.querySelector('[data-ra-attach-count]');
+    if (!countEl) return;
+    var gallery = sectionEl.querySelector('.ra-attach-grid');
+    var visible = 0;
+    if (gallery) {
+      gallery.querySelectorAll('.ra-attach-card').forEach(function (card) {
+        if (card.style.display !== 'none') visible += 1;
+      });
+    }
+    countEl.classList.toggle('d-none', visible === 0);
+    var numEl = countEl.querySelector('.fw-semibold');
+    if (numEl) numEl.textContent = visible + (visible === 1 ? ' attachment' : ' attachments');
+  }
+
+  function raClearNewAttachCards(galleryEl) {
+    if (!galleryEl) return;
+    galleryEl.querySelectorAll('[data-ra-new-attach-card]').forEach(function (el) {
+      raRevokeCardBlob(el.querySelector('.ra-attach-thumb'));
+      el.remove();
+    });
+  }
+
+  function raRenderSingleFile(input, galleryEl, sectionEl) {
+    raClearNewAttachCards(galleryEl);
+    if (!input || !galleryEl) return;
+    var file = input.files && input.files[0] ? input.files[0] : null;
+    galleryEl.querySelectorAll('[data-ra-existing-attach-card]').forEach(function (card) {
+      card.style.display = file ? 'none' : '';
+    });
+    if (!file) { raUpdateAttachCount(sectionEl); return; }
+    galleryEl.classList.add('ra-attach-grid');
+    var kind = raPreviewFileKind(file);
+    var previewSrc = kind === 'pdf' || kind === 'image' ? URL.createObjectURL(file) : '';
+    var card = raBuildAttachCard({
+      name: file.name,
+      previewSrc: previewSrc,
+      file: file,
+      onRemove: function () {
+        try {
+          if (previewSrc) URL.revokeObjectURL(previewSrc);
+          input.value = '';
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (err) { if (window.toastr) toastr.error('Could not remove file.'); }
+      }
+    });
+    galleryEl.appendChild(card);
+    raUpdateAttachCount(sectionEl);
+  }
+
+  function raBindExistingAttachmentCards(scope) {
+    (scope || document).querySelectorAll('[data-ra-existing-attach-card]').forEach(function (card) {
+      if (card.dataset.raAttachBound === '1') return;
+      card.dataset.raAttachBound = '1';
+      var thumbBtn = card.querySelector('.ra-attach-thumb');
+      if (thumbBtn) {
+        thumbBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          raShowUrlPreview(thumbBtn.getAttribute('data-ra-preview-url'), card.dataset.fileName || '');
+        });
+      }
+    });
+  }
+
+  function raSetupSingleFileUpload(input, box, galleryEl, sectionEl) {
+    if (!box || !input) return;
+    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) {
+      box.addEventListener(eventName, preventDefaults, false);
+    });
+    ['dragenter', 'dragover'].forEach(function (eventName) {
+      box.addEventListener(eventName, function () { box.classList.add('dragover'); }, false);
+    });
+    ['dragleave', 'drop'].forEach(function (eventName) {
+      box.addEventListener(eventName, function () { box.classList.remove('dragover'); }, false);
+    });
+    box.addEventListener('drop', function (e) {
+      var dt = e.dataTransfer;
+      if (!dt || !dt.files || !dt.files.length) return;
+      try {
+        var fileTransfer = new DataTransfer();
+        fileTransfer.items.add(dt.files[0]);
+        input.files = fileTransfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (err) { if (window.toastr) toastr.error('Could not add the dropped file.'); }
+    }, false);
+    input.addEventListener('change', function () { raRenderSingleFile(input, galleryEl, sectionEl); });
+  }
+
+  var raBuildingInput = document.getElementById('rental_building_photo_file');
+  var raAttachmentInput = document.getElementById('rental_attachment_file');
+  if (raBuildingInput || raAttachmentInput) {
+    raSetupSingleFileUpload(raBuildingInput, document.getElementById('rental-building-photo-upload-box'), document.getElementById('rental-building-photo-gallery'), document.getElementById('rental-building-photo-attach-area'));
+    raSetupSingleFileUpload(raAttachmentInput, document.getElementById('rental-attachment-upload-box'), document.getElementById('rental-attachment-gallery'), document.getElementById('rental-attachment-attach-area'));
+    raBindExistingAttachmentCards(document);
+  }
+  if (raPreviewModalEl) raPreviewModalEl.addEventListener('hidden.bs.modal', raRevokePreviewBlob);
+  window.addEventListener('beforeunload', function () {
+    raRevokePreviewBlob();
+    raBlobUrls.forEach(function (url) { try { URL.revokeObjectURL(url); } catch (err) {} });
   });
 })();
 
@@ -2814,7 +2974,7 @@
       addMoneyItem('ESI / PF', vlMoney(esiPf));
     }
 
-    addDetailItem('TDS section', tdsLabel !== '—' ? tdsLabel : '—');
+    addDetailItem('TDS section', tdsLabel !== '—' ? (tdsLabel !== 'TDS' ? tdsLabel : 'TDS') : '—');
     addDetailItem('Payment mode', row.payment_mode || '—');
     addDetailItem('UTR / Reference', row.utr || '—', { mono: true });
 
@@ -2925,3 +3085,4 @@
     });
   });
 })();
+

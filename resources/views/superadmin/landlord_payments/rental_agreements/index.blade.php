@@ -421,9 +421,10 @@
                 <tbody class="pay-pr-tbody">
                   @forelse ($records as $r)
                     @php
-                      $attachmentUrl = \App\Models\RentalAgreement::attachmentPublicUrl($r->attachment_path);
-                      $attachmentName = $r->attachment_original_name ?: ($r->attachment_path ? basename((string) $r->attachment_path) : '');
                       $buildingPhotoUrl = \App\Models\RentalAgreement::buildingPhotoPublicUrl($r->building_photo_path);
+                      if ($buildingPhotoUrl && ! str_contains($buildingPhotoUrl, '/public/')) {
+                          $buildingPhotoUrl = str_replace('/rental_agreement_attachments/', '/public/rental_agreement_attachments/', $buildingPhotoUrl);
+                      }
                       $gstKey = (string) ($r->gst_type ?? '');
                       $raRowType = \App\Models\RentalAgreement::normalizeType((string) ($r->agreement_type ?? ''));
                       $extraNames = $r->additionalPartyNamesList();
@@ -661,32 +662,6 @@
     </div>
 
 <div id="raPeriodPopover" class="ra-period-popover d-none" role="dialog" aria-label="Year-wise rent schedule"></div>
-
-<div class="modal fade ra-attach-preview-modal" id="raRegisterAttachmentModal" tabindex="-1" aria-labelledby="raRegisterAttachmentModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="raRegisterAttachmentModalLabel">Attachment preview</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-0 bg-light ra-attach-preview-body">
-        <iframe id="raRegisterAttachmentIframe" class="ra-attach-preview-iframe d-none" title="Attachment preview"></iframe>
-        <img id="raRegisterAttachmentImg" class="ra-attach-preview-img d-none img-fluid d-block mx-auto" alt="" />
-        <div id="raRegisterAttachmentFallback" class="ra-attach-preview-fallback d-none">
-          <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
-          <p class="mb-2">Preview is not available for this file type.</p>
-          <a href="#" id="raRegisterAttachmentOpenLink" class="btn btn-sm btn-primary" target="_blank" rel="noopener">Open attachment</a>
-        </div>
-      </div>
-      <div class="modal-footer py-2">
-        <a href="#" id="raRegisterAttachmentFooterLink" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
-          <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open in new tab
-        </a>
-        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
   </div>
 </div>
 @include('superadmin.superadminfooter')
