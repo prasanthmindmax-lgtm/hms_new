@@ -19,12 +19,15 @@ class Tblvendor extends Authenticatable
 
     public const PARTY_LANDLORD = 'Landlord';
 
+    public const PARTY_MAINTENANCE = 'Maintenance Vendor';
+
 
     /** @var list<string> */
     public const PARTY_TYPES = [
         self::PARTY_VENDOR,
         self::PARTY_EMPLOYEE,
         self::PARTY_LANDLORD,
+        self::PARTY_MAINTENANCE,
     ];
 
     protected $table = 'vendor_tbl';
@@ -99,6 +102,13 @@ class Tblvendor extends Authenticatable
         return $this->belongsTo(usermanagementdetails::class, 'user_id');
     }
 
+    public function getCreatedByNameAttribute(): ?string
+    {
+        $name = trim((string) ($this->creator?->user_fullname ?? $this->creator?->username ?? ''));
+
+        return $name !== '' ? $name : null;
+    }
+
     public static function normalizePartyType(?string $type): ?string
     {
         $type = trim((string) $type);
@@ -120,5 +130,31 @@ class Tblvendor extends Authenticatable
         return $query
             ->where('active_status', 0)
             ->where('party_type', self::PARTY_LANDLORD);
+    }
+
+    /** Active vendors for security / housekeeping service agreements. */
+    public function scopeActiveServiceVendors(Builder $query): Builder
+    {
+        return $query
+            ->where('active_status', 0)
+            ->where('party_type', self::PARTY_VENDOR);
+    }
+
+    /** Active maintenance vendors for maintenance master bills. */
+    public function scopeActiveMaintenanceVendors(Builder $query): Builder
+    {
+        return $query
+            ->where('active_status', 0)
+            ->where('party_type', self::PARTY_MAINTENANCE);
+    }
+
+    public function scopePartyType(Builder $query, ?string $type): Builder
+    {
+        $normalized = self::normalizePartyType($type);
+        if ($normalized === null) {
+            return $query;
+        }
+
+        return $query->where('party_type', $normalized);
     }
 }

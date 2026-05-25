@@ -428,75 +428,183 @@ public function getvendor(Request $request)
     $admin        = auth()->user();
     $limit_access = $admin->access_limits;
 
-    // Validate perPage to prevent bypassing pagination
     $perPage = (int) $request->get('per_page', 10);
-    $perPage = in_array($perPage, [10, 25, 50, 100, 250, 500]) ? $perPage : 10;
+    $perPage = in_array($perPage, [10, 25, 50, 100, 250, 500], true) ? $perPage : 10;
 
-    // Build base query
     $query = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails', 'history', 'creator'])
-                ->orderBy('id', 'desc');
+        ->orderBy('id', 'desc');
 
-    // ── Filters ──────────────────────────────────────────────
+    $this->applyVendorListingFilters($request, $query);
+
+    $listingStats = $this->vendorListingStats($request);
+    $activePartyType = $this->resolvedPartyTypeFilter($request);
+    $activeStatusFilter = $this->resolvedActiveStatusFilter($request);
+
+    $vendor = $query->paginate($perPage)
+        ->appends($request->except('page'));
+
+    if ($request->ajax()) {
+        return response()->json([
+            'html' => view('vendor.partials.table.vendor_rows', compact('vendor', 'perPage', 'limit_access'))->render(),
+            'stats' => $listingStats,
+            'active_party_type' => $activePartyType,
+            'active_status' => $activeStatusFilter,
+        ]);
+    }
+
+    $locations  = TblLocationModel::all();
+    $Tblvendor  = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
+    $allVendors = Tblvendor::orderBy('id', 'desc')->get();
+    $creatorIds = Tblvendor::whereNotNull('user_id')->distinct()->pluck('user_id');
+    $creators   = usermanagementdetails::whereIn('id', $creatorIds)->orderBy('user_fullname')->get(['id', 'user_fullname']);
+
+    return view('vendor.vendor', [
+        'admin'             => $admin,
+        'locations'         => $locations,
+        'vendor'            => $vendor,
+        'perPage'           => $perPage,
+        'Tblvendor'         => $Tblvendor,
+        'allVendors'        => $allVendors,
+        'creators'          => $creators,
+        'limit_access'      => $limit_access,
+        'partyStats'        => $listingStats,
+        'activePartyType'   => $activePartyType,
+        'activeStatusFilter' => $activeStatusFilter,
+        'partyTypeOptions'  => Tblvendor::PARTY_TYPES,
+    ]);
+}
+
+private function resolvedPartyTypeFilter(Request $request): ?string
+{
+    $types = $this->resolvedPartyTypeFilters($request);
+
+    return $types[0] ?? null;
+}
+
+/** @return list<string> */
+private function resolvedPartyTypeFilters(Request $request): array
+{
+    if (! $request->filled('party_type')) {
+        return [];
+    }
+
+    $types = [];
+    foreach (explode(',', (string) $request->party_type) as $part) {
+        $normalized = Tblvendor::normalizePartyType(trim($part));
+        if ($normalized !== null) {
+            $types[] = $normalized;
+        }
+    }
+
+    return array_values(array_unique($types));
+}
+
+private function resolvedActiveStatusFilter(Request $request): ?string
+{
+    if (! $request->has('active_status')) {
+        return null;
+    }
+
+    $status = (string) $request->input('active_status');
+    if ($status === '') {
+        return null;
+    }
+
+    if (str_contains($status, ',')) {
+        $status = trim(explode(',', $status)[0]);
+    }
+
+    return in_array($status, ['0', '1'], true) ? $status : null;
+}
+
+/**
+ * @return array{total: int, vendor: int, employee: int, landlord: int, maintenance: int, active: int, inactive: int}
+ */
+private function vendorListingStats(Request $request): array
+{
+    $partyBase = Tblvendor::query();
+    $this->applyVendorListingFilters($request, $partyBase, applyPartyType: false, applyActiveStatus: true);
+
+    $statusBase = Tblvendor::query();
+    $this->applyVendorListingFilters($request, $statusBase, applyPartyType: true, applyActiveStatus: false);
+
+    return [
+        'total'    => (clone $partyBase)->count(),
+        'vendor'   => (clone $partyBase)->where('party_type', Tblvendor::PARTY_VENDOR)->count(),
+        'employee' => (clone $partyBase)->where('party_type', Tblvendor::PARTY_EMPLOYEE)->count(),
+        'landlord' => (clone $partyBase)->where('party_type', Tblvendor::PARTY_LANDLORD)->count(),
+        'maintenance' => (clone $partyBase)->where('party_type', Tblvendor::PARTY_MAINTENANCE)->count(),
+        'active'   => (clone $statusBase)->where('active_status', 0)->count(),
+        'inactive' => (clone $statusBase)->where('active_status', 1)->count(),
+    ];
+}
+
+/** @return list<int|string> */
+private function maintenanceVendorIds(): array
+{
+    return Tblvendor::query()
+        ->where('party_type', Tblvendor::PARTY_MAINTENANCE)
+        ->pluck('id')
+        ->all();
+}
+
+private function applyVendorListingFilters(
+    Request $request,
+    \Illuminate\Database\Eloquent\Builder $query,
+    bool $applyPartyType = true,
+    bool $applyActiveStatus = true,
+): void {
     if ($request->filled('date_from') && $request->filled('date_to')) {
         $from = Carbon::createFromFormat('d/m/Y', $request->date_from)->startOfDay();
         $to   = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
         $query->whereBetween('created_at', [$from, $to]);
     }
     if ($request->filled('zone_id')) {
-        $query->whereIn('zone_id', explode(',', $request->zone_id));
+        $query->whereIn('zone_id', explode(',', (string) $request->zone_id));
     }
     if ($request->filled('branch_id')) {
-        $query->whereIn('branch_id', explode(',', $request->branch_id));
+        $query->whereIn('branch_id', explode(',', (string) $request->branch_id));
     }
     if ($request->filled('company_id')) {
-        $query->whereIn('company_id', explode(',', $request->company_id));
+        $query->whereIn('company_id', explode(',', (string) $request->company_id));
     }
     if ($request->filled('vendor_id')) {
-        $query->whereIn('id', explode(',', $request->vendor_id));
+        $query->whereIn('id', explode(',', (string) $request->vendor_id));
     }
-    if ($request->filled('active_status')) {
-        $query->where('active_status', $request->active_status);
+    if ($request->filled('created_by_id')) {
+        $query->whereIn('user_id', explode(',', (string) $request->created_by_id));
+    }
+    if ($applyActiveStatus) {
+        $activeStatus = $this->resolvedActiveStatusFilter($request);
+        if ($activeStatus !== null) {
+            $query->where('active_status', (int) $activeStatus);
+        }
+    }
+    if ($applyPartyType) {
+        $partyTypes = $this->resolvedPartyTypeFilters($request);
+        if (count($partyTypes) === 1) {
+            $query->where('party_type', $partyTypes[0]);
+        } elseif (count($partyTypes) > 1) {
+            $query->whereIn('party_type', $partyTypes);
+        }
     }
     if ($request->filled('universal_search')) {
         $search = $request->universal_search;
         $query->where(function ($q) use ($search) {
-            $q->where('vendor_id',         'like', "%{$search}%")
-              ->orWhere('vendor_first_name','like', "%{$search}%")
-              ->orWhere('vendor_last_name', 'like', "%{$search}%")
-              ->orWhere('company_name',     'like', "%{$search}%")
-              ->orWhere('display_name',     'like', "%{$search}%")
-              ->orWhere('mobile',           'like', "%{$search}%")
-              ->orWhere('pan_number',       'like', "%{$search}%")
-              ->orWhere('gst_number',       'like', "%{$search}%")
-              ->orWhere('website',          'like', "%{$search}%")
-              ->orWhere('department',       'like', "%{$search}%")
-              ->orWhere('reference',        'like', "%{$search}%");
+            $q->where('vendor_id', 'like', "%{$search}%")
+                ->orWhere('vendor_first_name', 'like', "%{$search}%")
+                ->orWhere('vendor_last_name', 'like', "%{$search}%")
+                ->orWhere('company_name', 'like', "%{$search}%")
+                ->orWhere('display_name', 'like', "%{$search}%")
+                ->orWhere('mobile', 'like', "%{$search}%")
+                ->orWhere('pan_number', 'like', "%{$search}%")
+                ->orWhere('gst_number', 'like', "%{$search}%")
+                ->orWhere('website', 'like', "%{$search}%")
+                ->orWhere('department', 'like', "%{$search}%")
+                ->orWhere('reference', 'like', "%{$search}%")
+                ->orWhere('party_type', 'like', "%{$search}%");
         });
     }
-
-    // Paginate — exclude 'page' from appends so the paginator controls its own page links
-    $vendor = $query->paginate($perPage)
-                    ->appends($request->except('page'));
-
-    // ── AJAX: return only the table partial ──────────────────
-    if ($request->ajax()) {
-        return view('vendor.partials.table.vendor_rows', compact('vendor', 'perPage', 'limit_access'))->render();
-    }
-
-    // ── Full page load: fetch extra data only when needed ────
-    $locations  = TblLocationModel::all();
-    $Tblvendor  = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
-    $allVendors = Tblvendor::orderBy('id', 'desc')->get();
-
-    return view('vendor.vendor', [
-        'admin'        => $admin,
-        'locations'    => $locations,
-        'vendor'       => $vendor,
-        'perPage'      => $perPage,
-        'Tblvendor'    => $Tblvendor,
-        'allVendors'   => $allVendors,
-        'limit_access' => $limit_access,
-    ]);
 }
 
 public function getvendorcreate()
@@ -573,7 +681,7 @@ public function getvendorcreate()
     }
     if ($request->filled('party_type') && $partyType === null) {
         return response()->json([
-            'message' => 'Invalid Party Type. Choose Employee, Landlord, or Vendor.',
+            'message' => 'Invalid Party Type. Choose Employee, Landlord, Vendor, or Maintenance Vendor.',
         ], 422);
     }
 
@@ -2593,7 +2701,7 @@ public function statementprint(Request $request, $id)
         $billlist = $query->paginate($perPage)->appends($request->all());
 
         if ($request->ajax()) {
-            $html = view('vendor.partials.table.bill_rows', compact('billlist','perPage'))->render();
+            $html = view('vendor.partials.table.bill_rows', compact('billlist','perPage','limit_access'))->render();
             return response()->json(['html' => $html, 'stats' => $stats]);
         }
 
@@ -2602,6 +2710,126 @@ public function statementprint(Request $request, $id)
             'locations'     => $locations,
             'billlist'      => $billlist,
             'perPage'       => $perPage,
+            'TblZonesModel' => $TblZonesModel,
+            'Tblcompany'    => $Tblcompany,
+            'Tblvendor'     => $Tblvendor,
+            'Tblaccount'    => $Tblaccount,
+            'stats'         => $stats,
+        ]);
+    }
+
+    public function getmaintenance(Request $request)
+    {
+        $admin = auth()->user();
+        $limit_access = $admin->access_limits;
+        $locations = TblLocationModel::all();
+        $perPage = $request->get('per_page', 10);
+        $TblZonesModel = TblZonesModel::orderBy('id', 'asc')->get();
+        $Tblcompany = Tblcompany::orderBy('id', 'asc')->paginate(10);
+        $Tblvendor = Tblvendor::activeMaintenanceVendors()->orderBy('id', 'asc')->get();
+        $Tblaccount = Tblaccount::orderBy('id', 'asc')->get();
+        $query = Tblbill::with(['BillLines','Tblvendor','TblBilling','Tblbankdetails','Purchase','Purchase.quotation','billPayments'])
+            ->orderBy('id', 'desc')
+            ->where('delete_status', 0)
+            ->whereHas('Tblvendor', function ($q) {
+                $q->where('party_type', Tblvendor::PARTY_MAINTENANCE);
+            });
+
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $from = Carbon::createFromFormat('d/m/Y', $request->date_from)->startOfDay();
+            $to   = Carbon::createFromFormat('d/m/Y', $request->date_to)->endOfDay();
+            $query->whereRaw("
+                STR_TO_DATE(bill_date, '%d/%m/%Y') BETWEEN ? AND ? ", [$from, $to]);
+        }
+        if ($request->filled('zone_id')) {
+            $ids = explode(',', $request->zone_id);
+            $query->whereIn('zone_id', $ids);
+        }
+        if ($request->filled('branch_id')) {
+            $ids = explode(',', $request->branch_id);
+            $query->whereIn('branch_id', $ids);
+        }
+        if ($request->filled('company_id')) {
+            $ids = explode(',', $request->company_id);
+            $query->whereIn('company_id', $ids);
+        }
+        if ($request->filled('vendor_id')) {
+            $ids = explode(',', $request->vendor_id);
+            $query->whereIn('vendor_id', $ids);
+        }
+        if ($request->filled('status_name')) {
+            $statuses = array_map('trim', explode(',', $request->status_name));
+            $query->where(function ($q) use ($statuses) {
+                foreach ($statuses as $status) {
+                    $q->orWhere('status', 'LIKE', '%' . $status . '%');
+                }
+            });
+        }
+        if ($request->filled('nature_id')) {
+            $ids = explode(',', $request->nature_id);
+
+            $query->whereHas('BillLines', function ($q) use ($ids) {
+                $q->whereIn('account_id', $ids);
+            });
+        }
+        if ($request->filled('universal_search')) {
+            $search = $request->universal_search;
+            $query->where(function($q) use ($search) {
+                $q->where('vendor_name', 'like', "%{$search}%")
+                ->orWhere('zone_name', 'like', "%{$search}%")
+                ->orWhere('branch_name', 'like', "%{$search}%")
+                ->orWhere('company_name', 'like', "%{$search}%")
+                ->orWhere('bill_gen_number', 'like', "%{$search}%")
+                ->orWhere('bill_number', 'like', "%{$search}%")
+                ->orWhere('order_number', 'like', "%{$search}%")
+                ->orWhere('bill_date', 'like', "%{$search}%")
+                ->orWhere('sub_total_amount', 'like', "%{$search}%")
+                ->orWhere('tax_type', 'like', "%{$search}%")
+                ->orWhere('grand_total_amount', 'like', "%{$search}%")
+                ->orWhere('due_date', 'like', "%{$search}%");
+            });
+        }
+
+        $filteredMaintenanceQuery = clone $query;
+        $stats = [
+            'total'        => (clone $filteredMaintenanceQuery)->count(),
+            'paid'         => (clone $filteredMaintenanceQuery)->where('bill_status', 'paid')->count(),
+            'pending'      => (clone $filteredMaintenanceQuery)->where(function ($q) {
+                                  $q->where('bill_status', '!=', 'paid')->orWhereNull('bill_status');
+                              })->count(),
+            'total_amount' => (clone $filteredMaintenanceQuery)->sum('grand_total_amount'),
+        ];
+
+        if ($request->filled('stat_filter')) {
+            $sf = $request->stat_filter;
+            if ($sf === 'paid') {
+                $query->where('bill_status', 'paid');
+            } elseif ($sf === 'pending') {
+                $query->where(function ($q) {
+                    $q->where('bill_status', '!=', 'paid')->orWhereNull('bill_status');
+                });
+            }
+        }
+
+        $billlist = $query->paginate($perPage)->appends($request->all());
+
+        if ($request->ajax()) {
+            $html = view('vendor.partials.table.bill_rows', [
+                'billlist' => $billlist,
+                'perPage' => $perPage,
+                'limit_access' => $limit_access,
+                'billTableMode' => 'maintenance',
+            ])->render();
+
+            return response()->json(['html' => $html, 'stats' => $stats]);
+        }
+
+        return view('vendor.maintenance_dashboard', [
+            'admin'         => $admin,
+            'locations'     => $locations,
+            'billlist'      => $billlist,
+            'perPage'       => $perPage,
+            'limit_access'  => $limit_access,
             'TblZonesModel' => $TblZonesModel,
             'Tblcompany'    => $Tblcompany,
             'Tblvendor'     => $Tblvendor,

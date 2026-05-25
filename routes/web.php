@@ -533,6 +533,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('/check-bill-number', [VendorController::class,'checkBillNumber'])->name('check.bill.number');
     //asset
     Route::get('/superadmin/asset_dashboard', [VendorController::class, 'getasset'])->name('superadmin.getasset');
+    Route::get('/superadmin/maintenance_dashboard', [VendorController::class, 'getmaintenance'])->name('superadmin.getmaintenance');
 
     //bill made
     Route::get('/superadmin/bill_made_dashboard', [VendorController::class, 'getbillmade'])->name('superadmin.getbillmade');
@@ -1003,7 +1004,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('rental-agreements/{rentalAgreement}', [RentalAgreementController::class, 'show'])->name('rental-agreements.show');
     Route::get('rental-agreements/{rentalAgreement}/edit', [RentalAgreementController::class, 'edit'])->name('rental-agreements.edit');
     Route::put('rental-agreements/{rentalAgreement}', [RentalAgreementController::class, 'update'])->name('rental-agreements.update');
-    
+
     Route::get('rental-payments/charts', [RentalPaymentsController::class, 'chart'])->name('rental-payments.charts');
     Route::get('rental-payments/export', [RentalPaymentsController::class, 'export'])->name('rental-payments.export');
     Route::get('rental-payments', [RentalPaymentsController::class, 'index'])->name('rental-payments');

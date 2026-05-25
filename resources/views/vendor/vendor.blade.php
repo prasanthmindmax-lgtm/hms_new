@@ -6,7 +6,7 @@
   @include('superadmin.superadminhead')
   <!-- [Head] end -->
   <!-- [Body] Start -->
-<link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}" id="main-style-link" />
+<link rel="stylesheet" href="{{ asset('/assets/css/vendor.css') }}?v={{ @filemtime(public_path('assets/css/vendor.css')) }}" id="main-style-link" />
 <link rel="stylesheet" href="{{ asset('/assets/css/quotation.css') }}" />
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
@@ -227,45 +227,187 @@
                         </div>
                     </div>
 
+                @php
+                  $partyStats = $partyStats ?? ['total' => 0, 'vendor' => 0, 'employee' => 0, 'landlord' => 0, 'maintenance' => 0, 'active' => 0, 'inactive' => 0];
+                  $activePartyType = $activePartyType ?? null;
+                  $activeStatusFilter = $activeStatusFilter ?? null;
+                @endphp
+
+                {{-- ── Vendor KPI stats ── --}}
+                <div class="vn-stats-board" id="vendorStatsBoard">
+                    <div class="vn-stats-panel">
+                        <div class="vn-stats-panel__head">
+                            <div class="vn-stats-panel__title-wrap">
+                                <span class="vn-stats-panel__eyebrow"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> Insights</span>
+                            </div>
+                        </div>
+                        <div class="vn-stats-panel__body">
+                            <div class="vn-stats-layout">
+                                <div class="vn-stats-layout__cards">
+                                    <div class="vn-kpi vn-kpi--slate {{ $activePartyType === null ? 'is-active' : '' }}"
+                                        data-party-filter="" role="button" tabindex="0" title="Show all party types">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Total</span>
+                                            <span class="vn-kpi__value" id="stat-party-total">{{ number_format($partyStats['total'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">All records</span>
+                                        </span>
+                                    </div>
+                                    <div class="vn-kpi vn-kpi--emerald {{ $activePartyType === 'Vendor' ? 'is-active' : '' }}"
+                                        data-party-filter="Vendor" role="button" tabindex="0" title="Filter: Vendor">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Vendors</span>
+                                            <span class="vn-kpi__value" id="stat-party-vendor">{{ number_format($partyStats['vendor'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">Party · Vendor</span>
+                                        </span>
+                                    </div>
+                                    <div class="vn-kpi vn-kpi--amber {{ $activePartyType === 'Employee' ? 'is-active' : '' }}"
+                                        data-party-filter="Employee" role="button" tabindex="0" title="Filter: Employee">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Employees</span>
+                                            <span class="vn-kpi__value" id="stat-party-employee">{{ number_format($partyStats['employee'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">Party · Employee</span>
+                                        </span>
+                                    </div>
+                                    <div class="vn-kpi vn-kpi--violet {{ $activePartyType === 'Landlord' ? 'is-active' : '' }}"
+                                        data-party-filter="Landlord" role="button" tabindex="0" title="Filter: Landlord">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-house-door" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Landlords</span>
+                                            <span class="vn-kpi__value" id="stat-party-landlord">{{ number_format($partyStats['landlord'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">Party · Landlord</span>
+                                        </span>
+                                    </div>
+                                    <div class="vn-kpi vn-kpi--cyan {{ $activePartyType === 'Maintenance Vendor' ? 'is-active' : '' }}"
+                                        data-party-filter="Maintenance Vendor" role="button" tabindex="0" title="Filter: Maintenance Vendor">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-tools" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Maintenance</span>
+                                            <span class="vn-kpi__value" id="stat-party-maintenance">{{ number_format($partyStats['maintenance'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">Party · Maintenance Vendor</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="vn-stats-layout__cards">
+                                    <div class="vn-kpi vn-kpi--green {{ ($activeStatusFilter ?? null) === '0' ? 'is-active' : '' }}"
+                                        data-status-filter="0" role="button" tabindex="0" title="Filter: Active vendors">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Active</span>
+                                            <span class="vn-kpi__value" id="stat-status-active">{{ number_format($partyStats['active'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">Live in register</span>
+                                        </span>
+                                    </div>
+                                    <div class="vn-kpi vn-kpi--rose {{ ($activeStatusFilter ?? null) === '1' ? 'is-active' : '' }}"
+                                        data-status-filter="1" role="button" tabindex="0" title="Filter: Inactive vendors">
+                                        <span class="vn-kpi__bar" aria-hidden="true"></span>
+                                        <span class="vn-kpi__icon"><i class="bi bi-pause-circle-fill" aria-hidden="true"></i></span>
+                                        <span class="vn-kpi__body">
+                                            <span class="vn-kpi__label">Inactive</span>
+                                            <span class="vn-kpi__value" id="stat-status-inactive">{{ number_format($partyStats['inactive'] ?? 0) }}</span>
+                                            <span class="vn-kpi__meta">Deactivated</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
                 {{-- ── Filters ── --}}
                 <div class="qd-filters" id="filtersSection">
                     <div class="qd-filter-row">
                         <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
+                            <label>Party Type</label>
+                            <input type="text" class="form-control party-filter-search-input dropdown-search-input" placeholder="Select Party Type" readonly value="{{ $activePartyType ?? '' }}">
+                            <input type="hidden" name="party_type" class="party_type_filter" value="{{ $activePartyType ?? '' }}">
+                            <div class="dropdown-menu tax-dropdown">
+                                <div class="inner-search-container">
+                                    <input type="text" class="inner-search" placeholder="Search Party Type...">
+                                </div>
+                                <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                                </div>
+                                <div class="dropdown-list multiselect party-type-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
                             <label>Vendor</label>
                             <input type="text" class="form-control vendor-search-input dropdown-search-input" placeholder="Select Vendor" readonly>
                             <input type="hidden" name="vendor_id" class="vendor_id">
-                          <div class="dropdown-menu tax-dropdown">
-                            <div class="inner-search-container">
+                            <div class="dropdown-menu tax-dropdown">
+                                <div class="inner-search-container">
                                     <input type="text" class="inner-search" placeholder="Search Vendor...">
-                            </div>
+                                </div>
                                 <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
                                     <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
-                            </div>
+                                </div>
                                 <div class="dropdown-list multiselect vendor-list"></div>
+                            </div>
                         </div>
-                    </div>
 
                         <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
                             <label>Status</label>
-                            <input type="text" class="form-control status-search-input dropdown-search-input" placeholder="Select Status" readonly>
-                            <input type="hidden" name="status_filter" class="status_filter">
-                          <div class="dropdown-menu tax-dropdown">
-                            <div class="inner-search-container">
+                            @php
+                                $statusFilterIds = ($activeStatusFilter ?? '') !== '' ? array_map('trim', explode(',', (string) $activeStatusFilter)) : [];
+                                $statusFilterLabels = [];
+                                foreach ($statusFilterIds as $statusId) {
+                                    if ($statusId === '0') {
+                                        $statusFilterLabels[] = 'Active';
+                                    } elseif ($statusId === '1') {
+                                        $statusFilterLabels[] = 'Inactive';
+                                    }
+                                }
+                                $statusFilterLabel = implode(', ', $statusFilterLabels);
+                            @endphp
+                            <input type="text" class="form-control status-search-input dropdown-search-input" placeholder="Select Status" readonly
+                              value="{{ $statusFilterLabel }}">
+                            <input type="hidden" name="status_filter" class="status_filter" value="{{ $activeStatusFilter ?? '' }}">
+                            <div class="dropdown-menu tax-dropdown">
+                                <div class="inner-search-container">
                                     <input type="text" class="inner-search" placeholder="Search Status...">
-                            </div>
+                                </div>
                                 <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
                                     <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
-                            </div>
+                                </div>
                                 <div class="dropdown-list multiselect status-list">
                                     <div data-value="Active" data-id="0">Active</div>
                                     <div data-value="Inactive" data-id="1">Inactive</div>
-                          </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <div class="qd-filter-group tax-dropdown-wrapper vendor-section">
+                            <label>Created By</label>
+                            <input type="text" class="form-control creator-search-input dropdown-search-input" placeholder="Select User" readonly>
+                            <input type="hidden" name="created_by_id" class="created_by_id">
+                            <div class="dropdown-menu tax-dropdown">
+                                <div class="inner-search-container">
+                                    <input type="text" class="inner-search" placeholder="Search User...">
+                                </div>
+                                <div class="d-flex justify-content-between p-2 border-bottom" style="gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary select-all">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary deselect-all">Clear</button>
+                                </div>
+                                <div class="dropdown-list multiselect creator-list"></div>
+                            </div>
                         </div>
-                          </div>
-                        </div>
+                    </div>
+                </div>
 
                 {{-- ── Search bar ── --}}
                 <div class="qd-search-row">
@@ -308,11 +450,9 @@
                 </div>
             </div>
             <div class="vp-header-right">
-                @if ($limit_access === 1 || $limit_access === 4)
                     <button class="btn btn-sm btn-outline-secondary edit_btn">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
-                @endif
                 @if ($limit_access === 1)
                     <button class="btn btn-sm btn-outline-danger delete_btn">
                         <i class="bi bi-trash"></i> Delete
@@ -656,6 +796,9 @@
                             $toggle.prop('checked', false);
                         }
                         toastr.success(response.message);
+                        if (typeof window.refreshVendorList === 'function') {
+                            window.refreshVendorList(sessionStorage.getItem('vendor_page') || 1);
+                        }
                     }
                 },
                 error: function (xhr) {
@@ -996,7 +1139,10 @@
                     vendor_name: $('.vendor-search-input').val(),
                     status_name: $('.status-search-input').val(),
                     status_filter: $('.status_filter').val(),
-
+                    party_type: $('.party_type_filter').val(),
+                    party_type_name: $('.party-filter-search-input').val(),
+                    created_by_id: $('.created_by_id').val(),
+                    created_by_name: $('.creator-search-input').val(),
                     universal_search: $('.universal_search').val()
                 };
 
@@ -1294,48 +1440,145 @@
     $(document).ready(function () {
 
     const Tblvendor = @json($Tblvendor);
+    const partyTypeOptions = @json($partyTypeOptions ?? \App\Models\Tblvendor::PARTY_TYPES);
+    const creators = @json($creators ?? []);
 
-      Tblvendor.forEach(Tblvendor => {
-                        const item = $(`
-                            <div data-value="${Tblvendor.display_name}" data-id="${Tblvendor.id}">${Tblvendor.display_name}</div>
-                        `);
-                        $('.vendor-list').append(item);
-                    });
+    const $filterSection = $('#filtersSection');
 
+      partyTypeOptions.forEach(function (partyType) {
+          $filterSection.find('.party-type-list').append(
+              $('<div>').attr('data-value', partyType).attr('data-id', partyType).text(partyType)
+          );
+      });
+
+      Tblvendor.forEach(function (row) {
+          $filterSection.find('.vendor-list').append(
+              $('<div>').attr('data-value', row.display_name).attr('data-id', row.id).text(row.display_name)
+          );
+      });
+
+      creators.forEach(function (u) {
+          $filterSection.find('.creator-list').append(
+              $('<div>').attr('data-value', u.user_fullname).attr('data-id', u.id).text(u.user_fullname)
+          );
+      });
+
+    function getFilterHiddenValue($hidden) {
+        return String($hidden.val() || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    function syncFilterListSelectedState(listSelector, hiddenSelector) {
+        const $hidden = typeof hiddenSelector === 'string' ? $(hiddenSelector) : hiddenSelector;
+        const partSet = {};
+        getFilterHiddenValue($hidden).forEach(function (part) {
+            partSet[part] = true;
+        });
+        $('#filtersSection ' + listSelector + ' div, body > .vn-filter-dd ' + listSelector + ' div').each(function () {
+            const id = String($(this).attr('data-id') ?? '').trim();
+            $(this).toggleClass('selected', !!partSet[id]);
+        });
+    }
+
+    function clearFilterListSelectedState(listSelector) {
+        $('#filtersSection ' + listSelector + ' div, body > .vn-filter-dd ' + listSelector + ' div').removeClass('selected');
+    }
+
+    function statusFilterDisplayLabel(statusVal) {
+        const parts = String(statusVal || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        const labels = [];
+        parts.forEach(function (id) {
+            if (id === '0') {
+                labels.push('Active');
+            } else if (id === '1') {
+                labels.push('Inactive');
+            }
+        });
+        return labels.join(', ');
+    }
+
+    syncFilterListSelectedState('.party-type-list', '.party_type_filter');
+    syncFilterListSelectedState('.vendor-list', '.vendor_id');
+    syncFilterListSelectedState('.status-list', '.status_filter');
+    syncFilterListSelectedState('.creator-list', '.created_by_id');
+    if ($('.status_filter').val()) {
+        $('.status-search-input').val(statusFilterDisplayLabel($('.status_filter').val()));
+    }
+
+    function positionVendorFilterDropdown($input, $dropdown) {
+        const el = $input[0];
+        if (!el || !$dropdown || !$dropdown.length) {
+            return;
+        }
+        const rect = el.getBoundingClientRect();
+        const width = rect.width;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        let left = rect.left;
+        if (left + width > viewportWidth - 8) {
+            left = Math.max(8, rect.right - width);
+        }
+        $dropdown.css({
+            position: 'fixed',
+            top: rect.bottom + 4,
+            left: left,
+            width: width,
+            right: 'auto',
+            zIndex: 10050
+        });
+    }
 
     $(document).ready(function () {
 
         // =================== OPEN DROPDOWN ===================
-        $(document).on('click', '.dropdown-search-input', function (e) {
+        $(document).on('click', '#filtersSection .dropdown-search-input', function (e) {
         e.stopPropagation();
-        $('.dropdown-menu.tax-dropdown').hide(); // close others
+        $('.dropdown-menu.tax-dropdown.vn-filter-dd').hide();
 
         const $input = $(this);
+        const $sourceMenu = $input.siblings('.dropdown-menu');
         let $dropdown = $input.data('dropdown');
 
-        // Clone dropdown only once per input
         if (!$dropdown) {
-            $dropdown = $input.siblings('.dropdown-menu').clone(true);
+            $dropdown = $sourceMenu.clone(false);
+            $dropdown.addClass('vn-filter-dd');
             $('body').append($dropdown);
             $input.data('dropdown', $dropdown);
         }
 
+        $dropdown.find('.dropdown-list').html($sourceMenu.find('.dropdown-list').html());
+
         $dropdown.data('wrapper', $input.closest('.tax-dropdown-wrapper'));
 
-        const offset = $input.offset();
-        $dropdown.css({
-            position: 'absolute',
-            top: offset.top + $input.outerHeight(),
-            left: offset.left,
-            width: $input.outerWidth(),
-            zIndex: 999
-        }).show();
+        const $hidden = $input.closest('.tax-dropdown-wrapper').find('input[type="hidden"]');
+        const listClass = ($sourceMenu.find('.dropdown-list').attr('class') || '').match(/\b([\w-]+-list)\b/);
+        if (listClass && listClass[1]) {
+            syncFilterListSelectedState('.' + listClass[1], $hidden);
+        }
+
+        $dropdown.find('.inner-search').val('');
+        $dropdown.find('.dropdown-list.multiselect div').show();
+
+        positionVendorFilterDropdown($input, $dropdown);
+        $dropdown.show();
 
         $dropdown.find('.inner-search').focus();
         });
 
+        $(window).on('scroll.vnFilterDd resize.vnFilterDd', function () {
+            $('body > .dropdown-menu.tax-dropdown.vn-filter-dd:visible').each(function () {
+                const $dd = $(this);
+                const $wrap = $dd.data('wrapper');
+                if (!$wrap || !$wrap.closest('#filtersSection').length) {
+                    return;
+                }
+                const $inp = $wrap.find('.dropdown-search-input').first();
+                if ($inp.length) {
+                    positionVendorFilterDropdown($inp, $dd);
+                }
+            });
+        });
+
         // =================== FILTER SEARCH ===================
-        $(document).on('keyup', '.inner-search', function () {
+        $(document).on('keyup', '#filtersSection .inner-search, body > .vn-filter-dd .inner-search', function () {
         const searchVal = $(this).val().toLowerCase();
         $(this).closest('.dropdown-menu').find('.dropdown-list div').each(function () {
             const text = $(this).text().toLowerCase();
@@ -1344,15 +1587,14 @@
         });
 
         // =================== MULTISELECT (Individual Item) ===================
-        $(document).on('click', '.dropdown-list.multiselect div', function (e) {
+        $(document).on('click', '#filtersSection .dropdown-list.multiselect div, body > .vn-filter-dd .dropdown-list.multiselect div', function (e) {
         e.stopPropagation();
         $(this).toggleClass('selected');
-        const $dropdown = $(this).closest('.tax-dropdown');
-        updateMultiSelection($dropdown);
+        updateMultiSelection($(this).closest('.tax-dropdown'));
         });
 
         // =================== SELECT ALL ===================
-        $(document).on('click', '.select-all', function (e) {
+        $(document).on('click', '#filtersSection .select-all, body > .vn-filter-dd .select-all', function (e) {
         e.stopPropagation();
         const $dropdown = $(this).closest('.tax-dropdown');
         $dropdown.find('.dropdown-list.multiselect div').addClass('selected');
@@ -1360,7 +1602,7 @@
         });
 
         // =================== DESELECT ALL ===================
-        $(document).on('click', '.deselect-all', function (e) {
+        $(document).on('click', '#filtersSection .deselect-all, body > .vn-filter-dd .deselect-all', function (e) {
         e.stopPropagation();
         const $dropdown = $(this).closest('.tax-dropdown');
         $dropdown.find('.dropdown-list.multiselect div').removeClass('selected');
@@ -1369,8 +1611,8 @@
 
         // =================== CLOSE ON OUTSIDE CLICK ===================
         $(document).on('click', function (e) {
-        if (!$(e.target).closest('.tax-dropdown-wrapper').length && !$(e.target).closest('.tax-dropdown').length) {
-            $('.dropdown-menu.tax-dropdown').hide();
+        if (!$(e.target).closest('#filtersSection .tax-dropdown-wrapper').length && !$(e.target).closest('.dropdown-menu.tax-dropdown.vn-filter-dd').length) {
+            $('.dropdown-menu.tax-dropdown.vn-filter-dd').hide();
         }
         });
 
@@ -1384,7 +1626,7 @@
 
         $dropdown.find('.dropdown-list.multiselect div.selected').each(function () {
             selectedItems.push($(this).text().trim());
-            selectedIds.push($(this).data('id'));
+            selectedIds.push(String($(this).attr('data-id') ?? '').trim());
         });
 
         const $visibleInput = wrapper.find('.dropdown-search-input');
@@ -1394,8 +1636,14 @@
         $visibleInput.val(selectedItems.join(', '));
         $hiddenInput.val(selectedIds.join(','));
 
-        // ✅ Trigger change event (important)
-        $hiddenInput.trigger('click');
+        const listClass = ($dropdown.find('.dropdown-list').attr('class') || '').match(/\b([\w-]+-list)\b/);
+        if (listClass && listClass[1]) {
+            syncFilterListSelectedState('.' + listClass[1], $hiddenInput);
+        }
+
+        if (typeof window.applyVendorListFilter === 'function') {
+            window.applyVendorListFilter($hiddenInput);
+        }
         }
     });
 
@@ -1481,7 +1729,7 @@
         });
 
          $(document).on('click', function (e) {
-            if (!$(e.target).closest('.tax-dropdown-wrapper').length) {
+            if (!$(e.target).closest('.tax-dropdown-wrapper').length && !$(e.target).closest('.dropdown-menu.tax-dropdown').length) {
               $('.dropdown-menu.tax-dropdown').hide();
             }
           });
@@ -1677,11 +1925,15 @@
             }
            sessionStorage.removeItem("restore_filters");
         }
-        let filters = savedFilters ||{
+        let filters = savedFilters || {
             vendor_name: '',
             vendor_id: '',
             status_filter: '',
             status_name: '',
+            party_type: '',
+            party_type_name: '',
+            created_by_id: '',
+            created_by_name: '',
             universal_search: '',
         };
 
@@ -1711,6 +1963,16 @@
                 <i class="bi bi-search me-1"></i>${filters.universal_search} &times;
             </span>`;
         }
+        if (filters.party_type) {
+            summaryHtml += `<span class="filter-badge remove-icon" data-type="party">
+                <i class="bi bi-diagram-3 me-1"></i>${filters.party_type_name || filters.party_type} &times;
+            </span>`;
+        }
+        if (filters.created_by_id) {
+            summaryHtml += `<span class="filter-badge remove-icon" data-type="creator">
+                <i class="bi bi-person me-1"></i>${filters.created_by_name} &times;
+            </span>`;
+        }
 
         if (summaryHtml) {
             summaryHtml += `<span class="filter-badge filter-clear" id="clear-all">Clear all</span>`;
@@ -1719,21 +1981,101 @@
         $("#filter-summary").html(summaryHtml || "");
     }
 
+    function syncPartyStatCards(activePartyType) {
+        const parts = String(activePartyType || '').split(',').map(s => s.trim()).filter(Boolean);
+        const active = parts.length === 1 ? parts[0] : '';
+        $('#vendorStatsBoard .vn-kpi[data-party-filter]').each(function () {
+            const cardVal = String($(this).data('party-filter') ?? '');
+            $(this).toggleClass('is-active', cardVal === active);
+        });
+    }
+
+    function syncPartyTypeDropdownSelection(partyTypeVal) {
+        $('.party_type_filter').val(partyTypeVal || '');
+        syncFilterListSelectedState('.party-type-list', '.party_type_filter');
+    }
+
+    function syncCreatorDropdownSelection() {
+        syncFilterListSelectedState('.creator-list', '.created_by_id');
+    }
+
+    function syncStatusStatCards(activeStatus) {
+        const parts = String(activeStatus || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        const active = parts.length === 1 ? parts[0] : '';
+        $('#vendorStatsBoard .vn-kpi[data-status-filter]').each(function () {
+            const cardVal = String($(this).data('status-filter') ?? '');
+            $(this).toggleClass('is-active', cardVal === active);
+        });
+    }
+
+    function syncStatusDropdownSelection() {
+        syncFilterListSelectedState('.status-list', '.status_filter');
+    }
+
+    function updateVendorStats(stats) {
+        if (!stats) {
+            return;
+        }
+        $('#stat-party-total').text(Number(stats.total || 0).toLocaleString('en-IN'));
+        $('#stat-party-employee').text(Number(stats.employee || 0).toLocaleString('en-IN'));
+        $('#stat-party-vendor').text(Number(stats.vendor || 0).toLocaleString('en-IN'));
+        $('#stat-party-landlord').text(Number(stats.landlord || 0).toLocaleString('en-IN'));
+        $('#stat-party-maintenance').text(Number(stats.maintenance || 0).toLocaleString('en-IN'));
+        $('#stat-status-active').text(Number(stats.active || 0).toLocaleString('en-IN'));
+        $('#stat-status-inactive').text(Number(stats.inactive || 0).toLocaleString('en-IN'));
+    }
+
     function loadVendor(page = 1, perPage = null) {
         if (!perPage) perPage = $('#per_page').val() || 10;
         $.ajax({
             url: '{{ route("superadmin.getvendor") }}',
             type: "GET",
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
             data: {
                 per_page: perPage,
                 page: page,
                 vendor_id: filters.vendor_id,
                 active_status: filters.status_filter,
+                party_type: filters.party_type,
+                created_by_id: filters.created_by_id,
                 universal_search: filters.universal_search
             },
             success: function (data) {
                 if (data && typeof data === 'object' && data.html !== undefined) {
                     $("#Neft-body").html(data.html);
+                    if (data.stats) {
+                        updateVendorStats(data.stats);
+                    }
+                    if (data.active_party_type !== undefined) {
+                        filters.party_type = data.active_party_type || '';
+                        filters.party_type_name = filters.party_type ? ($('.party-filter-search-input').val() || filters.party_type) : '';
+                        $('.party_type_filter').val(filters.party_type);
+                        if (!filters.party_type) {
+                            $('.party-filter-search-input').val('');
+                        }
+                        syncPartyStatCards(filters.party_type);
+                        syncPartyTypeDropdownSelection(filters.party_type);
+                    }
+                    if (data.active_created_by_id !== undefined) {
+                        filters.created_by_id = data.active_created_by_id || '';
+                        filters.created_by_name = filters.created_by_id ? ($('.creator-search-input').val() || '') : '';
+                        $('.created_by_id').val(filters.created_by_id);
+                        if (!filters.created_by_id) {
+                            $('.creator-search-input').val('');
+                        }
+                        syncCreatorDropdownSelection();
+                    }
+                    if (data.active_status !== undefined) {
+                        const statusVal = data.active_status === null || data.active_status === '' ? '' : String(data.active_status);
+                        filters.status_filter = statusVal;
+                        filters.status_name = statusVal ? ($('.status-search-input').val() || statusFilterDisplayLabel(statusVal)) : '';
+                        $('.status_filter').val(statusVal);
+                        if (!statusVal) {
+                            $('.status-search-input').val('');
+                        }
+                        syncStatusStatCards(statusVal);
+                        syncStatusDropdownSelection();
+                    }
                 } else {
                     $("#Neft-body").html(data);
                 }
@@ -1744,6 +2086,7 @@
             }
         });
     }
+    window.refreshVendorList = loadVendor;
     // Saved filters
     if (savedFilters) {
         window.restoringFilters = true;
@@ -1754,6 +2097,18 @@
         $('.vendor-search-input').val(filters.vendor_name);
         $('.universal_search').val(filters.universal_search || '');
         $('.status-search-input').val(filters.status_name || '');
+        $('.party_type_filter').val(filters.party_type || '');
+        $('.party-filter-search-input').val(filters.party_type_name || filters.party_type || '');
+        syncPartyStatCards(filters.party_type || '');
+        syncPartyTypeDropdownSelection(filters.party_type || '');
+        $('.status_filter').val(filters.status_filter ?? '');
+        $('.status-search-input').val(filters.status_name || statusFilterDisplayLabel(filters.status_filter) || '');
+        syncStatusStatCards(filters.status_filter ?? '');
+        syncStatusDropdownSelection();
+        $('.creator-search-input').val(filters.created_by_name || '');
+        $('.created_by_id').val(filters.created_by_id || '');
+        syncCreatorDropdownSelection();
+        syncFilterListSelectedState('.vendor-list', '.vendor_id');
 
         const savedPage = sessionStorage.getItem('vendor_page') || 1;
 
@@ -1762,22 +2117,80 @@
         }, 200);
     }
 
-    // =================== MULTI-SELECT CHANGE LISTENER ===================
-    function setupMultiSelect(selectorInput, selectorHidden) {
-        var ns = 'click.ms' + selectorHidden.replace(/[^a-zA-Z0-9]/g, '');
-        $(document).off(ns, selectorHidden).on(ns, selectorHidden, function () {
-            const selectedIds  = $(this).val();
-            const selectedText = $(selectorInput).val();
-            if (selectorHidden === '.vendor_id') {
-                filters.vendor_id = selectedIds; filters.vendor_name = selectedText;
-            } else if (selectorHidden === '.status_filter') {
-                filters.status_filter = selectedIds; filters.status_name = selectedText;
-            }
-            loadVendor();
-        });
+    window.applyVendorListFilter = function ($hiddenInput) {
+        const $wrap = $hiddenInput.closest('.tax-dropdown-wrapper');
+        const $visible = $wrap.find('.dropdown-search-input');
+        const selectedIds = $hiddenInput.val() || '';
+        const selectedText = $visible.val() || '';
+
+        if ($hiddenInput.hasClass('vendor_id')) {
+            filters.vendor_id = selectedIds;
+            filters.vendor_name = selectedText;
+        } else if ($hiddenInput.hasClass('status_filter')) {
+            filters.status_filter = selectedIds;
+            filters.status_name = selectedText;
+            syncStatusStatCards(filters.status_filter);
+        } else if ($hiddenInput.hasClass('party_type_filter')) {
+            filters.party_type = selectedIds;
+            filters.party_type_name = selectedText;
+            syncPartyStatCards(filters.party_type);
+        } else if ($hiddenInput.hasClass('created_by_id')) {
+            filters.created_by_id = selectedIds;
+            filters.created_by_name = selectedText;
+        }
+
+        loadVendor();
+    };
+
+    syncPartyTypeDropdownSelection($('.party_type_filter').val());
+    syncStatusDropdownSelection();
+    syncCreatorDropdownSelection();
+
+    function activateVendorKpiCard($card) {
+        if ($card.is('[data-party-filter]')) {
+            $card.trigger('click');
+            return;
+        }
+        if ($card.is('[data-status-filter]')) {
+            $card.trigger('click');
+        }
     }
-    setupMultiSelect('.vendor-search-input', '.vendor_id');
-    setupMultiSelect('.status-search-input', '.status_filter');
+
+    $(document).on('keydown', '#vendorStatsBoard .vn-kpi[role="button"]', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            activateVendorKpiCard($(this));
+        }
+    });
+
+    $(document).on('click', '#vendorStatsBoard .vn-kpi[data-party-filter]', function () {
+        const partyType = String($(this).data('party-filter') ?? '');
+        const isActive = partyType === String(filters.party_type ?? '');
+        filters.party_type = isActive ? '' : partyType;
+        filters.party_type_name = filters.party_type;
+        $('.party_type_filter').val(filters.party_type);
+        $('.party-filter-search-input').val(filters.party_type || '');
+        $('.party-type-list div').removeClass('selected');
+        if (filters.party_type !== '') {
+            syncPartyTypeDropdownSelection(filters.party_type);
+        }
+        syncPartyStatCards(filters.party_type);
+        loadVendor(1);
+    });
+
+    $(document).on('click', '#vendorStatsBoard .vn-kpi[data-status-filter]', function () {
+        const statusVal = String($(this).data('status-filter') ?? '');
+        const current = String(filters.status_filter ?? '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        const isActive = current.length === 1 && current[0] === statusVal;
+        filters.status_filter = isActive ? '' : statusVal;
+        filters.status_name = filters.status_filter ? statusFilterDisplayLabel(filters.status_filter) : '';
+        $('.status_filter').val(filters.status_filter);
+        $('.status-search-input').val(filters.status_name);
+        syncStatusDropdownSelection();
+        syncStatusStatCards(filters.status_filter);
+        loadVendor(1);
+    });
+
     $('.universal_search').on('keyup', function () {
       filters.universal_search = $('.universal_search').val();
         loadVendor();
@@ -1791,27 +2204,56 @@
             filters.vendor_name = '';
             $('.vendor_id').val('');
             $('.vendor-search-input').val('');
-            $('.vendor-list div').removeClass('selected');
+            clearFilterListSelectedState('.vendor-list');
         } else if (type === 'status') {
             filters.status_filter = '';
             filters.status_name = '';
             $('.status_filter').val('');
             $('.status-search-input').val('');
-            $('.status-list div').removeClass('selected');
+            clearFilterListSelectedState('.status-list');
+            syncStatusStatCards('');
         } else if (type === 'search') {
             filters.universal_search = '';
             $('.universal_search').val('');
+        } else if (type === 'party') {
+            filters.party_type = '';
+            filters.party_type_name = '';
+            $('.party_type_filter').val('');
+            $('.party-filter-search-input').val('');
+            clearFilterListSelectedState('.party-type-list');
+            syncPartyStatCards('');
+        } else if (type === 'creator') {
+            filters.created_by_id = '';
+            filters.created_by_name = '';
+            $('.created_by_id').val('');
+            $('.creator-search-input').val('');
+            clearFilterListSelectedState('.creator-list');
         }
         loadVendor();
     });
 
     // Clear all filters
     $("#filter-summary").on('click', '#clear-all', function () {
-        filters = { vendor_name: '', vendor_id: '', status_filter: '', status_name: '', universal_search: '' };
-        $('.vendor-search-input, .status-search-input').val('');
-        $('.vendor_id, .status_filter').val('');
+        filters = {
+            vendor_name: '',
+            vendor_id: '',
+            status_filter: '',
+            status_name: '',
+            party_type: '',
+            party_type_name: '',
+            created_by_id: '',
+            created_by_name: '',
+            universal_search: '',
+        };
+        $('.vendor-search-input, .status-search-input, .party-filter-search-input, .creator-search-input').val('');
+        $('.vendor_id, .status_filter, .party_type_filter, .created_by_id').val('');
         $('.universal_search').val('');
-        $('.dropdown-list div').removeClass('selected');
+        clearFilterListSelectedState('.vendor-list');
+        clearFilterListSelectedState('.status-list');
+        clearFilterListSelectedState('.party-type-list');
+        clearFilterListSelectedState('.creator-list');
+        syncPartyStatCards('');
+        syncStatusStatCards('');
         loadVendor();
     });
 
