@@ -437,8 +437,10 @@ public function getvendor(Request $request)
     $this->applyVendorListingFilters($request, $query);
 
     $listingStats = $this->vendorListingStats($request);
-    $activePartyType = $this->resolvedPartyTypeFilter($request);
-    $activeStatusFilter = $this->resolvedActiveStatusFilter($request);
+    $activePartyType = $request->filled('party_type') ? (string) $request->input('party_type') : null;
+    $activeStatusFilter = $request->has('active_status') && (string) $request->input('active_status') !== ''
+        ? (string) $request->input('active_status')
+        : null;
 
     $vendor = $query->paginate($perPage)
         ->appends($request->except('page'));
@@ -447,8 +449,9 @@ public function getvendor(Request $request)
         return response()->json([
             'html' => view('vendor.partials.table.vendor_rows', compact('vendor', 'perPage', 'limit_access'))->render(),
             'stats' => $listingStats,
-            'active_party_type' => $activePartyType,
-            'active_status' => $activeStatusFilter,
+            'active_party_type' => $request->filled('party_type') ? (string) $request->input('party_type') : '',
+            'active_created_by_id' => $request->filled('created_by_id') ? (string) $request->input('created_by_id') : '',
+            'active_status' => $request->has('active_status') ? (string) $request->input('active_status') : '',
         ]);
     }
 
@@ -499,22 +502,26 @@ private function resolvedPartyTypeFilters(Request $request): array
     return array_values(array_unique($types));
 }
 
-private function resolvedActiveStatusFilter(Request $request): ?string
+private function resolvedActiveStatusFilters(Request $request): array
 {
     if (! $request->has('active_status')) {
-        return null;
+        return [];
     }
 
     $status = (string) $request->input('active_status');
     if ($status === '') {
-        return null;
+        return [];
     }
 
-    if (str_contains($status, ',')) {
-        $status = trim(explode(',', $status)[0]);
+    $values = [];
+    foreach (explode(',', $status) as $part) {
+        $part = trim($part);
+        if (in_array($part, ['0', '1'], true)) {
+            $values[] = (int) $part;
+        }
     }
 
-    return in_array($status, ['0', '1'], true) ? $status : null;
+    return array_values(array_unique($values));
 }
 
 /**
@@ -575,9 +582,11 @@ private function applyVendorListingFilters(
         $query->whereIn('user_id', explode(',', (string) $request->created_by_id));
     }
     if ($applyActiveStatus) {
-        $activeStatus = $this->resolvedActiveStatusFilter($request);
-        if ($activeStatus !== null) {
-            $query->where('active_status', (int) $activeStatus);
+        $activeStatuses = $this->resolvedActiveStatusFilters($request);
+        if (count($activeStatuses) === 1) {
+            $query->where('active_status', $activeStatuses[0]);
+        } elseif (count($activeStatuses) > 1) {
+            $query->whereIn('active_status', $activeStatuses);
         }
     }
     if ($applyPartyType) {
@@ -619,9 +628,7 @@ public function getvendorcreate()
         $serial = 'VEN-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
         $admin = auth()->user();
         $limit_access=$admin->access_limits;
-        if ($id !== "" && (int) $limit_access !== 1) {
-            return redirect()->route('superadmin.getvendor')->with('error', 'Only admin users can edit vendors.');
-        }
+
         $locations = TblLocationModel::all();
         $Tbltdstax = Tbltdstax::orderBy('id', 'desc')->paginate(10);
         $Tbltdssection = Tbltdssection::orderBy('id', 'asc')->paginate(10);
@@ -642,12 +649,6 @@ public function getvendorcreate()
     $user_id = auth()->user()->id;
     $admin = auth()->user();
     $limit_access = (int) ($admin->access_limits ?? 0);
-
-    if ($isUpdate && $limit_access !== 1) {
-        return response()->json([
-            'message' => 'Only admin users can edit vendors.',
-        ], 403);
-    }
 
     $primaryContactFirstName = $this->validateRestrictedVendorNameField(
         $request->input('primary_contact_first_name'),
@@ -10539,7 +10540,7 @@ public function getprofessionalsummary(Request $request)
             }
         }
 
-        $bills = $billQuery->with(['BillLines', 'Tblvendor', 'Tblvendor.bankdetails', 'Tblbankdetails'])->get();
+            $bills = $billQuery->with(['BillLines', 'Tblvendor', 'Tblvendor.bankdetails', 'Tblbankdetails'])->get();
 
         // ── Helpers matching JS safeVal / emptyVal exactly ──────────────────────
         // safeVal: returns 'NA' for null / '' (used for name, mobile, email, remark, date, ref, addl)
