@@ -33,6 +33,7 @@ use App\Http\Controllers\LicenceDocumentCatalogController;
 use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\SecurityAgreementController;
 use App\Http\Controllers\PaymentRequestController;
 use App\Http\Controllers\UserActivityController;
 use App\Http\Controllers\GstR1WorkingController;
@@ -1008,6 +1009,13 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('rental-payments/charts', [RentalPaymentsController::class, 'chart'])->name('rental-payments.charts');
     Route::get('rental-payments/export', [RentalPaymentsController::class, 'export'])->name('rental-payments.export');
     Route::get('rental-payments', [RentalPaymentsController::class, 'index'])->name('rental-payments');
+
+    Route::get('security-agreements', [SecurityAgreementController::class, 'index'])->name('security-agreements.index');
+    Route::get('security-agreements/create', [SecurityAgreementController::class, 'create'])->name('security-agreements.create');
+    Route::post('security-agreements', [SecurityAgreementController::class, 'store'])->name('security-agreements.store');
+    Route::get('security-agreements/{securityAgreement}', [SecurityAgreementController::class, 'show'])->name('security-agreements.show');
+    Route::get('security-agreements/{securityAgreement}/edit', [SecurityAgreementController::class, 'edit'])->name('security-agreements.edit');
+    Route::put('security-agreements/{securityAgreement}', [SecurityAgreementController::class, 'update'])->name('security-agreements.update');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
@@ -1048,7 +1056,7 @@ Route::middleware(['auth','role_id:2'])->group(function () {
      Route::get('/referral/patientdateandfitter', [MarketController::class, 'patientdateandfitter'])->name('referral.patientdateandfitter');
      Route::get('/referral/patientpop', [MarketController::class, 'patientpop'])->name('referral.patientpop');
      Route::get('/referral/meetingpop', [MarketController::class, 'meetingpop'])->name('referral.meetingpop');
-});
+     });
 
 //admin routes
 Route::middleware(['auth','role_id:4'])->group(function () {

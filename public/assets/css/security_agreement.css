@@ -1,0 +1,3680 @@
+﻿/**
+ * Security agreements — consolidated styles (form, register, owner payments, ledger).
+ */
+
+body.security-agreement-page {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #1e293b;
+}
+
+body.security-agreement-page .pc-container .pc-content {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 14px;
+  padding-right: 16px;
+}
+
+.security-agreement {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 1.5rem;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+body.security-agreement-page .card {
+  overflow: visible;
+}
+
+body.security-agreement-page .hero {
+  overflow: hidden;
+  border-radius: 22px 22px 0 0;
+}
+
+.hero {
+  position: relative;
+  padding: 22px 26px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #4338ca 100%);
+  color: #f8fafc;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -55%;
+  right: -8%;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-title {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #f8fafc;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-text .hero-title {
+  margin-bottom: 0.35rem;
+}
+
+.hero-sub .hero-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.65rem;
+  margin-bottom: 0.25rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  color: #f8fafc;
+}
+
+.hero-sub .hero-cat-pill--hospital {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(147, 197, 253, 0.55);
+}
+
+.hero-sub .hero-cat-pill--hostel {
+  background: rgba(139, 92, 246, 0.35);
+  border-color: rgba(196, 181, 253, 0.55);
+}
+
+.hero-sub-muted {
+  display: inline;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.hero-title i,
+.hero-kicker i {
+  color: #a5b4fc;
+}
+
+.hero-sub {
+  margin: 0;
+  max-width: 64ch;
+  color: rgba(248, 250, 252, 0.88);
+  font-size: 0.93rem;
+}
+
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+body.security-agreement-page .security-agreement.index .hero-inner {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 200px;
+}
+
+body.security-agreement-page .security-agreement.index .hero {
+  align-items: flex-start;
+}
+
+.btn-primary,
+.btn-ghost,
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none !important;
+  transition: all 0.18s ease;
+}
+
+.btn-primary {
+  padding: 0.68rem 1.1rem;
+  color: #1e1b4b !important;
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+  border: 1px solid rgba(224, 231, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+}
+
+.btn-ghost,
+.btn-outline {
+  padding: 0.65rem 1rem;
+}
+
+.btn-ghost {
+  color: #f8fafc !important;
+  border: 1px solid rgba(248, 250, 252, 0.45);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-ghost:hover,
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.btn-outline {
+  color: #334155 !important;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+}
+
+.create-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #312e81 !important;
+  background: #fff;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  text-decoration: none !important;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.create-url:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.15);
+  color: #1e1b4b !important;
+}
+
+.page-body {
+  padding: 22px 24px 24px;
+}
+
+body.security-agreement-page .security-agreement .stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+body.security-agreement-page .security-agreement .stat {
+  position: relative;
+  padding: 15px 16px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+body.security-agreement-page .security-agreement .stat-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 1rem;
+}
+
+body.security-agreement-page .security-agreement .stat-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+body.security-agreement-page .security-agreement .stat-value {
+  display: block;
+  color: #0f172a;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+body.security-agreement-page .security-agreement .stat-hint {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.filter-card,
+.panel,
+.section,
+.show-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+}
+
+.filter-card {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.filter-shell {
+  padding: 18px;
+  margin-bottom: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filter-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.filter-title i {
+  color: #4f46e5;
+}
+
+.filter-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.showing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.showing-pill strong {
+  color: #1e1b4b;
+}
+
+.toolbar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.dd-input,
+.toolbar-select,
+.search-wrap input {
+  min-height: 46px;
+}
+
+.dd-input:hover,
+.toolbar-select:hover,
+.search-wrap input:hover {
+  border-color: #c7d2fe;
+}
+
+.dd-input:focus,
+.toolbar-select:focus,
+.search-wrap input:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.search-wrap i {
+  color: #4f46e5;
+}
+
+.dd {
+  position: relative;
+}
+
+.dd-input {
+  width: 100%;
+  padding: 0.78rem 2.8rem 0.78rem 0.95rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background:
+    linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%),
+    linear-gradient(to right, #fff, #fff);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 14px) calc(50% - 2px),
+    100% 0;
+  background-size: 6px 6px, 6px 6px, 2.8rem 100%;
+  background-repeat: no-repeat;
+  color: #0f172a;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+}
+
+.dd-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.16);
+}
+
+.dd-panel.show {
+  display: block;
+}
+
+.dd-search {
+  padding: 12px 12px 8px;
+}
+
+.dd-search-input {
+  width: 100%;
+  padding: 0.68rem 0.8rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  color: #0f172a;
+  font-size: 0.88rem;
+}
+
+.dd-search-input:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.dd-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.dd-clear {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.dd-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.dd-item,
+.dropdown-empty {
+  padding: 0.7rem 0.78rem;
+  border-radius: 10px;
+  color: #334155;
+  font-size: 0.88rem;
+}
+
+.dd-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dd-item:hover {
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.dd-item.is-selected {
+  background: linear-gradient(180deg, #e0e7ff 0%, #eef2ff 100%);
+  color: #312e81;
+  font-weight: 700;
+}
+
+.dropdown-empty {
+  color: #64748b;
+}
+
+.applied-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #edf2f7;
+}
+
+.applied-label {
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.filter-badge:hover,
+.filter-clear:hover {
+  color: #312e81;
+}
+
+.filter-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.filter-clear {
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.table-toolbar {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.search-wrap {
+  position: relative;
+}
+
+.search-wrap i {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  font-size: 1rem;
+}
+
+.search-wrap input {
+  width: 100%;
+  padding: 0.78rem 0.95rem 0.78rem 2.75rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+}
+
+.toolbar-select {
+  min-width: 96px;
+  padding: 0.78rem 0.9rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0.7rem 1rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: all 0.18s ease;
+}
+
+.toolbar-btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+}
+
+.toolbar-btn--primary:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.toolbar-btn--ghost {
+  color: #334155;
+  background: #fff;
+  border-color: #dbe3ef;
+}
+
+.toolbar-btn--ghost:hover {
+  background: #f8fafc;
+}
+
+.section,
+.show-card {
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.section-title,
+.panel-head,
+.show-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.section-title {
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.76rem;
+}
+
+.section-title i,
+.panel-head i,
+.show-card-head i {
+  color: #4f46e5;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.field-input,
+.field-select,
+.field-textarea {
+  width: 100%;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field-textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.field-input:focus,
+.field-select:focus,
+.field-textarea:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.help {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
+.form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -8px 25px rgba(15, 23, 42, 0.05);
+}
+
+.form-footer-meta {
+  margin-right: auto;
+  color: #64748b;
+  font-size: 0.79rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.95rem 0.9rem;
+  border-bottom: 1px solid #eef2f7;
+  vertical-align: top;
+  font-size: 0.9rem;
+}
+
+.table th {
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table tbody tr:hover {
+  background: #fafcff;
+}
+
+.ref {
+  color: #312e81;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.text-muted-inline {
+  color: #64748b;
+}
+
+.owner {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.address {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #dbe3ef;
+  color: #334155;
+  background: #fff;
+  text-decoration: none;
+}
+
+.empty {
+  padding: 2rem 1rem !important;
+  text-align: center;
+  color: #64748b;
+}
+
+.show-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.show-item {
+  padding: 14px;
+  border: 1px solid #edf2f7;
+  border-radius: 14px;
+  background: #fbfdff;
+}
+
+.show-item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.show-item-label i {
+  color: #4f46e5;
+}
+
+.show-item-value {
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.show-item-value.show-item-value--pre {
+  white-space: pre-line;
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination {
+  margin-top: 16px;
+}
+
+/* —— Agreement register (data table) —— */
+body.security-agreement-page .panel-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  background: #fff;
+}
+
+body.security-agreement-page .panel-head--table {
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 0.85rem !important;
+  margin-bottom: 0 !important;
+}
+
+body.security-agreement-page .table-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+}
+
+body.security-agreement-page .table-meta__count {
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+body.security-agreement-page .table-meta__label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+body.security-agreement-page .table-wrap--register {
+  margin-top: 0;
+  border-radius: 12px;
+  border: 1px solid #e8edf5;
+  background: #fafbfc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+body.security-agreement-page .table--register {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1040px;
+}
+
+body.security-agreement-page .table--register thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.72rem 0.85rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 2px solid #e2e8f0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .table--register thead th:first-child {
+  border-top-left-radius: 11px;
+}
+
+body.security-agreement-page .table--register thead th:last-child {
+  border-top-right-radius: 11px;
+}
+
+body.security-agreement-page .table--register tbody td {
+  padding: 0.85rem 0.85rem;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+body.security-agreement-page .table--register tbody tr:last-child td {
+  border-bottom: none;
+}
+
+body.security-agreement-page .table--register tbody tr:nth-child(even) td {
+  background: #fbfcfe;
+}
+
+body.security-agreement-page .table--register tbody tr:hover td {
+  background: #f5f7ff;
+  box-shadow: inset 3px 0 0 #6366f1;
+}
+
+body.security-agreement-page .th--numeric,
+body.security-agreement-page .td--numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+body.security-agreement-page .th--actions,
+body.security-agreement-page .td--actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+body.security-agreement-page .th--attach,
+body.security-agreement-page .td--attach {
+  width: 1%;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .th--gst,
+body.security-agreement-page .td--gst {
+  width: 1%;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .ref--code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  color: #3730a3 !important;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none !important;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+body.security-agreement-page .ref--code:hover {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #312e81 !important;
+}
+
+body.security-agreement-page .cell-date {
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+body.security-agreement-page .cell-strong {
+  color: #0f172a;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+body.security-agreement-page .table--register .address {
+  margin-top: 3px;
+  font-size: 0.78rem;
+  max-width: 220px;
+}
+
+body.security-agreement-page .cell-period {
+  color: #334155;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  max-width: 200px;
+  display: inline-block;
+}
+
+body.security-agreement-page .money {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.875rem;
+}
+
+body.security-agreement-page .gst-pill {
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  padding: 0.35em 0.65em !important;
+  letter-spacing: 0.02em;
+}
+
+body.security-agreement-page .file-chip--table {
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  gap: 0.35rem;
+}
+
+body.security-agreement-page .text-muted-inline--table {
+  font-size: 0.85rem;
+}
+
+body.security-agreement-page .table--register .actions {
+  justify-content: flex-end;
+}
+
+body.security-agreement-page .table--register .icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #475569;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+body.security-agreement-page .table--register .icon-btn:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.15);
+}
+
+body.security-agreement-page .empty--table {
+  padding: 3rem 1.5rem !important;
+  text-align: center;
+  vertical-align: middle !important;
+  background: linear-gradient(180deg, #fafbfc 0%, #fff 45%) !important;
+  border: none !important;
+}
+
+body.security-agreement-page .empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #94a3b8;
+  font-size: 1.75rem;
+}
+
+body.security-agreement-page .empty__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.35rem;
+}
+
+body.security-agreement-page .empty__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.security-agreement-page .pagination--table {
+  margin-top: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+body.security-agreement-page .pagination--table .pagination {
+  margin-bottom: 0;
+  gap: 0.25rem;
+}
+
+body.security-agreement-page .pagination--table .page-link {
+  border-radius: 8px;
+  border-color: #e2e8f0;
+  color: #475569;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+}
+
+body.security-agreement-page .pagination--table .page-item.active .page-link {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+body.security-agreement-page .pagination--table .page-link:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #312e81;
+}
+
+body.security-agreement-page .pagination--table .page-item.active .page-link:hover {
+  background: #4338ca;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+.alert {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  margin-bottom: 16px;
+}
+
+.alert ul {
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
+}
+
+@media (max-width: 991.98px) {
+  .hero,
+  .page-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .table th,
+  .table td {
+    padding: 0.8rem 0.72rem;
+  }
+
+  .form-footer {
+    position: static;
+  }
+
+  .filter-shell {
+    padding: 14px;
+  }
+
+  .applied-bar {
+    align-items: flex-start;
+  }
+
+  .table-toolbar {
+    padding: 14px;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+  }
+
+  .toolbar-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* Payment request style filter shell for rental agreement index */
+body.security-agreement-page .index .filter-shell {
+  margin-bottom: 20px;
+  padding: 18px 20px 20px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.security-agreement-page .index .filter-shell.filter-qd {
+  padding: 0;
+  background: #fff;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  overflow: visible;
+}
+
+body.security-agreement-page .index .filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+body.security-agreement-page .index .filter-shell.filter-qd > .filter-head {
+  margin-bottom: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eef0f7;
+}
+
+body.security-agreement-page .index .filter-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #0f2744;
+}
+
+body.security-agreement-page .index .filter-title i {
+  color: #4f46e5;
+  font-size: 17px;
+}
+
+body.security-agreement-page .index .showing-count {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+  padding: 8px 16px;
+  background: #fff;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.security-agreement-page .index .showing-count strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filters.pay-pr-qd-filters {
+  padding: 12px 18px 10px;
+  background: #f9fafd;
+  border-bottom: 1px solid #eef0f7;
+}
+
+body.security-agreement-page .index .pay-pr-qd-filter-spacer {
+  visibility: hidden;
+  pointer-events: none;
+  min-height: 0;
+}
+
+/* Category, landlord, state, RCM, GST type — five columns on rental agreements register. */
+body.security-agreement-page .index #filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 8px 16px;
+  margin-bottom: 0;
+}
+
+body.security-agreement-page .index #llp-report-filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px 16px;
+  margin-bottom: 0;
+}
+
+body.security-agreement-page .index #filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary .filter-cell,
+body.security-agreement-page .index #llp-report-filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary .filter-cell {
+  min-width: 0;
+}
+
+body.security-agreement-page .index #filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary .tax-dropdown-wrapper.pay-pr-dd,
+body.security-agreement-page .index #llp-report-filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary .tax-dropdown-wrapper.pay-pr-dd {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  body.security-agreement-page .index #filter-form .pay-pr-table-toolbar .pay-pr-table-toolbar-search:not(.col-auto) {
+    flex: 1 1 0 !important;
+    max-width: 100% !important;
+  }
+
+  body.security-agreement-page .security-agreement.index #filter-form .pay-pr-table-toolbar .pay-pr-table-toolbar-search {
+    flex: 0 1 auto !important;
+    max-width: 300px !important;
+  }
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group > label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9aa5b8;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group .form-control,
+body.security-agreement-page .index .pay-pr-filter-shell .pay-pr-per-page-select,
+body.security-agreement-page .index .qd-search-wrap input {
+  box-shadow: none !important;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group .form-control {
+  height: 36px !important;
+  border: 1px solid #d4d9e8 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  font-size: 12.5px !important;
+  color: #3d4a5c !important;
+  padding: 0 10px !important;
+  transition: border-color 0.15s !important;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group .form-control:focus {
+  border-color: #4f6ef7 !important;
+  box-shadow: 0 0 0 2px rgba(79, 110, 247, 0.12) !important;
+  outline: none !important;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group .form-select {
+  height: 36px !important;
+  border: 1px solid #d4d9e8 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  font-size: 12.5px !important;
+  color: #3d4a5c !important;
+  padding: 0 10px !important;
+  transition: border-color 0.15s !important;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group .form-select:focus {
+  border-color: #4f6ef7 !important;
+  box-shadow: 0 0 0 2px rgba(79, 110, 247, 0.12) !important;
+  outline: none !important;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-filter-group .form-control::placeholder {
+  color: #b0b9cc;
+}
+
+body.security-agreement-page .index .qd-date-wrap {
+  height: 36px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-size: 12.5px;
+  color: #3d4a5c;
+  box-shadow: none;
+}
+
+body.security-agreement-page .index .qd-date-wrap:hover {
+  border-color: #a8b3d0;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-date-wrap #dateLabel,
+body.security-agreement-page .index .pay-pr-filter-shell .qd-date-wrap #llpReportDateLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: #3d4a5c;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .qd-date-wrap .fa {
+  color: #9aa5b8;
+  font-size: 13px;
+}
+
+body.security-agreement-page .index .qd-applied-bar {
+  padding: 6px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border-bottom: 1px solid #eef0f7;
+  min-height: 34px;
+}
+
+body.security-agreement-page .index .qd-applied-bar .applied-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9aa5b8;
+}
+
+body.security-agreement-page .index .pay-pr-filter-chips {
+  min-width: 0;
+}
+
+body.security-agreement-page .filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  margin: 2px 0;
+  border-radius: 6px;
+  background: #28a745;
+  color: #fff;
+  font-size: 9px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+body.security-agreement-page .filter-badge:hover {
+  opacity: 0.85;
+}
+
+body.security-agreement-page .filter-badge .remove-icon {
+  margin-left: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+body.security-agreement-page .filter-clear {
+  background-color: #dc3545;
+}
+
+body.security-agreement-page .index .pay-pr-filter-chips .filter-badge,
+body.security-agreement-page .index .pay-pr-filter-chips a.filter-badge.text-white {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  line-height: 1.35;
+  max-width: 100%;
+  border-radius: 8px;
+  background: #eef2ff !important;
+  color: #4338ca !important;
+  border: 1px solid #e0e7ff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.security-agreement-page .index .pay-pr-filter-chips .filter-badge:hover {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+  border-color: #c7d2fe;
+  opacity: 1;
+}
+
+body.security-agreement-page .index .pay-pr-filter-chips .filter-badge.filter-clear {
+  background: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3;
+}
+
+body.security-agreement-page .index .pay-pr-filter-chips .filter-badge.filter-clear:hover {
+  background: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-color: #fda4af;
+}
+
+body.security-agreement-page .index .pay-pr-filter-chips .filter-badge span:not(.remove-icon) {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .index .pay-pr-table-toolbar {
+  width: 100%;
+  border-top: 1px solid #eef0f7;
+  padding: 6px 18px 12px;
+}
+
+body.security-agreement-page .index .pay-pr-table-toolbar-search {
+  max-width: 100%;
+}
+
+body.security-agreement-page .index .pay-pr-toolbar-search-row {
+  padding: 0 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+body.security-agreement-page .index .qd-search-row {
+  display: flex;
+  align-items: center;
+}
+
+body.security-agreement-page .index .qd-search-wrap {
+  position: relative;
+  width: 280px;
+}
+
+body.security-agreement-page .index .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 280px;
+  max-width: 100%;
+}
+
+body.security-agreement-page .security-agreement.index .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 100%;
+  max-width: 300px;
+}
+
+body.security-agreement-page .index .qd-search-wrap i {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9aa5b8;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+body.security-agreement-page .index .qd-search-wrap input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  padding: 0 10px 0 32px;
+  font-size: 12.5px;
+  color: #3d4a5c;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+body.security-agreement-page .index .qd-search-wrap input:focus {
+  border-color: #4f6ef7;
+  outline: none;
+}
+
+body.security-agreement-page .index .qd-search-wrap input::placeholder {
+  color: #b0b9cc;
+}
+
+body.security-agreement-page .index .pay-pr-toolbar-search-wrap.qd-search-wrap input {
+  height: 38px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+body.security-agreement-page .index .pay-pr-per-page-field {
+  flex: 0 0 auto;
+}
+
+body.security-agreement-page .index .pay-pr-per-page-field--toolbar {
+  align-self: flex-end;
+}
+
+body.security-agreement-page .index .pay-pr-per-page-field .pay-pr-per-page-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+
+body.security-agreement-page .index .pay-pr-per-page-field .pay-pr-per-page-select {
+  min-width: 88px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #d4d9e8;
+  color: #0f172a;
+  font-size: 0.875rem;
+  padding-right: 2rem;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .tax-dropdown-wrapper {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+body.security-agreement-page #filter-form .dropdown-menu.tax-dropdown.pay-pr-tax-dd,
+body.security-agreement-page > .dropdown-menu.tax-dropdown.pay-pr-tax-dd {
+  max-height: min(320px, 70vh);
+  overflow: hidden;
+  display: none;
+  padding: 0;
+  margin: 0 !important;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
+  z-index: 10050;
+  box-sizing: border-box;
+}
+
+body.security-agreement-page #filter-form .pay-pr-tax-dd .dropdown-list.multiselect,
+body.security-agreement-page > .pay-pr-tax-dd .dropdown-list.multiselect {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+body.security-agreement-page #filter-form .pay-pr-tax-dd .dropdown-list.multiselect div,
+body.security-agreement-page > .pay-pr-tax-dd .dropdown-list.multiselect div {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: #334155;
+}
+
+body.security-agreement-page #filter-form .pay-pr-tax-dd .dropdown-list.multiselect div:hover,
+body.security-agreement-page > .pay-pr-tax-dd .dropdown-list.multiselect div:hover {
+  background: #f8fafc;
+}
+
+body.security-agreement-page #filter-form .pay-pr-tax-dd .dropdown-list.multiselect div.selected,
+body.security-agreement-page > .pay-pr-tax-dd .dropdown-list.multiselect div.selected {
+  background: #ecfdf5;
+  font-weight: 600;
+  color: #166534;
+}
+
+body.security-agreement-page > .pay-pr-tax-dd .inner-search-container,
+body.security-agreement-page #filter-form .pay-pr-tax-dd .inner-search-container {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+body.security-agreement-page > .pay-pr-tax-dd .inner-search,
+body.security-agreement-page #filter-form .pay-pr-tax-dd .inner-search {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+body.security-agreement-page > .pay-pr-tax-dd .inner-search:focus,
+body.security-agreement-page #filter-form .pay-pr-tax-dd .inner-search:focus {
+  outline: none;
+  border-color: #4f6ef7;
+}
+
+body.security-agreement-page .dropdown-empty {
+  padding: 8px 12px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+
+/* Register grid: table/card/rows/pagination match Payment Requests (payment_request.css .index). */
+
+body.security-agreement-page .index .pay-pr-table-card .pay-pr-row td {
+  vertical-align: middle;
+}
+
+.index .pay-pr-type-pill--hospital {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+.index .pay-pr-type-pill--hostel {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+
+.index .gst-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.42em 0.85em;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.index .gst-pill--including {
+  background: #d1fae5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.index .gst-pill--excluding {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.index .gst-pill--none {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.index .gst-pill--unknown {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+body.security-agreement-page .tax-cell,
+.index .tax-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+body.security-agreement-page .rcm-line,
+.index .rcm-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+}
+
+body.security-agreement-page .rcm-pill,
+.index .rcm-pill {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+body.security-agreement-page .rcm-pill--yes,
+.index .rcm-pill--yes {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+body.security-agreement-page .rcm-pill--no,
+.index .rcm-pill--no {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+body.security-agreement-page .rcm-value,
+.index .rcm-value {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+body.security-agreement-page .gst-meta,
+.index .gst-meta {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #475569;
+  line-height: 1.3;
+}
+
+body.security-agreement-page #sa_rcm_value_wrap.rcm-value.rcm-value--hidden {
+  display: none;
+}
+
+body.security-agreement-page .gst-detail-wrap.gst-detail-wrap--hidden,
+body.security-agreement-page .gst-detail-fields.gst-detail-wrap.gst-detail-wrap--hidden {
+  display: none !important;
+}
+
+body.security-agreement-page .gst-fields.gst-fields--hidden {
+  display: none !important;
+}
+
+/* GST card — inputs row + breakdown below */
+body.security-agreement-page .gst-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: visible;
+  width: 100%;
+}
+
+body.security-agreement-page .gst-card.gst-card--with-breakdown {
+  gap: 1rem;
+}
+
+body.security-agreement-page .gst-card-inputs {
+  min-width: 0;
+}
+
+body.security-agreement-page .gst-inputs-row.form-grid.form-grid--4 {
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+body.security-agreement-page .gst-card:not(.gst-card--expanded) .gst-inputs-row.form-grid.form-grid--4 {
+  grid-template-columns: minmax(0, 280px);
+  max-width: 320px;
+}
+
+body.security-agreement-page .gst-input-field {
+  min-width: 0;
+  align-self: start;
+}
+
+body.security-agreement-page .gst-card-breakdown {
+  min-width: 0;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+body.security-agreement-page .gst-card:not(.gst-card--with-breakdown) .gst-card-breakdown {
+  display: none !important;
+}
+
+body.security-agreement-page .breakdown-heading {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.01em;
+}
+
+body.security-agreement-page .breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: stretch;
+}
+
+body.security-agreement-page .breakdown-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+body.security-agreement-page .breakdown-col-title {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-col-title {
+  color: #2563eb;
+}
+
+body.security-agreement-page .gst-tax-block {
+  margin-top: 0.25rem;
+}
+
+body.security-agreement-page .tax-mode-badge {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+body.security-agreement-page .gst-dropdown.tax-dropdown-wrapper,
+body.security-agreement-page .tds-dropdown.tax-dropdown-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+body.security-agreement-page .gst-dropdown .tax-dropdown,
+body.security-agreement-page .tds-dropdown .tax-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 1060;
+  width: 100%;
+  min-width: 14rem;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  padding: 0;
+  overflow: visible;
+}
+
+body.security-agreement-page .gst-dropdown .tax-dropdown.show,
+body.security-agreement-page .tds-dropdown .tax-dropdown.show {
+  display: block !important;
+}
+
+body.security-agreement-page .gst-dropdown .tax-gst-list,
+body.security-agreement-page .tds-dropdown .tax-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+body.security-agreement-page .gst-dropdown .tax-gst-list div,
+body.security-agreement-page .tds-dropdown .tax-list div {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+body.security-agreement-page .gst-dropdown .tax-gst-list div:hover,
+body.security-agreement-page .tds-dropdown .tax-list div:hover {
+  background: #f1f5f9;
+}
+
+body.security-agreement-page .section .row:has(.gst-dropdown),
+body.security-agreement-page .section .row:has(.tds-dropdown),
+body.security-agreement-page .gst-fields,
+body.security-agreement-page .gst-tax-block {
+  overflow: visible;
+}
+
+body.security-agreement-page .gst-calculate-output.gst_calculate_show {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+body.security-agreement-page .gst-calculate-output .tax_show.tax_show {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+body.security-agreement-page .gst-calculate-output .tax_show label {
+  margin: 0;
+  font-weight: 600;
+}
+
+body.security-agreement-page .gst-calculate-output:empty {
+  display: none;
+}
+
+body.security-agreement-page .gst-show-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+body.security-agreement-page .gst-show-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+body.security-agreement-page .gst-show-line.gst-show-line--service {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+body.security-agreement-page .gst-show-line.gst-show-line--service:last-child {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+body.security-agreement-page .tds-breakdown-panel {
+  width: 100%;
+}
+
+body.security-agreement-page .tax-section-block {
+  margin-top: 0.5rem;
+}
+
+/* ── Rent and charges (create form — 4-card layout) ─────────── */
+body.security-agreement-page .form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  overflow: visible;
+}
+
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row {
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+}
+
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row > [class*='col-'] {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row > [class*='col-'] .field-label,
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row > [class*='col-'] .form-label {
+  flex-shrink: 0;
+}
+
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row > [class*='col-'] .field-input,
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row > [class*='col-'] .field-select,
+body.security-agreement-page .form-block.form-block--details .form-block-body > .row > [class*='col-'] .field-textarea {
+  width: 100%;
+}
+
+/* Override uikit `section { padding: 100px 0; }` on rent-charge cards */
+body.security-agreement-page .form-stack > section,
+body.security-agreement-page .form-block {
+  padding: 0;
+  margin: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: visible;
+}
+
+body.security-agreement-page .form-block-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+body.security-agreement-page .form-block-head i {
+  font-size: 1.05rem;
+  color: #3b82f6;
+}
+
+body.security-agreement-page .form-block-body {
+  padding: 0.65rem 1rem 0.85rem;
+  overflow: visible;
+}
+
+body.security-agreement-page .form-grid {
+  display: grid;
+  gap: 0.85rem 1rem;
+}
+
+body.security-agreement-page .form-grid.form-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.security-agreement-page .form-grid.form-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+body.security-agreement-page .form-grid.form-grid--rcm {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+}
+
+body.security-agreement-page .form-block-body > .form-grid.form-grid--3 + .form-grid.form-grid--3 {
+  margin-top: 0.85rem;
+}
+
+body.security-agreement-page .form-grid.form-grid--3.form-grid.form-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sa-paid-leave-days-wrap--hidden {
+  display: none !important;
+}
+
+body.security-agreement-page .form-block-body .field-select,
+body.security-agreement-page .form-block-body .field-input,
+body.security-agreement-page .section .row .field-input,
+body.security-agreement-page .section .row .field-select {
+  min-height: 42px;
+}
+
+body.security-agreement-page .section .row > [class*='col-'] {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+body.security-agreement-page .section .row > [class*='col-'] .field-label {
+  flex-shrink: 0;
+}
+
+body.security-agreement-page .section .row > [class*='col-'] .field-input,
+body.security-agreement-page .section .row > [class*='col-'] .field-select,
+body.security-agreement-page .section .row > [class*='col-'] .sa-doc-file-input {
+  width: 100%;
+}
+
+body.security-agreement-page .amount-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  overflow: visible;
+}
+
+body.security-agreement-page .amount-wrap:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+body.security-agreement-page .amount-prefix,
+body.security-agreement-page .amount-suffix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding: 0 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+body.security-agreement-page .amount-prefix {
+  grid-column: 1;
+  border-radius: 7px 0 0 7px;
+}
+
+body.security-agreement-page .amount-wrap.amount-wrap--suffix {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+body.security-agreement-page .amount-wrap.amount-wrap--suffix .amount-suffix {
+  grid-column: 2;
+  border-right: 0;
+  border-left: 1px solid #e2e8f0;
+  border-radius: 0 7px 7px 0;
+}
+
+body.security-agreement-page .amount-wrap.amount-wrap--suffix .amount-input,
+body.security-agreement-page .amount-wrap.amount-wrap--suffix .field-input.amount-input {
+  grid-column: 1;
+}
+
+body.security-agreement-page .amount-wrap .amount-input,
+body.security-agreement-page .amount-wrap .field-input {
+  grid-column: 2;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 0.7rem 0.85rem;
+  overflow-x: auto;
+}
+
+body.security-agreement-page .amount-wrap:has(.amount-prefix) .amount-input,
+body.security-agreement-page .amount-wrap:has(.amount-prefix) .field-input.amount-input {
+  border-radius: 0 7px 7px 0;
+}
+
+body.security-agreement-page .amount-wrap.amount-wrap--suffix .amount-input,
+body.security-agreement-page .amount-wrap.amount-wrap--suffix .field-input.amount-input {
+  border-radius: 7px 0 0 7px;
+}
+
+body.security-agreement-page .amount-wrap .amount-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+body.security-agreement-page .amount-wrap .amount-input[type='number']::-webkit-outer-spin-button,
+body.security-agreement-page .amount-wrap .amount-input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+body.security-agreement-page .amount-wrap .amount-input:focus,
+body.security-agreement-page .amount-wrap .field-input:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+body.security-agreement-page .field-hint {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+body.security-agreement-page .tax-row {
+  display: grid;
+  gap: 0.85rem 1rem;
+  overflow: visible;
+}
+
+body.security-agreement-page .tax-row.tax-row--gst {
+  grid-template-columns: 1fr;
+  margin-bottom: 0.85rem;
+}
+
+body.security-agreement-page .tax-row.tax-row--tds {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 0.85rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+body.security-agreement-page .tax-col {
+  min-width: 0;
+  overflow: visible;
+}
+
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-box {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+body.security-agreement-page .breakdown-box {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
+  flex: 1;
+  min-height: 4.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-box {
+  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  min-height: 5.5rem;
+  padding: 0.65rem 0.75rem;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+body.security-agreement-page .breakdown-box.breakdown-box--empty {
+  min-height: 4.5rem;
+}
+
+body.security-agreement-page .breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-item {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+body.security-agreement-page .breakdown-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+body.security-agreement-page .breakdown-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-value {
+  font-size: 0.8rem;
+}
+
+body.security-agreement-page .breakdown-item.breakdown-item--total .breakdown-value {
+  color: #2563eb;
+  font-size: 0.82rem;
+}
+
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-item.breakdown-item--total .breakdown-label,
+body.security-agreement-page .breakdown-col.breakdown-col--total .breakdown-item.breakdown-item--total .breakdown-value {
+  font-weight: 700;
+}
+
+body.security-agreement-page .rcm-radios {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-top: 0.35rem;
+  min-height: 2.5rem;
+}
+
+body.security-agreement-page .rcm-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+}
+
+body.security-agreement-page .rcm-radio input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+body.security-agreement-page .rcm-value.rcm-value--hidden {
+  display: none !important;
+}
+
+@media (max-width: 767.98px) {
+  body.security-agreement-page .breakdown-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  body.security-agreement-page .breakdown-box {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 991.98px) {
+  body.security-agreement-page .form-grid.form-grid--3,
+  body.security-agreement-page .form-grid.form-grid--4,
+  body.security-agreement-page .tax-row.tax-row--gst,
+  body.security-agreement-page .tax-row.tax-row--tds {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body.security-agreement-page .form-grid.form-grid--3,
+  body.security-agreement-page .form-grid.form-grid--4,
+  body.security-agreement-page .form-grid.form-grid--rcm,
+  body.security-agreement-page .tax-row.tax-row--gst,
+  body.security-agreement-page .tax-row.tax-row--tds {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.security-agreement-page .section-subtitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+body.security-agreement-page .tds-dropdown.tax-dropdown-wrapper {
+  position: relative;
+}
+
+body.security-agreement-page .tds-dropdown .tds-dropdown-menu.tax-dropdown {
+  width: 100%;
+  max-height: 220px;
+  overflow: hidden;
+}
+
+body.security-agreement-page .tds-calculate-output {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+body.security-agreement-page .tds-calculate-output:empty {
+  display: none;
+}
+
+body.security-agreement-page .tds-fields-wrap {
+  margin-top: 0.25rem;
+}
+
+/* ── Standalone index: category filter + Create toolbar ───── */
+body.security-agreement-page .standalone-toolbar {
+  margin: 0 0 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Toolbar lives inside .pc-content (same as register body) so it aligns with the main column. */
+body.security-agreement-page .pc-container .pc-content > .standalone-toolbar {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+body.security-agreement-page .standalone-toolbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+body.security-agreement-page .standalone-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+body.security-agreement-page .standalone-toolbar-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+body.security-agreement-page .seg-pills .nav-link {
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: 0.45rem 1.1rem;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+body.security-agreement-page .seg-pills .nav-link:hover {
+  color: #4338ca;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+body.security-agreement-page .seg-pills .nav-link.active {
+  color: #fff;
+  background: linear-gradient(145deg, #4f46e5 0%, #4338ca 100%);
+  border-color: transparent;
+}
+
+body.security-agreement-page .seg-pills .nav-link i {
+  margin-right: 0.25rem;
+  opacity: 0.9;
+}
+
+body.security-agreement-page .index .pay-pr-filter-shell .filter-category {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+body.security-agreement-page .type-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .standalone-toolbar-create {
+  flex-shrink: 0;
+}
+
+/* ── Register UI aligned with landlord advances (hero, filters, table shell) ─ */
+body.security-agreement-page .security-agreement.index > .card {
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 14px 40px rgba(49, 46, 129, 0.045);
+  border-color: #e2e8f0;
+  overflow: hidden;
+}
+
+body.security-agreement-page .security-agreement.index .page-body {
+  padding: 1.1rem 1.15rem 1.25rem;
+}
+
+body.security-agreement-page .security-agreement.index .stats {
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+body.security-agreement-page .security-agreement.index .stat {
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+body.security-agreement-page .security-agreement.show .stats {
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+body.security-agreement-page .security-agreement.show .stat {
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+body.security-agreement-page .security-agreement.index .filter-shell.filter-qd {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  margin-bottom: 1rem;
+}
+
+body.security-agreement-page .security-agreement.index .filter-shell.filter-qd > .filter-head {
+  padding: 1rem 1.15rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+body.security-agreement-page .security-agreement.index .filter-title {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+body.security-agreement-page .security-agreement.index .filter-title i {
+  color: #6366f1;
+}
+
+body.security-agreement-page .security-agreement.index .showing-count {
+  border-radius: 999px;
+  border-color: #e2e8f0;
+  background: #fff;
+  font-weight: 600;
+}
+
+body.security-agreement-page .security-agreement.index .pay-pr-filter-shell .qd-filters.pay-pr-qd-filters {
+  background: #fff;
+  border-bottom: 1px solid #eef2f7;
+}
+
+body.security-agreement-page .security-agreement.index .pay-pr-table-card {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 14px 40px rgba(49, 46, 129, 0.045);
+}
+
+body.security-agreement-page .security-agreement .pay-pr-empty.table-empty {
+  padding: 2.75rem 1.25rem !important;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-empty.table-empty .pay-pr-empty-icon {
+  font-size: 2.25rem;
+  color: #cbd5e1;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-empty.table-empty .pay-pr-empty-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #475569;
+  letter-spacing: -0.02em;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-empty.table-empty .pay-pr-empty-hint,
+body.security-agreement-page .security-agreement .pay-pr-empty.table-empty .table-empty-hint {
+  max-width: 22rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-pagination-bar {
+  margin-top: 1.1rem;
+}
+
+/* Register: Google Maps + building thumb + other parties */
+body.security-agreement-page .security-agreement .pay-pr-map-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+body.security-agreement-page .security-agreement .pay-pr-map-link:hover {
+  background: rgba(37, 99, 235, 0.18);
+  color: #1d4ed8;
+}
+body.security-agreement-page .security-agreement .pay-pr-building-thumb {
+  display: block;
+  max-width: 72px;
+  max-height: 52px;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+body.security-agreement-page .security-agreement .pay-pr-td-names .pay-pr-extra-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1.35;
+  max-width: 10rem;
+}
+body.security-agreement-page .security-agreement .pay-pr-th-refund,
+body.security-agreement-page .security-agreement .pay-pr-th-rent {
+  min-width: 7.25rem;
+  width: 7.25rem;
+  white-space: nowrap;
+  vertical-align: middle;
+  padding-left: 0.5rem;
+  padding-right: 0.65rem;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-th-refund {
+  min-width: 8.5rem;
+  width: 8.5rem;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-th-amt-label {
+  display: inline-block;
+  line-height: 1.25;
+  text-align: right;
+  white-space: normal;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-td-amt {
+  min-width: 7.25rem;
+  white-space: nowrap;
+}
+
+.maps-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  text-decoration: none;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+.maps-link:hover {
+  background: rgba(37, 99, 235, 0.16);
+  color: #1e3a8a;
+}
+
+.building-show-img {
+  max-width: min(100%, 420px);
+  max-height: 280px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  object-fit: contain;
+}
+
+.building-thumb-preview {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  object-fit: cover;
+}
+
+[data-field].is-invalid .field-input,
+[data-field].is-invalid .field-select,
+[data-field].is-invalid .field-textarea,
+[data-field].is-invalid .form-control {
+  border-color: #dc3545;
+}
+
+[data-field] .invalid-feedback,
+[data-field] .js-field-feedback {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: #dc3545;
+}
+
+
+/* ========== Register, period popover, owner payments ledger ========== */
+
+/* Security agreements register — hero header, period popover, expandable rows */
+.register-hero .hero-lead {
+  margin: 0;
+  max-width: 48rem;
+  font-size: 0.95rem;
+  color: rgba(248, 250, 252, 0.92);
+  line-height: 1.55;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.65rem;
+}
+.register-hero .hero-lead strong {
+  color: #fff;
+  font-weight: 600;
+}
+.register-hero .hero-lead-muted {
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 0.875rem;
+}
+.register-hero .register-scope-label {
+  font-weight: 600;
+  color: rgba(248, 250, 252, 0.85);
+}
+.register-hero .register-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.register-hero .register-cat-pill--hospital {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.register-hero .register-cat-pill--hostel {
+  background: rgba(167, 243, 208, 0.25);
+  color: #ecfdf5;
+  border: 1px solid rgba(167, 243, 208, 0.45);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.main-content {
+  min-width: 0;
+}
+
+.row-expand-trigger {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.row-expand-trigger:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+tr.pay-pr-row.row-expanded td {
+  background: rgba(99, 102, 241, 0.04);
+}
+.detail-row td {
+  padding: 0 !important;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.detail-panel {
+  padding: 0.85rem 1rem 1rem;
+}
+.detail-panel-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin-bottom: 0.65rem;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+}
+@media (max-width: 767.98px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.detail-item.detail-item--wide {
+  grid-column: 1 / -1;
+}
+.detail-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.15rem;
+}
+.detail-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.period-link {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  text-align: left;
+}
+.period-link:hover,
+.period-link.period-link--active {
+  color: #1d4ed8;
+}
+.period-popover {
+  background: #fff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: 0.85rem 1rem;
+}
+.period-popover-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.period-popover-head strong {
+  font-size: 0.8125rem;
+  color: #4338ca;
+}
+.period-popover-head span {
+  font-size: 0.8125rem;
+  color: #334155;
+}
+.period-popover-table {
+  width: 100%;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+.period-popover-table th,
+.period-popover-table td {
+  padding: 0.35rem 0.4rem;
+  vertical-align: top;
+  border-bottom: 1px solid #f1f5f9;
+}
+.period-popover-table th {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+}
+.period-popover-label {
+  font-weight: 700;
+  color: #4338ca;
+  white-space: nowrap;
+}
+.period-popover-note {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* ── Register: Refine list + toolbar + table alignment ───────── */
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px 16px;
+  align-items: end;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-filter-shell .qd-filter-row.filter-row-secondary {
+  margin-top: 8px;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .filter-category,
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-filter-shell .qd-date-wrap {
+  min-height: 36px;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-table-toolbar.row {
+  align-items: center !important;
+  margin-top: 0.75rem !important;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-table-toolbar-search {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: min(100%, 300px);
+}
+
+@media (min-width: 768px) {
+  body.security-agreement-page .security-agreement.index #filter-form .pay-pr-table-toolbar-search.col-auto {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 300px;
+  }
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-per-page-field--toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
+  width: auto;
+  flex: 0 0 auto;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-per-page-field--toolbar .pay-pr-per-page-label {
+  margin-bottom: 0 !important;
+  white-space: nowrap;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 100%;
+  max-width: 300px;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-toolbar-search-wrap.qd-search-wrap input {
+  height: 36px;
+}
+
+body.security-agreement-page .security-agreement.index #filter-form .pay-pr-per-page-select {
+  height: 36px;
+  min-width: 5.5rem;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-thead.qdt-head th.pay-pr-th-amt.text-end {
+  text-align: right !important;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-amount-curr {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+}
+
+@media (max-width: 991.98px) {
+  body.security-agreement-page .security-agreement.index #filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body.security-agreement-page .security-agreement.index #filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.security-agreement-page .security-agreement.index #filter-form .pay-pr-per-page-field--toolbar {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Register table — location column (icon before zone) */
+body.security-agreement-page .security-agreement .pay-pr-loc-stack,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-loc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-loc-zone,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-loc-zone,
+.index .pay-pr-loc-zone {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  margin-bottom: 0.25rem;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-loc-zone--branch-only,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-loc-zone--branch-only {
+  margin-bottom: 0;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-map-link--inline,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-map-link--inline,
+.index .pay-pr-map-link--inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-map-link--inline:hover,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-map-link--inline:hover,
+.index .pay-pr-map-link--inline:hover {
+  background: rgba(37, 99, 235, 0.18);
+  color: #1d4ed8;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-loc-zone .pay-pr-zone-pill,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-loc-zone .pay-pr-zone-pill {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-loc-stack > .pay-pr-branch-txt,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-loc-stack > .pay-pr-branch-txt {
+  padding-left: 1.85rem;
+}
+
+/* Register table — company column */
+body.security-agreement-page .security-agreement .pay-pr-th-company,
+body.security-agreement-page .security-agreement .pay-pr-td-company,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-th-company,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-td-company {
+  min-width: 16rem;
+  width: 18rem;
+  max-width: 24rem;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-td-company .pay-pr-company-name,
+body.llp-page .llp-ws-embed .security-agreement .pay-pr-td-company .pay-pr-company-name {
+  display: block;
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  word-break: normal;
+  font-weight: 500;
+  color: #334155;
+  line-height: 1.45;
+}
+
+/* Register table — RCM column */
+body.security-agreement-page .security-agreement .pay-pr-th-rcm,
+body.security-agreement-page .security-agreement .pay-pr-td-rcm {
+  text-align: center;
+  white-space: nowrap;
+  min-width: 4.5rem;
+}
+
+body.security-agreement-page .security-agreement .rcm-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+body.security-agreement-page .security-agreement .pay-pr-td-rcm .rcm-pill {
+  min-width: 2.25rem;
+  text-align: center;
+}
+
+/* Register table — attachment column */
+body.security-agreement-page .security-agreement .pay-pr-th-attachment,
+body.security-agreement-page .security-agreement .pay-pr-td-attachment {
+  min-width: 10.5rem;
+  width: 11.5rem;
+}
+
+body.security-agreement-page .security-agreement .attach-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+body.security-agreement-page .security-agreement .attach-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  color: #1e293b;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+body.security-agreement-page .security-agreement.index button.attach-tile {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-family: inherit;
+}
+
+body.security-agreement-page .security-agreement .attach-tile:hover,
+body.security-agreement-page .security-agreement .attach-tile:focus-visible {
+  border-color: #6366f1;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.12);
+  outline: none;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-icon--pdf {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-icon--image {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-icon--doc {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-icon--file {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-kicker {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-name {
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 6.5rem;
+}
+
+body.security-agreement-page .security-agreement .attach-tile-badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+body.security-agreement-page .security-agreement .attach-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+body.security-agreement-page .security-agreement .attach-open:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4f46e5;
+}
+
+body.security-agreement-page .security-agreement .attach-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+body.security-agreement-page .preview-modal-body {
+  min-height: 50vh;
+}
+
+body.security-agreement-page .preview-modal-iframe {
+  width: 100%;
+  min-height: 65vh;
+  height: 70vh;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+body.security-agreement-page .preview-modal-img {
+  max-width: 100%;
+  width: auto;
+  max-height: 75vh;
+  object-fit: contain;
+  padding: 1rem;
+}
+
+body.security-agreement-page .preview-modal-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 40vh;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #64748b;
+}
+
+body.security-agreement-page .preview-modal-fallback i {
+  font-size: 2.5rem;
+  color: #94a3b8;
+}
+
+/* Owner name → bill payments & NEFT page */
+a.pay-pr-vendor-name.owner-payments-link,
+button.pay-pr-vendor-name.owner-payments-trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+}
+a.pay-pr-vendor-name.owner-payments-link:hover,
+button.pay-pr-vendor-name.owner-payments-trigger:hover,
+tr.pay-pr-row.row-payments-expanded button.owner-payments-trigger {
+  color: #4338ca;
+}
+tr.pay-pr-row.row-payments-expanded td {
+  background: rgba(37, 99, 235, 0.05);
+}
+.payments-row td.payments-row-cell {
+  padding: 0 !important;
+  border-bottom: 1px solid #c7d2fe;
+  background: #f8fafc;
+}
+.payments-panel {
+  padding: 0.85rem 1rem 1rem;
+}
+.payments-panel-head {
+  margin-bottom: 0.75rem;
+}
+.payments-panel-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #312e81;
+}
+.payments-panel-sub {
+  font-size: 0.75rem;
+}
+.payments-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+@media (max-width: 991.98px) {
+  .payments-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 575.98px) {
+  .payments-summary {
+    grid-template-columns: 1fr;
+  }
+}
+.payments-stat {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+}
+.payments-stat-lbl {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.1rem;
+}
+.payments-stat-val {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.payments-stat-val--warn {
+  color: #b45309;
+}
+.payments-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+.payments-table {
+  width: 100%;
+  margin: 0;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+.payments-table th {
+  background: #f1f5f9;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #475569;
+  padding: 0.45rem 0.55rem;
+  white-space: nowrap;
+}
+.payments-table td {
+  padding: 0.45rem 0.55rem;
+  border-top: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.payments-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 1rem !important;
+}
+.pay-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pay-pill--done {
+  background: #dcfce7;
+  color: #166534;
+}
+.pay-pill--pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.pay-pill--opening {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+body.security-agreement-page.owner-payments-page .hero .owner-payments-sub {
+  font-size: 0.93rem;
+  margin-top: 0.35rem;
+  color: rgba(248, 250, 252, 0.9);
+}
+body.security-agreement-page.owner-payments-page .hero .owner-payments-agreement {
+  font-weight: 700;
+  color: #e0e7ff;
+  letter-spacing: 0.02em;
+}
+body.security-agreement-page.owner-payments-page .hero .hero-sub-muted {
+  color: rgba(248, 250, 252, 0.78);
+}
+body.security-agreement-page.owner-payments-page .hero .hero-cat-pill {
+  margin-right: 0.5rem;
+}
+body.security-agreement-page.owner-payments-page .payments-summary--page {
+  margin-bottom: 1.25rem;
+}
+body.security-agreement-page.owner-payments-page .payments-table-wrap--page {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+body.security-agreement-page.owner-payments-page .owner-payments-footnote a {
+  font-weight: 600;
+}
+.owner-agreements-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.owner-agreement-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #312e81;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.owner-agreement-chip:hover {
+  background: #e0e7ff;
+  color: #1e1b4b;
+}
+.owner-agreement-chip-cat {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6366f1;
+}
+.payments-agreement-link {
+  font-weight: 600;
+  color: #4338ca;
+  text-decoration: none;
+}
+.payments-agreement-link:hover {
+  text-decoration: underline;
+}
+body.security-agreement-page.owner-payments-page .owner-payments-hero .owner-payments-agreement {
+  font-weight: 700;
+  color: #e0e7ff;
+}
+.payments-utr {
+  color: #64748b;
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+.payments-open-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+.payments-open-link:hover {
+  text-decoration: underline;
+}
+body.llp-page .llp-ws-embed .payments-panel,
+body.security-agreement-page .payments-panel {
+  padding: 0.85rem 1rem 1rem;
+}
+
+/* Owner ledger — compact sections (override uikit `section { padding: 100px 0 }`) */
+body.security-agreement-page.owner-payments-page section.ledger-section {
+  padding: 0;
+  margin: 0;
+}
+body.security-agreement-page.owner-payments-page .payments-summary--ledger {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 0.75rem;
+}
+@media (max-width: 991.98px) {
+  body.security-agreement-page.owner-payments-page .payments-summary--ledger {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+body.security-agreement-page.owner-payments-page .payments-stat--rent-expense { border-top: 3px solid #2563eb; }
+body.security-agreement-page.owner-payments-page .payments-stat--rent-advance { border-top: 3px solid #7c3aed; }
+body.security-agreement-page.owner-payments-page .payments-stat--maintenance { border-top: 3px solid #d97706; }
+body.security-agreement-page.owner-payments-page .payments-stat--total-sent { border-top: 3px solid #059669; }
+.ledger-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.ledger-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.ledger-section--rent-expenses { border-top: 3px solid #2563eb; }
+.ledger-section--rent-advance { border-top: 3px solid #7c3aed; }
+.ledger-section--maintenance-charges { border-top: 3px solid #d97706; }
+.ledger-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.ledger-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ledger-section-pending {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #c2410c;
+}
+.ledger-section-table {
+  border: 0;
+  box-shadow: none;
+}
+
+/* vendor.css hides input[type="file"] globally — restore upload UI inside pr-pay-upload-box */
+body.security-agreement-page .sa-doc-upload-zone {
+  width: 100%;
+}
+
+body.security-agreement-page .sa-doc-upload-box {
+  padding: 1.35rem 1rem;
+  min-height: 9.5rem;
+}
+
+body.security-agreement-page .sa-doc-upload-box .pr-pay-upload-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 1.35rem;
+  margin-bottom: 0.65rem;
+}
+
+body.security-agreement-page .sa-doc-upload-box .pr-pay-upload-text {
+  font-size: 0.9rem;
+}
+
+body.security-agreement-page .sa-doc-upload-box .pr-pay-upload-hint {
+  font-size: 0.78rem;
+  margin-bottom: 0;
+}
+
+body.security-agreement-page .sa-doc-upload-box input[type="file"],
+body.security-agreement-page .sa-doc-upload-box .sa-doc-file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block !important;
+  opacity: 0;
+  cursor: pointer;
+}
+
+body.security-agreement-page .sa-doc-pending-preview {
+  width: 100%;
+}
