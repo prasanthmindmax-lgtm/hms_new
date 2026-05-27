@@ -477,13 +477,6 @@ public function getvendor(Request $request)
     ]);
 }
 
-private function resolvedPartyTypeFilter(Request $request): ?string
-{
-    $types = $this->resolvedPartyTypeFilters($request);
-
-    return $types[0] ?? null;
-}
-
 /** @return list<string> */
 private function resolvedPartyTypeFilters(Request $request): array
 {
