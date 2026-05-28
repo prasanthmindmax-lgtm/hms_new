@@ -855,7 +855,7 @@ function rowClick(event) {
                     $locations = null;
                     $zones = null;
 
-                    if ($admin->access_limits == 1) {
+                    if ($admin->access_limits == 1 || $admin->access_limits == 4) {
                         // Access limit 1 → All zones
                         $zones = TblZonesModel::select('name', 'id')->get();
                         $locations = TblLocationModel::select('name', 'id','zone_id')->get();
