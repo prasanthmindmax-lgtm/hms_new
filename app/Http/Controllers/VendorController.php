@@ -456,7 +456,7 @@ public function getvendor(Request $request)
     }
 
     $locations  = TblLocationModel::all();
-    $Tblvendor  = Tblvendor::where('active_status', 0)->orderBy('id', 'asc')->get();
+    $Tblvendor  = Tblvendor::orderBy('id', 'asc')->get();
     $allVendors = Tblvendor::orderBy('id', 'desc')->get();
     $creatorIds = Tblvendor::whereNotNull('user_id')->distinct()->pluck('user_id');
     $creators   = usermanagementdetails::whereIn('id', $creatorIds)->orderBy('user_fullname')->get(['id', 'user_fullname']);
