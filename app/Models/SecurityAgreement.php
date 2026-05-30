@@ -7,7 +7,6 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SecurityAgreement extends Model
 {
@@ -81,11 +80,6 @@ class SecurityAgreement extends Model
         ];
     }
 
-    public static function isVendorGstPartyType(?string $vendorTypeName): bool
-    {
-        return self::canonicalVendorGstPartyType($vendorTypeName) !== null;
-    }
-
     public static function canonicalVendorGstPartyType(?string $vendorTypeName): ?string
     {
         $normalized = mb_strtolower(trim((string) $vendorTypeName));
@@ -146,13 +140,8 @@ class SecurityAgreement extends Model
         'vendor_id',
         'address',
         'agreement_period',
-        'advance_amount',
-        'security_charge_amount',
-        'housekeeping_charge_amount',
         'security_fixed_salary_amount',
         'housekeeping_fixed_salary_amount',
-        'security_paid_leave_applicable',
-        'security_paid_leave_days',
         'housekeeping_paid_leave_applicable',
         'housekeeping_paid_leave_days',
         'gst_type',
@@ -177,30 +166,14 @@ class SecurityAgreement extends Model
         'pan_number',
         'contact_person_name',
         'contact_person_number',
-        'attachment_path',
-        'attachment_original_name',
-        'esi_certificate_path',
-        'esi_certificate_original_name',
-        'pf_certificate_path',
-        'pf_certificate_original_name',
+        'attachment_files',
+        'esi_certificate_files',
+        'pf_certificate_files',
         'created_by',
     ];
 
     /** Folder on the public storage disk (pass any name per module). */
     public const FILE_STORAGE_FOLDER = 'security_agreement_attachments';
-
-    public static function storedFileStorageFolder(): string
-    {
-        return self::FILE_STORAGE_FOLDER;
-    }
-
-    /**
-     * @return array<string, array{path: string, name?: string, label?: string}>
-     */
-    public static function storedFileSlotDefinitions(): array
-    {
-        return self::FILE_SLOTS;
-    }
 
     /** @var array<string, string> */
     public const FILE_INPUT_NAMES = [
@@ -216,34 +189,26 @@ class SecurityAgreement extends Model
         'pf_certificate' => 'keep_pf_certificate_paths',
     ];
 
-    /** @var array<string, array{path: string, name: string, label: string}> */
+    /** @var array<string, array{column: string, label: string}> */
     public const FILE_SLOTS = [
         'security_agreement' => [
-            'path' => 'attachment_path',
-            'name' => 'attachment_original_name',
+            'column' => 'attachment_files',
             'label' => 'Security agreement file',
         ],
         'esi_certificate' => [
-            'path' => 'esi_certificate_path',
-            'name' => 'esi_certificate_original_name',
+            'column' => 'esi_certificate_files',
             'label' => 'ESI certificate',
         ],
         'pf_certificate' => [
-            'path' => 'pf_certificate_path',
-            'name' => 'pf_certificate_original_name',
+            'column' => 'pf_certificate_files',
             'label' => 'PF certificate',
         ],
     ];
 
     protected $casts = [
         'agreement_date' => 'date',
-        'advance_amount' => 'decimal:2',
-        'security_charge_amount' => 'decimal:2',
-        'housekeeping_charge_amount' => 'decimal:2',
         'security_fixed_salary_amount' => 'decimal:2',
         'housekeeping_fixed_salary_amount' => 'decimal:2',
-        'security_paid_leave_applicable' => 'boolean',
-        'security_paid_leave_days' => 'integer',
         'housekeeping_paid_leave_applicable' => 'boolean',
         'housekeeping_paid_leave_days' => 'integer',
         'gst_percentage' => 'decimal:2',
@@ -290,29 +255,6 @@ class SecurityAgreement extends Model
         return in_array((string) $type, [self::GST_INCLUDING, self::GST_EXCLUDING], true);
     }
 
-    /**
-     * GST amount for rent + maintenance (each line calculated separately, then summed).
-     */
-    public static function computeGstAmount(
-        string $gstType,
-        float $monthlyRent,
-        float $maintenance,
-        float $percentage
-    ): float {
-        return self::computeGstBreakdown($gstType, $monthlyRent, $maintenance, $percentage)['gst_amount'];
-    }
-
-    /**
-     * GST breakdown for a single inclusive/exclusive base amount.
-     *
-     * @return array{
-     *     taxable: float,
-     *     gst_amount: float,
-     *     cgst_amount: float,
-     *     sgst_amount: float,
-     *     igst_amount: float,
-     * }
-     */
     public static function computeGstBreakdownForBase(
         string $gstType,
         float $base,
@@ -370,19 +312,6 @@ class SecurityAgreement extends Model
         ];
     }
 
-    /**
-     * Taxable base and GST split for rent and maintenance (calculated separately, totals combined).
-     *
-     * @return array{
-     *     taxable: float,
-     *     gst_amount: float,
-     *     cgst_amount: float,
-     *     sgst_amount: float,
-     *     igst_amount: float,
-     *     rent: array{taxable: float, gst_amount: float, cgst_amount: float, sgst_amount: float, igst_amount: float},
-     *     maintenance: array{taxable: float, gst_amount: float, cgst_amount: float, sgst_amount: float, igst_amount: float},
-     * }
-     */
     public static function computeGstBreakdown(
         string $gstType,
         float $monthlyRent,
@@ -453,11 +382,9 @@ class SecurityAgreement extends Model
         $breakdown = self::computeGstBreakdown(
             (string) $this->gst_type,
             self::effectiveServiceTaxBase(
-                (float) ($this->security_charge_amount ?? 0),
                 $this->security_fixed_salary_amount !== null ? (float) $this->security_fixed_salary_amount : null
             ),
             self::effectiveServiceTaxBase(
-                (float) ($this->housekeeping_charge_amount ?? 0),
                 $this->housekeeping_fixed_salary_amount !== null ? (float) $this->housekeeping_fixed_salary_amount : null
             ),
             (float) ($this->gst_percentage ?? 0),
@@ -465,11 +392,9 @@ class SecurityAgreement extends Model
         );
 
         $securityBase = self::effectiveServiceTaxBase(
-            (float) ($this->security_charge_amount ?? 0),
             $this->security_fixed_salary_amount !== null ? (float) $this->security_fixed_salary_amount : null
         );
         $housekeepingBase = self::effectiveServiceTaxBase(
-            (float) ($this->housekeeping_charge_amount ?? 0),
             $this->housekeeping_fixed_salary_amount !== null ? (float) $this->housekeeping_fixed_salary_amount : null
         );
 
@@ -477,7 +402,7 @@ class SecurityAgreement extends Model
 
         if ($securityBase > 0 || ($breakdown['rent']['gst_amount'] ?? 0) > 0) {
             $rows[] = [
-                'label' => 'Security charge',
+                'label' => 'Security salary',
                 'taxable' => (float) ($breakdown['rent']['taxable'] ?? 0),
                 'gst_amount' => (float) ($breakdown['rent']['gst_amount'] ?? 0),
             ];
@@ -485,7 +410,7 @@ class SecurityAgreement extends Model
 
         if ($housekeepingBase > 0 || ($breakdown['maintenance']['gst_amount'] ?? 0) > 0) {
             $rows[] = [
-                'label' => 'Housekeeping charge',
+                'label' => 'Housekeeping salary',
                 'taxable' => (float) ($breakdown['maintenance']['taxable'] ?? 0),
                 'gst_amount' => (float) ($breakdown['maintenance']['gst_amount'] ?? 0),
             ];
@@ -502,11 +427,6 @@ class SecurityAgreement extends Model
         return $rows;
     }
 
-    /**
-     * Per-service TDS rows for register / show (security, housekeeping, combined).
-     *
-     * @return array<int, array{label: string, charge_amount: float, tds_amount: float}>
-     */
     public function tdsServiceBreakdownRows(): array
     {
         $rate = (float) ($this->tds_rate ?? 0);
@@ -515,11 +435,9 @@ class SecurityAgreement extends Model
         }
 
         $securityBase = self::effectiveServiceTaxBase(
-            (float) ($this->security_charge_amount ?? 0),
             $this->security_fixed_salary_amount !== null ? (float) $this->security_fixed_salary_amount : null
         );
         $housekeepingBase = self::effectiveServiceTaxBase(
-            (float) ($this->housekeeping_charge_amount ?? 0),
             $this->housekeeping_fixed_salary_amount !== null ? (float) $this->housekeeping_fixed_salary_amount : null
         );
 
@@ -533,16 +451,16 @@ class SecurityAgreement extends Model
 
         if ($securityBase > 0 || $breakdown['security'] > 0) {
             $rows[] = [
-                'label' => 'Security charge',
-                'charge_amount' => $securityBase,
+                'label' => 'Security salary',
+                'salary_amount' => $securityBase,
                 'tds_amount' => $breakdown['security'],
             ];
         }
 
         if ($housekeepingBase > 0 || $breakdown['housekeeping'] > 0) {
             $rows[] = [
-                'label' => 'Housekeeping charge',
-                'charge_amount' => $housekeepingBase,
+                'label' => 'Housekeeping salary',
+                'salary_amount' => $housekeepingBase,
                 'tds_amount' => $breakdown['housekeeping'],
             ];
         }
@@ -550,7 +468,7 @@ class SecurityAgreement extends Model
         if ($rows !== [] && $breakdown['total'] > 0) {
             $rows[] = [
                 'label' => 'Combined total',
-                'charge_amount' => round($securityBase + $housekeepingBase, 2),
+                'salary_amount' => round($securityBase + $housekeepingBase, 2),
                 'tds_amount' => $breakdown['total'],
             ];
         }
@@ -559,15 +477,10 @@ class SecurityAgreement extends Model
     }
 
     /**
-     * Charge amount used for GST/TDS when set; otherwise fixed salary for that service line.
+     * Fixed salary amount used as the GST/TDS tax base for a service line.
      */
-    public static function effectiveServiceTaxBase(float $chargeAmount, ?float $salaryAmount): float
+    public static function effectiveServiceTaxBase(?float $salaryAmount): float
     {
-        $charge = max(0.0, $chargeAmount);
-        if ($charge > 0) {
-            return $charge;
-        }
-
         return max(0.0, (float) ($salaryAmount ?? 0));
     }
 
@@ -649,15 +562,35 @@ class SecurityAgreement extends Model
         return $parts !== [] ? implode(' · ', $parts) : '—';
     }
 
-    /** TDS rate as decimal (0.10 for 10%) for landlord payment calculator. */
-    public function tdsRateDecimal(): float
+    /**
+     * Register table: GST rate only (e.g. "18%").
+     */
+    public function gstPercentageDisplay(): string
+    {
+        if (! self::isGstApplicableType((string) ($this->gst_type ?? ''))) {
+            return '—';
+        }
+
+        if ($this->gst_percentage === null || (float) $this->gst_percentage <= 0) {
+            return '—';
+        }
+
+        return rtrim(rtrim(number_format((float) $this->gst_percentage, 2), '0'), '.').'%';
+    }
+
+    /**
+     * Register table: TDS rate only (e.g. "2%").
+     */
+    public function tdsPercentageDisplay(): string
     {
         $rate = (float) ($this->tds_rate ?? 0);
         if ($rate <= 0) {
-            return 0.0;
+            return '—';
         }
 
-        return $rate <= 1 ? $rate : $rate / 100;
+        $display = $rate <= 1 ? $rate * 100 : $rate;
+
+        return rtrim(rtrim(number_format($display, 2), '0'), '.').'%';
     }
 
     public function isRcmApplicable(): bool
@@ -697,10 +630,7 @@ class SecurityAgreement extends Model
             return [];
         }
 
-        $nameCol = $meta['name'] ?? null;
-        $legacyName = $nameCol ? trim((string) ($this->{$nameCol} ?? '')) : null;
-
-        return app(FileUploadService::class)->decodeFiles($this->{$meta['path']} ?? null, $legacyName !== '' ? $legacyName : null);
+        return app(FileUploadService::class)->decodeFiles($this->{$meta['column']} ?? null);
     }
 
     /**
@@ -761,53 +691,6 @@ class SecurityAgreement extends Model
         };
     }
 
-    /**
-     * @return list<string>
-     */
-    public function additionalPartyNamesList(): array
-    {
-        $raw = trim((string) ($this->additional_party_names ?? ''));
-        if ($raw === '') {
-            return [];
-        }
-
-        $lines = preg_split('/\r\n|\r|\n/', $raw);
-        if (! is_array($lines)) {
-            return [];
-        }
-
-        $out = [];
-        foreach ($lines as $line) {
-            $t = trim((string) $line);
-            if ($t !== '') {
-                $out[] = $t;
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * Google Maps search URL from zone, branch, and address text.
-     */
-    public static function googleMapsSearchUrl(?string $zoneName, ?string $branchName, ?string $address): string
-    {
-        $parts = [];
-        foreach ([$branchName, $zoneName, $address] as $p) {
-            $t = trim((string) $p);
-            if ($t !== '') {
-                $parts[] = $t;
-            }
-        }
-        $q = implode(', ', $parts);
-
-        if ($q === '') {
-            return 'https://www.google.com/maps';
-        }
-
-        return 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($q);
-    }
-
     public function creator(): BelongsTo
     {
         return $this->belongsTo(usermanagementdetails::class, 'created_by');
@@ -852,92 +735,5 @@ class SecurityAgreement extends Model
         return $query
             ->whereDate('end_of_agreement_date', '>=', $today->toDateString())
             ->whereDate('end_of_agreement_date', '<=', $today->copy()->addDays($days)->toDateString());
-    }
-
-    /**
-     * @return array{0: Carbon, 1: Carbon}|null
-     */
-    public static function parseAgreementPeriodDates(?string $raw): ?array
-    {
-        $raw = trim((string) $raw);
-        if ($raw === '' || ! preg_match('/\s+to\s+/i', $raw)) {
-            return null;
-        }
-
-        $parts = preg_split('/\s+to\s+/i', $raw, 2);
-        if (! is_array($parts) || count($parts) !== 2) {
-            return null;
-        }
-
-        foreach (['d-m-Y', 'd/m/Y', 'Y-m-d'] as $format) {
-            try {
-                $start = Carbon::createFromFormat($format, trim((string) $parts[0]))->startOfDay();
-                $end = Carbon::createFromFormat($format, trim((string) $parts[1]))->startOfDay();
-
-                return [$start, $end];
-            } catch (\Throwable $e) {
-                // Try next format.
-            }
-        }
-
-        try {
-            return [
-                Carbon::parse(trim((string) $parts[0]))->startOfDay(),
-                Carbon::parse(trim((string) $parts[1]))->startOfDay(),
-            ];
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Year-wise monthly rent schedule (Yr 1, Yr 2, …) using rent hike % on each anniversary.
-     *
-     * @return list<array{label: string, period_label: string, monthly_rent: float}>
-     */
-    public function yearlyRentSchedule(): array
-    {
-        $parsed = self::parseAgreementPeriodDates($this->agreement_period);
-        if ($parsed === null) {
-            return [];
-        }
-
-        [$start, $end] = $parsed;
-        if ($end->lt($start)) {
-            return [];
-        }
-
-        $baseRent = (float) $this->security_charge_amount;
-        $hikePct = max(0, (float) ($this->rent_hike_percentage ?? 0));
-
-        $schedule = [];
-        $yearIndex = 1;
-        $cursor = $start->copy();
-
-        while ($cursor->lte($end) && $yearIndex <= 40) {
-            $yearEnd = $cursor->copy()->addYear()->subDay();
-            if ($yearEnd->gt($end)) {
-                $yearEnd = $end->copy();
-            }
-
-            $rent = $yearIndex === 1
-                ? $baseRent
-                : round($baseRent * pow(1 + ($hikePct / 100), $yearIndex - 1), 2);
-
-            $schedule[] = [
-                'label' => 'Yr '.$yearIndex,
-                'period_label' => $cursor->format('d M Y').' – '.$yearEnd->format('d M Y'),
-                'monthly_rent' => $rent,
-            ];
-
-            if ($yearEnd->gte($end)) {
-                break;
-            }
-
-            $cursor = $yearEnd->copy()->addDay();
-            $yearIndex++;
-        }
-
-        return $schedule;
     }
 }

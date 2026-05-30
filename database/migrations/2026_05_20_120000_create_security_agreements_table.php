@@ -19,13 +19,8 @@ return new class extends Migration
             $table->unsignedBigInteger('vendor_id');
             $table->text('address');
             $table->string('agreement_period', 120);
-            $table->decimal('advance_amount', 15, 2)->default(0);
-            $table->decimal('security_charge_amount', 15, 2)->default(0);
-            $table->decimal('housekeeping_charge_amount', 15, 2)->default(0);
             $table->decimal('security_fixed_salary_amount', 15, 2)->nullable();
             $table->decimal('housekeeping_fixed_salary_amount', 15, 2)->nullable();
-            $table->boolean('security_paid_leave_applicable')->default(false);
-            $table->unsignedSmallInteger('security_paid_leave_days')->nullable();
             $table->boolean('housekeeping_paid_leave_applicable')->default(false);
             $table->unsignedSmallInteger('housekeeping_paid_leave_days')->nullable();
             $table->string('gst_type', 30);
@@ -50,12 +45,9 @@ return new class extends Migration
             $table->string('pan_number', 30)->nullable();
             $table->string('contact_person_name', 255)->nullable();
             $table->string('contact_person_number', 30)->nullable();
-            $table->text('attachment_path')->nullable();
-            $table->string('attachment_original_name', 255)->nullable();
-            $table->text('esi_certificate_path')->nullable();
-            $table->string('esi_certificate_original_name', 255)->nullable();
-            $table->text('pf_certificate_path')->nullable();
-            $table->string('pf_certificate_original_name', 255)->nullable();
+            $table->text('attachment_files')->nullable();
+            $table->text('esi_certificate_files')->nullable();
+            $table->text('pf_certificate_files')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
 

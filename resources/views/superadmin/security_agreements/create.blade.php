@@ -8,11 +8,6 @@
 @endpush
 
 @section('head_scripts')
-<div id="saFlashData"
-  data-success="{{ e((string) session('success', '')) }}"
-  data-error="{{ e((string) session('error', '')) }}"
-  data-validation-errors="{{ e(json_encode($errors->all())) }}"
-  hidden></div>
 <script id="saBranchesData" type="application/json">@json($branches->map(fn ($branch) => ['id' => (int) $branch->id, 'name' => $branch->name, 'zone_id' => (int) $branch->zone_id])->values())</script>
 @endsection
 
@@ -35,6 +30,16 @@
   $selectedCompanyName = $selectedCompanyId ? ($companies->firstWhere('id', (int) $selectedCompanyId)?->company_name ?? '') : '';
   $selectedZoneName = $selectedZoneId ? ($zones->firstWhere('id', (int) $selectedZoneId)?->name ?? '') : '';
   $selectedBranchName = $selectedBranchId ? ($branches->firstWhere('id', (int) $selectedBranchId)?->name ?? '') : '';
+
+  $saAttachTypeClass = static function (string $kind): string {
+      return match ($kind) {
+          'pdf' => 'pr-gmail-type-pdf',
+          'doc' => 'pr-gmail-type-doc',
+          'image' => 'pr-gmail-type-img',
+          default => 'pr-gmail-type-file',
+      };
+  };
+
   $agreementDate = old('agreement_date', $r?->agreement_date?->format('Y-m-d'));
   $agreementPeriod = old('agreement_period', $r?->agreement_period ?? '');
   $agreementPeriodStart = old('agreement_period_start', '');
@@ -73,24 +78,9 @@
   if ($selectedVendorId !== '') {
       $matchedVendor = ($vendors ?? collect())->firstWhere('id', (int) $selectedVendorId);
       if ($matchedVendor) {
-          $selectedVendorDisplay = trim((string) ($matchedVendor->display_name ?? '')) !== ''
-              ? (string) $matchedVendor->display_name
-              : (string) ($matchedVendor->company_name ?? '');
+          $selectedVendorDisplay = $matchedVendor->listDisplayLabel();
       }
   }
-  $legacyPaidLeaveDays = $r && isset($r->paid_leave_applicable_days) && $r->paid_leave_applicable_days > 0
-      ? (int) $r->paid_leave_applicable_days
-      : null;
-  $securityPaidLeaveApplicable = (string) old(
-      'security_paid_leave_applicable',
-      $r
-          ? (($r->security_paid_leave_applicable ?? false) || $legacyPaidLeaveDays !== null ? '1' : '0')
-          : '0'
-  );
-  $securityPaidLeaveDays = old(
-      'security_paid_leave_days',
-      $r?->security_paid_leave_days ?? $legacyPaidLeaveDays ?? ''
-  );
   $housekeepingPaidLeaveApplicable = (string) old(
       'housekeeping_paid_leave_applicable',
       $r && ($r->housekeeping_paid_leave_applicable ?? false) ? '1' : '0'
@@ -228,7 +218,7 @@
                   @enderror
                 </div>
                 @if (!$isEdit)
-                  <div class="col-lg-4 col-md-6">
+                  <div class="col-lg-4 col-md-6" data-field="agreement_type">
                     <label class="field-label" for="sa_agreement_type">Category <span class="text-danger">*</span></label>
                     <select id="sa_agreement_type" name="agreement_type" class="field-input @error('agreement_type') is-invalid @enderror" required>
                       @php
@@ -263,12 +253,8 @@
                       </div>
                       <div class="vendor-list">
                         @foreach (($vendors ?? collect()) as $v)
-                          @php
-                            $vendorLabel = trim((string) ($v->display_name ?? '')) !== '' ? (string) $v->display_name : (string) ($v->company_name ?? '');
-                          @endphp
-                          @if ($vendorLabel !== '')
-                            <div data-value="{{ $vendorLabel }}" data-id="{{ $v->id }}" data-pan="{{ $v->pan_number ?? '' }}">{{ $vendorLabel }}</div>
-                          @endif
+                          @php $vendorLabel = $v->listDisplayLabel(); @endphp
+                          <div data-value="{{ $vendorLabel }}" data-id="{{ $v->id }}" data-pan="{{ $v->pan_number ?? '' }}">{{ $vendorLabel }}</div>
                         @endforeach
                       </div>
                     </div>
@@ -308,9 +294,12 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                   @enderror
                 </div>
-                <div class="col-lg-4 col-md-6">
-                  <label class="field-label">Termination Period</label>
-                  <input type="text" name="termination_period" class="field-input @error('termination_period') is-invalid @enderror" maxlength="120" value="{{ $o('termination_period') }}" placeholder="e.g. 3 months notice">
+                <div class="col-lg-4 col-md-6" data-field="termination_period">
+                  <label class="field-label">Termination Period <span class="text-danger">*</span></label>
+                  <input type="text" name="termination_period" class="field-input @error('termination_period') is-invalid @enderror" maxlength="120" value="{{ $o('termination_period') }}" placeholder="e.g. 3 months notice" required>
+                  @error('termination_period')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
                 </div>
                 <div class="col-12" data-field="address">
                   <label class="field-label">Address <span class="text-danger">*</span></label>
@@ -359,66 +348,33 @@
             $raCgst = $o('cgst_amount', '0');
             $raSgst = $o('sgst_amount', '0');
             $raIgst = $o('igst_amount', '0');
-            $raTdsTaxName = $o('tds_tax_name');
+            $gstOptions = $gstOptions ?? \App\Models\SecurityAgreement::GST_TAX_MODE_LABELS;
+            $gstTaxes = $gstTaxes ?? collect();
+            $tdsTaxes = $tdsTaxes ?? collect();
             $raTdsTaxId = $o('tds_tax_id');
             $raTdsRate = $o('tds_rate');
-            $raTdsSectionId = $o('tds_section_id');
-            $raTdsSection = trim((string) $o('tds_section'));
             $raTdsAmt = $o('tds_amount');
-            $raTdsSearchDisplay = (string) $raTdsTaxName;
-            if ($raTdsSearchDisplay !== '' && $raTdsRate !== '' && $raTdsRate !== null) {
-            $pct = (float) $raTdsRate;
-            $displayPct = $pct <= 1 && $pct > 0 ? $pct * 100 : $pct;
-            $pctFmt = rtrim(rtrim(number_format($displayPct, 2), '0'), '.');
-            $raTdsSearchDisplay = $pctFmt . '% TDS';
-            }
-            $raTdsSectionDisplay = $raTdsSection;
-            if ($raTdsSectionDisplay !== '' && $raTdsTaxName !== '' && $raTdsTaxName !== null && stripos($raTdsSectionDisplay, (string) $raTdsTaxName) === false) {
-            $raTdsSectionDisplay = $raTdsSectionDisplay . ' - ' . $raTdsTaxName;
+            $raTdsSearchDisplay = '';
+            if ($raTdsTaxId !== '' && $raTdsTaxId !== null) {
+                $selectedTds = $tdsTaxes->firstWhere('id', (int) $raTdsTaxId);
+                if ($selectedTds) {
+                    $sectionName = trim((string) ($selectedTds->section_name ?? $selectedTds->section?->name ?? ''));
+                    $pct = (float) $selectedTds->tax_rate;
+                    $displayPct = $pct <= 1 && $pct > 0 ? $pct * 100 : $pct;
+                    $pctFmt = rtrim(rtrim(number_format($displayPct, 2), '0'), '.');
+                    $raTdsSearchDisplay = trim((string) $selectedTds->tax_name);
+                    if ($pctFmt !== '') {
+                        $raTdsSearchDisplay .= ' ['.$pctFmt.'%]';
+                    }
+                    if ($sectionName !== '') {
+                        $raTdsSearchDisplay .= ' — '.$sectionName;
+                    }
+                }
             }
             $raTdsDisplayFormatted = $raTdsAmt !== '' && $raTdsAmt !== null
             ? number_format((float) $raTdsAmt, 2)
             : '';
-            $gstOptions = $gstOptions ?? \App\Models\SecurityAgreement::GST_TAX_MODE_LABELS;
-            $gstTaxes = $gstTaxes ?? collect();
-            $tdsTaxes = $tdsTaxes ?? collect();
             @endphp
-
-            <section class="form-block">
-            <header class="form-block-head">
-            <i class="bi bi-house-door" aria-hidden="true"></i>
-            <span>Service charges</span>
-            </header>
-            <div class="form-block-body form-grid form-grid--3">
-            <div data-field="advance_amount">
-            <label class="field-label" for="sa_advance_amount">Advance amount (refundable advance paid) <span class="text-danger">*</span></label>
-            <div class="amount-wrap">
-            <span class="amount-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="advance_amount" id="sa_advance_amount" class="field-input amount-input @error('advance_amount') is-invalid @enderror" value="{{ $o('advance_amount') }}" placeholder="0.00">
-            </div>
-            @error('advance_amount')
-              <div class="invalid-feedback d-block">{{ $message }}</div>
-            @enderror
-            </div>
-            <div data-field="security_charge_amount">
-            <label class="field-label" for="sa_security_charge_amount">Security charge amount <span class="text-danger">*</span></label>
-            <div class="amount-wrap">
-            <span class="amount-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="security_charge_amount" id="sa_security_charge_amount" class="field-input amount-input @error('security_charge_amount') is-invalid @enderror" value="{{ $o('security_charge_amount') }}" placeholder="0.00">
-            </div>
-            @error('security_charge_amount')
-              <div class="invalid-feedback d-block">{{ $message }}</div>
-            @enderror
-            </div>
-            <div>
-            <label class="field-label" for="sa_housekeeping_charge_amount">Housekeeping charge amount</label>
-            <div class="amount-wrap">
-            <span class="amount-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="housekeeping_charge_amount" id="sa_housekeeping_charge_amount" class="field-input amount-input @error('housekeeping_charge_amount') is-invalid @enderror" value="{{ $o('housekeeping_charge_amount') }}" placeholder="0.00">
-            </div>
-            </div>
-            </div>
-            </section>
 
             <section class="form-block">
             <header class="form-block-head">
@@ -426,40 +382,26 @@
             <span>Salary &amp; compliance</span>
             </header>
             <div class="form-block-body">
-            <div class="form-grid form-grid--3" data-paid-leave-role="security">
-            <div>
-            <label class="field-label" for="sa_security_fixed_salary">Security fixed salary amount</label>
+            <div class="form-grid form-grid--4 sa-salary-grid" data-paid-leave-role="housekeeping">
+            <div data-field="security_fixed_salary_amount">
+            <label class="field-label" for="sa_security_fixed_salary">Security fixed salary amount <span class="text-danger">*</span></label>
             <div class="amount-wrap">
             <span class="amount-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="security_fixed_salary_amount" id="sa_security_fixed_salary" class="field-input amount-input" value="{{ $o('security_fixed_salary_amount') }}" placeholder="0.00">
+            <input type="number" step="0.01" min="0" name="security_fixed_salary_amount" id="sa_security_fixed_salary" class="field-input amount-input @error('security_fixed_salary_amount') is-invalid @enderror" value="{{ $o('security_fixed_salary_amount') }}" placeholder="0.00" required>
             </div>
-            </div>
-            <div data-field="security_paid_leave_applicable">
-            <label class="field-label" for="sa_security_paid_leave_applicable">Security paid leave applicable <span class="text-danger">*</span></label>
-            <select name="security_paid_leave_applicable" id="sa_security_paid_leave_applicable" class="field-select @error('security_paid_leave_applicable') is-invalid @enderror" data-paid-leave-toggle>
-              <option value="0" @selected($securityPaidLeaveApplicable === '0')>No</option>
-              <option value="1" @selected($securityPaidLeaveApplicable === '1')>Yes</option>
-            </select>
-            @error('security_paid_leave_applicable')
+            @error('security_fixed_salary_amount')
               <div class="invalid-feedback d-block">{{ $message }}</div>
             @enderror
             </div>
-            <div class="sa-paid-leave-days-wrap @if($securityPaidLeaveApplicable !== '1') sa-paid-leave-days-wrap--hidden @endif" data-paid-leave-days-wrap data-field="security_paid_leave_days">
-            <label class="field-label" for="sa_security_paid_leave_days">Security paid leave days <span class="text-danger">*</span></label>
-            <input type="number" step="1" min="1" max="366" name="security_paid_leave_days" id="sa_security_paid_leave_days" class="field-input @error('security_paid_leave_days') is-invalid @enderror" value="{{ $securityPaidLeaveDays }}" placeholder="e.g. 12" data-paid-leave-days>
-            @error('security_paid_leave_days')
-              <div class="invalid-feedback d-block">{{ $message }}</div>
-            @enderror
-            </div>
-            </div>
-
-            <div class="form-grid form-grid--3" data-paid-leave-role="housekeeping">
-            <div>
-            <label class="field-label" for="sa_housekeeping_fixed_salary">Housekeeping fixed salary amount</label>
+            <div data-field="housekeeping_fixed_salary_amount">
+            <label class="field-label" for="sa_housekeeping_fixed_salary">Housekeeping fixed salary amount <span class="text-danger">*</span></label>
             <div class="amount-wrap">
             <span class="amount-prefix" aria-hidden="true">&#8377;</span>
-            <input type="number" step="0.01" min="0" name="housekeeping_fixed_salary_amount" id="sa_housekeeping_fixed_salary" class="field-input amount-input" value="{{ $o('housekeeping_fixed_salary_amount') }}" placeholder="0.00">
+            <input type="number" step="0.01" min="0" name="housekeeping_fixed_salary_amount" id="sa_housekeeping_fixed_salary" class="field-input amount-input @error('housekeeping_fixed_salary_amount') is-invalid @enderror" value="{{ $o('housekeeping_fixed_salary_amount') }}" placeholder="0.00" required>
             </div>
+            @error('housekeeping_fixed_salary_amount')
+              <div class="invalid-feedback d-block">{{ $message }}</div>
+            @enderror
             </div>
             <div data-field="housekeeping_paid_leave_applicable">
             <label class="field-label" for="sa_housekeeping_paid_leave_applicable">Housekeeping paid leave applicable <span class="text-danger">*</span></label>
@@ -561,15 +503,15 @@
                 </div>
               </div>
 
-              <div class="gst-card-breakdown gst-fields {{ $raShowGstCalc ? '' : 'gst-fields--hidden' }}" id="sa_gst_breakdown_panel" aria-live="polite">
+              <div class="gst-card-breakdown gst-fields {{ $raShowGstCalc ? '' : 'gst-fields--hidden' }}" id="sa_gst_breakdown_panel" aria-live="polite" data-field="gst_amount">
                 <h3 class="breakdown-heading">GST breakdown</h3>
                 <div class="breakdown-grid">
                   <div class="breakdown-col">
-                    <span class="breakdown-col-title">Security charge</span>
+                    <span class="breakdown-col-title">Security salary</span>
                     <div class="breakdown-box gst-calculate-output" id="sa_gst_breakdown_rent"></div>
                   </div>
                   <div class="breakdown-col">
-                    <span class="breakdown-col-title">Housekeeping charge</span>
+                    <span class="breakdown-col-title">Housekeeping salary</span>
                     <div class="breakdown-box gst-calculate-output" id="sa_gst_breakdown_maintenance"></div>
                   </div>
                   <div class="breakdown-col breakdown-col--total">
@@ -585,22 +527,19 @@
               </div>
             </div>{{-- /sa_gst_card --}}
 
-            <div class="tax-row tax-row--tds" id="sa_tds_fields_wrap">
+            <div class="tax-row tax-row--tds tax-row--tds-single" id="sa_tds_fields_wrap">
             <div class="tax-col" data-field="tds_tax_id">
-            <label class="field-label">TDS <span class="text-danger">*</span></label>
+            <label class="field-label" for="sa_tds_search_input">TDS <span class="text-danger">*</span></label>
             <div class="tax-dropdown-wrapper tds-tax-section tds-dropdown w-100">
             <input type="text"
-            class="form-control tax-search-input field-input @error('tds_tax_name') is-invalid @enderror"
+            class="form-control tax-search-input field-input @error('tds_tax_id') is-invalid @enderror"
             id="sa_tds_search_input"
             value="{{ $raTdsSearchDisplay }}"
-            placeholder="Select TDS"
+            placeholder="Select TDS tax"
             readonly
             autocomplete="off">
-            <input type="hidden" name="tds_tax_name" id="sa_tds_tax_name" value="{{ $raTdsTaxName }}">
-            <input type="hidden" name="tds_rate" class="selected-tds-tax" id="sa_tds_rate" value="{{ $raTdsRate }}">
             <input type="hidden" name="tds_tax_id" class="tds-tax-id" id="sa_tds_tax_id" value="{{ $raTdsTaxId }}">
-            <input type="hidden" name="tds_section_id" class="tds_section_id" id="sa_tds_section_id" value="{{ $raTdsSectionId }}">
-            <input type="hidden" name="tds_section" id="sa_tds_section" value="{{ $raTdsSection }}">
+            <input type="hidden" id="sa_tds_rate" value="{{ $raTdsRate }}">
             <div class="dropdown-menu tax-dropdown tds-dropdown-menu">
             <div class="tax-list" id="sa_tax_tds_list">
             @forelse ($tdsTaxes ?? [] as $tax)
@@ -611,7 +550,6 @@
             data-value="{{ $tax->tax_rate }}"
             data-id="{{ $tax->id }}"
             data-name="{{ $tax->tax_name }}"
-            data-section-id="{{ $tax->section_id }}"
             data-section-name="{{ $sectionName }}">
             {{ $tax->tax_name }} [{{ $tax->tax_rate }}%]@if ($sectionName !== '') &mdash; {{ $sectionName }}@endif
             </div>
@@ -621,12 +559,7 @@
             </div>
             </div>
             </div>
-            @error('tds_tax_name')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-            @error('tds_rate')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-            </div>
-            <div class="tax-col">
-            <label class="field-label" for="sa_tds_section_display">TDS section</label>
-            <input type="text" class="field-input" id="sa_tds_section_display" value="{{ $raTdsSectionDisplay }}" placeholder="From selected TDS" readonly>
+            @error('tds_tax_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
             </div>
             </div>
 
@@ -634,11 +567,11 @@
               <h3 class="breakdown-heading">TDS breakdown</h3>
               <div class="breakdown-grid">
                 <div class="breakdown-col">
-                  <span class="breakdown-col-title">Security charge</span>
+                  <span class="breakdown-col-title">Security salary</span>
                   <div class="breakdown-box tds-calculate-output" id="sa_tds_breakdown_security"></div>
                 </div>
                 <div class="breakdown-col">
-                  <span class="breakdown-col-title">Housekeeping charge</span>
+                  <span class="breakdown-col-title">Housekeeping salary</span>
                   <div class="breakdown-box tds-calculate-output" id="sa_tds_breakdown_housekeeping"></div>
                 </div>
                 <div class="breakdown-col breakdown-col--total">
@@ -646,9 +579,9 @@
                   <div class="breakdown-box tds-calculate-output" id="sa_tds_breakdown_total"></div>
                 </div>
               </div>
-              <input type="hidden" name="tds_amount" id="sa_tds_amount" value="{{ $raTdsAmt }}">
+              <input type="hidden" id="sa_tds_amount" value="{{ $raTdsAmt }}">
               @error('tds_amount')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-              <p class="field-hint mb-0 mt-2">TDS is calculated on security and housekeeping charge amounts (or fixed salary when charge is zero), then combined.</p>
+              <p class="field-hint mb-0 mt-2">TDS is calculated on security and housekeeping fixed salary amounts, then combined.</p>
             </div>
             </div>
             </section>
@@ -687,17 +620,26 @@
                 Contact and documents
               </div>
               <div class="row g-3">
-                <div class="col-lg-4 col-md-6">
-                  <label class="field-label">PAN Number</label>
-                  <input type="text" name="pan_number" class="field-input @error('pan_number') is-invalid @enderror" maxlength="30" value="{{ $o('pan_number') }}" placeholder="Enter PAN number">
+                <div class="col-lg-4 col-md-6" data-field="pan_number">
+                  <label class="field-label">PAN Number <span class="text-danger">*</span></label>
+                  <input type="text" name="pan_number" class="field-input @error('pan_number') is-invalid @enderror" maxlength="30" value="{{ $o('pan_number') }}" placeholder="Enter PAN number" required>
+                  @error('pan_number')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
                 </div>
-                <div class="col-lg-4 col-md-6">
-                  <label class="field-label">Contact Person Name</label>
-                  <input type="text" name="contact_person_name" class="field-input @error('contact_person_name') is-invalid @enderror" maxlength="255" value="{{ $o('contact_person_name') }}" placeholder="Enter contact person name">
+                <div class="col-lg-4 col-md-6" data-field="contact_person_name">
+                  <label class="field-label">Contact Person Name <span class="text-danger">*</span></label>
+                  <input type="text" name="contact_person_name" class="field-input @error('contact_person_name') is-invalid @enderror" maxlength="255" value="{{ $o('contact_person_name') }}" placeholder="Enter contact person name" required>
+                  @error('contact_person_name')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
                 </div>
-                <div class="col-lg-4 col-md-6">
-                  <label class="field-label">Contact Person Number</label>
-                  <input type="text" name="contact_person_number" class="field-input @error('contact_person_number') is-invalid @enderror" maxlength="30" value="{{ $o('contact_person_number') }}" placeholder="Enter contact number">
+                <div class="col-lg-4 col-md-6" data-field="contact_person_number">
+                  <label class="field-label">Contact Person Number <span class="text-danger">*</span></label>
+                  <input type="text" name="contact_person_number" class="field-input @error('contact_person_number') is-invalid @enderror" maxlength="30" value="{{ $o('contact_person_number') }}" placeholder="Enter contact number" required>
+                  @error('contact_person_number')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
                 </div>
                 @foreach (\App\Models\SecurityAgreement::FILE_SLOTS as $slot => $fileMeta)
                   @php
@@ -705,46 +647,56 @@
                     $keepInput = \App\Models\SecurityAgreement::FILE_KEEP_INPUT_NAMES[$slot];
                     $existingDocuments = $r ? $r->documentsForSlot($slot) : [];
                     $hasExisting = count($existingDocuments) > 0;
-                    $slotRequired = $slot === 'security_agreement' && ! $hasExisting;
+                    $slotRequired = ! ($isEdit && $hasExisting);
                     $uploadBoxId = 'sa-upload-box-'.$slot;
                   @endphp
-                  <div class="col-12 col-lg-4 sa-doc-upload-col">
+                  <div class="col-12 col-lg-4 sa-doc-upload-col" data-field="{{ $fileInput }}">
                     <label class="field-label" for="{{ $fileInput }}">
                       {{ $fileMeta['label'] }}
-                      @if ($slotRequired)
-                        <span class="text-danger">*</span>
-                      @endif
+                      <span class="text-danger">*</span>
                     </label>
                     @if ($isEdit && $hasExisting)
-                      <ul class="list-unstyled small mb-2 existing-files">
-                        @foreach ($existingDocuments as $doc)
-                          @if (($doc['path'] ?? '') !== '')
-                            <li class="mb-2">
-                              <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <label class="d-flex align-items-center gap-2 mb-0">
-                                  <input type="checkbox" name="{{ $keepInput }}[]" value="{{ $doc['path'] }}" checked>
-                                  <span class="file-chip file-chip--{{ $doc['preview_kind'] ?? 'other' }}">
-                                    <i class="bi {{ $doc['icon'] ?? 'bi-file-earmark' }}" aria-hidden="true"></i>
-                                    {{ $doc['name'] }}
+                      <div class="sa-doc-existing-attach mb-2" data-sa-existing-attach-section>
+                        <p class="small text-muted mb-2">Click × to remove on save. Upload more files below.</p>
+                        <div class="pr-gmail-attach-grid pr-gmail-attach-grid--row" role="list" aria-live="polite">
+                          @foreach ($existingDocuments as $doc)
+                            @if (($doc['path'] ?? '') !== '' && ! empty($doc['url']))
+                              @php
+                                $previewKind = (string) ($doc['preview_kind'] ?? 'other');
+                                $previewTitle = (string) ($doc['name'] ?? $fileMeta['label']);
+                              @endphp
+                              <div class="pr-gmail-attach-card" role="listitem" data-sa-existing-attach-card data-file-name="{{ $previewTitle }}">
+                                <input type="checkbox" name="{{ $keepInput }}[]" value="{{ $doc['path'] }}" checked class="d-none sa-attach-keep" aria-hidden="true">
+                                <button type="button" class="pr-gmail-attach-remove" title="Remove {{ $previewTitle }}" aria-label="Remove {{ $previewTitle }}">
+                                  <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                </button>
+                                <button type="button"
+                                  class="pr-gmail-attach-thumb"
+                                  data-sa-attach-preview
+                                  data-sa-attach-preview-url="{{ $doc['url'] }}"
+                                  data-sa-attach-preview-kind="{{ $previewKind }}"
+                                  data-sa-attach-preview-title="{{ $previewTitle }}"
+                                  title="Preview {{ $previewTitle }}">
+                                  <span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--{{ $previewKind }}">
+                                    @if ($previewKind === 'image')
+                                      <img src="{{ $doc['url'] }}" alt="" loading="lazy" class="pr-gmail-attach-thumb-media">
+                                    @elseif ($previewKind === 'pdf')
+                                      <iframe src="{{ $doc['url'] }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media" loading="lazy"></iframe>
+                                    @else
+                                      <span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi {{ $doc['icon'] ?? 'bi-file-earmark-text' }}"></i></span>
+                                    @endif
                                   </span>
-                                </label>
-                                @if (! empty($doc['url']))
-                                  <button type="button"
-                                    class="btn btn-sm btn-outline-primary"
-                                    data-sa-attach-preview
-                                    data-sa-attach-preview-url="{{ $doc['url'] }}"
-                                    data-sa-attach-preview-kind="{{ $doc['preview_kind'] ?? 'other' }}"
-                                    data-sa-attach-preview-title="{{ $doc['name'] }}">
-                                    <i class="bi bi-eye" aria-hidden="true"></i> View
-                                  </button>
-                                  <a href="{{ $doc['url'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-link">Open</a>
-                                @endif
+                                </button>
+                                <div class="pr-gmail-attach-foot">
+                                  <span class="pr-gmail-type-badge {{ $saAttachTypeClass($previewKind) }}">{{ $doc['badge'] ?? 'FILE' }}</span>
+                                  <span class="pr-gmail-attach-name" title="{{ $previewTitle }}">{{ $previewTitle }}</span>
+                                </div>
+                                <span class="pr-gmail-attach-fold" aria-hidden="true"></span>
                               </div>
-                            </li>
-                          @endif
-                        @endforeach
-                      </ul>
-                      <p class="small text-muted mb-2">Uncheck to remove on save. Upload more files below.</p>
+                            @endif
+                          @endforeach
+                        </div>
+                      </div>
                     @endif
                     <div class="pr-pay-attachment-zone sa-doc-upload-zone">
                       <div class="pr-pay-upload-box sa-doc-upload-box @error($fileInput) border border-danger @enderror @error($fileInput.'.*') border border-danger @enderror"
@@ -765,7 +717,7 @@
                           @if ($slotRequired && ! ($isEdit && $hasExisting)) required @endif>
                       </div>
                     </div>
-                    <div id="{{ $fileInput }}-preview" class="sa-doc-pending-preview small mt-2 d-none" aria-live="polite"></div>
+                    <div id="{{ $fileInput }}-preview" class="sa-doc-pending-preview mt-2 d-none" aria-live="polite"></div>
                     @error($fileInput)
                       <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
@@ -796,27 +748,27 @@
 @endsection
 
 @section('modals')
-<div class="modal fade preview-modal" id="attachmentPreviewModal" tabindex="-1" aria-labelledby="attachmentPreviewModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="attachmentPreviewModalLabel">Document preview</h5>
+<div class="modal fade preview-modal pr-show-attachment-modal" id="attachmentPreviewModal" tabindex="-1" aria-labelledby="attachmentPreviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-bottom py-2 py-md-3">
+        <h2 class="modal-title h5 mb-0 fw-bold text-truncate pe-2" id="attachmentPreviewModalLabel">Document preview</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0 bg-light preview-modal-body">
-        <iframe id="attachmentPreviewIframe" class="preview-modal-iframe d-none" title="Document preview"></iframe>
-        <img id="attachmentPreviewImg" class="preview-modal-img d-none img-fluid d-block mx-auto" alt="" />
+      <div class="modal-body p-0 bg-light pr-show-attachment-modal-body preview-modal-body">
+        <iframe id="attachmentPreviewIframe" class="preview-modal-iframe pr-show-attachment-iframe d-none" title="Document preview"></iframe>
+        <img id="attachmentPreviewImg" class="preview-modal-img pr-show-attachment-img d-none img-fluid d-block mx-auto" alt="" />
         <div id="attachmentPreviewFallback" class="preview-modal-fallback d-none">
           <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
           <p class="mb-2">Preview is not available for this file type.</p>
           <a href="#" id="attachmentPreviewOpenLink" class="btn btn-sm btn-primary" target="_blank" rel="noopener">Open document</a>
         </div>
       </div>
-      <div class="modal-footer py-2">
-        <a href="#" id="attachmentPreviewFooterLink" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+      <div class="modal-footer py-2 border-top">
+        <a href="#" id="attachmentPreviewFooterLink" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">
           <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open in new tab
         </a>
-        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -828,5 +780,33 @@
 <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script src="{{ asset('assets/js/form_field_validation.js') }}"></script>
-<script src="{{ asset('assets/js/security_agreement.js') }}"></script>
+@if (session('success') || session('error') || ($errors ?? null)?->any())
+<script>
+(function () {
+  if (window.__saFlashToastShown || typeof window.toastr === 'undefined') {
+    return;
+  }
+  window.__saFlashToastShown = true;
+  @if (session('success'))
+  toastr.success(@json(session('success')));
+  @endif
+  @if (session('error'))
+  toastr.error(@json(session('error')));
+  @endif
+  @php $validationMessages = ($errors ?? null)?->all() ?? []; @endphp
+  @if (count($validationMessages) > 0)
+  if (window.FormFieldValidation && typeof window.FormFieldValidation.showBackendToasts === 'function') {
+    FormFieldValidation.showBackendToasts(@json($validationMessages), {
+      summary: @json(count($validationMessages) > 1 ? 'Please correct the highlighted fields.' : '')
+    });
+  } else {
+    @foreach ($validationMessages as $idx => $msg)
+    setTimeout(function () { toastr.error(@json($msg)); }, {{ (int) $idx * 120 }});
+    @endforeach
+  }
+  @endif
+})();
+</script>
+@endif
+<script src="{{ asset('assets/js/security_agreement.js') }}?v={{ @filemtime(public_path('assets/js/security_agreement.js')) }}"></script>
 @endpush

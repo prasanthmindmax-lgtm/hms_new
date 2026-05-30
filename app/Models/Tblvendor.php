@@ -125,11 +125,49 @@ class Tblvendor extends Authenticatable
         return null;
     }
 
+    /**
+     * Dropdown / register label with sensible fallbacks so every vendor row can be shown.
+     */
+    public function listDisplayLabel(): string
+    {
+        $label = trim((string) ($this->display_name ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+
+        $label = trim((string) ($this->company_name ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+
+        $person = trim(implode(' ', array_filter([
+            trim((string) ($this->vendor_first_name ?? '')),
+            trim((string) ($this->vendor_last_name ?? '')),
+        ])));
+
+        if ($person !== '') {
+            return $person;
+        }
+
+        $code = trim((string) ($this->vendor_id ?? ''));
+        if ($code !== '') {
+            return $code;
+        }
+
+        return 'Vendor #'.(int) $this->id;
+    }
+
     public function scopeActiveLandlords(Builder $query): Builder
     {
         return $query
             ->where('active_status', 0)
             ->where('party_type', self::PARTY_LANDLORD);
+    }
+
+    /** All active rows in vendor master (active_status = 0). */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('active_status', 0);
     }
 
     /** Active vendors for security / housekeeping service agreements. */

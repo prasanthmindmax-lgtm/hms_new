@@ -1,6 +1,6 @@
-/**
- * Security agreements & landlord payments — consolidated client scripts.
- * Requires jQuery, moment/daterangepicker (filters/create/register), Chart.js (landlord payment reports only), FormFieldValidation (create).
+﻿/**
+ * Security agreements â€” client scripts (create, register, attachments).
+ * Requires jQuery, moment/daterangepicker (filters/create), FormFieldValidation (create).
  */
 
 /* ========== Form validation ========== */
@@ -35,7 +35,48 @@
     return el ? el.value : '0';
   }
 
+  function housekeepingPaidLeaveApplicable() {
+    const el = form.querySelector('[name="housekeeping_paid_leave_applicable"]');
+    return el ? el.value === '1' : false;
+  }
+
+  function validateRequiredDocuments() {
+    const fileSlots = [
+      { field: 'security_agreement_files', label: 'Security agreement file' },
+      { field: 'esi_certificate_files', label: 'ESI certificate' },
+      { field: 'pf_certificate_files', label: 'PF certificate' },
+    ];
+    let valid = true;
+    let firstInvalid = null;
+
+    fileSlots.forEach(function (slot) {
+      const container = form.querySelector('[data-field="' + slot.field + '"]');
+      if (!container) {
+        return;
+      }
+      FormFieldValidation.clearField(container);
+      const fileInput = container.querySelector('input[type="file"]');
+      const keepChecked = container.querySelectorAll('input[type="checkbox"][name^="keep_"]:checked');
+      const hasFiles = fileInput && fileInput.files && fileInput.files.length > 0;
+      const hasKept = keepChecked.length > 0;
+      if (!hasFiles && !hasKept) {
+        FormFieldValidation.setError(container, 'Please upload at least one ' + slot.label + '.');
+        valid = false;
+        if (!firstInvalid) {
+          firstInvalid = container;
+        }
+      }
+    });
+
+    if (firstInvalid) {
+      firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    return valid;
+  }
+
   const rules = [
+    { field: 'agreement_type', required: true, message: 'Category is required.' },
     { field: 'company_id', required: true, message: 'Company is required.' },
     { field: 'zone_id', required: true, message: 'Zone is required.' },
     { field: 'branch_id', required: true, message: 'Location is required.' },
@@ -66,9 +107,39 @@
       },
     },
     { field: 'address', required: true, message: 'Address is required.' },
-    { field: 'advance_amount', required: true, min: 0, message: 'Advance amount is required.' },
-    { field: 'security_charge_amount', required: true, min: 0, message: 'Security charge amount is required.' },
+    { field: 'termination_period', required: true, message: 'Termination period is required.' },
     { field: 'end_of_agreement_date', required: true, message: 'End of agreement date is required.' },
+    {
+      field: 'security_fixed_salary_amount',
+      required: true,
+      min: 0,
+      message: 'Security fixed salary amount is required.',
+      minMessage: 'Enter a valid security fixed salary amount.',
+    },
+    {
+      field: 'housekeeping_fixed_salary_amount',
+      required: true,
+      min: 0,
+      message: 'Housekeeping fixed salary amount is required.',
+      minMessage: 'Enter a valid housekeeping fixed salary amount.',
+    },
+    { field: 'housekeeping_paid_leave_applicable', required: true, message: 'Select whether housekeeping paid leave applies.' },
+    {
+      field: 'housekeeping_paid_leave_days',
+      validate: function (val) {
+        if (!housekeepingPaidLeaveApplicable()) {
+          return '';
+        }
+        if (String(val).trim() === '') {
+          return 'Enter housekeeping paid leave days when applicable.';
+        }
+        const days = parseInt(val, 10);
+        if (!Number.isFinite(days) || days < 1) {
+          return 'Enter valid housekeeping paid leave days.';
+        }
+        return '';
+      },
+    },
     { field: 'gst_applicable', required: true, message: 'Select whether GST is applicable.' },
     {
       field: 'gst_type',
@@ -95,7 +166,30 @@
         return '';
       },
     },
-    { field: 'tds_tax_id', required: true, message: 'TDS tax is required.' },
+    {
+      field: 'gst_amount',
+      validate: function (val) {
+        if (!gstApplicable() || !hasGstTaxMode()) {
+          return '';
+        }
+        if (String(val).trim() === '') {
+          return 'GST amount is required when GST is applicable.';
+        }
+        const num = parseFloat(val);
+        if (!Number.isFinite(num) || num < 0) {
+          return 'Enter a valid GST amount.';
+        }
+        return '';
+      },
+    },
+    {
+      field: 'tds_tax_id',
+      required: true,
+      message: 'Select a TDS tax from the list.',
+    },
+    { field: 'pan_number', required: true, message: 'PAN number is required.' },
+    { field: 'contact_person_name', required: true, message: 'Contact person name is required.' },
+    { field: 'contact_person_number', required: true, message: 'Contact person number is required.' },
     { field: 'rcm_applicable', required: true, message: 'RCM selection is required.' },
     {
       field: 'rcm_value',
@@ -118,7 +212,9 @@
   FormFieldValidation.bindClearOnInput(form);
 
   form.addEventListener('submit', function (e) {
-    if (!FormFieldValidation.validateForm(form, rules)) {
+    const fieldsOk = FormFieldValidation.validateForm(form, rules);
+    const filesOk = validateRequiredDocuments();
+    if (!fieldsOk || !filesOk) {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -128,7 +224,7 @@
 
 /* ========== GST and TDS ========== */
 /**
- * Security agreement — GST & TDS (Bill module tax dropdown pattern).
+ * Security agreement â€” GST & TDS (Bill module tax dropdown pattern).
  */
 (function () {
   const GST_INCLUDING = 'including_gst';
@@ -142,8 +238,6 @@
     : [];
   const typeEl = document.getElementById('sa_gst_type');
   const wrapEl = document.getElementById('sa_gst_fields_wrap');
-  const rentEl = document.getElementById('sa_security_charge_amount');
-  const maintEl = document.getElementById('sa_housekeeping_charge_amount');
   const securitySalaryEl = document.getElementById('sa_security_fixed_salary');
   const housekeepingSalaryEl = document.getElementById('sa_housekeeping_fixed_salary');
 
@@ -162,12 +256,8 @@
   const gstFieldWraps = document.querySelectorAll('.form-block.form-block--tax .gst-fields');
 
   const tdsSearchEl = document.getElementById('sa_tds_search_input');
-  const tdsNameEl = document.getElementById('sa_tds_tax_name');
   const tdsRateEl = document.getElementById('sa_tds_rate');
   const tdsTaxIdEl = document.getElementById('sa_tds_tax_id');
-  const tdsSectionIdEl = document.getElementById('sa_tds_section_id');
-  const tdsSectionEl = document.getElementById('sa_tds_section');
-  const tdsSectionDisplayEl = document.getElementById('sa_tds_section_display');
   const tdsAmtEl = document.getElementById('sa_tds_amount');
   const tdsSecuritySummaryEl = document.getElementById('sa_tds_breakdown_security');
   const tdsHousekeepingSummaryEl = document.getElementById('sa_tds_breakdown_housekeeping');
@@ -242,20 +332,12 @@
     return match ? num(match[1]) : 0;
   };
 
-  const serviceTaxBase = function (chargeEl, salaryEl) {
-    const charge = chargeEl ? num(chargeEl.value) : 0;
-    if (charge > 0) {
-      return charge;
-    }
-    return salaryEl ? num(salaryEl.value) : 0;
-  };
-
   const securityTaxBase = function () {
-    return serviceTaxBase(rentEl, securitySalaryEl);
+    return securitySalaryEl ? num(securitySalaryEl.value) : 0;
   };
 
   const housekeepingTaxBase = function () {
-    return serviceTaxBase(maintEl, housekeepingSalaryEl);
+    return housekeepingSalaryEl ? num(housekeepingSalaryEl.value) : 0;
   };
 
   const rentAmount = function () {
@@ -376,22 +458,19 @@
     return display + '% GST';
   };
 
-  const formatTdsSearchLabel = function (rate) {
+  const formatTdsOptionLabel = function (name, rate, sectionName) {
     const pct = num(rate);
     const displayPct = pct <= 1 && pct > 0 ? pct * 100 : pct;
-    if (displayPct <= 0) return '';
-    const display = displayPct % 1 === 0 ? String(displayPct) : displayPct.toFixed(2).replace(/\.?0+$/, '');
-    return display + '% TDS';
-  };
-
-  const formatTdsSectionDisplay = function (sectionName, taxName) {
-    const section = (sectionName || '').trim();
-    const name = (taxName || '').trim();
-    if (!section) return name;
-    if (!name || section.toLowerCase().indexOf(name.toLowerCase()) !== -1) {
-      return section;
+    if (displayPct <= 0 && !name) {
+      return '';
     }
-    return section + ' - ' + name;
+    const display = displayPct % 1 === 0 ? String(displayPct) : displayPct.toFixed(2).replace(/\.?0+$/, '');
+    let label = name ? name + ' [' + display + '%]' : display + '% TDS';
+    const section = (sectionName || '').trim();
+    if (section) {
+      label += ' — ' + section;
+    }
+    return label;
   };
 
   const renderGstBreakdown = function (container, payload) {
@@ -505,7 +584,7 @@
     container.classList.remove('breakdown-box--empty');
     const rateLabel = rate % 1 === 0 ? String(rate) : rate.toFixed(2).replace(/\.?0+$/, '');
     const items = [
-      { label: 'Charge amount', amount: charge, highlight: false },
+      { label: 'Salary amount', amount: charge, highlight: false },
       { label: 'TDS (' + rateLabel + '%)', amount: tdsAmount, highlight: true },
     ];
     container.innerHTML = items
@@ -659,18 +738,13 @@
       const name = tdsItem.getAttribute('data-name') || '';
       const rate = tdsItem.getAttribute('data-value') || '';
       const id = tdsItem.getAttribute('data-id') || '';
-      const sectionId = tdsItem.getAttribute('data-section-id') || '';
       const sectionName = tdsItem.getAttribute('data-section-name') || '';
 
-      if (tdsSearchEl) tdsSearchEl.value = formatTdsSearchLabel(rate) || tdsItem.textContent.trim();
-      if (tdsNameEl) tdsNameEl.value = name;
+      if (tdsSearchEl) {
+        tdsSearchEl.value = formatTdsOptionLabel(name, rate, sectionName) || tdsItem.textContent.trim();
+      }
       if (tdsRateEl) tdsRateEl.value = rate;
       if (tdsTaxIdEl) tdsTaxIdEl.value = id;
-      if (tdsSectionIdEl) tdsSectionIdEl.value = sectionId;
-      if (tdsSectionEl) tdsSectionEl.value = sectionName;
-      if (tdsSectionDisplayEl) {
-        tdsSectionDisplayEl.value = formatTdsSectionDisplay(sectionName, name);
-      }
 
       tdsItem.closest('.tax-dropdown')?.classList.remove('show');
       if (tdsSearchEl) tdsSearchEl.setAttribute('readonly', 'readonly');
@@ -685,7 +759,7 @@
     }
   });
 
-  [rentEl, maintEl, securitySalaryEl, housekeepingSalaryEl].forEach(function (el) {
+  [securitySalaryEl, housekeepingSalaryEl].forEach(function (el) {
     if (!el) return;
     el.addEventListener('input', function () {
       raGstCalculate();
@@ -705,13 +779,11 @@
 
 /* ========== Register filters ========== */
 /**
- * Security agreements register — multi-select filters (same pattern as payment requests / bill module).
+ * Security agreements register â€” multi-select filters (same pattern as payment requests / bill module).
  */
 (function ($) {
   const filterFormConfigs = [
     { selector: '#filter-form', branchesNodeId: 'saBranchesData' },
-    { selector: '#llp-report-filter-form', branchesNodeId: 'llpReportBranchesData' },
-    { selector: '#llp-payments-filter-form', branchesNodeId: 'llpPaymentsBranchesData' },
   ];
   const activeForms = filterFormConfigs
     .map(function (cfg) {
@@ -731,6 +803,7 @@
 
   const submitTimers = {};
   const formSelector = activeForms.map(function (f) { return f.selector; }).join(', ');
+  let registerLoading = false;
 
   function ctxForForm($form) {
     const id = $form.attr('id');
@@ -750,15 +823,204 @@
     return null;
   }
 
+  const ARRAY_FILTER_PARAMS = [
+    'company_id',
+    'state_id',
+    'zone_id',
+    'branch_id',
+    'vendor_type_name',
+    'rcm_applicable',
+    'vendor_id',
+  ];
+
+  function buildRegisterUrl($form) {
+    const action = $form.attr('action') || window.location.pathname;
+    const qs = $form.serialize();
+    return qs ? action + '?' + qs : action;
+  }
+
+  function arrayParamValues(params, name) {
+    const bracketed = params.getAll(name + '[]');
+    if (bracketed.length) {
+      return bracketed;
+    }
+    return params.getAll(name);
+  }
+
+  function syncDateLabelFromFields() {
+    const df = $('#sa_date_from').val();
+    const dt = $('#sa_date_to').val();
+    if (df && dt && typeof moment !== 'undefined') {
+      $('#dateLabel').text(
+        moment(df).format('MMM D, YYYY') + ' – ' + moment(dt).format('MMM D, YYYY')
+      );
+      return;
+    }
+    $('#dateLabel').text('All dates');
+  }
+
+  function syncDropdownFromIds($form, paramName, ids) {
+    const $wrap = $form.find('.pay-pr-dd[data-filter-param="' + paramName + '"]').first();
+    if (!$wrap.length) {
+      return;
+    }
+    const emptyLbl = $wrap.data('empty-label') || 'All';
+    const idSet = ids.map(String);
+    const texts = [];
+    $wrap.find('.dropdown-list.multiselect div').not('.dropdown-empty').each(function () {
+      const id = String($(this).attr('data-id') || '');
+      const selected = idSet.indexOf(id) > -1;
+      $(this).toggleClass('selected', selected);
+      if (selected) {
+        texts.push($(this).text().trim());
+      }
+    });
+    $wrap.find('.pay-pr-dd-input').val(texts.length ? texts.join(', ') : emptyLbl);
+    syncRaArray($form, paramName, ids);
+  }
+
+  function syncFormFromUrl(urlString) {
+    const $form = $('#filter-form');
+    if (!$form.length) {
+      return;
+    }
+    let url;
+    try {
+      url = new URL(urlString, window.location.origin);
+    } catch (e) {
+      return;
+    }
+    const params = url.searchParams;
+
+    $('#sa_date_from').val(params.get('date_from') || '');
+    $('#sa_date_to').val(params.get('date_to') || '');
+    syncDateLabelFromFields();
+
+    $('#category_filter').val(params.get('category') || 'all');
+    $('#universal_search').val(params.get('search') || '');
+    const perPage = params.get('per_page');
+    if (perPage) {
+      $('#pay-pr-per-page').val(perPage);
+    }
+
+    ARRAY_FILTER_PARAMS.forEach(function (paramName) {
+      syncDropdownFromIds($form, paramName, arrayParamValues(params, paramName));
+    });
+
+    const ctx = ctxForForm($form);
+    if (ctx) {
+      renderBranchList(ctx);
+    }
+  }
+
+  function syncRegisterMeta(panelEl) {
+    if (!panelEl) {
+      return;
+    }
+    const range = panelEl.getAttribute('data-row-range') || '0';
+    const total = panelEl.getAttribute('data-total-rows') || '0';
+    const $count = $('.pay-pr-filter-head-meta .showing-count');
+    if ($count.length) {
+      $count.html('Rows <strong>' + range + '</strong> of <strong>' + total + '</strong>');
+    }
+  }
+
+  function applyRegisterHtml(html, sourceUrl, pushHistory) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const partIds = ['sa-register-stats', 'sa-register-chips-slot', 'sa-register-panel'];
+    let replaced = false;
+
+    partIds.forEach(function (id) {
+      const newEl = doc.getElementById(id);
+      const cur = document.getElementById(id);
+      if (newEl && cur) {
+        cur.replaceWith(document.importNode(newEl, true));
+        replaced = true;
+      }
+    });
+
+    if (!replaced) {
+      window.location.href = sourceUrl;
+      return;
+    }
+
+    syncRegisterMeta(document.getElementById('sa-register-panel'));
+    if (sourceUrl) {
+      syncFormFromUrl(sourceUrl);
+    }
+    if (pushHistory && sourceUrl) {
+      window.history.pushState({ saRegister: true }, '', sourceUrl);
+    }
+  }
+
+  function setRegisterLoading(active) {
+    const overlay = document.getElementById('sa-register-loading-overlay');
+    const statsEl = document.getElementById('sa-register-stats');
+    const panelEl = document.getElementById('sa-register-panel');
+    document.body.classList.toggle('sa-register-is-loading', !!active);
+    if (overlay) {
+      overlay.hidden = !active;
+      overlay.setAttribute('aria-busy', active ? 'true' : 'false');
+    }
+    if (statsEl) {
+      statsEl.classList.toggle('is-loading', !!active);
+    }
+    if (panelEl) {
+      panelEl.classList.toggle('is-loading', !!active);
+      if (active) {
+        panelEl.setAttribute('aria-busy', 'true');
+      } else {
+        panelEl.removeAttribute('aria-busy');
+      }
+    }
+  }
+
+  function loadRegisterFromUrl(url, pushHistory) {
+    if (registerLoading || !document.getElementById('sa-register-panel')) {
+      return;
+    }
+    registerLoading = true;
+    setRegisterLoading(true);
+
+    fetch(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'text/html',
+      },
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
+        return res.text();
+      })
+      .then(function (html) {
+        applyRegisterHtml(html, url, pushHistory);
+      })
+      .catch(function () {
+        window.location.href = url;
+      })
+      .finally(function () {
+        registerLoading = false;
+        setRegisterLoading(false);
+      });
+  }
+
   function submitNow($form) {
     const key = $form.attr('id') || 'filter-form';
     if (submitTimers[key]) {
       clearTimeout(submitTimers[key]);
       submitTimers[key] = null;
     }
-    if ($form[0]) {
-      $form[0].submit();
+    if (!document.getElementById('sa-register-panel')) {
+      if ($form[0]) {
+        $form[0].submit();
+      }
+      return;
     }
+    loadRegisterFromUrl(buildRegisterUrl($form), true);
   }
 
   function scheduleSubmit($form) {
@@ -1073,81 +1335,64 @@
 
   const $raForm = $('#filter-form');
   if ($raForm.length) {
+    $raForm.on('submit', function (e) {
+      e.preventDefault();
+      submitNow($raForm);
+    });
+
+    $('#category_filter').on('change', function () {
+      scheduleSubmit($raForm);
+    });
+
     window.saRegisterFilters = {
       submitNow: function () { submitNow($raForm); },
       scheduleSubmit: function () { scheduleSubmit($raForm); },
+      loadFromUrl: function (url, pushHistory) { loadRegisterFromUrl(url, pushHistory !== false); },
     };
   }
 
-  function bindLlpDateRange($form, $dateWrap, $fromInput, $toInput, $labelEl) {
-    if (typeof $.fn.daterangepicker !== 'function' || typeof moment === 'undefined' || !$dateWrap.length) {
+  function shouldHandleRegisterLink(anchor) {
+    if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) {
+      return false;
+    }
+    if (!document.getElementById('sa-register-panel')) {
+      return false;
+    }
+    try {
+      const linkUrl = new URL(anchor.href, window.location.origin);
+      return linkUrl.origin === window.location.origin
+        && linkUrl.pathname === window.location.pathname;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  $(document).on('click', '#sa-register-chips-slot a, #sa-register-panel .pagination a', function (e) {
+    if (!shouldHandleRegisterLink(this)) {
       return;
     }
-    const df = $fromInput.val();
-    const dt = $toInput.val();
-    const opts = {
-      autoUpdateInput: false,
-      locale: { format: 'YYYY-MM-DD', separator: ' – ', cancelLabel: 'Clear', applyLabel: 'Apply' },
-      opens: 'left',
-      drops: 'down',
-    };
-    if (df && dt) {
-      opts.startDate = moment(df);
-      opts.endDate = moment(dt);
+    e.preventDefault();
+    loadRegisterFromUrl(this.href, true);
+  });
+
+  window.addEventListener('popstate', function (ev) {
+    if (!document.getElementById('sa-register-panel')) {
+      return;
     }
-    $dateWrap.daterangepicker(opts);
-    $dateWrap.on('apply.daterangepicker', function (ev, picker) {
-      $fromInput.val(picker.startDate.format('YYYY-MM-DD'));
-      $toInput.val(picker.endDate.format('YYYY-MM-DD'));
-      $labelEl.text(picker.startDate.format('MMM D, YYYY') + ' – ' + picker.endDate.format('MMM D, YYYY'));
-      submitNow($form);
-    });
-    $dateWrap.on('cancel.daterangepicker', function () {
-      $fromInput.val('');
-      $toInput.val('');
-      $labelEl.text('All dates');
-      submitNow($form);
-    });
-  }
-
-  const $llpForm = $('#llp-report-filter-form');
-  if ($llpForm.length) {
-    window.llpReportFilters = {
-      submitNow: function () { submitNow($llpForm); },
-      scheduleSubmit: function () { scheduleSubmit($llpForm); },
-    };
-    $llpForm.find('#llp_report_billing_month').on('change', function () {
-      submitNow($llpForm);
-    });
-    bindLlpDateRange(
-      $llpForm,
-      $('#llpReportDateRange'),
-      $('#llp_report_date_from'),
-      $('#llp_report_date_to'),
-      $('#llpReportDateLabel')
-    );
-  }
-
-  const $llpPaymentsForm = $('#llp-payments-filter-form');
-  if ($llpPaymentsForm.length) {
-    window.llpPaymentsFilters = {
-      submitNow: function () { submitNow($llpPaymentsForm); },
-      scheduleSubmit: function () { scheduleSubmit($llpPaymentsForm); },
-    };
-    bindLlpDateRange(
-      $llpPaymentsForm,
-      $('#llpPaymentsDateRange'),
-      $('#llp_payments_date_from'),
-      $('#llp_payments_date_to'),
-      $('#llpPaymentsDateLabel')
-    );
-  }
+    if (ev.state && ev.state.saRegister) {
+      loadRegisterFromUrl(window.location.href, false);
+      return;
+    }
+    if (window.location.pathname === document.getElementById('filter-form')?.getAttribute('action')) {
+      loadRegisterFromUrl(window.location.href, false);
+    }
+  });
 })(jQuery);
 
 
 /* ========== Create form page ========== */
 /**
- * Security agreement create/edit — period picker, location dropdowns, attachments, RCM, flash toasts.
+ * Security agreement create/edit â€” period picker, location dropdowns, attachments, RCM, flash toasts.
  */
 (function ($) {
   'use strict';
@@ -1156,82 +1401,8 @@
   const startInput = $('#agreementPeriodStart');
   const endInput = $('#agreementPeriodEnd');
   const endAgreementDate = $('#endAgreementDate');
-  const attachmentInput = document.getElementById('rental_attachment_file');
-  const attachmentPreviewBar = document.getElementById('rental-attachment-preview-bar');
-  const attachmentPreviewName = document.getElementById('rental-attachment-preview-name');
-  const attachmentPreviewSize = document.getElementById('rental-attachment-preview-size');
   const root = document.getElementById('payLocationStrip');
-  const flashData = document.getElementById('saFlashData');
   const branchesDataNode = document.getElementById('saBranchesData');
-
-  if (flashData) {
-    const successMessage = flashData.getAttribute('data-success') || '';
-    const errorMessage = flashData.getAttribute('data-error') || '';
-    if (successMessage && window.toastr) {
-      toastr.success(successMessage);
-    }
-    if (errorMessage && window.toastr) {
-      toastr.error(errorMessage);
-    }
-
-    let validationErrors = [];
-    try {
-      validationErrors = JSON.parse(flashData.getAttribute('data-validation-errors') || '[]');
-    } catch (e) {
-      validationErrors = [];
-    }
-    if (validationErrors.length) {
-      if (window.FormFieldValidation) {
-        FormFieldValidation.showBackendToasts(validationErrors, {
-          summary: validationErrors.length > 1 ? 'Please correct the highlighted fields.' : '',
-        });
-      } else if (window.toastr) {
-        validationErrors.forEach(function (msg, idx) {
-          setTimeout(function () {
-            toastr.error(msg);
-          }, idx * 120);
-        });
-      }
-    }
-  }
-
-  function bindFilePreview(input, previewBar, previewName, previewSize) {
-    if (!input || !previewBar || !previewName || !previewSize) {
-      return;
-    }
-    input.addEventListener('change', function () {
-      const file = this.files && this.files[0] ? this.files[0] : null;
-      if (!file) {
-        previewBar.hidden = true;
-        previewName.textContent = '';
-        previewName.title = '';
-        previewSize.textContent = '';
-        return;
-      }
-      const sizeInKb = file.size / 1024;
-      const sizeLabel =
-        sizeInKb >= 1024
-          ? (sizeInKb / 1024).toFixed(2) + ' MB'
-          : Math.max(1, Math.round(sizeInKb)) + ' KB';
-      previewName.textContent = file.name;
-      previewName.title = file.name;
-      previewSize.textContent = sizeLabel;
-      previewBar.hidden = false;
-    });
-  }
-
-  bindFilePreview(
-    attachmentInput,
-    attachmentPreviewBar,
-    attachmentPreviewName,
-    attachmentPreviewSize
-  );
-  bindFilePreview(
-    document.getElementById('rental_building_photo_file'),
-    document.getElementById('rental-building-photo-preview-bar'),
-    document.getElementById('rental-building-photo-preview-name'),
-    document.getElementById('rental-building-photo-preview-size')
-  );
 
   if (root) {
     const branches = branchesDataNode ? JSON.parse(branchesDataNode.textContent || '[]') : [];
@@ -1474,10 +1645,10 @@
       return;
     }
     const applicable = select.value === '1';
-    const grid = pairEl.matches('.form-grid form-grid--3') ? pairEl : pairEl.querySelector('.form-grid form-grid--3');
+    const grid = pairEl.matches('.form-grid') ? pairEl : pairEl.querySelector('.form-grid');
     daysWrap.classList.toggle('sa-paid-leave-days-wrap--hidden', !applicable);
     if (grid) {
-      grid.classList.toggle('form-grid--two', !applicable);
+      grid.classList.toggle('sa-salary-grid--three', !applicable);
     }
     if (daysInput) {
       daysInput.disabled = !applicable;
@@ -1502,22 +1673,10 @@
 
 /* ========== Register page ========== */
 /**
- * Security agreement register — date range, expandable rows, period popover.
+ * Security agreement register â€” date range, expandable rows, period popover.
  */
 (function ($) {
   'use strict';
-
-  const flashData = document.getElementById('saFlashData');
-  if (flashData) {
-    const successMessage = flashData.dataset.success || '';
-    const errorMessage = flashData.dataset.error || '';
-    if (successMessage && window.toastr) {
-      toastr.success(successMessage);
-    }
-    if (errorMessage && window.toastr) {
-      toastr.error(errorMessage);
-    }
-  }
 
   const $form = $('#filter-form');
 
@@ -1537,7 +1696,7 @@
     const dt = $('#sa_date_to').val();
     const opts = {
       autoUpdateInput: false,
-      locale: { format: 'YYYY-MM-DD', separator: ' – ', cancelLabel: 'Clear', applyLabel: 'Apply' },
+      locale: { format: 'YYYY-MM-DD', separator: ' â€“ ', cancelLabel: 'Clear', applyLabel: 'Apply' },
       opens: 'left',
       drops: 'down',
     };
@@ -1552,7 +1711,7 @@
       $('#sa_date_from').val(picker.startDate.format('YYYY-MM-DD'));
       $('#sa_date_to').val(picker.endDate.format('YYYY-MM-DD'));
       $('#dateLabel').text(
-        picker.startDate.format('MMM D, YYYY') + ' – ' + picker.endDate.format('MMM D, YYYY')
+        picker.startDate.format('MMM D, YYYY') + ' â€“ ' + picker.endDate.format('MMM D, YYYY')
       );
       submitFilterForm();
     });
@@ -1597,137 +1756,12 @@
     e.preventDefault();
     toggleDetailRow($(this).closest('tr.pay-pr-row'));
   });
-
-  const $periodPopover = $('#periodPopover');
-  let activePeriodBtn = null;
-
-  function formatInr(n) {
-    return '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  function buildPeriodPopoverHtml(period, schedule, hike, baseRent) {
-    let rows = '';
-    if (Array.isArray(schedule) && schedule.length) {
-      schedule.forEach(function (yr, idx) {
-        const tag = idx === 0 ? 'Current yr' : idx === 1 ? 'Next yr' : yr.label;
-        rows +=
-          '<tr><td class="period-popover-label">' +
-          tag +
-          '</td><td>' +
-          (yr.period_label || '—') +
-          '</td><td class="text-end fw-semibold">' +
-          formatInr(yr.monthly_rent) +
-          '</td></tr>';
-      });
-    } else {
-      rows =
-        '<tr><td colspan="3" class="text-muted">No year breakdown — check agreement period and rent hike %.</td></tr>';
-    }
-    const hikeNote =
-      Number(hike) > 0
-        ? '<p class="period-popover-note mb-0">Hike: <strong>' +
-          hike +
-          '%</strong> per year on base ' +
-          formatInr(baseRent) +
-          '.</p>'
-        : '<p class="period-popover-note mb-0">Flat rent ' + formatInr(baseRent) + ' (no hike % set).</p>';
-
-    return (
-      '<div class="period-popover-head"><strong>Agreement period</strong><span>' +
-      period +
-      '</span></div>' +
-      '<table class="period-popover-table"><thead><tr><th>Year</th><th>Period</th><th class="text-end">Monthly rent</th></tr></thead><tbody>' +
-      rows +
-      '</tbody></table>' +
-      hikeNote
-    );
-  }
-
-  function positionPeriodPopover($btn) {
-    if (!$periodPopover.length || !$btn.length) {
-      return;
-    }
-    const rect = $btn[0].getBoundingClientRect();
-    const popW = Math.min(420, window.innerWidth - 16);
-    let left = rect.left;
-    if (left + popW > window.innerWidth - 8) {
-      left = window.innerWidth - popW - 8;
-    }
-    $periodPopover.css({
-      position: 'fixed',
-      top: rect.bottom + 8,
-      left: Math.max(8, left),
-      width: popW,
-      zIndex: 10060,
-    });
-  }
-
-  function closePeriodPopover() {
-    if ($periodPopover.length) {
-      $periodPopover.addClass('d-none').empty();
-    }
-    if (activePeriodBtn) {
-      activePeriodBtn.removeClass('period-link period-link--active');
-    }
-    activePeriodBtn = null;
-  }
-
-  $(document).on('click', '.period-link', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const $btn = $(this);
-    if (activePeriodBtn && activePeriodBtn[0] === $btn[0]) {
-      closePeriodPopover();
-      return;
-    }
-    closePeriodPopover();
-    activePeriodBtn = $btn;
-    $btn.addClass('period-link period-link--active');
-    let schedule = [];
-    try {
-      schedule = JSON.parse($btn.attr('data-schedule') || '[]');
-    } catch (err) {
-      schedule = [];
-    }
-    $periodPopover
-      .html(
-        buildPeriodPopoverHtml($btn.data('period') || '', schedule, $btn.data('hike') || 0, $btn.data('base-rent') || 0)
-      )
-      .removeClass('d-none');
-    positionPeriodPopover($btn);
-  });
-
-  $(document).on('click', function (e) {
-    if ($(e.target).closest('.period-link, #periodPopover').length) {
-      return;
-    }
-    closePeriodPopover();
-  });
-
-  $(window).on('scroll resize', function () {
-    if (activePeriodBtn) {
-      positionPeriodPopover(activePeriodBtn);
-    }
-  });
 })(jQuery);
 
 
 /* ========== Security agreement document file inputs ========== */
 (function () {
   'use strict';
-
-  const formatBytes = function (bytes) {
-    if (!bytes || bytes <= 0) {
-      return '';
-    }
-    if (bytes < 1024) {
-      return bytes + ' B';
-    }
-    if (bytes < 1024 * 1024) {
-      return (bytes / 1024).toFixed(1) + ' KB';
-    }
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
 
   const previewKindFromName = function (name) {
     const ext = (name.split('.').pop() || '').toLowerCase();
@@ -1737,8 +1771,87 @@
     if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1) {
       return 'image';
     }
+    if (ext === 'doc' || ext === 'docx') {
+      return 'doc';
+    }
     return 'other';
   };
+
+  const fileTypeMeta = function (name) {
+    const ext = (String(name || '').split('.').pop() || '').toLowerCase();
+    const kind = previewKindFromName(name);
+    if (kind === 'pdf') {
+      return { kind: 'pdf', badge: 'PDF', cls: 'pr-gmail-type-pdf' };
+    }
+    if (kind === 'doc') {
+      return { kind: 'doc', badge: 'DOC', cls: 'pr-gmail-type-doc' };
+    }
+    if (kind === 'image') {
+      return { kind: 'image', badge: ext === 'jpeg' ? 'JPG' : ext.toUpperCase(), cls: 'pr-gmail-type-img' };
+    }
+    return { kind: 'other', badge: ext ? ext.toUpperCase() : 'FILE', cls: 'pr-gmail-type-file' };
+  };
+
+  const buildGmailAttachCard = function (opts) {
+    const meta = fileTypeMeta(opts.name);
+    const card = document.createElement('div');
+    card.className = 'pr-gmail-attach-card';
+    card.setAttribute('role', 'listitem');
+    if (opts.pending) {
+      card.setAttribute('data-sa-pending-attach-card', '');
+    }
+
+    let thumbHtml = '';
+    if (meta.kind === 'image' && opts.previewSrc) {
+      thumbHtml = '<img src="' + opts.previewSrc + '" alt="" class="pr-gmail-attach-thumb-media">';
+    } else if (meta.kind === 'pdf' && opts.previewSrc) {
+      thumbHtml = '<iframe src="' + opts.previewSrc + '#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media"></iframe>';
+    } else {
+      thumbHtml = '<span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>';
+    }
+
+    const safeName = String(opts.name || 'File').replace(/"/g, '&quot;');
+    const safeUrl = String(opts.previewSrc || '').replace(/"/g, '&quot;');
+    card.innerHTML =
+      '<button type="button" class="pr-gmail-attach-thumb" data-sa-attach-preview data-sa-attach-preview-url="' + safeUrl + '" data-sa-attach-preview-kind="' + meta.kind + '" data-sa-attach-preview-title="' + safeName + '" title="Preview ' + safeName + '">' +
+      '<span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--' + meta.kind + '">' + thumbHtml + '</span></button>' +
+      '<div class="pr-gmail-attach-foot"><span class="pr-gmail-type-badge ' + meta.cls + '">' + meta.badge + '</span>' +
+      '<span class="pr-gmail-attach-name" title="' + safeName + '">' + (opts.name || 'File') + '</span></div>' +
+      '<span class="pr-gmail-attach-fold" aria-hidden="true"></span>';
+
+    const thumbBtn = card.querySelector('.pr-gmail-attach-thumb');
+    if (thumbBtn && opts.previewSrc && opts.objectUrl) {
+      thumbBtn.setAttribute('data-sa-object-url', opts.objectUrl);
+    }
+
+    return card;
+  };
+
+  const bindExistingAttachCards = function (scope) {
+    (scope || document).querySelectorAll('[data-sa-existing-attach-card]').forEach(function (card) {
+      if (card.dataset.saAttachBound === '1') {
+        return;
+      }
+      card.dataset.saAttachBound = '1';
+      const keep = card.querySelector('.sa-attach-keep');
+      const removeBtn = card.querySelector('.pr-gmail-attach-remove');
+      if (removeBtn && keep) {
+        removeBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          keep.checked = false;
+          card.classList.add('pr-gmail-attach-card--removed');
+          window.setTimeout(function () {
+            if (!keep.checked) {
+              card.style.display = 'none';
+            }
+          }, 220);
+        });
+      }
+    });
+  };
+
+  bindExistingAttachCards();
 
   const saSetupDocUploadBox = function (input, box) {
     if (!input || !box) {
@@ -1803,46 +1916,22 @@
       }
 
       previewEl.classList.remove('d-none');
-      const list = document.createElement('ul');
-      list.className = 'list-unstyled mb-0';
+      const grid = document.createElement('div');
+      grid.className = 'pr-gmail-attach-grid pr-gmail-attach-grid--row';
+      grid.setAttribute('role', 'list');
 
-      files.forEach(function (file, index) {
-        const li = document.createElement('li');
-        li.className = 'mb-2';
-        const row = document.createElement('div');
-        row.className = 'd-flex align-items-center gap-2 flex-wrap';
-
-        const label = document.createElement('span');
-        label.className = 'file-chip';
-        label.textContent = file.name + (file.size ? ' (' + formatBytes(file.size) + ')' : '');
-        row.appendChild(label);
-
+      files.forEach(function (file) {
         const objectUrl = URL.createObjectURL(file);
-        const kind = previewKindFromName(file.name);
-        const viewBtn = document.createElement('button');
-        viewBtn.type = 'button';
-        viewBtn.className = 'btn btn-sm btn-outline-primary';
-        viewBtn.innerHTML = '<i class="bi bi-eye" aria-hidden="true"></i> Preview';
-        viewBtn.setAttribute('data-sa-attach-preview', '');
-        viewBtn.setAttribute('data-sa-attach-preview-url', objectUrl);
-        viewBtn.setAttribute('data-sa-attach-preview-kind', kind);
-        viewBtn.setAttribute('data-sa-attach-preview-title', file.name);
-        viewBtn.setAttribute('data-sa-object-url', objectUrl);
-        row.appendChild(viewBtn);
-
-        li.appendChild(row);
-        list.appendChild(li);
-
-        viewBtn.addEventListener('click', function () {
-          viewBtn._saRevokeTimer = setTimeout(function () {
-            if (viewBtn._saRevokeTimer) {
-              clearTimeout(viewBtn._saRevokeTimer);
-            }
-          }, 60000);
+        const card = buildGmailAttachCard({
+          name: file.name,
+          previewSrc: objectUrl,
+          objectUrl: objectUrl,
+          pending: true,
         });
+        grid.appendChild(card);
       });
 
-      previewEl.appendChild(list);
+      previewEl.appendChild(grid);
     });
   });
 
@@ -1866,7 +1955,7 @@
 
 /* ========== Register attachment modal ========== */
 /**
- * Security agreement register — attachment preview modal.
+ * Security agreement register â€” attachment preview modal.
  */
 (function () {
   'use strict';
@@ -1940,1143 +2029,5 @@
       btn.getAttribute('data-sa-attach-preview-kind') || 'other',
       btn.getAttribute('data-sa-attach-preview-title') || 'Attachment'
     );
-  });
-})();
-
-
-/* ========== Landlord payment report — stats charts ========== */
-(function () {
-  'use strict';
-
-  const chartDataNode = document.getElementById('llpReportChartData');
-  const chartToggle = document.getElementById('llpReportChartToggle');
-  const chartPanel = document.getElementById('llpReportChartPanel');
-  const chartLayout = document.getElementById('llpReportChartLayout');
-
-  if (!chartDataNode || !chartToggle || !chartPanel) {
-    return;
-  }
-
-  let chartInstances = [];
-
-  function readChartData() {
-    try {
-      return JSON.parse(chartDataNode.textContent || '{}');
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function destroyCharts() {
-    chartInstances.forEach(function (chart) {
-      if (chart) {
-        chart.destroy();
-      }
-    });
-    chartInstances = [];
-  }
-
-  function moneyTick(value) {
-    return '₹' + Number(value).toLocaleString('en-IN');
-  }
-
-  function makeChart(canvasId, config) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas || typeof Chart === 'undefined') {
-      return null;
-    }
-    const chart = new Chart(canvas.getContext('2d'), config);
-    chartInstances.push(chart);
-    return chart;
-  }
-
-  function initPaymentCharts(data) {
-    const byMonth = data.byMonth || {};
-    if (byMonth.labels && byMonth.labels.length) {
-      makeChart('llpReportPayableMonthChart', {
-        type: 'bar',
-        data: {
-          labels: byMonth.labels,
-          datasets: [
-            {
-              label: 'Final payable',
-              data: byMonth.final || [],
-              backgroundColor: '#6366f1',
-              borderRadius: 6,
-            },
-            {
-              label: 'Gross',
-              data: byMonth.gross || [],
-              backgroundColor: '#94a3b8',
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: { display: true, text: 'Payable by billing month', font: { size: 13, weight: '600' } },
-            legend: { position: 'bottom' },
-          },
-          scales: {
-            y: { ticks: { callback: moneyTick } },
-          },
-        },
-      });
-    }
-
-    const byCharge = data.byCharge;
-    if (byCharge && byCharge.labels && byCharge.labels.length) {
-      makeChart('llpReportChargeChart', {
-        type: 'doughnut',
-        data: {
-          labels: byCharge.labels,
-          datasets: [
-            {
-              data: byCharge.values || [],
-              backgroundColor: ['#6366f1', '#0ea5e9', '#f59e0b'],
-              borderWidth: 0,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: { display: true, text: 'Amount by charge type', font: { size: 13, weight: '600' } },
-            legend: { position: 'bottom' },
-          },
-        },
-      });
-    }
-
-    const byStatus = data.byStatus || {};
-    if (byStatus.labels && byStatus.labels.length) {
-      makeChart('llpReportStatusChart', {
-        type: 'bar',
-        data: {
-          labels: byStatus.labels,
-          datasets: [
-            {
-              label: 'Final payable',
-              data: byStatus.amounts || [],
-              backgroundColor: '#818cf8',
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          indexAxis: 'y',
-          plugins: {
-            title: { display: true, text: 'By approval status', font: { size: 13, weight: '600' } },
-            legend: { display: false },
-          },
-          scales: {
-            x: { ticks: { callback: moneyTick } },
-          },
-        },
-      });
-    }
-
-    const byZone = data.byZone || {};
-    if (byZone.labels && byZone.labels.length) {
-      makeChart('llpReportZoneChart', {
-        type: 'bar',
-        data: {
-          labels: byZone.labels.map(function (label) {
-            const name = String(label || '');
-            return name.length > 20 ? name.slice(0, 18) + '…' : name;
-          }),
-          datasets: [
-            {
-              label: 'Final payable',
-              data: byZone.amounts || [],
-              backgroundColor: '#4f46e5',
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          indexAxis: 'y',
-          plugins: {
-            title: { display: true, text: 'Top zones by payable', font: { size: 13, weight: '600' } },
-            legend: { display: false },
-          },
-          scales: {
-            x: { ticks: { callback: moneyTick } },
-          },
-        },
-      });
-    }
-  }
-
-  function initAdvanceCharts(data) {
-    const byMonth = data.byMonth || {};
-    if (byMonth.labels && byMonth.labels.length) {
-      makeChart('llpReportAdvanceMonthChart', {
-        type: 'line',
-        data: {
-          labels: byMonth.labels,
-          datasets: [
-            {
-              label: 'Paid amount',
-              data: byMonth.paid || [],
-              borderColor: '#6366f1',
-              backgroundColor: 'rgba(99, 102, 241, 0.12)',
-              fill: true,
-              tension: 0.3,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: { display: true, text: 'Advance paid by month', font: { size: 13, weight: '600' } },
-          },
-          scales: {
-            y: { ticks: { callback: moneyTick } },
-          },
-        },
-      });
-    }
-
-    const byZone = data.byZone || {};
-    if (byZone.labels && byZone.labels.length) {
-      makeChart('llpReportAdvanceZoneChart', {
-        type: 'bar',
-        data: {
-          labels: byZone.labels.map(function (label) {
-            const name = String(label || '');
-            return name.length > 20 ? name.slice(0, 18) + '…' : name;
-          }),
-          datasets: [
-            {
-              label: 'Paid',
-              data: byZone.amounts || [],
-              backgroundColor: '#0ea5e9',
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          indexAxis: 'y',
-          plugins: {
-            title: { display: true, text: 'Advance paid by zone', font: { size: 13, weight: '600' } },
-            legend: { display: false },
-          },
-          scales: {
-            x: { ticks: { callback: moneyTick } },
-          },
-        },
-      });
-    }
-  }
-
-  function initCharts() {
-    destroyCharts();
-    if (typeof Chart === 'undefined') {
-      return;
-    }
-    const data = readChartData();
-    if (data.rowType === 'advance') {
-      initAdvanceCharts(data);
-    } else {
-      initPaymentCharts(data);
-    }
-  }
-
-  chartToggle.addEventListener('click', function () {
-    const open = chartPanel.classList.contains('d-none');
-    chartPanel.classList.toggle('d-none', !open);
-    if (chartLayout) {
-      chartLayout.classList.toggle('llp-report-chart-layout--open', open);
-    }
-    chartToggle.classList.toggle('llp-report-chart-toggle--active', open);
-    chartToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    chartToggle.innerHTML = open
-      ? '<i class="bi bi-table" aria-hidden="true"></i> Table view'
-      : '<i class="bi bi-bar-chart-line" aria-hidden="true"></i> Chart view';
-    if (open) {
-      window.setTimeout(initCharts, 60);
-    } else {
-      destroyCharts();
-    }
-  });
-})();
-
-
-
-/* ========== Landlord payments — AJAX tabs & KPI filters ========== */
-/**
- * Landlord payments — AJAX tab switching, GST/TDS KPI filters, and pagination.
- */
-(function () {
-  'use strict';
-
-  var loading = false;
-
-  function getPanel() {
-    return document.getElementById('llp-payments-panel');
-  }
-
-  function getStats() {
-    return document.getElementById('llp-payments-stats');
-  }
-
-  function panelUrl(href) {
-    try {
-      var u = new URL(href, window.location.origin);
-      return u.pathname + u.search;
-    } catch (e) {
-      return href;
-    }
-  }
-
-  function currentQueryParams() {
-    return new URLSearchParams(window.location.search);
-  }
-
-  function buildPanelUrl(overrides) {
-    var params = currentQueryParams();
-    Object.keys(overrides).forEach(function (key) {
-      var value = overrides[key];
-      if (value === null || value === undefined || value === '') {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
-    params.delete('page');
-    return window.location.pathname + '?' + params.toString();
-  }
-
-  function syncTabs(activeTab) {
-    document.querySelectorAll('[data-llp-tabs] .llp-payments-seg__item').forEach(function (link) {
-      var isActive = link.getAttribute('data-llp-tab') === activeTab;
-      link.classList.toggle('is-active', isActive);
-      if (isActive) {
-        link.setAttribute('aria-current', 'page');
-      } else {
-        link.removeAttribute('aria-current');
-      }
-    });
-  }
-
-  function syncTaxFilterButtons(activeTax) {
-    document.querySelectorAll('[data-llp-tax-filter]').forEach(function (btn) {
-      var val = btn.getAttribute('data-llp-tax-filter');
-      var isActive = !!activeTax && val === activeTax;
-      btn.classList.toggle('is-active', isActive);
-      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
-  }
-
-  function syncTaxFilterInput(activeTax) {
-    var form = document.getElementById('llp-payments-filter-form');
-    if (!form) {
-      return;
-    }
-    var input = form.querySelector('input[name="tax_filter"]');
-    if (activeTax) {
-      if (!input) {
-        input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'tax_filter';
-        input.id = 'llp_payments_tax_filter';
-        var tabInput = form.querySelector('input[name="tab"]');
-        if (tabInput && tabInput.parentNode) {
-          tabInput.parentNode.insertBefore(input, tabInput.nextSibling);
-        } else {
-          form.appendChild(input);
-        }
-      }
-      input.value = activeTax;
-    } else if (input) {
-      input.remove();
-    }
-  }
-
-  function syncToolbar(panel) {
-    if (!panel) {
-      return;
-    }
-    var toolbar = document.querySelector('.llp-payments-card__toolbar');
-    if (!toolbar) {
-      return;
-    }
-    var pairs = [
-      ['chart', panel.getAttribute('data-chart-url')],
-      ['excel', panel.getAttribute('data-export-excel')],
-      ['csv', panel.getAttribute('data-export-csv')],
-    ];
-    pairs.forEach(function (pair) {
-      var link = toolbar.querySelector('[data-llp-action="' + pair[0] + '"]');
-      if (link && pair[1]) {
-        link.href = pair[1];
-      }
-    });
-  }
-
-  function syncFilterMeta(panel, statsEl) {
-    if (!panel) {
-      return;
-    }
-    var activeTab = panel.getAttribute('data-active-tab');
-    var activeTax = panel.getAttribute('data-active-tax-filter') || '';
-    if (!activeTax && statsEl) {
-      activeTax = statsEl.getAttribute('data-active-tax-filter') || '';
-    }
-
-    var tabInput = document.querySelector('#llp-payments-filter-form input[name="tab"]');
-    if (tabInput && activeTab) {
-      tabInput.value = activeTab;
-    }
-    syncTaxFilterInput(activeTax || null);
-    syncTaxFilterButtons(activeTax || null);
-
-    var range = panel.getAttribute('data-row-range') || '0';
-    var total = panel.getAttribute('data-total-rows') || '0';
-    var pill = document.querySelector('.pay-pr-filter-head-meta .showing-count');
-    if (pill) {
-      pill.innerHTML = 'Rows <strong>' + range + '</strong> of <strong>' + total + '</strong>';
-    }
-    var clearLink = document.querySelector('.llp-payments-filters-slot .filter-clear');
-    if (clearLink && activeTab) {
-      try {
-        var u = new URL(clearLink.href, window.location.origin);
-        u.searchParams.set('tab', activeTab);
-        u.searchParams.delete('tax_filter');
-        clearLink.href = u.pathname + u.search;
-      } catch (e) { /* ignore */ }
-    }
-  }
-
-  function applyPanelHtml(html, pushUrl, sourceUrl) {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, 'text/html');
-    var newPanel = doc.getElementById('llp-payments-panel');
-    var newStats = doc.getElementById('llp-payments-stats');
-    var current = getPanel();
-    if (!newPanel || !current) {
-      window.location.href = sourceUrl;
-      return;
-    }
-    current.replaceWith(newPanel);
-    var currentStats = getStats();
-    if (newStats && currentStats) {
-      currentStats.replaceWith(newStats);
-    }
-    var activeTab = newPanel.getAttribute('data-active-tab');
-    if (activeTab) {
-      syncTabs(activeTab);
-    }
-    syncToolbar(newPanel);
-    syncFilterMeta(newPanel, newStats || getStats());
-    if (pushUrl) {
-      window.history.pushState({ llpPayments: true }, '', sourceUrl);
-    }
-  }
-
-  function loadPanel(href, pushUrl) {
-    if (loading) {
-      return;
-    }
-    var url = panelUrl(href);
-    var panel = getPanel();
-    if (!panel) {
-      window.location.href = href;
-      return;
-    }
-    loading = true;
-    panel.classList.add('is-loading');
-    panel.setAttribute('aria-busy', 'true');
-    var statsEl = getStats();
-    if (statsEl) {
-      statsEl.classList.add('is-loading');
-    }
-
-    fetch(url, {
-      method: 'GET',
-      credentials: 'same-origin',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        Accept: 'text/html',
-      },
-    })
-      .then(function (res) {
-        if (!res.ok) {
-          throw new Error('HTTP ' + res.status);
-        }
-        return res.text();
-      })
-      .then(function (html) {
-        applyPanelHtml(html, pushUrl, url);
-      })
-      .catch(function () {
-        window.location.href = href;
-      })
-      .finally(function () {
-        loading = false;
-        var p = getPanel();
-        if (p) {
-          p.classList.remove('is-loading');
-          p.removeAttribute('aria-busy');
-        }
-        var statsDone = getStats();
-        if (statsDone) {
-          statsDone.classList.remove('is-loading');
-        }
-      });
-  }
-
-  function shouldHandleLink(anchor, panel) {
-    if (!anchor || !panel || anchor.target === '_blank') {
-      return false;
-    }
-    if (anchor.hasAttribute('download')) {
-      return false;
-    }
-    try {
-      var linkUrl = new URL(anchor.href, window.location.origin);
-      if (linkUrl.origin !== window.location.origin) {
-        return false;
-      }
-      return linkUrl.pathname === window.location.pathname;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  document.addEventListener('click', function (ev) {
-    var taxBtn = ev.target.closest('[data-llp-tax-filter]');
-    if (taxBtn) {
-      ev.preventDefault();
-      var filter = taxBtn.getAttribute('data-llp-tax-filter');
-      if (!filter) {
-        return;
-      }
-      var params = currentQueryParams();
-      var current = params.get('tax_filter');
-      var next = current === filter ? null : filter;
-      loadPanel(buildPanelUrl({ tax_filter: next }), true);
-      return;
-    }
-
-    var tabLink = ev.target.closest('[data-llp-tabs] .llp-payments-seg__item');
-    if (tabLink) {
-      if (tabLink.classList.contains('is-active')) {
-        ev.preventDefault();
-        return;
-      }
-      ev.preventDefault();
-      loadPanel(tabLink.href, true);
-      return;
-    }
-
-    var pageLink = ev.target.closest('#llp-payments-panel .pagination a');
-    if (pageLink && shouldHandleLink(pageLink, getPanel())) {
-      ev.preventDefault();
-      loadPanel(pageLink.href, true);
-    }
-  });
-
-  window.addEventListener('popstate', function () {
-    if (!getPanel()) {
-      return;
-    }
-    loadPanel(window.location.href, false);
-  });
-
-  document.addEventListener('DOMContentLoaded', function () {
-    var panel = getPanel();
-    var statsEl = getStats();
-    if (panel) {
-      syncFilterMeta(panel, statsEl);
-    }
-  });
-})();
-
-
-/* ========== Landlord payments — chart report page ========== */
-(function () {
-  'use strict';
-
-  const isChartReportPage = document.body.classList.contains('llp-chart-report-page');
-  const charts = {
-    status: null,
-    topLandlords: null,
-    gstSplit: null,
-    financialTotals: null,
-    nature: null,
-  };
-
-  function readChartData() {
-    const node = document.getElementById('llpChartData');
-    if (!node) {
-      return null;
-    }
-    try {
-      return JSON.parse(node.textContent || '{}');
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function formatInr(value) {
-    return '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-  }
-
-  function emptyMessage(canvas, text) {
-    if (!canvas || !canvas.parentElement) {
-      return;
-    }
-    const wrap = canvas.parentElement;
-    wrap.innerHTML =
-      '<p class="llp-chart-report-empty text-muted small mb-0 text-center py-5">' +
-      (text || 'No data for current filters.') +
-      '</p>';
-  }
-
-  function initStatusChart(data) {
-    const canvas = document.getElementById('llpStatusChart');
-    if (!canvas || typeof Chart === 'undefined') {
-      return;
-    }
-
-    const breakdown = data.statusBreakdown || {};
-    const labels = data.statusLabels || { paid: 'Paid', pending: 'Pending / due' };
-    const paid = Number(breakdown.paid || 0);
-    const pending = Number(breakdown.pending || 0);
-
-    if (paid <= 0 && pending <= 0) {
-      emptyMessage(canvas, 'No payable amounts in the current filter.');
-      return;
-    }
-
-    if (charts.status) {
-      charts.status.destroy();
-    }
-
-    charts.status = new Chart(canvas.getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: [labels.paid || 'Paid', labels.pending || 'Pending / due'],
-        datasets: [
-          {
-            data: [paid, pending],
-            backgroundColor: ['#10b981', '#f59e0b'],
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                return ctx.label + ': ' + formatInr(ctx.parsed);
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  function initNatureChart(data) {
-    const canvas = document.getElementById('llpNatureChart');
-    if (!canvas || typeof Chart === 'undefined') {
-      return;
-    }
-
-    const natureBreakdown = Array.isArray(data.natureBreakdown) ? data.natureBreakdown : [];
-    const withAmount = natureBreakdown.filter(function (o) {
-      return Number(o.amount || 0) > 0.009;
-    });
-
-    if (!withAmount.length) {
-      emptyMessage(canvas, 'No charge-type totals for the current filter.');
-      return;
-    }
-
-    if (charts.nature) {
-      charts.nature.destroy();
-    }
-
-    const colors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#94a3b8'];
-
-    charts.nature = new Chart(canvas.getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: withAmount.map(function (o) {
-          return String(o.label || o.key || '');
-        }),
-        datasets: [
-          {
-            data: withAmount.map(function (o) {
-              return Number(o.amount || 0);
-            }),
-            backgroundColor: withAmount.map(function (o, i) {
-              return colors[i % colors.length];
-            }),
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                return ctx.label + ': ' + formatInr(ctx.parsed);
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  function initTopLandlordsChart(data) {
-    const canvas = document.getElementById('llpTopLandlordsChart');
-    if (!canvas || typeof Chart === 'undefined') {
-      return;
-    }
-
-    const topLandlords = Array.isArray(data.topLandlords) ? data.topLandlords : [];
-    if (!topLandlords.length) {
-      emptyMessage(canvas, 'No landlord totals for the current filter.');
-      return;
-    }
-
-    if (charts.topLandlords) {
-      charts.topLandlords.destroy();
-    }
-
-    charts.topLandlords = new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: topLandlords.map(function (o) {
-          const name = String(o.owner || '');
-          return name.length > 22 ? name.slice(0, 20) + '…' : name;
-        }),
-        datasets: [
-          {
-            label: 'Final NEFT',
-            data: topLandlords.map(function (o) {
-              return Number(o.amount || 0);
-            }),
-            backgroundColor: '#6366f1',
-            borderRadius: 6,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: 'y',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                return formatInr(ctx.parsed.x);
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: {
-              callback: function (v) {
-                return formatInr(v);
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  function initGstSplitChart(data) {
-    const canvas = document.getElementById('llpGstSplitChart');
-    if (!canvas || typeof Chart === 'undefined') {
-      return;
-    }
-
-    const gstSplit = Array.isArray(data.gstSplit) ? data.gstSplit : [];
-    if (!gstSplit.length) {
-      emptyMessage(canvas, 'No GST amounts in the current filter.');
-      return;
-    }
-
-    if (charts.gstSplit) {
-      charts.gstSplit.destroy();
-    }
-
-    charts.gstSplit = new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: gstSplit.map(function (o) {
-          return String(o.label || '');
-        }),
-        datasets: [
-          {
-            label: 'GST amount',
-            data: gstSplit.map(function (o) {
-              return Number(o.amount || 0);
-            }),
-            backgroundColor: ['#0d9488', '#14b8a6', '#5eead4'],
-            borderRadius: 8,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                return formatInr(ctx.parsed.y);
-              },
-            },
-          },
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: function (v) {
-                return formatInr(v);
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  function initFinancialTotalsChart(data) {
-    const canvas = document.getElementById('llpFinancialTotalsChart');
-    if (!canvas || typeof Chart === 'undefined') {
-      return;
-    }
-
-    const totals = Array.isArray(data.financialTotals) ? data.financialTotals : [];
-    const withAmount = totals.filter(function (o) {
-      return Number(o.amount || 0) > 0.009;
-    });
-
-    if (!withAmount.length) {
-      emptyMessage(canvas, 'No financial totals for the current filter.');
-      return;
-    }
-
-    if (charts.financialTotals) {
-      charts.financialTotals.destroy();
-    }
-
-    charts.financialTotals = new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: withAmount.map(function (o) {
-          return String(o.label || '');
-        }),
-        datasets: [
-          {
-            label: 'Amount',
-            data: withAmount.map(function (o) {
-              return Number(o.amount || 0);
-            }),
-            backgroundColor: '#0284c7',
-            borderRadius: 8,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: 'y',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                return formatInr(ctx.parsed.x);
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: {
-              callback: function (v) {
-                return formatInr(v);
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  function initChartReportPage() {
-    const data = readChartData();
-    if (!data) {
-      return;
-    }
-    initStatusChart(data);
-    initNatureChart(data);
-    initTopLandlordsChart(data);
-    initGstSplitChart(data);
-    initFinancialTotalsChart(data);
-  }
-
-  function bootChartReport() {
-    if (!isChartReportPage) {
-      return;
-    }
-    if (typeof Chart === 'undefined') {
-      return;
-    }
-    initChartReportPage();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootChartReport);
-  } else {
-    bootChartReport();
-  }
-})();
-
-
-/* ========== Vendor owner payments — breakdown drawer & ledger tabs ========== */
-(function () {
-  'use strict';
-
-  var drawer = document.getElementById('vlBreakdownDrawer');
-  if (!drawer) {
-    return;
-  }
-
-  var backdrop = drawer.querySelector('.vl-breakdown-drawer__backdrop');
-  var grid = document.getElementById('vlBreakdownGrid');
-  var viewBillLink = document.getElementById('vlDrawerViewBill');
-  var activeBtn = null;
-
-  function vlMoney(value) {
-    if (value === null || value === undefined || value === '' || value === '—') {
-      return '—';
-    }
-    var n = Number(value);
-    if (!isFinite(n)) {
-      return '—';
-    }
-    if (Math.abs(n) < 0.009) {
-      return '0.00';
-    }
-    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  function setText(id, text) {
-    var el = document.getElementById(id);
-    if (el) {
-      el.textContent = text;
-    }
-  }
-
-  function addDetailItem(label, value, opts) {
-    opts = opts || {};
-    var item = document.createElement('div');
-    item.className = 'vl-detail-item';
-
-    var lbl = document.createElement('span');
-    lbl.className = 'vl-detail-label';
-    lbl.textContent = label;
-
-    var val = document.createElement('span');
-    val.className = 'vl-detail-value' + (opts.mono ? ' vl-detail-value--mono' : '');
-    val.textContent = value;
-
-    item.appendChild(lbl);
-    item.appendChild(val);
-    grid.appendChild(item);
-  }
-
-  function addMoneyItem(label, amount) {
-    addDetailItem(label, amount === '—' ? '—' : '\u20B9' + amount);
-  }
-
-  function populateDrawer(row) {
-    if (!grid) {
-      return;
-    }
-
-    grid.innerHTML = '';
-
-    var billRef = row.bill_ref || row.agreement_number || '—';
-    var toPay = Number(row.net_payable ?? row.pending_balance ?? 0);
-    var paidAmt = Number(row.amount_sent ?? 0);
-    var dueDate = row.due_date || row.payment_month || '—';
-    var tdsLabel = String(row.tds_label || 'TDS').trim() || 'TDS';
-
-    setText('vlDrawerBill', billRef);
-    setText('vlDrawerMonth', row.payment_month || '—');
-    setText('vlDrawerPurpose', row.payment_purpose || '—');
-    setText('vlDrawerStatus', String(row.status_label || '—').toUpperCase());
-    setText('vlDrawerToPay', vlMoney(toPay));
-    setText('vlDrawerPaid', vlMoney(paidAmt));
-    setText('vlDrawerDue', dueDate);
-
-    if (viewBillLink) {
-      if (row.detail_url) {
-        viewBillLink.href = row.detail_url;
-        viewBillLink.classList.remove('d-none');
-      } else {
-        viewBillLink.href = '#';
-        viewBillLink.classList.add('d-none');
-      }
-    }
-
-    addMoneyItem('Sub total', vlMoney(row.sub_total));
-    addMoneyItem('GST', vlMoney(row.gst_amount));
-    addMoneyItem('CGST', vlMoney(row.cgst_amount));
-    addMoneyItem('SGST', vlMoney(row.sgst_amount));
-    if (Number(row.igst_amount || 0) > 0.009) {
-      addMoneyItem('IGST', vlMoney(row.igst_amount));
-    }
-    addMoneyItem('TDS', vlMoney(row.tds_amount));
-    addMoneyItem('Gross', vlMoney(row.gross_amount));
-    addMoneyItem('Other deductions', vlMoney(row.other_deductions));
-
-    var esiPf = Number(row.esi_amount || 0) + Number(row.pf_amount || 0);
-    if (esiPf > 0.009) {
-      addMoneyItem('ESI / PF', vlMoney(esiPf));
-    }
-
-    addDetailItem('TDS section', tdsLabel !== '—' ? tdsLabel : '—');
-    addDetailItem('Payment mode', row.payment_mode || '—');
-    addDetailItem('UTR / Reference', row.utr || '—', { mono: true });
-
-    if (row.bill_payment_made && row.bill_payment_made !== '—') {
-      addDetailItem('Bill paid on', row.bill_payment_made);
-    }
-  }
-
-  function openDrawer(btn, row) {
-    if (activeBtn && activeBtn !== btn) {
-      activeBtn.setAttribute('aria-expanded', 'false');
-      activeBtn.classList.remove('is-open');
-    }
-
-    activeBtn = btn;
-    btn.setAttribute('aria-expanded', 'true');
-    btn.classList.add('is-open');
-
-    populateDrawer(row);
-    drawer.classList.add('is-open');
-    drawer.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('vl-drawer-open');
-
-    var closeBtn = drawer.querySelector('.vl-breakdown-drawer__close');
-    if (closeBtn) {
-      closeBtn.focus();
-    }
-  }
-
-  function closeDrawer() {
-    drawer.classList.remove('is-open');
-    drawer.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('vl-drawer-open');
-
-    if (activeBtn) {
-      activeBtn.setAttribute('aria-expanded', 'false');
-      activeBtn.classList.remove('is-open');
-      activeBtn = null;
-    }
-  }
-
-  document.querySelectorAll('.vl-more-btn[data-vl-row]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var raw = btn.getAttribute('data-vl-row');
-      if (!raw) {
-        return;
-      }
-
-      var row;
-      try {
-        row = JSON.parse(raw);
-      } catch (e) {
-        return;
-      }
-
-      if (drawer.classList.contains('is-open') && activeBtn === btn) {
-        closeDrawer();
-        return;
-      }
-
-      openDrawer(btn, row);
-    });
-  });
-
-  drawer.querySelectorAll('[data-vl-drawer-close]').forEach(function (el) {
-    el.addEventListener('click', closeDrawer);
-  });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
-      closeDrawer();
-    }
-  });
-})();
-
-(function () {
-  'use strict';
-  var tabs = document.querySelectorAll('[data-vl-tab]');
-  if (!tabs.length) return;
-  var panels = document.querySelectorAll('[data-vl-panel]');
-  var statCards = document.querySelectorAll('[data-vl-stat-tab]');
-  function activate(slug) {
-    tabs.forEach(function (tab) {
-      var on = tab.getAttribute('data-vl-tab') === slug;
-      tab.classList.toggle('is-active', on);
-      tab.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    panels.forEach(function (panel) {
-      var on = panel.getAttribute('data-vl-panel') === slug;
-      panel.classList.toggle('is-active', on);
-      if (on) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
-    });
-    statCards.forEach(function (card) {
-      card.classList.toggle('is-vl-active', card.getAttribute('data-vl-stat-tab') === slug);
-    });
-  }
-  var initialTab = document.querySelector('[data-vl-tab].is-active');
-  if (initialTab) activate(initialTab.getAttribute('data-vl-tab'));
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () { activate(tab.getAttribute('data-vl-tab')); });
-  });
-  statCards.forEach(function (card) {
-    var slug = card.getAttribute('data-vl-stat-tab');
-    var go = function () { activate(slug); };
-    card.addEventListener('click', go);
-    card.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
-    });
   });
 })();

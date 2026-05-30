@@ -13,7 +13,6 @@ use App\Models\TblZonesModel;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -88,6 +87,7 @@ class SecurityAgreementController extends Controller
                 'show' => 'security-agreements.show',
                 'edit' => 'security-agreements.edit',
                 'update' => 'security-agreements.update',
+                'destroy' => 'security-agreements.destroy',
             ],
         ];
     }
@@ -109,6 +109,7 @@ class SecurityAgreementController extends Controller
                 'show' => 'security-agreements.show',
                 'edit' => 'security-agreements.edit',
                 'update' => 'security-agreements.update',
+                'destroy' => 'security-agreements.destroy',
             ],
         ];
     }
@@ -277,53 +278,6 @@ class SecurityAgreementController extends Controller
         return $query;
     }
 
-    private function applyVendorOwnerExistsFilter(Builder $query, callable $vendorConstraint): void
-    {
-        $collation = 'utf8mb4_unicode_ci';
-
-        $query->whereExists(function ($sub) use ($vendorConstraint, $collation) {
-            $sub->selectRaw('1')
-                ->from('vendor_tbl')
-                ->where('vendor_tbl.active_status', 0)
-                ->where('vendor_tbl.party_type', Tblvendor::PARTY_LANDLORD)
-                ->where(function ($link) use ($collation) {
-                    $link->whereColumn('vendor_tbl.id', 'security_agreements.vendor_id')
-                        ->orWhere(function ($name) use ($collation) {
-                            $name->whereRaw(
-                                "vendor_tbl.display_name COLLATE {$collation} = security_agreements.owner_name COLLATE {$collation}"
-                            )->orWhereRaw(
-                                "vendor_tbl.company_name COLLATE {$collation} = security_agreements.owner_name COLLATE {$collation}"
-                            );
-                        });
-                });
-            $vendorConstraint($sub);
-        });
-    }
-
-    private function normalizeAdditionalPartyNames(?string $raw): ?string
-    {
-        if ($raw === null) {
-            return null;
-        }
-        $raw = trim($raw);
-        if ($raw === '') {
-            return null;
-        }
-        $lines = preg_split('/\r\n|\r|\n/', $raw);
-        if (! is_array($lines)) {
-            return null;
-        }
-        $out = [];
-        foreach ($lines as $line) {
-            $t = trim((string) $line);
-            if ($t !== '') {
-                $out[] = $t;
-            }
-        }
-
-        return $out === [] ? null : implode("\n", $out);
-    }
-
     private function resolveVendorIdFromRequest(Request $request): int
     {
         $vendorId = (int) $request->input('vendor_id', 0);
@@ -338,7 +292,7 @@ class SecurityAgreementController extends Controller
 
     private function activeVendorQuery()
     {
-        return Tblvendor::query()->where('active_status', 0);
+        return Tblvendor::query()->active();
     }
 
     private function formatAgreementPeriod(string $startDate, string $endDate): string
@@ -363,11 +317,23 @@ class SecurityAgreementController extends Controller
      */
     private function vendorDropdownData(): array
     {
+        $vendors = $this->activeVendorQuery()
+            ->get([
+                'id',
+                'display_name',
+                'company_name',
+                'vendor_id',
+                'vendor_first_name',
+                'vendor_last_name',
+                'pan_number',
+                'vendor_type_name',
+                'party_type',
+            ])
+            ->sortBy(fn (Tblvendor $vendor) => strtolower($this->vendorDisplayLabel($vendor)))
+            ->values();
+
         return [
-            'vendors' => $this->activeVendorQuery()
-                ->orderBy('display_name')
-                ->orderBy('company_name')
-                ->get(['id', 'display_name', 'company_name', 'vendor_id', 'pan_number', 'vendor_type_name', 'party_type']),
+            'vendors' => $vendors,
         ];
     }
 
@@ -382,19 +348,14 @@ class SecurityAgreementController extends Controller
     private function serviceVendorFilterOptions()
     {
         return $this->activeVendorQuery()
-            ->orderBy('display_name')
-            ->orderBy('company_name')
-            ->get(['id', 'display_name', 'company_name']);
+            ->get(['id', 'display_name', 'company_name', 'vendor_id', 'vendor_first_name', 'vendor_last_name'])
+            ->sortBy(fn (Tblvendor $vendor) => strtolower($this->vendorDisplayLabel($vendor)))
+            ->values();
     }
 
     private function vendorDisplayLabel(Tblvendor $vendor): string
     {
-        $label = trim((string) ($vendor->display_name ?? ''));
-        if ($label === '') {
-            $label = trim((string) ($vendor->company_name ?? ''));
-        }
-
-        return $label;
+        return $vendor->listDisplayLabel();
     }
 
     /**
@@ -534,13 +495,8 @@ class SecurityAgreementController extends Controller
             'agreement_period' => 'required|string|max:50',
             'agreement_period_start' => 'required|date',
             'agreement_period_end' => 'required|date|after_or_equal:agreement_period_start',
-            'advance_amount' => 'required|numeric|min:0',
-            'security_charge_amount' => 'required|numeric|min:0',
-            'housekeeping_charge_amount' => 'nullable|numeric|min:0',
-            'security_fixed_salary_amount' => 'nullable|numeric|min:0',
-            'housekeeping_fixed_salary_amount' => 'nullable|numeric|min:0',
-            'security_paid_leave_applicable' => 'required|in:0,1',
-            'security_paid_leave_days' => 'nullable|required_if:security_paid_leave_applicable,1|integer|min:1|max:366',
+            'security_fixed_salary_amount' => 'required|numeric|min:0',
+            'housekeeping_fixed_salary_amount' => 'required|numeric|min:0',
             'housekeeping_paid_leave_applicable' => 'required|in:0,1',
             'housekeeping_paid_leave_days' => 'nullable|required_if:housekeeping_paid_leave_applicable,1|integer|min:1|max:366',
             'gst_applicable' => 'required|in:0,1',
@@ -553,19 +509,14 @@ class SecurityAgreementController extends Controller
             'cgst_amount' => 'nullable|numeric|min:0',
             'sgst_amount' => 'nullable|numeric|min:0',
             'igst_amount' => 'nullable|numeric|min:0',
-            'tds_tax_id' => 'required|integer',
-            'tds_tax_name' => 'required|string|max:120',
-            'tds_rate' => 'required|numeric|min:0|max:100',
-            'tds_section_id' => 'nullable|integer',
-            'tds_section' => 'nullable|string|max:40',
-            'tds_amount' => 'nullable|numeric|min:0',
+            'tds_tax_id' => ['required', 'integer', Rule::exists('tds_tax_tbl', 'id')],
             'rcm_applicable' => 'required|in:0,1',
             'rcm_value' => 'nullable|required_if:rcm_applicable,1|numeric|min:0',
             'end_of_agreement_date' => 'required|date|after_or_equal:agreement_date',
-            'termination_period' => 'nullable|string|max:120',
-            'pan_number' => 'nullable|string|max:30',
-            'contact_person_name' => 'nullable|string|max:255',
-            'contact_person_number' => 'nullable|string|max:30',
+            'termination_period' => 'required|string|max:120',
+            'pan_number' => 'required|string|max:30',
+            'contact_person_name' => 'required|string|max:255',
+            'contact_person_number' => 'required|string|max:30',
             'vendor_id' => [
                 'required',
                 'integer',
@@ -601,26 +552,18 @@ class SecurityAgreementController extends Controller
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    private function paidLeavePayloadFromValidated(array $validated): array
+    private function housekeepingPaidLeavePayloadFromValidated(array $validated): array
     {
-        $securityApplicable = (string) ($validated['security_paid_leave_applicable'] ?? '0') === '1';
-        $housekeepingApplicable = (string) ($validated['housekeeping_paid_leave_applicable'] ?? '0') === '1';
+        $applicable = (string) ($validated['housekeeping_paid_leave_applicable'] ?? '0') === '1';
 
         return [
-            'security_paid_leave_applicable' => $securityApplicable,
-            'security_paid_leave_days' => $securityApplicable
-                ? (int) ($validated['security_paid_leave_days'] ?? 0)
-                : null,
-            'housekeeping_paid_leave_applicable' => $housekeepingApplicable,
-            'housekeeping_paid_leave_days' => $housekeepingApplicable
+            'housekeeping_paid_leave_applicable' => $applicable,
+            'housekeeping_paid_leave_days' => $applicable
                 ? (int) ($validated['housekeeping_paid_leave_days'] ?? 0)
                 : null,
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     /**
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
@@ -663,11 +606,9 @@ class SecurityAgreementController extends Controller
 
         $gstTaxType = strtoupper(trim((string) ($validated['gst_tax_type'] ?? 'GST'))) ?: 'GST';
         $securityBase = SecurityAgreement::effectiveServiceTaxBase(
-            (float) ($validated['security_charge_amount'] ?? 0),
             isset($validated['security_fixed_salary_amount']) ? (float) $validated['security_fixed_salary_amount'] : null
         );
         $housekeepingBase = SecurityAgreement::effectiveServiceTaxBase(
-            (float) ($validated['housekeeping_charge_amount'] ?? 0),
             isset($validated['housekeeping_fixed_salary_amount']) ? (float) $validated['housekeeping_fixed_salary_amount'] : null
         );
         $breakdown = SecurityAgreement::computeGstBreakdown(
@@ -714,31 +655,41 @@ class SecurityAgreementController extends Controller
      */
     private function tdsPayloadFromValidated(array $validated): array
     {
-        $rate = (float) ($validated['tds_rate'] ?? 0);
+        $tax = Tbltdstax::query()->with('section:id,name')->find((int) ($validated['tds_tax_id'] ?? 0));
+        if ($tax === null) {
+            return [
+                'tds_tax_id' => null,
+                'tds_tax_name' => null,
+                'tds_rate' => null,
+                'tds_section_id' => null,
+                'tds_section' => null,
+                'tds_amount' => null,
+            ];
+        }
+
+        $rate = (float) $tax->tax_rate;
         if ($rate > 0 && $rate <= 1) {
             $rate = $rate * 100;
         }
 
+        $sectionName = trim((string) ($tax->section_name ?? $tax->section?->name ?? ''));
+
         $breakdown = SecurityAgreement::computeTdsBreakdown(
             SecurityAgreement::effectiveServiceTaxBase(
-                (float) ($validated['security_charge_amount'] ?? 0),
                 isset($validated['security_fixed_salary_amount']) ? (float) $validated['security_fixed_salary_amount'] : null
             ),
             SecurityAgreement::effectiveServiceTaxBase(
-                (float) ($validated['housekeeping_charge_amount'] ?? 0),
                 isset($validated['housekeeping_fixed_salary_amount']) ? (float) $validated['housekeeping_fixed_salary_amount'] : null
             ),
             $rate
         );
 
         return [
-            'tds_tax_id' => isset($validated['tds_tax_id']) ? (int) $validated['tds_tax_id'] : null,
-            'tds_tax_name' => trim((string) ($validated['tds_tax_name'] ?? '')) ?: null,
+            'tds_tax_id' => (int) $tax->id,
+            'tds_tax_name' => trim((string) $tax->tax_name) ?: null,
             'tds_rate' => round($rate, 4),
-            'tds_section_id' => isset($validated['tds_section_id']) && $validated['tds_section_id'] !== ''
-                ? (int) $validated['tds_section_id']
-                : null,
-            'tds_section' => trim((string) ($validated['tds_section'] ?? '')) ?: null,
+            'tds_section_id' => $tax->section_id ? (int) $tax->section_id : null,
+            'tds_section' => $sectionName !== '' ? $sectionName : null,
             'tds_amount' => $breakdown['total'],
         ];
     }
@@ -755,18 +706,19 @@ class SecurityAgreementController extends Controller
             'agreement_date.required' => 'Security agreement date is required.',
             'vendor_id.required' => 'Please select a vendor from the list.',
             'vendor_id.exists' => 'Selected vendor is invalid or inactive.',
-            'security_charge_amount.required' => 'Security charge amount is required.',
-            'security_paid_leave_applicable.required' => 'Select whether paid leave applies for security.',
-            'security_paid_leave_days.required_if' => 'Enter paid leave days for security when applicable.',
+            'security_fixed_salary_amount.required' => 'Security fixed salary amount is required.',
+            'housekeeping_fixed_salary_amount.required' => 'Housekeeping fixed salary amount is required.',
             'housekeeping_paid_leave_applicable.required' => 'Select whether paid leave applies for housekeeping.',
             'housekeeping_paid_leave_days.required_if' => 'Enter paid leave days for housekeeping when applicable.',
+            'termination_period.required' => 'Termination period is required.',
+            'pan_number.required' => 'PAN number is required.',
+            'contact_person_name.required' => 'Contact person name is required.',
+            'contact_person_number.required' => 'Contact person number is required.',
             'address.required' => 'Address is required.',
             'agreement_period.required' => 'Agreement period is required.',
             'agreement_period_start.required' => 'Select the agreement period start date.',
             'agreement_period_end.required' => 'Select the agreement period end date.',
             'agreement_period_end.after_or_equal' => 'Agreement period end date must be the same as or after the start date.',
-            'advance_amount.required' => 'Advance amount is required.',
-            'security_charge_amount.required' => 'Monthly rent amount is required.',
             'gst_applicable.required' => 'Select whether GST is applicable (Yes or No).',
             'gst_type.required_if' => 'Select tax mode (Including or Excluding GST).',
             'gst_tax_id.required_if' => 'Select a GST rate from the list.',
@@ -774,8 +726,7 @@ class SecurityAgreementController extends Controller
             'gst_percentage.required_if' => 'Select a GST rate from the list.',
             'gst_amount.required_if' => 'GST amount is required when GST is applicable.',
             'tds_tax_id.required' => 'Select a TDS tax from the list.',
-            'tds_tax_name.required' => 'Select a TDS tax from the list.',
-            'tds_rate.required' => 'Select a TDS tax from the list.',
+            'tds_tax_id.exists' => 'Selected TDS tax is not valid.',
             'rcm_applicable.required' => 'Select whether RCM is applicable (Yes or No).',
             'rcm_applicable.in' => 'RCM must be Yes or No.',
             'rcm_value.required_if' => 'Enter the RCM value when RCM is Yes.',
@@ -805,9 +756,8 @@ class SecurityAgreementController extends Controller
 
         $stats = [
             'total' => (clone $base)->count(),
-            'advance_total' => (float) (clone $base)->sum('advance_amount'),
-            'security_charge_total' => (float) (clone $base)->sum('security_charge_amount'),
-            'housekeeping_charge_total' => (float) (clone $base)->sum('housekeeping_charge_amount'),
+            'security_salary_total' => (float) (clone $base)->sum('security_fixed_salary_amount'),
+            'housekeeping_salary_total' => (float) (clone $base)->sum('housekeeping_fixed_salary_amount'),
             'ending_soon' => (clone $base)->activeWithinDays(30)->count(),
         ];
 
@@ -1029,9 +979,21 @@ class SecurityAgreementController extends Controller
         ];
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): View|\Illuminate\Http\Response
     {
-        return view('superadmin.security_agreements.index', $this->indexViewData($request));
+        $data = $this->indexViewData($request);
+
+        if ($request->ajax()) {
+            $view = view('superadmin.security_agreements.index', $data);
+
+            return response(
+                $view->fragment('sa-register-stats')
+                . $view->fragment('sa-register-chips')
+                . $view->fragment('sa-register-panel')
+            );
+        }
+
+        return view('superadmin.security_agreements.index', $data);
     }
 
     public function create(Request $request): View
@@ -1074,12 +1036,9 @@ class SecurityAgreementController extends Controller
             'vendor_id' => $vendorId,
             'address' => $validated['address'],
             'agreement_period' => $this->formatAgreementPeriod($validated['agreement_period_start'], $validated['agreement_period_end']),
-            'advance_amount' => $validated['advance_amount'],
-            'security_charge_amount' => $validated['security_charge_amount'],
-            'housekeeping_charge_amount' => $validated['housekeeping_charge_amount'] ?? 0,
             'security_fixed_salary_amount' => $validated['security_fixed_salary_amount'] ?? null,
             'housekeeping_fixed_salary_amount' => $validated['housekeeping_fixed_salary_amount'] ?? null,
-            ...$this->paidLeavePayloadFromValidated($validated),
+            ...$this->housekeepingPaidLeavePayloadFromValidated($validated),
             'gst_type' => $validated['gst_type'],
             ...$this->gstPayloadFromValidated($validated),
             ...$this->tdsPayloadFromValidated($validated),
@@ -1098,7 +1057,7 @@ class SecurityAgreementController extends Controller
 
         return redirect()
             ->route('security-agreements.index', $this->indexRedirectQuery($request, $agreementType))
-            ->with('success', SecurityAgreement::typeLabel($agreementType).' saved.');
+            ->with('success', 'Security agreement saved successfully.');
     }
 
     public function show(Request $request, SecurityAgreement $securityAgreement): View
@@ -1153,12 +1112,9 @@ class SecurityAgreementController extends Controller
             'vendor_id' => $vendorId,
             'address' => $validated['address'],
             'agreement_period' => $this->formatAgreementPeriod($validated['agreement_period_start'], $validated['agreement_period_end']),
-            'advance_amount' => $validated['advance_amount'],
-            'security_charge_amount' => $validated['security_charge_amount'],
-            'housekeeping_charge_amount' => $validated['housekeeping_charge_amount'] ?? 0,
             'security_fixed_salary_amount' => $validated['security_fixed_salary_amount'] ?? null,
             'housekeeping_fixed_salary_amount' => $validated['housekeeping_fixed_salary_amount'] ?? null,
-            ...$this->paidLeavePayloadFromValidated($validated),
+            ...$this->housekeepingPaidLeavePayloadFromValidated($validated),
             'gst_type' => $validated['gst_type'],
             ...$this->gstPayloadFromValidated($validated),
             ...$this->tdsPayloadFromValidated($validated),
@@ -1176,7 +1132,34 @@ class SecurityAgreementController extends Controller
 
         return redirect()
             ->route('security-agreements.index', $this->indexRedirectQuery($request, $agreementType))
-            ->with('success', SecurityAgreement::typeLabel($agreementType).' updated.');
+            ->with('success', 'Security agreement updated successfully.');
+    }
+
+    public function destroy(Request $request, SecurityAgreement $securityAgreement): RedirectResponse
+    {
+        $this->userRow();
+        $agreementType = SecurityAgreement::normalizeType((string) $securityAgreement->agreement_type);
+        $agreementNumber = (string) $securityAgreement->agreement_number;
+        $this->deleteAgreementFiles($securityAgreement);
+        $securityAgreement->delete();
+
+        return redirect()
+            ->route('security-agreements.index', $this->indexRedirectQuery($request, $agreementType))
+            ->with('success', 'Agreement '.$agreementNumber.' deleted.');
+    }
+
+    private function deleteAgreementFiles(SecurityAgreement $record): void
+    {
+        $folder = SecurityAgreement::FILE_STORAGE_FOLDER;
+
+        foreach (SecurityAgreement::FILE_SLOTS as $slot => $meta) {
+            foreach ($record->filesForSlot($slot) as $file) {
+                $path = (string) ($file['path'] ?? '');
+                if ($path !== '') {
+                    $this->fileUpload->delete($path, $folder);
+                }
+            }
+        }
     }
 
     /**
@@ -1256,10 +1239,7 @@ class SecurityAgreementController extends Controller
                 $files = array_merge($files, $uploaded);
             }
 
-            $payload[$meta['path']] = $this->fileUpload->encodeFiles($files);
-            if (isset($meta['name'])) {
-                $payload[$meta['name']] = null;
-            }
+            $payload[$meta['column']] = $this->fileUpload->encodeFiles($files);
         }
     }
 
@@ -1271,10 +1251,6 @@ class SecurityAgreementController extends Controller
         $errors = [];
 
         foreach (SecurityAgreement::FILE_SLOTS as $slot => $meta) {
-            if (in_array($slot, ['esi_certificate', 'pf_certificate'], true)) {
-                continue;
-            }
-
             $input = SecurityAgreement::FILE_INPUT_NAMES[$slot];
             $keepKey = SecurityAgreement::FILE_KEEP_INPUT_NAMES[$slot];
             $label = (string) ($meta['label'] ?? $slot);
