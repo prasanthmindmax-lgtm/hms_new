@@ -554,6 +554,14 @@
                                     <span class="vp-info-key"><i class="bi bi-person"></i> Created By</span>
                                     <span class="vp-info-val created_by">—</span>
                                 </div>
+                                <div class="vp-info-row">
+                                    <span class="vp-info-key"><i class="bi bi-calendar-check"></i> Status Changed On</span>
+                                    <span class="vp-info-val status_changed_on">—</span>
+                                </div>
+                                <div class="vp-info-row">
+                                    <span class="vp-info-key"><i class="bi bi-person-check"></i> Status Changed By</span>
+                                    <span class="vp-info-val status_changed_by">—</span>
+                                </div>
                             </div>
                                     </div>
 
@@ -788,6 +796,15 @@
                 data: { id: vendorId, _token: '{{ csrf_token() }}' },
                 success: function (response) {
                     if (response.success) {
+                        const $row = $toggle.closest('tr');
+                        if (response.status_changed_on) {
+                            $row.find('.vendor-status-changed-on').text(response.status_changed_on);
+                            $row.data('statusChangedOn', response.status_changed_on);
+                        }
+                        if (response.status_changed_by_name) {
+                            $row.find('.vendor-status-changed-by').text(response.status_changed_by_name);
+                            $row.data('statusChangedByName', response.status_changed_by_name);
+                        }
                         if (response.active_status == 0) {
                             $label.removeClass('bg-secondary').addClass('bg-success').text('Active');
                             $toggle.prop('checked', true);
@@ -928,6 +945,8 @@
             const customerpayment_terms= $(this).data('payment_terms');
             const customerLanguage = $(this).data('portal_language');
             const createdByName = $(this).data('createdByName');
+            const statusChangedByName = $(this).data('statusChangedByName');
+            const statusChangedOn = $(this).data('statusChangedOn') || $(this).find('.vendor-status-changed-on').text().trim();
             const billing_address = JSON.parse($(this).attr('data-billingaddress'));
             const shippingAddress = JSON.parse($(this).attr('data-shippingaddress'));
             const contacts = JSON.parse($(this).attr('data-contacts'));
@@ -1013,6 +1032,8 @@
             $('.customer_currency').text(customerCurrency);
             $('#customer_language').text(customerLanguage || '—');
             $('.created_by').text(createdByName != null && String(createdByName).trim() !== '' ? String(createdByName) : '—');
+            $('.status_changed_on').text(statusChangedOn && statusChangedOn !== '—' ? statusChangedOn : '—');
+            $('.status_changed_by').text(statusChangedByName != null && String(statusChangedByName).trim() !== '' ? String(statusChangedByName) : '—');
             $('#total-income').text('Total Income — ₹0.00');
             $('#vendor-overview-fy').val('');
             // Reset to overview tab

@@ -35,6 +35,8 @@ class Tblvendor extends Authenticatable
     protected $fillable = [
         'user_id',
         'active_status',
+        'status_changed_on',
+        'status_changed_by',
         'vendor_id',
         'vendor_salutation',
         'vendor_first_name',
@@ -65,6 +67,10 @@ class Tblvendor extends Authenticatable
         'tds_amount',
         'remarks',
         'documents',
+    ];
+
+    protected $casts = [
+        'status_changed_on' => 'date',
     ];
 
     public function billingAddress()
@@ -100,6 +106,11 @@ class Tblvendor extends Authenticatable
     public function creator()
     {
         return $this->belongsTo(usermanagementdetails::class, 'user_id');
+    }
+
+    public function statusChanger()
+    {
+        return $this->belongsTo(usermanagementdetails::class, 'status_changed_by');
     }
 
     public function getCreatedByNameAttribute(): ?string

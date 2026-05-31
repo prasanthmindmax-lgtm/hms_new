@@ -431,7 +431,7 @@ public function getvendor(Request $request)
     $perPage = (int) $request->get('per_page', 10);
     $perPage = in_array($perPage, [10, 25, 50, 100, 250, 500], true) ? $perPage : 10;
 
-    $query = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails', 'history', 'creator'])
+    $query = Tblvendor::with(['billingAddress', 'shippingAddress', 'contacts', 'bankdetails', 'history', 'creator', 'statusChanger'])
         ->orderBy('id', 'desc');
 
     $this->applyVendorListingFilters($request, $query);
@@ -703,8 +703,6 @@ public function getvendorcreate()
         $vendor_id = 'VEN-001';
     }
     $data = [
-        'user_id' => $user_id,
-        'vendor_id' => $vendor_id,
         'vendor_salutation' => $request->primary_contact_salutation,
         'vendor_first_name' => $primaryContactFirstName,
         'vendor_last_name' => $primaryContactLastName,
@@ -734,7 +732,9 @@ public function getvendorcreate()
         'remarks' => $request->remarks,
         'updated_at' => $now,
     ];
-    if (!$isUpdate) {
+    if (! $isUpdate) {
+        $data['user_id'] = $user_id;
+        $data['vendor_id'] = $vendor_id;
         $data['updated_at'] = $now;
         $data['active_status'] = 1;
     }
@@ -1078,13 +1078,25 @@ public function toggleVendorStatus(Request $request)
         return response()->json(['message' => 'Only admin users can change vendor status.'], 403);
     }
 
+    $request->validate([
+        'id' => 'required|integer|exists:vendor_tbl,id',
+    ]);
+
     $vendor = Tblvendor::findOrFail($request->id);
-    $vendor->active_status = $vendor->active_status == 0 ? 1 : 0;
+    $markingActive = (int) $vendor->active_status === 1;
+
+    $vendor->active_status = $markingActive ? 0 : 1;
+    $vendor->status_changed_on = now()->toDateString();
+    $vendor->status_changed_by = $admin->id;
     $vendor->save();
+    $vendor->load('statusChanger');
+    $statusChangedByName = trim((string) ($vendor->statusChanger?->user_fullname ?? $vendor->statusChanger?->username ?? ''));
 
     return response()->json([
         'success' => true,
         'active_status' => $vendor->active_status,
+        'status_changed_on' => Carbon::parse($vendor->status_changed_on)->format('d M Y'),
+        'status_changed_by_name' => $statusChangedByName !== '' ? $statusChangedByName : '—',
         'message' => $vendor->active_status == 0 ? 'Vendor marked as Active' : 'Vendor marked as Inactive',
     ]);
 }
