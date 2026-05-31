@@ -855,7 +855,7 @@ function rowClick(event) {
                     $locations = null;
                     $zones = null;
 
-                    if ($admin->access_limits == 1) {
+                    if ($admin->access_limits == 1 || $admin->access_limits == 4) {
                         // Access limit 1 → All zones
                         $zones = TblZonesModel::select('name', 'id')->get();
                         $locations = TblLocationModel::select('name', 'id','zone_id')->get();
@@ -1205,6 +1205,7 @@ function rowClick(event) {
                                              <th class="thview"><input type="checkbox" id="saved-select-all" title="Select all pending"></th>
                                          @endif
                                          <th class="thview">S.No</th>
+                                         <th class="thview">Requested At</th>
                                          <th class="thview">Zone Name</th>
                                          <th class="thview">Branch Name</th>
                                          <th class="thview">Wife MRD No / Name</th>

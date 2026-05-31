@@ -11219,7 +11219,7 @@ private function savecurld($checkin,$location_id,$locationName,$zoneName, $locat
 }
 private function getAccessibleLocations($admin)
 {
-    if ($admin->access_limits == 1) {
+    if ($admin->access_limits == 1 || $admin->access_limits == 4) {
         // ALL locations
         return TblLocationModel::orderBy('name')->pluck('name', 'id')->toArray();
     }
@@ -12102,7 +12102,7 @@ public function refundform_data(Request $request){
         $data->whereBetween('hms_refund_form.created_at', [$startDate, $endDate]);
     }
 
-    if ($user->access_limits == 2 || $user->access_limits == 4) {
+    if ($user->access_limits == 2) {
         $branchIds = [];
         if (!empty($user->zone_id)) {
             $branchIds = DB::table('tbl_locations')->where('zone_id', $user->zone_id)->pluck('id')->toArray();

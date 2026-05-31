@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
 class PaymentRequest extends Model
 {
     protected $table = 'payment_requests';
@@ -33,6 +32,8 @@ class PaymentRequest extends Model
 
     public const TYPE_ELECTRICITY = 'electricity';
 
+    public const TYPE_DONOR_PAYMENT = 'donor_payment';
+
     public const TYPES = [
         self::TYPE_ADVANCE,
         self::TYPE_PART_PAYMENT,
@@ -45,6 +46,7 @@ class PaymentRequest extends Model
         self::TYPE_MISCELLANEOUS,
         self::TYPE_RENT,
         self::TYPE_ELECTRICITY,
+        self::TYPE_DONOR_PAYMENT,
     ];
 
     /** @var array<string, string> */
@@ -60,6 +62,7 @@ class PaymentRequest extends Model
         self::TYPE_MISCELLANEOUS => 'Miscellaneous Payment',
         self::TYPE_RENT => 'Rent Payment',
         self::TYPE_ELECTRICITY => 'Electricity Payment',
+        self::TYPE_DONOR_PAYMENT => 'Donor Payment',
     ];
 
     public const PAYOUT_ONLY_TYPES = [
@@ -71,6 +74,7 @@ class PaymentRequest extends Model
         self::TYPE_MISCELLANEOUS,
         self::TYPE_RENT,
         self::TYPE_ELECTRICITY,
+        self::TYPE_DONOR_PAYMENT,
     ];
 
     public const PO_LINKED_TYPES = [
@@ -136,6 +140,12 @@ class PaymentRequest extends Model
 
     private const BILL_DISBURSE_EPS = 0.02;
 
+    public const SLOT_PO = 'po';
+
+    public const SLOT_DOCUMENT = 'document';
+
+    public const SLOT_BANK = 'bank';
+
     protected $fillable = [
         'request_no',
         'company_id',
@@ -199,6 +209,7 @@ class PaymentRequest extends Model
             self::TYPE_MISCELLANEOUS => 'text-bg-light',
             self::TYPE_RENT => 'text-bg-info',
             self::TYPE_ELECTRICITY => 'text-bg-primary',
+            self::TYPE_DONOR_PAYMENT => 'text-bg-success',
             default => 'text-bg-secondary',
         };
 
@@ -342,6 +353,130 @@ class PaymentRequest extends Model
         }
 
         return rtrim(asset('/public/payment_request_attachments'), '/').'/'.rawurlencode($name);
+    }
+
+    public static function slotAttachmentPathColumn(string $slot): string
+    {
+        return match ($slot) {
+            self::SLOT_PO => 'po_attachment_path',
+            self::SLOT_DOCUMENT => 'document_attachment_path',
+            self::SLOT_BANK => 'bank_document_path',
+            default => throw new \InvalidArgumentException('Unknown attachment slot: '.$slot),
+        };
+    }
+
+    public static function slotFilesColumn(string $slot): string
+    {
+        return self::slotAttachmentPathColumn($slot);
+    }
+
+    public static function slotLegacyPathColumn(string $slot): string
+    {
+        return self::slotAttachmentPathColumn($slot);
+    }
+
+    public function filesForSlot(string $slot): array
+    {
+        $pathCol = self::slotAttachmentPathColumn($slot);
+
+        return self::pathsToAttachmentFileList(
+            self::decodeAttachmentPathList($this->{$pathCol}),
+        );
+    }
+
+    /**
+     * @param  list<string>  $paths
+     * @return list<array{path: string, name: string}>
+     */
+    public static function pathsToAttachmentFileList(array $paths): array
+    {
+        $files = [];
+        foreach ($paths as $path) {
+            $path = trim($path);
+            if ($path === '') {
+                continue;
+            }
+            $files[] = [
+                'path' => $path,
+                'name' => basename(str_replace('\\', '/', $path)),
+            ];
+        }
+
+        return $files;
+    }
+
+    /**
+     * @param  list<array{path?: string, name?: string}|string>  $files
+     */
+    public function setFilesForSlot(string $slot, array $files): void
+    {
+        $paths = [];
+        foreach ($files as $file) {
+            $path = is_string($file)
+                ? trim($file)
+                : trim((string) ($file['path'] ?? $file['stored_path'] ?? ''));
+            if ($path !== '') {
+                $paths[] = $path;
+            }
+        }
+
+        $col = self::slotAttachmentPathColumn($slot);
+
+        if ($paths === []) {
+            $this->{$col} = null;
+
+            return;
+        }
+
+        $payload = array_map(static fn (string $path) => ['path' => $path], $paths);
+        $this->{$col} = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function decodeAttachmentPathList(mixed $raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        if (is_array($raw)) {
+            $items = $raw;
+        } else {
+            $trim = trim((string) $raw);
+            if ($trim === '') {
+                return [];
+            }
+
+            if ($trim[0] === '[') {
+                $decoded = json_decode($trim, true);
+                $items = is_array($decoded) ? $decoded : [];
+            } else {
+                return [$trim];
+            }
+        }
+
+        $paths = [];
+        foreach ($items as $item) {
+            if (is_string($item)) {
+                $path = trim($item);
+            } elseif (is_array($item)) {
+                $path = trim((string) ($item['path'] ?? $item['stored_path'] ?? ''));
+            } else {
+                $path = '';
+            }
+            if ($path !== '') {
+                $paths[] = $path;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    public function filePublicUrl(array $file): ?string
+    {
+        return self::attachmentPublicUrl($file['path'] ?? null);
     }
 
     public function branch(): BelongsTo

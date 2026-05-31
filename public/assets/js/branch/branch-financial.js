@@ -440,9 +440,14 @@ $(document).ready(function() {
         formData.append('acknowledgement_agreed', $('#acknowledgement_agreed').is(':checked') ? 1 : 0);
 
         // Determine URL using route names
-        let url = storeRoute;
+        let url = (typeof storeRoute !== 'undefined') ? storeRoute : '';
 
         if (editMode && currentEditId) {
+            if (typeof updateRoute === 'undefined') {
+                showAlert('Error', 'Update route is not configured on this page.', 'error');
+                $('#submitBtn').prop('disabled', false).html('<i class="fas fa-save"></i> Save Report');
+                return;
+            }
             url = updateRoute.replace(':id', currentEditId);
             formData.append('_method', 'PUT');
             Object.keys(removedExistingFiles).forEach(function(field) {
@@ -508,6 +513,11 @@ $(document).ready(function() {
     // ================================================
     $(document).on('click', '.btn-edit', function() {
         const reportId = $(this).data('id');
+
+        if (typeof showRoute === 'undefined') {
+            showAlert('Error', 'Edit route is not configured on this page.', 'error');
+            return;
+        }
 
         // Show loading
         showAlert('Loading', 'Please wait...', 'info', false);

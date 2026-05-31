@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -18,12 +19,15 @@ class Tblvendor extends Authenticatable
 
     public const PARTY_LANDLORD = 'Landlord';
 
+    public const PARTY_MAINTENANCE = 'Maintenance Vendor';
+
 
     /** @var list<string> */
     public const PARTY_TYPES = [
         self::PARTY_VENDOR,
         self::PARTY_EMPLOYEE,
         self::PARTY_LANDLORD,
+        self::PARTY_MAINTENANCE,
     ];
 
     protected $table = 'vendor_tbl';
@@ -31,6 +35,8 @@ class Tblvendor extends Authenticatable
     protected $fillable = [
         'user_id',
         'active_status',
+        'status_changed_on',
+        'status_changed_by',
         'vendor_id',
         'vendor_salutation',
         'vendor_first_name',
@@ -62,7 +68,11 @@ class Tblvendor extends Authenticatable
         'remarks',
         'documents',
     ];
-    
+
+    protected $casts = [
+        'status_changed_on' => 'date',
+    ];
+
     public function billingAddress()
     {
         return $this->hasOne(TblBilling::class, 'vendor_id');
@@ -98,6 +108,18 @@ class Tblvendor extends Authenticatable
         return $this->belongsTo(usermanagementdetails::class, 'user_id');
     }
 
+    public function statusChanger()
+    {
+        return $this->belongsTo(usermanagementdetails::class, 'status_changed_by');
+    }
+
+    public function getCreatedByNameAttribute(): ?string
+    {
+        $name = trim((string) ($this->creator?->user_fullname ?? $this->creator?->username ?? ''));
+
+        return $name !== '' ? $name : null;
+    }
+
     public static function normalizePartyType(?string $type): ?string
     {
         $type = trim((string) $type);
@@ -112,5 +134,76 @@ class Tblvendor extends Authenticatable
         }
 
         return null;
+    }
+
+    /**
+     * Dropdown / register label with sensible fallbacks so every vendor row can be shown.
+     */
+    public function listDisplayLabel(): string
+    {
+        $label = trim((string) ($this->display_name ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+
+        $label = trim((string) ($this->company_name ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+
+        $person = trim(implode(' ', array_filter([
+            trim((string) ($this->vendor_first_name ?? '')),
+            trim((string) ($this->vendor_last_name ?? '')),
+        ])));
+
+        if ($person !== '') {
+            return $person;
+        }
+
+        $code = trim((string) ($this->vendor_id ?? ''));
+        if ($code !== '') {
+            return $code;
+        }
+
+        return 'Vendor #'.(int) $this->id;
+    }
+
+    public function scopeActiveLandlords(Builder $query): Builder
+    {
+        return $query
+            ->where('active_status', 0)
+            ->where('party_type', self::PARTY_LANDLORD);
+    }
+
+    /** All active rows in vendor master (active_status = 0). */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('active_status', 0);
+    }
+
+    /** Active vendors for security / housekeeping service agreements. */
+    public function scopeActiveServiceVendors(Builder $query): Builder
+    {
+        return $query
+            ->where('active_status', 0)
+            ->where('party_type', self::PARTY_VENDOR);
+    }
+
+    /** Active maintenance vendors for maintenance master bills. */
+    public function scopeActiveMaintenanceVendors(Builder $query): Builder
+    {
+        return $query
+            ->where('active_status', 0)
+            ->where('party_type', self::PARTY_MAINTENANCE);
+    }
+
+    public function scopePartyType(Builder $query, ?string $type): Builder
+    {
+        $normalized = self::normalizePartyType($type);
+        if ($normalized === null) {
+            return $query;
+        }
+
+        return $query->where('party_type', $normalized);
     }
 }

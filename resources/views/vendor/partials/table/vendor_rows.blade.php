@@ -5,6 +5,7 @@
               <th style="width: 30px;"><input type="checkbox" id="selectAllRows" /></th>
               <th>ID</th>
               <th>NAME</th>
+              <th>PARTY TYPE</th>
               <th>COMPANY NAME</th>
               <th>PAN NUMBER</th>
               <th>GST NUMBER</th>
@@ -13,6 +14,9 @@
               <th>REFERENCE</th>
               <th>RECEIVABLES (BCY)</th>
               <th>UNUSED CREDITS (BCY)</th>
+              <th>CREATED BY</th>
+              <th>STATUS CHANGED DATE</th>
+              <th>STATUS CHANGED BY</th>
               <th>FILES</th>
               <th>STATUS</th>
           </tr>
@@ -46,6 +50,8 @@
                     }
                 }
                 $fileUrls = array_values(array_unique($fileUrls));
+                $statusChangedByName = trim((string) ($v->statusChanger?->user_fullname ?? $v->statusChanger?->username ?? ''));
+                $statusChangedByDisplay = $statusChangedByName !== '' ? $statusChangedByName : '—';
               @endphp
               <tr class="customer-row"
                   data-id="{{ $v->id }}"
@@ -69,7 +75,9 @@
                   data-remarks="{{ $v->remarks }}"
                   data-history='@json($v->history)'
                   data-created_by="{{ $v->user_id }}"
-                  data-created-by-name="{{ e(trim((string) ($v->creator?->user_fullname ?? $v->creator?->username ?? '')) ?: '—') }}"
+                  data-created-by-name="{{ e($v->created_by_name ?? '—') }}"
+                  data-status-changed-on="{{ $v->status_changed_on ? \Carbon\Carbon::parse($v->status_changed_on)->format('d M Y') : '' }}"
+                  data-status-changed-by-name="{{ e($v->status_changed_by_name ?? '—') }}"
                   data-all_data='@json($v)'
               >
                   <td><input type="checkbox" class="row-checkbox" value="{{ $v->id }}" /></td>
@@ -82,6 +90,7 @@
                           <br><span style="font-size:11px;color:#8898aa;">{{ $v->created_at->format('d/m/Y') }}</span>
                       </a>
                   </td>
+                  <td>{{ $v->party_type ?: '—' }}</td>
                   <td>
                       <span title="{{ $v->company_name }}">
                           {{ \Illuminate\Support\Str::limit($v->company_name ?? '', 25, '...') }}
@@ -94,6 +103,13 @@
                   <td>{{ $v->reference ?? '-' }}</td>
                   <td>₹{{ number_format($v->opening_balance ?? 0, 2) }}</td>
                   <td>₹0.00</td>
+                  <td>{{ $v->created_by_name ?? '—' }}</td>
+                  <td class="vendor-status-changed-on">
+                      {{ $v->status_changed_on ? $v->status_changed_on->format('d M Y') : '—' }}
+                  </td>
+                  <td class="vendor-status-changed-by">
+                      {{ $statusChangedByDisplay }}
+                  </td>
                   <td class="vendor-files-cell text-center align-middle" onclick="event.stopPropagation()">
                     @if(count($fileUrls) > 0)
                         <span class="doc-row vendor-files-chip"
@@ -131,7 +147,7 @@
               </tr>
           @empty
               <tr>
-                  <td colspan="13" class="text-center py-5 text-muted">
+                  <td colspan="16" class="text-center py-5 text-muted">
                       <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
                       No vendors found
                   </td>

@@ -2355,7 +2355,6 @@ $(document).ready(function () {
             $visibleInput.val(selectedItems.join(', '));
             $hiddenInput.val(selectedIds.join(','));
 
-            // ✅ Trigger change event (important)
             $hiddenInput.trigger('click');
           }
         });
@@ -2625,6 +2624,7 @@ $(document).ready(function () {
                     financial_name: filters.financial_name,
                     status_name: filters.status_name,
                     category_id: filters.category_id,
+                    nature_id: filters.nature_id,
                     state_name: filters.state_name,
                     created_by_id: filters.created_by_id,
                     universal_search: filters.universal_search
@@ -2679,7 +2679,7 @@ $(document).ready(function () {
                     const savedPage = sessionStorage.getItem('quotation_page') || 1;
 
                     setTimeout(function() {
-                        loadQuotations(savedPage, $('#per_page').val());
+                        loadBill(savedPage, $('#per_page').val());
                     }, 200);
                 }
           // =================== UPDATE STATS FROM AJAX ===================

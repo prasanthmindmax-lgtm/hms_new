@@ -24,6 +24,8 @@ use App\Http\Controllers\PharmacyAuditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadiantCashPickupController;
 use App\Http\Controllers\RadiantMismatchAlertController;
+use App\Http\Controllers\RentalAgreementController;
+use App\Http\Controllers\RentalPaymentsController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\IndentController;
 use App\Http\Controllers\TicketController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\LicenceDocumentCatalogController;
 use App\Http\Controllers\LicenceDocumentController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\SecurityAgreementController;
 use App\Http\Controllers\PaymentRequestController;
 use App\Http\Controllers\UserActivityController;
 use App\Http\Controllers\GstR1WorkingController;
@@ -532,6 +535,7 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::post('/check-bill-number', [VendorController::class,'checkBillNumber'])->name('check.bill.number');
     //asset
     Route::get('/superadmin/asset_dashboard', [VendorController::class, 'getasset'])->name('superadmin.getasset');
+    Route::get('/superadmin/maintenance_dashboard', [VendorController::class, 'getmaintenance'])->name('superadmin.getmaintenance');
 
     //bill made
     Route::get('/superadmin/bill_made_dashboard', [VendorController::class, 'getbillmade'])->name('superadmin.getbillmade');
@@ -1019,6 +1023,26 @@ Route::get('superadmin/activitydata', [SuperAdminController::class, 'activitydat
     Route::get('pharmacy-audits/{pharmacyAudit}', [PharmacyAuditController::class, 'show'])->name('pharmacy-audits.show');
     Route::get('pharmacy-audits/{pharmacyAudit}/edit', [PharmacyAuditController::class, 'edit'])->name('pharmacy-audits.edit');
     Route::put('pharmacy-audits/{pharmacyAudit}', [PharmacyAuditController::class, 'update'])->name('pharmacy-audits.update');
+
+    Route::get('rental-agreements', [RentalAgreementController::class, 'index'])->name('rental-agreements.index');
+    Route::get('rental-agreements/create', [RentalAgreementController::class, 'create'])->name('rental-agreements.create');
+    Route::post('rental-agreements', [RentalAgreementController::class, 'store'])->name('rental-agreements.store');
+    Route::get('rental-agreements/vendors/{vendor}/owner-payments', [RentalAgreementController::class, 'vendorOwnerPayments'])->name('rental-agreements.vendor-owner-payments');
+    Route::get('rental-agreements/{rentalAgreement}/owner-payments', [RentalAgreementController::class, 'ownerPayments'])->name('rental-agreements.owner-payments');
+    Route::get('rental-agreements/{rentalAgreement}', [RentalAgreementController::class, 'show'])->name('rental-agreements.show');
+    Route::get('rental-agreements/{rentalAgreement}/edit', [RentalAgreementController::class, 'edit'])->name('rental-agreements.edit');
+    Route::put('rental-agreements/{rentalAgreement}', [RentalAgreementController::class, 'update'])->name('rental-agreements.update');
+
+    Route::get('rental-payments/charts', [RentalPaymentsController::class, 'chart'])->name('rental-payments.charts');
+    Route::get('rental-payments/export', [RentalPaymentsController::class, 'export'])->name('rental-payments.export');
+    Route::get('rental-payments', [RentalPaymentsController::class, 'index'])->name('rental-payments');
+
+    Route::get('security-agreements', [SecurityAgreementController::class, 'index'])->name('security-agreements.index');
+    Route::get('security-agreements/create', [SecurityAgreementController::class, 'create'])->name('security-agreements.create');
+    Route::post('security-agreements', [SecurityAgreementController::class, 'store'])->name('security-agreements.store');
+    Route::get('security-agreements/{securityAgreement}', [SecurityAgreementController::class, 'show'])->name('security-agreements.show');
+    Route::get('security-agreements/{securityAgreement}/edit', [SecurityAgreementController::class, 'edit'])->name('security-agreements.edit');
+    Route::put('security-agreements/{securityAgreement}', [SecurityAgreementController::class, 'update'])->name('security-agreements.update');
     });
 
 Route::middleware(['auth','role_id:2'])->group(function () {
@@ -1059,7 +1083,7 @@ Route::middleware(['auth','role_id:2'])->group(function () {
      Route::get('/referral/patientdateandfitter', [MarketController::class, 'patientdateandfitter'])->name('referral.patientdateandfitter');
      Route::get('/referral/patientpop', [MarketController::class, 'patientpop'])->name('referral.patientpop');
      Route::get('/referral/meetingpop', [MarketController::class, 'meetingpop'])->name('referral.meetingpop');
-});
+     });
 
 //admin routes
 Route::middleware(['auth','role_id:4'])->group(function () {

@@ -54,12 +54,25 @@
   $lookupUrl = route('superadmin.payment-requests.lookup-po');
   $lookupBillUrl = $lookupBillUrl ?? route('superadmin.payment-requests.lookup-bill');
 
-  $existingPoUrl = $isEdit ? \App\Models\PaymentRequest::attachmentPublicUrl($pr->po_attachment_path) : null;
-  $existingDocUrl = $isEdit ? \App\Models\PaymentRequest::attachmentPublicUrl($pr->document_attachment_path) : null;
-  $existingBankUrl = $isEdit ? \App\Models\PaymentRequest::attachmentPublicUrl($pr->bank_document_path) : null;
-  $existingPoName = $existingPoUrl ? basename((string) $pr->po_attachment_path) : '';
-  $existingDocName = $existingDocUrl ? basename((string) $pr->document_attachment_path) : '';
-  $existingBankName = $existingBankUrl ? basename((string) $pr->bank_document_path) : '';
+  $existingPoAttachments = collect();
+  $existingDocAttachments = collect();
+  $existingBankAttachments = collect();
+  if ($isEdit) {
+      $existingPoAttachments = $pr->filesForSlot(\App\Models\PaymentRequest::SLOT_PO);
+      $existingDocAttachments = $pr->filesForSlot(\App\Models\PaymentRequest::SLOT_DOCUMENT);
+      $existingBankAttachments = $pr->filesForSlot(\App\Models\PaymentRequest::SLOT_BANK);
+  }
+
+  $payPrAttFileMeta = function (string $name): array {
+      $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+      return match ($ext) {
+          'pdf' => ['badge' => 'PDF', 'class' => 'pr-gmail-type-pdf', 'kind' => 'pdf'],
+          'doc', 'docx' => ['badge' => 'DOC', 'class' => 'pr-gmail-type-doc', 'kind' => 'doc'],
+          'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp' => ['badge' => strtoupper($ext === 'jpeg' ? 'JPG' : $ext), 'class' => 'pr-gmail-type-img', 'kind' => 'image'],
+          default => ['badge' => $ext !== '' ? strtoupper($ext) : 'FILE', 'class' => 'pr-gmail-type-file', 'kind' => 'other'],
+      };
+  };
 @endphp
 <!doctype html>
 <html lang="en">
@@ -260,6 +273,7 @@
                           'miscellaneous' => 'Miscellaneous Payment',
                           'rent' => 'Rent Payment',
                           'electricity' => 'Electricity Payment',
+                          'donor_payment' => 'Donor Payment',
                       ];
                       $ptDisp = $ptOld && isset($ptLabels[$ptOld]) ? $ptLabels[$ptOld] : '';
                     @endphp
@@ -399,28 +413,49 @@
                   <div class="pr-pay-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
                   <div class="pr-pay-upload-text">Drag & drop or <span>browse files</span></div>
                   <p class="pr-pay-upload-hint">Support for PDF, Images, Word documents</p>
-                  <input type="file" name="po_attachment" id="pay_po_file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
+                  <input type="file" name="po_attachments[]" id="pay_po_file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
                 </div>
-                <div class="pr-pay-preview-bar-custom" id="pay-po-preview-bar" hidden>
-                  <div class="preview-icon-wrap"><i class="bi bi-file-earmark-check"></i></div>
-                  <div class="file-info">
-                    <span class="file-name" id="pay-po-preview-name" title=""></span>
-                    <div class="file-meta">
-                      <span class="file-size" id="pay-po-preview-size"></span>
-                    </div>
+                @php $__payAtts = $existingPoAttachments; $__payKeep = 'keep_po_attachment_paths'; $__payAttCount = is_countable($__payAtts) ? count($__payAtts) : 0; @endphp
+                <div class="pr-gmail-attach-section mt-3" id="pay-po-attach-area" data-pay-attach-section>
+                  <p class="pr-gmail-attach-section-head mb-2 {{ $__payAttCount === 0 ? 'd-none' : '' }}" data-pay-attach-count>
+                    <span class="fw-semibold text-dark">{{ $__payAttCount }} {{ $__payAttCount === 1 ? 'attachment' : 'attachments' }}</span>
+                    <span class="text-muted"> · saved on this request</span>
+                  </p>
+                  <div class="pr-gmail-attach-grid pr-gmail-attach-grid--row" id="pay-po-attach-gallery" role="list" aria-live="polite">
+                    @foreach ($__payAtts as $att)
+                      @php
+                        $path = (string) ($att['path'] ?? '');
+                        $name = (string) ($att['name'] ?? basename(str_replace('\\', '/', $path)));
+                        $url = \App\Models\PaymentRequest::attachmentPublicUrl($path);
+                        $meta = $payPrAttFileMeta($name);
+                      @endphp
+                      @if ($path !== '')
+                        <div class="pr-gmail-attach-card" role="listitem" data-pay-existing-attach-card data-file-name="{{ $name }}">
+                          <input type="checkbox" name="{{ $__payKeep }}[]" value="{{ $path }}" checked class="pay-attach-keep d-none" aria-hidden="true">
+                          <button type="button" class="pr-gmail-attach-remove" title="Remove attachment" aria-label="Remove {{ $name }}">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                          </button>
+                          <button type="button" class="pr-gmail-attach-thumb" @if ($url) data-pay-preview-url="{{ $url }}" @endif title="Preview {{ $name }}">
+                            <span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--{{ $meta['kind'] }}">
+                              @if ($url && $meta['kind'] === 'image')
+                                <img src="{{ $url }}" alt="" loading="lazy" class="pr-gmail-attach-thumb-media">
+                              @elseif ($url && $meta['kind'] === 'pdf')
+                                <iframe src="{{ $url }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media" loading="lazy"></iframe>
+                              @else
+                                <span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                              @endif
+                            </span>
+                          </button>
+                          <div class="pr-gmail-attach-foot">
+                            <span class="pr-gmail-type-badge {{ $meta['class'] }}">{{ $meta['badge'] }}</span>
+                            <span class="pr-gmail-attach-name" title="{{ $name }}">{{ $name }}</span>
+                          </div>
+                          <span class="pr-gmail-attach-fold" aria-hidden="true"></span>
+                        </div>
+                      @endif
+                    @endforeach
                   </div>
-                  <button type="button" class="btn btn-preview" id="btn-preview-po">
-                    <i class="bi bi-eye" aria-hidden="true"></i> View
-                  </button>
                 </div>
-                @if($isEdit && $existingPoUrl)
-                  <div class="pr-pay-existing-file mt-2" id="pay-po-existing-file">
-                    <i class="bi bi-paperclip" aria-hidden="true"></i>
-                    <span class="me-1">Currently attached:</span>
-                    <a href="{{ $existingPoUrl }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $existingPoName }}</a>
-                    <span class="text-muted small ms-2">Pick a new file above to replace it.</span>
-                  </div>
-                @endif
                 <p class="small text-muted mt-2 mb-0" id="pay-po-attach-help">
                   @if ($__prBillLink)
                     Attach a clear copy of the vendor bill for approvers.
@@ -469,35 +504,56 @@
                   <div class="pr-pay-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
                   <div class="pr-pay-upload-text">Drag & drop or <span>browse files</span></div>
                   <p class="pr-pay-upload-hint">Support for PDF, Images, Word documents</p>
-                  <input type="file" name="document_attachment" id="pay_doc_file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
+                  <input type="file" name="document_attachments[]" id="pay_doc_file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
                 </div>
-                <div class="pr-pay-preview-bar-custom" id="pay-doc-preview-bar" hidden>
-                  <div class="preview-icon-wrap"><i class="bi bi-file-earmark-check"></i></div>
-                  <div class="file-info">
-                    <span class="file-name" id="pay-doc-preview-name" title=""></span>
-                    <div class="file-meta">
-                      <span class="file-size" id="pay-doc-preview-size"></span>
-                    </div>
+                @php $__payAtts = $existingDocAttachments; $__payKeep = 'keep_document_attachment_paths'; $__payAttCount = is_countable($__payAtts) ? count($__payAtts) : 0; @endphp
+                <div class="pr-gmail-attach-section mt-3" id="pay-doc-attach-area" data-pay-attach-section>
+                  <p class="pr-gmail-attach-section-head mb-2 {{ $__payAttCount === 0 ? 'd-none' : '' }}" data-pay-attach-count>
+                    <span class="fw-semibold text-dark">{{ $__payAttCount }} {{ $__payAttCount === 1 ? 'attachment' : 'attachments' }}</span>
+                    <span class="text-muted"> · saved on this request</span>
+                  </p>
+                  <div class="pr-gmail-attach-grid pr-gmail-attach-grid--row" id="pay-doc-attach-gallery" role="list" aria-live="polite">
+                    @foreach ($__payAtts as $att)
+                      @php
+                        $path = (string) ($att['path'] ?? '');
+                        $name = (string) ($att['name'] ?? basename(str_replace('\\', '/', $path)));
+                        $url = \App\Models\PaymentRequest::attachmentPublicUrl($path);
+                        $meta = $payPrAttFileMeta($name);
+                      @endphp
+                      @if ($path !== '')
+                        <div class="pr-gmail-attach-card" role="listitem" data-pay-existing-attach-card data-file-name="{{ $name }}">
+                          <input type="checkbox" name="{{ $__payKeep }}[]" value="{{ $path }}" checked class="pay-attach-keep d-none" aria-hidden="true">
+                          <button type="button" class="pr-gmail-attach-remove" title="Remove attachment" aria-label="Remove {{ $name }}">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                          </button>
+                          <button type="button" class="pr-gmail-attach-thumb" @if ($url) data-pay-preview-url="{{ $url }}" @endif title="Preview {{ $name }}">
+                            <span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--{{ $meta['kind'] }}">
+                              @if ($url && $meta['kind'] === 'image')
+                                <img src="{{ $url }}" alt="" loading="lazy" class="pr-gmail-attach-thumb-media">
+                              @elseif ($url && $meta['kind'] === 'pdf')
+                                <iframe src="{{ $url }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media" loading="lazy"></iframe>
+                              @else
+                                <span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                              @endif
+                            </span>
+                          </button>
+                          <div class="pr-gmail-attach-foot">
+                            <span class="pr-gmail-type-badge {{ $meta['class'] }}">{{ $meta['badge'] }}</span>
+                            <span class="pr-gmail-attach-name" title="{{ $name }}">{{ $name }}</span>
+                          </div>
+                          <span class="pr-gmail-attach-fold" aria-hidden="true"></span>
+                        </div>
+                      @endif
+                    @endforeach
                   </div>
-                  <button type="button" class="btn btn-preview" id="btn-preview-doc">
-                    <i class="bi bi-eye" aria-hidden="true"></i> View
-                  </button>
                 </div>
-                @if($isEdit && $existingDocUrl)
-                  <div class="pr-pay-existing-file mt-2" id="pay-doc-existing-file">
-                    <i class="bi bi-paperclip" aria-hidden="true"></i>
-                    <span class="me-1">Currently attached:</span>
-                    <a href="{{ $existingDocUrl }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $existingDocName }}</a>
-                    <span class="text-muted small ms-2">Pick a new file above to replace it.</span>
-                  </div>
-                @endif
               </div>
 
               <div class="mt-4 pt-3 border-top border-secondary border-opacity-25" id="pay-bank-fields">
                 <div class="pr-pay-form-section-title mb-2">
                   <i class="bi bi-bank" aria-hidden="true"></i> Payee bank details
                 </div>
-                <p class="text-muted small mb-3">Required for Petty Cash Advance, Reimbursement, Ref Payment, Patient Refund, Insta Payment, Miscellaneous, Rent Payment, and Electricity Payment.</p>
+                <p class="text-muted small mb-3">Required for Petty Cash Advance, Reimbursement, Ref Payment, Patient Refund, Insta Payment, Miscellaneous, Rent Payment, Electricity Payment, and Donor Payment.</p>
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label" for="pay_bank_account">Bank account number <span class="text-danger pay-bank-req">*</span></label>
@@ -526,29 +582,50 @@
                       <div class="pr-pay-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
                       <div class="pr-pay-upload-text">Drag & drop or <span>browse files</span></div>
                       <p class="pr-pay-upload-hint">Cancelled cheque, bank statement header, or passbook scan (PDF or image)</p>
-                      <input type="file" name="bank_document" id="pay_bank_file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
+                      <input type="file" name="bank_documents[]" id="pay_bank_file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/*">
                     </div>
-                    <div class="pr-pay-preview-bar-custom" id="pay-bank-preview-bar" hidden>
-                      <div class="preview-icon-wrap"><i class="bi bi-file-earmark-check"></i></div>
-                      <div class="file-info">
-                        <span class="file-name" id="pay-bank-preview-name" title=""></span>
-                        <div class="file-meta">
-                          <span class="file-size" id="pay-bank-preview-size"></span>
-                        </div>
+                    @php $__payAtts = $existingBankAttachments; $__payKeep = 'keep_bank_attachment_paths'; $__payAttCount = is_countable($__payAtts) ? count($__payAtts) : 0; @endphp
+                    <div class="pr-gmail-attach-section mt-3" id="pay-bank-attach-area" data-pay-attach-section>
+                      <p class="pr-gmail-attach-section-head mb-2 {{ $__payAttCount === 0 ? 'd-none' : '' }}" data-pay-attach-count>
+                        <span class="fw-semibold text-dark">{{ $__payAttCount }} {{ $__payAttCount === 1 ? 'attachment' : 'attachments' }}</span>
+                        <span class="text-muted"> · saved on this request</span>
+                      </p>
+                      <div class="pr-gmail-attach-grid pr-gmail-attach-grid--row" id="pay-bank-attach-gallery" role="list" aria-live="polite">
+                        @foreach ($__payAtts as $att)
+                          @php
+                            $path = (string) ($att['path'] ?? '');
+                            $name = (string) ($att['name'] ?? basename(str_replace('\\', '/', $path)));
+                            $url = \App\Models\PaymentRequest::attachmentPublicUrl($path);
+                            $meta = $payPrAttFileMeta($name);
+                          @endphp
+                          @if ($path !== '')
+                            <div class="pr-gmail-attach-card" role="listitem" data-pay-existing-attach-card data-file-name="{{ $name }}">
+                              <input type="checkbox" name="{{ $__payKeep }}[]" value="{{ $path }}" checked class="pay-attach-keep d-none" aria-hidden="true">
+                              <button type="button" class="pr-gmail-attach-remove" title="Remove attachment" aria-label="Remove {{ $name }}">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                              </button>
+                              <button type="button" class="pr-gmail-attach-thumb" @if ($url) data-pay-preview-url="{{ $url }}" @endif title="Preview {{ $name }}">
+                                <span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--{{ $meta['kind'] }}">
+                                  @if ($url && $meta['kind'] === 'image')
+                                    <img src="{{ $url }}" alt="" loading="lazy" class="pr-gmail-attach-thumb-media">
+                                  @elseif ($url && $meta['kind'] === 'pdf')
+                                    <iframe src="{{ $url }}#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media" loading="lazy"></iframe>
+                                  @else
+                                    <span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                                  @endif
+                                </span>
+                              </button>
+                              <div class="pr-gmail-attach-foot">
+                                <span class="pr-gmail-type-badge {{ $meta['class'] }}">{{ $meta['badge'] }}</span>
+                                <span class="pr-gmail-attach-name" title="{{ $name }}">{{ $name }}</span>
+                              </div>
+                              <span class="pr-gmail-attach-fold" aria-hidden="true"></span>
+                            </div>
+                          @endif
+                        @endforeach
                       </div>
-                      <button type="button" class="btn btn-preview" id="btn-preview-bank">
-                        <i class="bi bi-eye" aria-hidden="true"></i> View
-                      </button>
                     </div>
-                    @if($isEdit && $existingBankUrl)
-                      <div class="pr-pay-existing-file mt-2" id="pay-bank-existing-file">
-                        <i class="bi bi-paperclip" aria-hidden="true"></i>
-                        <span class="me-1">Currently attached:</span>
-                        <a href="{{ $existingBankUrl }}" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none">{{ $existingBankName }}</a>
-                        <span class="text-muted small ms-2">Pick a new file above to replace it.</span>
-                      </div>
-                    @endif
-                    @error('bank_document')
+                    @error('bank_documents')
                       <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
                   </div>
@@ -581,7 +658,7 @@
         </div>
         <div class="pay-hint-card">
           <h3><i class="bi bi-paperclip" aria-hidden="true"></i> Files</h3>
-          <p class="mb-0 small">Use the upload area to pick one file, or drop a file. Supported: PDF, images, Word. Max ~10 MB.</p>
+          <p class="mb-0 small">Use the upload area to pick multiple files, or drop files. Supported: PDF, images, Word. Max ~10 MB per file.</p>
         </div>
         <div class="pay-hint-card" style="margin-bottom:0;">
           <h3><i class="bi bi-question-circle" aria-hidden="true"></i> PO number</h3>
@@ -637,9 +714,46 @@
   var vendorBillOpenRoute = @json(route('superadmin.getbill'));
   /** Edit mode: existing attachments satisfy "required file" rules; submit may omit a new file. */
   var isPayReqEditMode = root.getAttribute('data-pr-edit-mode') === '1';
-  var hasExistingPoFile = !!document.getElementById('pay-po-existing-file');
-  var hasExistingDocFile = !!document.getElementById('pay-doc-existing-file');
-  var hasExistingBankFile = !!document.getElementById('pay-bank-existing-file');
+  function payCountKeptAttachments(keepFieldName) {
+    return root.querySelectorAll('input[name="' + keepFieldName + '[]"]:checked').length;
+  }
+  function payPrepareInactiveAttachmentKeeps() {
+    var t = (typeSel && typeSel.value) || '';
+    var isPo = PO.indexOf(t) !== -1;
+    var isDoc = DOC.indexOf(t) !== -1;
+    root.querySelectorAll('input.pay-attach-keep').forEach(function(inp) {
+      var name = inp.getAttribute('name') || '';
+      var active = false;
+      if (name === 'keep_po_attachment_paths[]') {
+        active = isPo;
+      } else if (name === 'keep_document_attachment_paths[]' || name === 'keep_bank_attachment_paths[]') {
+        active = isDoc;
+      }
+      if (!active) {
+        inp.checked = false;
+        inp.disabled = true;
+      } else {
+        inp.disabled = false;
+      }
+    });
+  }
+  function payResetAttachmentKeepDisabled() {
+    root.querySelectorAll('input.pay-attach-keep').forEach(function(inp) {
+      inp.disabled = false;
+    });
+  }
+  function payCountInputFiles(input) {
+    return input && input.files ? input.files.length : 0;
+  }
+  function payValidateInputFileSizes(input, label) {
+    if (!input || !input.files) return null;
+    for (var i = 0; i < input.files.length; i++) {
+      if (input.files[i].size > PAY_PR_MAX_FILE_BYTES) {
+        return label + ' must be 10 MB or smaller per file.';
+      }
+    }
+    return null;
+  }
   var csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   var strip = root.querySelector('#payLocationStrip');
   var typeSel = document.getElementById('pay_type');
@@ -675,6 +789,51 @@
     if (t === 'application/pdf' || n.endsWith('.pdf')) { return 'pdf'; }
     if (t.indexOf('image/') === 0 || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(n)) { return 'image'; }
     return 'other';
+  }
+
+  function showPayUrlPreview(url, title) {
+    if (!url) {
+      if (window.toastr) toastr.error('Preview is unavailable.');
+      return;
+    }
+    if (!payPreviewModalEl) {
+      if (window.toastr) toastr.error('Preview is unavailable on this page.');
+      return;
+    }
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      if (window.toastr) toastr.error('UI library not loaded. Please refresh the page.');
+      return;
+    }
+    revokePayPreview();
+    var n = String(title || url || '').toLowerCase();
+    var kind = 'other';
+    if (/\.pdf($|\?)/i.test(n) || n.indexOf('.pdf') !== -1) kind = 'pdf';
+    else if (/\.(jpe?g|png|gif|webp|bmp|svg)($|\?)/i.test(n)) kind = 'image';
+    var mt = document.getElementById('payPreviewModalTitle');
+    if (mt) { mt.textContent = title || 'Document preview'; }
+    var iframe = document.getElementById('payPreviewIframe');
+    var img = document.getElementById('payPreviewImg');
+    var fb = document.getElementById('payPreviewFallback');
+    var fbname = document.getElementById('payPreviewFallbackName');
+    if (iframe) { iframe.classList.add('d-none'); iframe.removeAttribute('src'); }
+    if (img) { img.classList.add('d-none'); img.removeAttribute('src'); }
+    if (fb) { fb.classList.add('d-none'); }
+    if (kind === 'pdf' && iframe) {
+      iframe.classList.remove('d-none');
+      iframe.src = url;
+    } else if (kind === 'image' && img) {
+      img.classList.remove('d-none');
+      img.src = url;
+      img.alt = title || '';
+    } else if (fb) {
+      fb.classList.remove('d-none');
+      if (fbname) { fbname.textContent = title || ''; }
+    }
+    try {
+      bootstrap.Modal.getOrCreateInstance(payPreviewModalEl).show();
+    } catch (err) {
+      if (window.toastr) toastr.error('Could not open the preview window.');
+    }
   }
 
   function showPayFilePreview(file) {
@@ -860,15 +1019,15 @@
       payDocFormTemplate.classList.toggle('is-visible', needsFormTemplate);
     }
     if (payPoFile) {
-      payPoFile.required = p && !(isPayReqEditMode && hasExistingPoFile);
+      payPoFile.removeAttribute('required');
       if (!p && typeChanged) { payPoFile.value = ''; payPoFile.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     if (payDocFile) {
-      payDocFile.required = d && !(isPayReqEditMode && hasExistingDocFile);
+      payDocFile.removeAttribute('required');
       if (!d && typeChanged) { payDocFile.value = ''; payDocFile.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     if (payBankFile) {
-      payBankFile.required = d && !(isPayReqEditMode && hasExistingBankFile);
+      payBankFile.removeAttribute('required');
       if (!d && typeChanged) { payBankFile.value = ''; payBankFile.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     if (payBankAccount) {
@@ -924,7 +1083,7 @@
       leadEl.innerHTML = 'Enter the <strong>bill</strong> number or reference, tap <strong>Load</strong> (or press Enter) to fill bill details, then attach the supporting file below.';
       if (payBillLookupHasPo) {
         attLbl.innerHTML = 'Vendor bill &amp; PO attachment (PDF, image, or document) <span class="text-danger">*</span>';
-        attHelp.textContent = 'Upload the vendor bill and a clear copy of the linked purchase order for approvers (one combined file or multiple pages in a single PDF is fine).';
+        attHelp.textContent = 'Upload the vendor bill and a clear copy of the linked purchase order for approvers.';
       } else {
         attLbl.innerHTML = 'Vendor bill attachment (PDF, image, or document) <span class="text-danger">*</span>';
         attHelp.textContent = 'Attach a clear copy of the vendor bill for approvers.';
@@ -1220,25 +1379,27 @@
           }
         }
       }
-      var poFileMissing = !payPoFile || !payPoFile.files || !payPoFile.files.length;
-      var poFilePresent = !poFileMissing;
-      if (poFileMissing && !(isPayReqEditMode && hasExistingPoFile)) {
+      var poKept = payCountKeptAttachments('keep_po_attachment_paths');
+      var poNew = payCountInputFiles(payPoFile);
+      if (poKept + poNew < 1) {
         var attNeed = poLinkedAttBillMode
           ? (payBillLookupHasPo
-            ? 'Please attach the vendor bill and linked PO documentation (PDF, image, or Word).'
-            : 'Please attach the vendor bill (PDF, image, or Word).')
-          : 'Please attach the PO document (PDF, image, or Word).';
+            ? 'Please attach at least one vendor bill or PO document (PDF, image, or Word).'
+            : 'Please attach at least one vendor bill (PDF, image, or Word).')
+          : 'Please attach at least one PO document (PDF, image, or Word).';
         problems.push({ a: null, msg: attNeed, u: document.getElementById('pay-po-upload-box') });
-      } else if (poFilePresent && payPoFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
-        problems.push({ a: null, msg: 'Attachment must be 10 MB or smaller.', u: document.getElementById('pay-po-upload-box') });
+      } else {
+        var poSizeErr = payValidateInputFileSizes(payPoFile, 'Attachment');
+        if (poSizeErr) problems.push({ a: null, msg: poSizeErr, u: document.getElementById('pay-po-upload-box') });
       }
     } else if (d) {
-      var docFileMissing = !payDocFile || !payDocFile.files || !payDocFile.files.length;
-      var docFilePresent = !docFileMissing;
-      if (docFileMissing && !(isPayReqEditMode && hasExistingDocFile)) {
-        problems.push({ a: null, msg: 'Please attach a supporting document.', u: document.getElementById('pay-doc-upload-box') });
-      } else if (docFilePresent && payDocFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
-        problems.push({ a: null, msg: 'Supporting document must be 10 MB or smaller.', u: document.getElementById('pay-doc-upload-box') });
+      var docKept = payCountKeptAttachments('keep_document_attachment_paths');
+      var docNew = payCountInputFiles(payDocFile);
+      if (docKept + docNew < 1) {
+        problems.push({ a: null, msg: 'Please attach at least one supporting document.', u: document.getElementById('pay-doc-upload-box') });
+      } else {
+        var docSizeErr = payValidateInputFileSizes(payDocFile, 'Supporting document');
+        if (docSizeErr) problems.push({ a: null, msg: docSizeErr, u: document.getElementById('pay-doc-upload-box') });
       }
       var acct = payBankAccount ? String(payBankAccount.value || '').trim() : '';
       var ifsc = payBankIfsc ? String(payBankIfsc.value || '').trim().toUpperCase() : '';
@@ -1252,12 +1413,13 @@
       if (!br) {
         problems.push({ a: payBankBranch, msg: 'Please enter bank branch details.', u: null });
       }
-      var bankFileMissing = !payBankFile || !payBankFile.files || !payBankFile.files.length;
-      var bankFilePresent = !bankFileMissing;
-      if (bankFileMissing && !(isPayReqEditMode && hasExistingBankFile)) {
-        problems.push({ a: null, msg: 'Please attach the bank document (cheque / statement / passbook).', u: document.getElementById('pay-bank-upload-box') });
-      } else if (bankFilePresent && payBankFile.files[0].size > PAY_PR_MAX_FILE_BYTES) {
-        problems.push({ a: null, msg: 'Bank document must be 10 MB or smaller.', u: document.getElementById('pay-bank-upload-box') });
+      var bankKept = payCountKeptAttachments('keep_bank_attachment_paths');
+      var bankNew = payCountInputFiles(payBankFile);
+      if (bankKept + bankNew < 1) {
+        problems.push({ a: null, msg: 'Please attach at least one bank document (cheque / statement / passbook).', u: document.getElementById('pay-bank-upload-box') });
+      } else {
+        var bankSizeErr = payValidateInputFileSizes(payBankFile, 'Bank document');
+        if (bankSizeErr) problems.push({ a: null, msg: bankSizeErr, u: document.getElementById('pay-bank-upload-box') });
       }
     }
     if (problems.length) {
@@ -1285,9 +1447,9 @@
     return id ? document.getElementById(id) : null;
   }
   function payBoxForServerFileField(key) {
-    if (key === 'po_attachment') return document.getElementById('pay-po-upload-box');
-    if (key === 'document_attachment') return document.getElementById('pay-doc-upload-box');
-    if (key === 'bank_document') return document.getElementById('pay-bank-upload-box');
+    if (key.indexOf('po_attachment') === 0) return document.getElementById('pay-po-upload-box');
+    if (key.indexOf('document_attachment') === 0) return document.getElementById('pay-doc-upload-box');
+    if (key.indexOf('bank_document') === 0) return document.getElementById('pay-bank-upload-box');
     return null;
   }
   function payApplyServerValidationErrors(errors) {
@@ -1337,6 +1499,7 @@
     }
     var action = root.getAttribute('action') || window.location.href;
     window.setTimeout(function() {
+      payPrepareInactiveAttachmentKeeps();
       var fd = new FormData(root);
       fetch(action, {
         method: 'POST',
@@ -1434,6 +1597,7 @@
       }).catch(function() {
         if (window.toastr) toastr.error('Network error. Check your connection and try again.');
       }).finally(function() {
+        payResetAttachmentKeepDisabled();
         payReqSubmitting = false;
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -1451,22 +1615,158 @@
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
   }
 
-  function setupDragAndDrop(input, box, bar, nameEl, sizeEl) {
-    if (!box || !input) return;
+  function payMergeFilesIntoInput(input, newFiles) {
+    if (!input || !newFiles || !newFiles.length) return;
+    try {
+      var dt = new DataTransfer();
+      var i;
+      if (input.files) {
+        for (i = 0; i < input.files.length; i++) {
+          dt.items.add(input.files[i]);
+        }
+      }
+      for (i = 0; i < newFiles.length; i++) {
+        dt.items.add(newFiles[i]);
+      }
+      input.files = dt.files;
+    } catch (err) {
+      if (window.toastr) toastr.error('Could not attach files. Use Browse to pick files.');
+    }
+  }
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
-      box.addEventListener(eventName, preventDefaults, false);
+  function payFileTypeMeta(name) {
+    var n = String(name || '').toLowerCase();
+    var ext = n.indexOf('.') !== -1 ? n.split('.').pop() : '';
+    if (ext === 'pdf') return { badge: 'PDF', cls: 'pr-gmail-type-pdf', kind: 'pdf' };
+    if (ext === 'doc' || ext === 'docx') return { badge: 'DOC', cls: 'pr-gmail-type-doc', kind: 'doc' };
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1) {
+      return { badge: ext === 'jpeg' ? 'JPG' : ext.toUpperCase(), cls: 'pr-gmail-type-img', kind: 'image' };
+    }
+    return { badge: ext ? ext.toUpperCase() : 'FILE', cls: 'pr-gmail-type-file', kind: 'other' };
+  }
+
+  function payBuildGmailAttachCard(opts) {
+    var meta = payFileTypeMeta(opts.name);
+    var card = document.createElement('div');
+    card.className = 'pr-gmail-attach-card';
+    card.setAttribute('role', 'listitem');
+    if (opts.existing) {
+      card.setAttribute('data-pay-existing-attach-card', '');
+    } else {
+      card.setAttribute('data-pay-new-attach-card', '');
+    }
+    card.dataset.fileName = opts.name || '';
+    var thumbHtml = '';
+    if (meta.kind === 'image' && opts.previewSrc) {
+      thumbHtml = '<img src="' + opts.previewSrc + '" alt="" class="pr-gmail-attach-thumb-media">';
+    } else if (meta.kind === 'pdf' && opts.previewSrc) {
+      thumbHtml = '<iframe src="' + opts.previewSrc + '#toolbar=0&navpanes=0&scrollbar=0" title="" class="pr-gmail-attach-thumb-media"></iframe>';
+    } else {
+      thumbHtml = '<span class="pr-gmail-attach-thumb-fallback" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>';
+    }
+    card.innerHTML =
+      '<button type="button" class="pr-gmail-attach-remove" title="Remove attachment"><i class="bi bi-x-lg" aria-hidden="true"></i></button>' +
+      '<button type="button" class="pr-gmail-attach-thumb" data-pay-preview-url="' + String(opts.previewSrc || '').replace(/"/g, '&quot;') + '">' +
+      '<span class="pr-gmail-attach-thumb-inner pr-gmail-attach-thumb--' + meta.kind + '">' + thumbHtml + '</span></button>' +
+      '<div class="pr-gmail-attach-foot"><span class="pr-gmail-type-badge ' + meta.cls + '">' + meta.badge + '</span>' +
+      '<span class="pr-gmail-attach-name" title="' + String(opts.name || '').replace(/"/g, '&quot;') + '">' + (opts.name || 'File') + '</span></div>' +
+      '<span class="pr-gmail-attach-fold" aria-hidden="true"></span>';
+    card.querySelector('.pr-gmail-attach-remove').addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof opts.onRemove === 'function') opts.onRemove();
     });
+    var thumbBtn = card.querySelector('.pr-gmail-attach-thumb');
+    if (thumbBtn) {
+      if (opts.previewSrc && opts.file) thumbBtn._payBlobUrl = opts.previewSrc;
+      thumbBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (opts.file) showPayFilePreview(opts.file);
+        else if (opts.previewSrc) showPayUrlPreview(opts.previewSrc, opts.name);
+      });
+    }
+    return card;
+  }
+
+  function payBindExistingAttachmentCards(scope) {
+    (scope || root).querySelectorAll('[data-pay-existing-attach-card]').forEach(function(card) {
+      if (card.dataset.payAttachBound === '1') return;
+      card.dataset.payAttachBound = '1';
+      var keep = card.querySelector('.pay-attach-keep');
+      var removeBtn = card.querySelector('.pr-gmail-attach-remove');
+      var thumbBtn = card.querySelector('.pr-gmail-attach-thumb');
+      if (removeBtn && keep) {
+        removeBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          keep.checked = false;
+          card.classList.add('pr-gmail-attach-card--removed');
+          window.setTimeout(function() { if (!keep.checked) card.style.display = 'none'; }, 220);
+        });
+      }
+      if (thumbBtn) {
+        thumbBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          showPayUrlPreview(thumbBtn.getAttribute('data-pay-preview-url'), card.dataset.fileName || '');
+        });
+      }
+    });
+  }
+
+  function payRenderMultiFileList(input, listEl) {
+    if (!listEl) return;
+    listEl.querySelectorAll('[data-pay-new-attach-card]').forEach(function(el) {
+      var thumb = el.querySelector('.pr-gmail-attach-thumb');
+      if (thumb && thumb._payBlobUrl) {
+        try { URL.revokeObjectURL(thumb._payBlobUrl); } catch (e) { /* ignore */ }
+      }
+      el.remove();
+    });
+    if (!input || !input.files || !input.files.length) return;
+    listEl.classList.add('pr-gmail-attach-grid', 'pr-gmail-attach-grid--row');
+    for (var i = 0; i < input.files.length; i++) {
+      (function(idx) {
+        var f = input.files[idx];
+        var kind = payPreviewFileKind(f);
+        var previewSrc = (kind === 'pdf' || kind === 'image') ? URL.createObjectURL(f) : '';
+        var card = payBuildGmailAttachCard({
+          name: f.name,
+          previewSrc: previewSrc,
+          file: f,
+          isNew: true,
+          onRemove: function() {
+            try {
+              if (previewSrc) URL.revokeObjectURL(previewSrc);
+              var dt = new DataTransfer();
+              for (var j = 0; j < input.files.length; j++) {
+                if (j !== idx) dt.items.add(input.files[j]);
+              }
+              input.files = dt.files;
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (e2) {
+              if (window.toastr) toastr.error('Could not remove file.');
+            }
+          }
+        });
+        listEl.appendChild(card);
+      })(i);
+    }
+  }
+
+  function setupMultiFileUpload(input, box, listEl) {
+    if (!box || !input) return;
 
     function preventDefaults(e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
+      box.addEventListener(eventName, preventDefaults, false);
+    });
     ['dragenter', 'dragover'].forEach(function(eventName) {
       box.addEventListener(eventName, function() { box.classList.add('dragover'); }, false);
     });
-
     ['dragleave', 'drop'].forEach(function(eventName) {
       box.addEventListener(eventName, function() { box.classList.remove('dragover'); }, false);
     });
@@ -1474,50 +1774,19 @@
     box.addEventListener('drop', function(e) {
       var dt = e.dataTransfer;
       if (!dt || !dt.files || !dt.files.length) return;
-      var f = dt.files[0];
-      try {
-        var d = new DataTransfer();
-        d.items.add(f);
-        input.files = d.files;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-      } catch (err) {
-        if (window.toastr) toastr.error('Could not attach dropped file. Use Browse / click the area to pick a file.');
-      }
+      payMergeFilesIntoInput(input, dt.files);
+      input.dispatchEvent(new Event('change', { bubbles: true }));
     }, false);
 
     input.addEventListener('change', function() {
-      var f = this.files && this.files[0];
-      if (f && bar) {
-        bar.removeAttribute('hidden');
-        if (nameEl) { nameEl.textContent = f.name; nameEl.setAttribute('title', f.name); }
-        if (sizeEl) { sizeEl.textContent = formatBytes(f.size); }
-      } else if (bar) {
-        bar.setAttribute('hidden', '');
-      }
+      payRenderMultiFileList(input, listEl);
     });
   }
 
-  setupDragAndDrop(payPoFile, document.getElementById('pay-po-upload-box'), payPreviewBarPo, document.getElementById('pay-po-preview-name'), document.getElementById('pay-po-preview-size'));
-  setupDragAndDrop(payDocFile, document.getElementById('pay-doc-upload-box'), payPreviewBarDoc, document.getElementById('pay-doc-preview-name'), document.getElementById('pay-doc-preview-size'));
-  setupDragAndDrop(payBankFile, document.getElementById('pay-bank-upload-box'), payPreviewBarBank, document.getElementById('pay-bank-preview-name'), document.getElementById('pay-bank-preview-size'));
-  var btnPreviewPo = document.getElementById('btn-preview-po');
-  if (btnPreviewPo && payPoFile) {
-    btnPreviewPo.addEventListener('click', function() {
-      showPayFilePreview(payPoFile.files && payPoFile.files[0]);
-    });
-  }
-  var btnPreviewDoc = document.getElementById('btn-preview-doc');
-  if (btnPreviewDoc && payDocFile) {
-    btnPreviewDoc.addEventListener('click', function() {
-      showPayFilePreview(payDocFile.files && payDocFile.files[0]);
-    });
-  }
-  var btnPreviewBank = document.getElementById('btn-preview-bank');
-  if (btnPreviewBank && payBankFile) {
-    btnPreviewBank.addEventListener('click', function() {
-      showPayFilePreview(payBankFile.files && payBankFile.files[0]);
-    });
-  }
+  setupMultiFileUpload(payPoFile, document.getElementById('pay-po-upload-box'), document.getElementById('pay-po-attach-gallery'));
+  setupMultiFileUpload(payDocFile, document.getElementById('pay-doc-upload-box'), document.getElementById('pay-doc-attach-gallery'));
+  setupMultiFileUpload(payBankFile, document.getElementById('pay-bank-upload-box'), document.getElementById('pay-bank-attach-gallery'));
+  payBindExistingAttachmentCards(root);
   if (payBankIfsc) {
     payBankIfsc.addEventListener('blur', function() {
       this.value = String(this.value || '').trim().toUpperCase();

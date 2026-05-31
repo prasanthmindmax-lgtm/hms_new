@@ -9,7 +9,6 @@ use App\Models\Tblbillpay;
 use App\Models\TblLocationModel;
 use App\Models\TblPurchaseorder;
 use App\Models\Tblgrn;
-use App\Models\TblVendorHistory;
 use App\Models\Tblcompany;
 use App\Models\Tblvendor;
 use App\Models\TblZonesModel;
@@ -29,6 +28,8 @@ use Illuminate\Support\Carbon;
 
 class PaymentRequestController extends Controller
 {
+    private const UPLOAD_FILE_RULE = 'file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
+
     private function userRow(): object
     {
         $u = auth()->user();
@@ -226,6 +227,238 @@ class PaymentRequestController extends Controller
         return 'payment_request_attachments/'.$name;
     }
 
+    private function saveUploadedWithMeta(UploadedFile $file): array
+    {
+        return [
+            'stored_path' => $this->saveUploaded($file, 'superadmin/payment_requests'),
+            'original_name' => (string) $file->getClientOriginalName(),
+        ];
+    }
+
+    private function normalizeAttachmentPath(string $path): string
+    {
+        return str_replace('\\', '/', trim($path));
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    private function uploadedFilesFromRequest(Request $request, string $key): array
+    {
+        $files = $request->file($key);
+        if ($files === null) {
+            return [];
+        }
+        if ($files instanceof UploadedFile) {
+            return [$files];
+        }
+        if (! is_array($files)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $files,
+            static fn ($file) => $file instanceof UploadedFile
+        ));
+    }
+
+    /**
+     * @param  list<string>  $keepPaths
+     * @return list<string>
+     */
+    private function filterKeepPathsForSlot(PaymentRequest $paymentRequest, string $slot, array $keepPaths): array
+    {
+        $existing = [];
+        foreach ($paymentRequest->filesForSlot($slot) as $file) {
+            $normalized = $this->normalizeAttachmentPath((string) ($file['path'] ?? ''));
+            if ($normalized !== '') {
+                $existing[$normalized] = (string) ($file['path'] ?? '');
+            }
+        }
+
+        $kept = [];
+        foreach ($keepPaths as $keepPath) {
+            $normalized = $this->normalizeAttachmentPath($keepPath);
+            if ($normalized !== '' && isset($existing[$normalized])) {
+                $kept[] = $existing[$normalized];
+            }
+        }
+
+        return array_values(array_unique($kept));
+    }
+
+    private function attachmentValidationRules(string $type, bool $forUpdate): array
+    {
+        $fileItem = self::UPLOAD_FILE_RULE;
+        $rules = [];
+
+        if (PaymentRequest::requiresPoAttachment($type)) {
+            if ($forUpdate) {
+                $rules['po_attachments'] = 'nullable|array';
+                $rules['po_attachments.*'] = $fileItem;
+                $rules['keep_po_attachment_paths'] = 'nullable|array';
+                $rules['keep_po_attachment_paths.*'] = 'string|max:500';
+            } else {
+                $rules['po_attachments'] = 'required|array|min:1';
+                $rules['po_attachments.*'] = 'required|'.$fileItem;
+            }
+        } else {
+            if ($forUpdate) {
+                $rules['document_attachments'] = 'nullable|array';
+                $rules['document_attachments.*'] = $fileItem;
+                $rules['keep_document_attachment_paths'] = 'nullable|array';
+                $rules['keep_document_attachment_paths.*'] = 'string|max:500';
+            } else {
+                $rules['document_attachments'] = 'required|array|min:1';
+                $rules['document_attachments.*'] = 'required|'.$fileItem;
+            }
+        }
+
+        if (PaymentRequest::requiresPayeeBankDetails($type)) {
+            if ($forUpdate) {
+                $rules['bank_documents'] = 'nullable|array';
+                $rules['bank_documents.*'] = $fileItem;
+                $rules['keep_bank_attachment_paths'] = 'nullable|array';
+                $rules['keep_bank_attachment_paths.*'] = 'string|max:500';
+            } else {
+                $rules['bank_documents'] = 'required|array|min:1';
+                $rules['bank_documents.*'] = 'required|'.$fileItem;
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseKeepAttachmentPaths(Request $request, string $field): array
+    {
+        $raw = $request->input($field, []);
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($v) => trim((string) $v),
+            $raw
+        ), static fn ($v) => $v !== '')));
+    }
+
+    private function clearAttachmentSlot(PaymentRequest $paymentRequest, string $slot): void
+    {
+        foreach ($paymentRequest->filesForSlot($slot) as $file) {
+            $this->deleteAttachmentFile($file['path'] ?? null);
+        }
+        $paymentRequest->setFilesForSlot($slot, []);
+    }
+
+    private function syncAttachmentSlot(
+        PaymentRequest $paymentRequest,
+        string $slot,
+        array $newFiles,
+        array $keepPaths,
+        bool $forUpdate
+    ): ?string {
+        $kept = [];
+
+        if ($forUpdate) {
+            $keepPaths = $this->filterKeepPathsForSlot($paymentRequest, $slot, $keepPaths);
+
+            foreach ($paymentRequest->filesForSlot($slot) as $file) {
+                $path = (string) ($file['path'] ?? '');
+                $normalized = $this->normalizeAttachmentPath($path);
+                if ($normalized !== '' && in_array($path, $keepPaths, true)) {
+                    $kept[] = ['path' => $path];
+
+                    continue;
+                }
+                $this->deleteAttachmentFile($path);
+            }
+        }
+
+        foreach ($newFiles as $file) {
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                continue;
+            }
+            $meta = $this->saveUploadedWithMeta($file);
+            $kept[] = ['path' => $meta['stored_path']];
+        }
+
+        $paymentRequest->setFilesForSlot($slot, $kept);
+
+        return $paymentRequest->{PaymentRequest::slotAttachmentPathColumn($slot)};
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string, 2: ?string}
+     */
+    private function syncPaymentRequestAttachments(
+        PaymentRequest $paymentRequest,
+        Request $request,
+        string $type,
+        bool $forUpdate
+    ): array {
+        $needsPo = PaymentRequest::requiresPoAttachment($type);
+        $needsBank = PaymentRequest::requiresPayeeBankDetails($type);
+
+        if ($forUpdate) {
+            if ($needsPo) {
+                $this->clearAttachmentSlot($paymentRequest, PaymentRequest::SLOT_DOCUMENT);
+            } else {
+                $this->clearAttachmentSlot($paymentRequest, PaymentRequest::SLOT_PO);
+            }
+            if (! $needsBank) {
+                $this->clearAttachmentSlot($paymentRequest, PaymentRequest::SLOT_BANK);
+            }
+        }
+
+        $poPath = null;
+        $docPath = null;
+        $bankPath = null;
+
+        if ($needsPo) {
+            $poPath = $this->syncAttachmentSlot(
+                $paymentRequest,
+                PaymentRequest::SLOT_PO,
+                $this->uploadedFilesFromRequest($request, 'po_attachments'),
+                $this->parseKeepAttachmentPaths($request, 'keep_po_attachment_paths'),
+                $forUpdate
+            );
+        } else {
+            $docPath = $this->syncAttachmentSlot(
+                $paymentRequest,
+                PaymentRequest::SLOT_DOCUMENT,
+                $this->uploadedFilesFromRequest($request, 'document_attachments'),
+                $this->parseKeepAttachmentPaths($request, 'keep_document_attachment_paths'),
+                $forUpdate
+            );
+        }
+
+        if ($needsBank) {
+            $bankPath = $this->syncAttachmentSlot(
+                $paymentRequest,
+                PaymentRequest::SLOT_BANK,
+                $this->uploadedFilesFromRequest($request, 'bank_documents'),
+                $this->parseKeepAttachmentPaths($request, 'keep_bank_attachment_paths'),
+                $forUpdate
+            );
+        }
+
+        return [$poPath, $docPath, $bankPath];
+    }
+
+    private function assertSlotHasAttachments(
+        PaymentRequest $paymentRequest,
+        string $slot,
+        string $errorKey,
+        string $message
+    ): void {
+        if ($paymentRequest->filesForSlot($slot) === []) {
+            throw ValidationException::withMessages([$errorKey => $message]);
+        }
+    }
+
     private function resolveVendorTableIdForBill(Tblbill $bill): ?int
     {
         $raw = $bill->vendor_id;
@@ -390,15 +623,27 @@ class PaymentRequestController extends Controller
                 $outer->where('status', PaymentRequest::STATUS_PENDING)
                     ->orWhere(function (Builder $q) {
                         $q->where('status', PaymentRequest::STATUS_APPROVED)
-                            ->where(function (Builder $b) {
-                                $b->whereNull('bill_id')->orWhere('bill_id', 0);
-                            })
-                            ->whereDoesntHave('linkedBills');
+                            ->where(function (Builder $approved) {
+                                $approved->where(function (Builder $fwd) {
+                                    $fwd->whereNotNull('bill_id')->where('bill_id', '>', 0);
+                                })->orWhere(function (Builder $rev) {
+                                    $rev->where(function (Builder $b) {
+                                        $b->whereNull('bill_id')->orWhere('bill_id', 0);
+                                    })->whereDoesntHave('linkedBills');
+                                });
+                            });
                     });
             })
             ->orderByRaw('COALESCE(reviewed_at, created_at) ASC')
             ->orderBy('id')
-            ->get(['id', 'amount', 'status', 'created_at', 'reviewed_at', 'request_no', 'payment_type'])
+            ->get(['id', 'amount', 'status', 'created_at', 'reviewed_at', 'request_no', 'payment_type', 'bill_id'])
+            ->filter(function (PaymentRequest $pr): bool {
+                if ($pr->status !== PaymentRequest::STATUS_APPROVED) {
+                    return true;
+                }
+
+                return ! $this->approvedPaymentRequestHasBillMadeEntry($pr);
+            })
             ->map(function (PaymentRequest $pr): array {
                 $at = $pr->status === PaymentRequest::STATUS_APPROVED && $pr->reviewed_at !== null
                     ? $pr->reviewed_at
@@ -467,8 +712,7 @@ class PaymentRequestController extends Controller
 
     /**
      * Whether this request’s amount is counted in the payment-request slice of merged PO history
-     * (pending always; approved only when not yet represented by a vendor bill line — either via
-     * payment_requests.bill_id or via bill_tbl.payment_request_id link mode).
+     * (pending always; approved when not double-counted with a legacy Bill Made row or a bill raised from the PR).
      */
     private function paymentRequestIncludedInPoMergedPrHistory(PaymentRequest $pr): bool
     {
@@ -481,7 +725,7 @@ class PaymentRequestController extends Controller
         if ($pr->status === PaymentRequest::STATUS_APPROVED) {
             $hasForwardBill = (int) ($pr->bill_id ?? 0) > 0;
             if ($hasForwardBill) {
-                return false;
+                return ! $this->approvedPaymentRequestHasBillMadeEntry($pr);
             }
             $hasReverseBill = $pr->linkedBills()->exists();
 
@@ -491,11 +735,23 @@ class PaymentRequestController extends Controller
         return false;
     }
 
-    /**
-     * Remaining amount that may still be allocated on this PO (merged bill + PR activity vs PO grand total).
-     *
-     * @param  int|null  $excludePaymentRequestId  When updating, treat this row’s merged PR slice as removable headroom.
-     */
+    private function approvedPaymentRequestHasBillMadeEntry(PaymentRequest $pr): bool
+    {
+        if ($pr->status !== PaymentRequest::STATUS_APPROVED) {
+            return false;
+        }
+
+        $ref = trim((string) ($pr->request_no ?? ''));
+        if ($ref === '') {
+            return false;
+        }
+
+        return Tblbillpay::query()
+            ->where('reference', $ref)
+            ->where('payment_mode', 'Payment Request')
+            ->exists();
+    }
+
     private function remainingOnPurchaseOrderAgainstMergedHistory(TblPurchaseorder $po, ?int $excludePaymentRequestId): float
     {
         $poTotal = max(0.0, (float) ($po->grand_total_amount ?? 0));
@@ -688,11 +944,15 @@ class PaymentRequestController extends Controller
             ->where('bill_id', (int) $bill->id)
             ->where('status', PaymentRequest::STATUS_PENDING)
             ->sum('amount');
-        $approvedPr = (float) PaymentRequest::query()
+        $approvedPrRows = PaymentRequest::query()
             ->where('bill_id', (int) $bill->id)
             ->where('status', PaymentRequest::STATUS_APPROVED)
+            ->get(['id', 'request_no', 'amount', 'status']);
+        $approvedPr = (float) $approvedPrRows->sum('amount');
+        $approvedPrOnLedgerOnly = (float) $approvedPrRows
+            ->filter(fn (PaymentRequest $pr) => ! $this->approvedPaymentRequestHasBillMadeEntry($pr))
             ->sum('amount');
-        $payable = max(0.0, $reconciled - $pendingPr);
+        $payable = max(0.0, $reconciled - $pendingPr - $approvedPrOnLedgerOnly);
         $paidOutsidePr = max(0.0, $partial - $approvedPr);
 
         return [
@@ -1082,19 +1342,18 @@ class PaymentRequestController extends Controller
         if (PaymentRequest::requiresPoAttachment($type)) {
             $base['po_link_mode'] = ['required', 'string', Rule::in(['po', 'bill'])];
             $base['purchase_gen_order'] = 'nullable|string|max:100';
-            $base['po_attachment'] = 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
-        } else {
-            $base['document_attachment'] = 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
         }
 
         if (PaymentRequest::requiresPayeeBankDetails($type)) {
             $base['bank_account_number'] = 'required|string|max:64';
             $base['bank_ifsc_code'] = ['required', 'string', 'size:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'];
             $base['bank_branch_details'] = 'required|string|max:5000';
-            $base['bank_document'] = 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
         }
 
-        $validated = $request->validate(CreateFormDuration::mergeRules($base));
+        $validated = $request->validate(CreateFormDuration::mergeRules(array_merge(
+            $base,
+            $this->attachmentValidationRules($type, false)
+        )));
 
         $okBranch = TblLocationModel::query()
             ->where('id', (int) $validated['branch_id'])
@@ -1213,18 +1472,6 @@ class PaymentRequestController extends Controller
             }
         }
 
-        $poPath = null;
-        $docPath = null;
-        $bankDocPath = null;
-        if (PaymentRequest::requiresPoAttachment($type)) {
-            $poPath = $this->saveUploaded($request->file('po_attachment'), 'superadmin/payment_requests');
-        } else {
-            $docPath = $this->saveUploaded($request->file('document_attachment'), 'superadmin/payment_requests');
-        }
-        if (PaymentRequest::requiresPayeeBankDetails($type)) {
-            $bankDocPath = $this->saveUploaded($request->file('bank_document'), 'superadmin/payment_requests');
-        }
-
         $finalVendorId = $validated['vendor_id'] ?? null;
         if (empty($finalVendorId) && $po && $po->vendor_id) {
             $finalVendorId = $po->vendor_id;
@@ -1245,16 +1492,19 @@ class PaymentRequestController extends Controller
             'bill_total_snapshot' => $linkedBill ? (float) ($linkedBill->grand_total_amount ?? 0) : null,
             'bill_balance_snapshot' => $linkedBillFinancial ? $linkedBillFinancial['reconciled_remaining'] : null,
             'po_total_snapshot' => $po ? (float) ($po->grand_total_amount ?? 0) : null,
-            'po_attachment_path' => $poPath,
-            'document_attachment_path' => $docPath,
+            'po_attachment_path' => null,
+            'document_attachment_path' => null,
             'bank_account_number' => $validated['bank_account_number'] ?? null,
             'bank_ifsc_code' => isset($validated['bank_ifsc_code']) ? strtoupper($validated['bank_ifsc_code']) : null,
             'bank_branch_details' => $validated['bank_branch_details'] ?? null,
-            'bank_document_path' => $bankDocPath,
+            'bank_document_path' => null,
             'remarks' => $validated['remarks'] ?? null,
             'status' => PaymentRequest::STATUS_PENDING,
             'created_by' => (int) auth()->id(),
         ]);
+
+        $this->syncPaymentRequestAttachments($created, $request, $type, false);
+        $created->save();
         $this->appendPaymentRequestHistory($created, [
             $this->paymentRequestHistoryEntry('submitted', $u, 'Payment request submitted for review.'),
         ]);
@@ -1342,19 +1592,18 @@ class PaymentRequestController extends Controller
         if (PaymentRequest::requiresPoAttachment($type)) {
             $base['po_link_mode'] = ['required', 'string', Rule::in(['po', 'bill'])];
             $base['purchase_gen_order'] = 'nullable|string|max:100';
-            $base['po_attachment'] = 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
-        } else {
-            $base['document_attachment'] = 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
         }
 
         if (PaymentRequest::requiresPayeeBankDetails($type)) {
             $base['bank_account_number'] = 'required|string|max:64';
             $base['bank_ifsc_code'] = ['required', 'string', 'size:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'];
             $base['bank_branch_details'] = 'required|string|max:5000';
-            $base['bank_document'] = 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx';
         }
 
-        $validated = $request->validate(CreateFormDuration::mergeRules($base));
+        $validated = $request->validate(CreateFormDuration::mergeRules(array_merge(
+            $base,
+            $this->attachmentValidationRules($type, true)
+        )));
 
         $okBranch = TblLocationModel::query()
             ->where('id', (int) $validated['branch_id'])
@@ -1479,59 +1728,31 @@ class PaymentRequestController extends Controller
             }
         }
 
-        $poPath = $paymentRequest->po_attachment_path;
-        $docPath = $paymentRequest->document_attachment_path;
-        $bankDocPath = $paymentRequest->bank_document_path;
+        [$poPath, $docPath, $bankDocPath] = $this->syncPaymentRequestAttachments($paymentRequest, $request, $type, true);
 
         if (PaymentRequest::requiresPoAttachment($type)) {
-            if ($request->hasFile('po_attachment')) {
-                $newPoPath = $this->saveUploaded($request->file('po_attachment'), 'superadmin/payment_requests');
-                $this->deleteAttachmentFile($paymentRequest->po_attachment_path);
-                $poPath = $newPoPath;
-            }
-            if ($paymentRequest->document_attachment_path) {
-                $this->deleteAttachmentFile($paymentRequest->document_attachment_path);
-                $docPath = null;
-            }
-        } else {
-            if ($request->hasFile('document_attachment')) {
-                $newDocPath = $this->saveUploaded($request->file('document_attachment'), 'superadmin/payment_requests');
-                $this->deleteAttachmentFile($paymentRequest->document_attachment_path);
-                $docPath = $newDocPath;
-            }
-            if ($paymentRequest->po_attachment_path) {
-                $this->deleteAttachmentFile($paymentRequest->po_attachment_path);
-                $poPath = null;
-            }
+            $this->assertSlotHasAttachments(
+                $paymentRequest,
+                PaymentRequest::SLOT_PO,
+                'po_attachments',
+                'Please attach at least one PO / vendor bill document.'
+            );
         }
-
+        if (! PaymentRequest::requiresPoAttachment($type)) {
+            $this->assertSlotHasAttachments(
+                $paymentRequest,
+                PaymentRequest::SLOT_DOCUMENT,
+                'document_attachments',
+                'Please attach at least one supporting document.'
+            );
+        }
         if (PaymentRequest::requiresPayeeBankDetails($type)) {
-            if ($request->hasFile('bank_document')) {
-                $newBankPath = $this->saveUploaded($request->file('bank_document'), 'superadmin/payment_requests');
-                $this->deleteAttachmentFile($paymentRequest->bank_document_path);
-                $bankDocPath = $newBankPath;
-            }
-        } else {
-            if ($paymentRequest->bank_document_path) {
-                $this->deleteAttachmentFile($paymentRequest->bank_document_path);
-                $bankDocPath = null;
-            }
-        }
-
-        if (PaymentRequest::requiresPoAttachment($type) && empty($poPath)) {
-            throw ValidationException::withMessages([
-                'po_attachment' => 'Please attach the PO / vendor bill document.',
-            ]);
-        }
-        if (! PaymentRequest::requiresPoAttachment($type) && empty($docPath)) {
-            throw ValidationException::withMessages([
-                'document_attachment' => 'Please attach the supporting document.',
-            ]);
-        }
-        if (PaymentRequest::requiresPayeeBankDetails($type) && empty($bankDocPath)) {
-            throw ValidationException::withMessages([
-                'bank_document' => 'Please attach the bank document (cheque / statement / passbook).',
-            ]);
+            $this->assertSlotHasAttachments(
+                $paymentRequest,
+                PaymentRequest::SLOT_BANK,
+                'bank_documents',
+                'Please attach at least one bank document (cheque / statement / passbook).'
+            );
         }
 
         $finalVendorId = $validated['vendor_id'] ?? null;
@@ -1539,7 +1760,19 @@ class PaymentRequestController extends Controller
             $finalVendorId = $po->vendor_id;
         }
 
-        $paymentRequest->fill([
+        $attachmentFields = PaymentRequest::requiresPoAttachment($type)
+            ? [
+                'po_attachment_path' => $poPath,
+                'document_attachment_path' => null,
+                'bank_document_path' => PaymentRequest::requiresPayeeBankDetails($type) ? $bankDocPath : null,
+            ]
+            : [
+                'po_attachment_path' => null,
+                'document_attachment_path' => $docPath,
+                'bank_document_path' => PaymentRequest::requiresPayeeBankDetails($type) ? $bankDocPath : null,
+            ];
+
+        $paymentRequest->fill(array_merge([
             'company_id' => $validated['company_id'] ?? null,
             'zone_id' => (int) $validated['zone_id'],
             'branch_id' => (int) $validated['branch_id'],
@@ -1553,18 +1786,15 @@ class PaymentRequestController extends Controller
             'bill_total_snapshot' => $linkedBill ? (float) ($linkedBill->grand_total_amount ?? 0) : null,
             'bill_balance_snapshot' => $linkedBillFinancial ? $linkedBillFinancial['reconciled_remaining'] : null,
             'po_total_snapshot' => $po ? (float) ($po->grand_total_amount ?? 0) : null,
-            'po_attachment_path' => $poPath,
-            'document_attachment_path' => $docPath,
             'bank_account_number' => $validated['bank_account_number'] ?? null,
             'bank_ifsc_code' => isset($validated['bank_ifsc_code']) ? strtoupper($validated['bank_ifsc_code']) : null,
             'bank_branch_details' => $validated['bank_branch_details'] ?? null,
-            'bank_document_path' => $bankDocPath,
             'remarks' => $validated['remarks'] ?? null,
             'status' => $wasRejected ? PaymentRequest::STATUS_PENDING : $paymentRequest->status,
             'rejection_reason' => $wasRejected ? null : $paymentRequest->rejection_reason,
             'reviewed_by' => $wasRejected ? null : $paymentRequest->reviewed_by,
             'reviewed_at' => $wasRejected ? null : $paymentRequest->reviewed_at,
-        ]);
+        ], $attachmentFields));
         $paymentRequest->save();
         $historyEntries = [
             $this->paymentRequestHistoryEntry(
@@ -1643,7 +1873,7 @@ class PaymentRequestController extends Controller
 
             $this->applyApprovedPoLinkedLedger($paymentRequest);
             $this->appendPaymentRequestHistory($paymentRequest, [
-                $this->paymentRequestHistoryEntry('approved', $this->userRow(), 'Payment request approved for processing.'),
+                $this->paymentRequestHistoryEntry('approved', $this->userRow(), 'Payment request approved.'),
             ]);
         });
 
@@ -1677,7 +1907,8 @@ class PaymentRequestController extends Controller
     public function show(PaymentRequest $paymentRequest): View
     {
         $u = $this->userRow();
-        if (! $this->isPaymentRequestSuperAdmin($u)) {
+        $fromApprovedPayments = request()->query('from') === 'approved-payments';
+        if (! $fromApprovedPayments && ! $this->isPaymentRequestSuperAdmin($u)) {
             if ((int) $paymentRequest->created_by !== (int) auth()->id()) {
                 abort(403, 'You can only view payment requests you created.');
             }
@@ -1861,10 +2092,6 @@ class PaymentRequestController extends Controller
             ->all();
     }
 
-    /**
-     * When a PO-linked request is approved: record vendor “payment made” + line against the linked bill,
-     * or reduce PO balance when the request is anchored on the PO only (no bill). Settlement without a bill is skipped.
-     */
     private function applyApprovedPoLinkedLedger(PaymentRequest $pr): void
     {
         if (! in_array($pr->payment_type, PaymentRequest::PO_LINKED_TYPES, true)) {
@@ -1877,8 +2104,6 @@ class PaymentRequestController extends Controller
         }
 
         if ($pr->bill_id) {
-            $this->createBillPartPaymentFromApprovedPaymentRequest($pr, $amount);
-
             return;
         }
 
@@ -1891,126 +2116,6 @@ class PaymentRequestController extends Controller
         }
 
         $this->decrementPurchaseOrderBalanceFromApprovedPaymentRequest($pr, $amount);
-    }
-
-    private function nextBillPaymentGenOrder(): string
-    {
-        $lastRecord = Tblbillpay::query()->orderByDesc('id')->first();
-        if ($lastRecord && ! empty($lastRecord->payment_gen_order)) {
-            $lastNumber = (int) str_replace('PAYMENT-', '', (string) $lastRecord->payment_gen_order);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return 'PAYMENT-'.str_pad((string) $nextNumber, 3, '0', STR_PAD_LEFT);
-    }
-
-    private function createBillPartPaymentFromApprovedPaymentRequest(PaymentRequest $pr, float $amount): void
-    {
-        $bill = Tblbill::query()
-            ->whereKey((int) $pr->bill_id)
-            ->where(function ($q) {
-                $q->where('delete_status', 0)->orWhereNull('delete_status');
-            })
-            ->lockForUpdate()
-            ->first();
-
-        if (! $bill) {
-            return;
-        }
-
-        $balanceBefore = (float) ($bill->balance_amount ?? 0);
-        $applyAmount = min($amount, max(0.0, $balanceBefore));
-        if ($applyAmount < 0.0001) {
-            return;
-        }
-
-        $eps = 0.02;
-        $now = now();
-        $userId = (int) auth()->id();
-        $admin = auth()->user();
-        $adminEmail = is_object($admin) && isset($admin->email) ? (string) $admin->email : '';
-
-        $docNames = [];
-        if ($pr->po_attachment_path) {
-            $base = basename(str_replace('\\', '/', (string) $pr->po_attachment_path));
-            if ($base !== '' && $base !== '.' && $base !== '..') {
-                $docNames[] = $base;
-            }
-        }
-
-        $billPay = Tblbillpay::create([
-            'user_id' => $userId,
-            'vendor_id' => (int) $bill->vendor_id,
-            'vendor_name' => (string) ($bill->vendor_name ?? ''),
-            'zone_id' => $bill->zone_id,
-            'zone_name' => (string) ($bill->zone_name ?? ''),
-            'branch_id' => $bill->branch_id,
-            'branch_name' => (string) ($bill->branch_name ?? ''),
-            'company_id' => $bill->company_id,
-            'company_name' => (string) ($bill->company_name ?? ''),
-            'payment' => (string) $applyAmount,
-            'payment_gen_order' => $this->nextBillPaymentGenOrder(),
-            'payment_made' => 'Payment request '.(string) $pr->request_no,
-            'payment_date' => $now->format('d/m/Y'),
-            'payment_mode' => 'Payment Request',
-            'paid_through' => 'Superadmin approval',
-            'reference' => (string) $pr->request_no,
-            'remark' => Str::limit((string) ($pr->remarks ?? ''), 500),
-            'save_status' => 1,
-            'amount_paid' => $applyAmount,
-            'amount_used' => $applyAmount,
-            'amount_refunded' => 0,
-            'amount_excess' => 0,
-            'note' => '',
-            'documents' => json_encode($docNames),
-        ]);
-
-        $newBalance = max(0.0, $balanceBefore - $applyAmount);
-        $newPartial = (float) ($bill->partially_payment ?? 0) + $applyAmount;
-        $isPaid = $newBalance <= $eps;
-
-        if ($isPaid) {
-            Tblbill::where('id', $bill->id)->update([
-                'partially_payment' => $newPartial,
-                'balance_amount' => 0,
-                'bill_made_status' => 1,
-                'bill_status' => 'Paid',
-            ]);
-        } else {
-            Tblbill::where('id', $bill->id)->update([
-                'partially_payment' => $newPartial,
-                'balance_amount' => $newBalance,
-                'bill_status' => 'Partially Payed',
-            ]);
-        }
-
-        TblBillPayLines::create([
-            'bill_pay_id' => $billPay->id,
-            'bill_id' => $bill->id,
-            'bill_date' => $bill->bill_date,
-            'due_date' => $bill->due_date,
-            'bill_number' => $bill->bill_number,
-            'grand_total_amount' => $bill->grand_total_amount,
-            'balance_amount' => $balanceBefore,
-            'payment_date' => $now->format('d/m/Y'),
-            'amount' => $applyAmount,
-            'created_at' => $now,
-        ]);
-
-        $vendorRow = Tblvendor::query()->where('id', $bill->vendor_id)->first();
-        if ($vendorRow) {
-            TblVendorHistory::create([
-                'vendor_id' => $vendorRow->id,
-                'name' => 'Payments Made added',
-                'description' => 'Payment of amount ₹'.number_format($applyAmount, 2)
-                    .' from payment request '.(string) $pr->request_no
-                    .($adminEmail !== '' ? ' by '.$adminEmail : ''),
-                'date' => $now->toDateString(),
-                'time' => $now->format('h:i A'),
-            ]);
-        }
     }
 
     private function decrementPurchaseOrderBalanceFromApprovedPaymentRequest(PaymentRequest $pr, float $amount): void

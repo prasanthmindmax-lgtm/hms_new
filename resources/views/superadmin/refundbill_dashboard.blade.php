@@ -39,7 +39,7 @@
     body.modal-open {
         overflow: hidden !important;
     }
-    
+
     .form-border {
         border: 1px solid #000;
         padding: 20px;
@@ -325,7 +325,7 @@ function rowClick(event) {
              <div class="loading-overlay" id="loadingOverlay" style="display: none;">
                 <div class="spinner"></div>
             </div>
-        
+
             <div class="container-fluid">
 
                     <div class="card-body pc-component btn-page">
@@ -342,7 +342,7 @@ function rowClick(event) {
 
                                     <div class="modal-body">
                                         <input type="hidden" class="userid" name="userid" id="userid">
-                                        
+
                                         <!-- Error Alert Box -->
                                         <div class="alert alert-danger" id="form_error_box" style="display:none;">
                                             <strong>Please fix the following errors:</strong>
@@ -1030,7 +1030,7 @@ function rowClick(event) {
                             </div>
                         </div>
                     </div>
-            
+
 
                 <!-- Page Header -->
                     <div class="page-header">
@@ -1045,7 +1045,7 @@ function rowClick(event) {
                             </button>
                         </div>
                     </div>
-        
+
                 <!-- Stats Cards (dynamic by access_limits: 1=SuperAdmin, 2=Zonal, 3=Admin, 4=Audit, 5=User) -->
                 @php
                     $statConfig = [
@@ -1085,7 +1085,7 @@ function rowClick(event) {
                         </div>
                     @endforeach
                 </div>
-        
+
                 <!-- Tabs -->
                 <div class="nav-tabs-custom">
                     <button class="nav-tab active" id="pendingTab" data-tab="pending">
@@ -1102,7 +1102,7 @@ function rowClick(event) {
                     $locations = null;
                     $zones = null;
 
-                    if ($admin->access_limits == 1) {
+                    if ($admin->access_limits == 1 || $admin->access_limits == 4) {
                         $zones = TblZonesModel::select('name', 'id')->get();
                         $locations = TblLocationModel::select('name', 'id','zone_id')->get();
 
@@ -1166,12 +1166,12 @@ function rowClick(event) {
                  <div class="pending_overview">
                      <div class="filter-section filterrow">
                          <div class="filter-row">
-                             
+
                              <div id="dateRangePickerPending" class="form-control" style="cursor: pointer;">
                                  <i class="bi bi-calendar"></i>
                                  <span>Today</span>
                              </div>
-                             
+
                               <div class="">
                                 <div class="card">
                                     <div class="dropdown">
@@ -1206,11 +1206,11 @@ function rowClick(event) {
                                     </div>
                                 </div>
                             </div>
-             
-             
+
+
                              <input type="text" class="form-control documentdatasearch" placeholder="Enter the MRD" id="ref_mrd_views" name="phid" autocomplete="off">
                          </div>
-             
+
                          <!-- Filter Summary -->
                          <div class="d-flex align-items-center" style="margin-top: 10px;">
                              <p class="text-muted mb-0" style="font-size: 12px;">
@@ -1224,13 +1224,13 @@ function rowClick(event) {
                          </div>
                          <span style="display:none;" id="mydateviewsall"></span>
                      </div>
-             
+
                      <!-- Progress Bar -->
                      <div id="loader-container" style="display:none;">
                          <div class="progress-bar">Loading: 0%</div>
                          <div id="error-message" style="color: red; display: none;"></div>
                      </div>
-             
+
                      <!-- Table Container - Refund Patient List -->
                      <div class="card-body">
                          <div class="table-container maintable">
@@ -1276,13 +1276,13 @@ function rowClick(event) {
                <div class="saved_overview" style="display:none">
                    <div class="filter-section">
                         <div class="filter-row">
-                            
+
                             <div id="dateRangePickerSave" class="form-control" style="cursor: pointer;">
                                 <i class="bi bi-calendar"></i>
                                 <span>Today</span>
                             </div>
-                            
-                            
+
+
                              <div class="">
                                 <div class="card">
                                     <div class="dropdown">
@@ -1346,7 +1346,7 @@ function rowClick(event) {
                                 </select>
                             </div>
                         </div>
-            
+
                         <!-- Filter Summary -->
                         <div class="d-flex align-items-center" style="margin-top: 10px;">
                             <p class="text-muted mb-0" style="font-size: 12px;">
@@ -1366,12 +1366,12 @@ function rowClick(event) {
                         <button type="button" class="btn btn-success btn-sm" id="btn-approve-selected"><i class="bi bi-check-circle"></i> Approve selected</button>
                         <button type="button" class="btn btn-danger btn-sm ms-2" id="btn-reject-selected"><i class="bi bi-x-circle"></i> Reject selected</button>
                     </div>
-            
+
                     <!-- Progress Bar Saved -->
                     <div id="loader-container-save" style="display:none; width: 100%; margin-top: 10px;">
                         <div class="progress-bar2" style="width: 0%; height: 20px; background: #4caf50; text-align: center; color: white;">0%</div>
                     </div>
-            
+
                     <!-- Table Container - Saved Refund Forms -->
                     <div class="table-container">
                         <div class="table-wrapper">
@@ -1441,7 +1441,7 @@ function rowClick(event) {
                                </tbody>
                             </table>
                         </div>
-            
+
                         <!-- Pagination -->
                         <div class="footer">
                             <div>
@@ -1717,7 +1717,7 @@ function rowClick(event) {
             });
         })();
     </script>
-    
+
 <script>
     $(document).ready(function () {
 
@@ -2002,7 +2002,7 @@ function rowClick(event) {
 
 
     @include('superadmin.superadminfooter')
-    
+
     <!-- Global Modal Overflow Fix - Works on both Local & Live -->
     <script>
     (function() {
@@ -2011,26 +2011,26 @@ function rowClick(event) {
             document.body.classList.remove('modal-open');
             document.body.style.overflow = '';
             document.body.style.paddingRight = '';
-            
+
             // Remove all modal backdrops
             var backdrops = document.querySelectorAll('.modal-backdrop');
             backdrops.forEach(function(backdrop) {
                 backdrop.remove();
             });
         }
-        
+
         // Listen to Bootstrap modal hidden event (native Bootstrap event)
         $(document).on('hidden.bs.modal', '.modal', function () {
             fixBodyOverflow();
         });
-        
-        // Also listen to jQuery modal('hide') 
+
+        // Also listen to jQuery modal('hide')
         var originalHide = $.fn.modal.Constructor.prototype.hide;
         $.fn.modal.Constructor.prototype.hide = function() {
             originalHide.apply(this, arguments);
             setTimeout(fixBodyOverflow, 350);
         };
-        
+
         // Fallback: Check every 500ms if body has wrong overflow
         setInterval(function() {
             var hasModalOpen = $('.modal.show').length > 0;

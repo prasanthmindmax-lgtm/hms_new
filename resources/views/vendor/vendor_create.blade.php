@@ -184,7 +184,7 @@
                                         <div class="row form-section">
                                             <div class="col-12 col-md-6 row align-items-start mb-3">
                                                 <div class="section-title col-md-4">
-                                                    <span>Party Type <span style="color:red;">*</span>n</span>
+                                                    <span>Party Type <span style="color:red;">*</span></span>
                                                 </div>
                                                 <div class="form-group col-md-8 vendor-field-col">
                                                     <div class="tax-dropdown-wrapper tds-tax-section party-type-section" style="width:100%;max-width:340px;">

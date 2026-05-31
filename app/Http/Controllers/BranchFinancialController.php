@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BranchFinancialReport;
 use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
@@ -120,6 +121,8 @@ class BranchFinancialController extends Controller
             $upiFiles,
             $bankDepositFiles
         );
+
+        $this->validateUniqueReportDateAndBranch($request->report_date, (int) $request->branch_id);
         
         // Prepare data
         $data = [
@@ -219,7 +222,7 @@ class BranchFinancialController extends Controller
         if (!$existing) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
         }
-        
+
         // Handle file uploads
         $radiantFiles = $this->uploadFiles($request, 'radiant_collection_files');
         $radiantLedgerFiles = $this->uploadFiles($request, 'radiant_ledger_book_files');
@@ -274,6 +277,12 @@ class BranchFinancialController extends Controller
             $actualCardFiles,
             $upiFiles,
             $bankDepositFiles
+        );
+
+        $this->validateUniqueReportDateAndBranch(
+            $request->report_date,
+            (int) $request->branch_id,
+            (int) $id
         );
         
         // Update edit history
@@ -373,14 +382,14 @@ class BranchFinancialController extends Controller
     public function show($id)
     {
         $report = DB::table('branch_financial_reports')->where('id', $id)->first();
-        
-        if (!$report) {
+
+        if (! $report) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
         }
-        
+
         return response()->json([
             'success' => true,
-            'data' => $report
+            'data' => $report,
         ]);
     }
     
@@ -444,6 +453,33 @@ class BranchFinancialController extends Controller
         throw new HttpResponseException(
             response()->json(['success' => false, 'message' => $message], 422)
         );
+    }
+
+    /**
+     * One report per branch per calendar day.
+     */
+    private function validateUniqueReportDateAndBranch($reportDate, int $branchId, ?int $excludeId = null): void
+    {
+        if ($branchId <= 0 || $reportDate === null || trim((string) $reportDate) === '') {
+            return;
+        }
+
+        $query = DB::table('branch_financial_reports')
+            ->where('branch_id', $branchId)
+            ->whereDate('report_date', $reportDate);
+
+        if ($excludeId !== null && $excludeId > 0) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        if ($query->exists()) {
+            $branchName = DB::table('tbl_locations')->where('id', $branchId)->value('name');
+            $label = $branchName ? (string) $branchName : 'this branch';
+
+            $this->attachmentValidationFail(
+                'A financial report already exists for '.$label.' on the selected date. Please edit the existing entry or choose a different date or branch.'
+            );
+        }
     }
 
     private function applyRemovedFiles(Request $request, string $removedField, array $files): array

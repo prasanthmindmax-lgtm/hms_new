@@ -1,0 +1,3819 @@
+/**
+ * Rental agreements — consolidated styles (form, register, owner payments, ledger).
+ */
+
+body.ra-page {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #1e293b;
+}
+
+body.ra-page .pc-container .pc-content {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 14px;
+  padding-right: 16px;
+}
+
+.ra-shell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 1.5rem;
+}
+
+.ra-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+body.ra-page .ra-card {
+  overflow: visible;
+}
+
+body.ra-page .ra-hero {
+  overflow: hidden;
+  border-radius: 22px 22px 0 0;
+}
+
+.ra-hero {
+  position: relative;
+  padding: 22px 26px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #4338ca 100%);
+  color: #f8fafc;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.ra-hero::before {
+  content: '';
+  position: absolute;
+  top: -55%;
+  right: -8%;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.ra-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ra-hero-title {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #f8fafc;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ra-hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ra-hero-text .ra-hero-title {
+  margin-bottom: 0.35rem;
+}
+
+.ra-hero-sub .ra-hero-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.65rem;
+  margin-bottom: 0.25rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  color: #f8fafc;
+}
+
+.ra-hero-sub .ra-hero-cat-pill--hospital {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(147, 197, 253, 0.55);
+}
+
+.ra-hero-sub .ra-hero-cat-pill--hostel {
+  background: rgba(139, 92, 246, 0.35);
+  border-color: rgba(196, 181, 253, 0.55);
+}
+
+.ra-hero-sub-muted {
+  display: inline;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.ra-hero-title i,
+.ra-hero-kicker i {
+  color: #a5b4fc;
+}
+
+.ra-hero-sub {
+  margin: 0;
+  max-width: 64ch;
+  color: rgba(248, 250, 252, 0.88);
+  font-size: 0.93rem;
+}
+
+.ra-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ra-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ra-btn-primary,
+.ra-btn-ghost,
+.ra-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none !important;
+  transition: all 0.18s ease;
+}
+
+.ra-btn-primary {
+  padding: 0.68rem 1.1rem;
+  color: #1e1b4b !important;
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+  border: 1px solid rgba(224, 231, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+}
+
+.ra-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+}
+
+.ra-btn-ghost,
+.ra-btn-outline {
+  padding: 0.65rem 1rem;
+}
+
+.ra-btn-ghost {
+  color: #f8fafc !important;
+  border: 1px solid rgba(248, 250, 252, 0.45);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ra-btn-ghost:hover,
+.ra-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.ra-btn-outline {
+  color: #334155 !important;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+}
+
+.ra-body {
+  padding: 22px 24px 24px;
+}
+
+.ra-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.ra-stat {
+  position: relative;
+  padding: 15px 16px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.ra-stat-ic {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 1rem;
+}
+
+.ra-stat-lbl {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.ra-stat-num {
+  display: block;
+  color: #0f172a;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.ra-stat-hint {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.ra-filter-card,
+.ra-panel,
+.ra-section,
+.ra-show-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+}
+
+.ra-filter-card {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.ra-filter-shell {
+  padding: 18px;
+  margin-bottom: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.ra-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ra-filter-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.ra-filter-title i {
+  color: #4f46e5;
+}
+
+.ra-filter-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ra-showing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ra-showing-pill strong {
+  color: #1e1b4b;
+}
+
+.ra-toolbar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ra-dd-input,
+.ra-toolbar-select,
+.ra-search-wrap input {
+  min-height: 46px;
+}
+
+.ra-dd-input:hover,
+.ra-toolbar-select:hover,
+.ra-search-wrap input:hover {
+  border-color: #c7d2fe;
+}
+
+.ra-dd-input:focus,
+.ra-toolbar-select:focus,
+.ra-search-wrap input:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.ra-search-wrap i {
+  color: #4f46e5;
+}
+
+.ra-dd {
+  position: relative;
+}
+
+.ra-dd-input {
+  width: 100%;
+  padding: 0.78rem 2.8rem 0.78rem 0.95rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background:
+    linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%),
+    linear-gradient(to right, #fff, #fff);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 14px) calc(50% - 2px),
+    100% 0;
+  background-size: 6px 6px, 6px 6px, 2.8rem 100%;
+  background-repeat: no-repeat;
+  color: #0f172a;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+}
+
+.ra-dd-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.16);
+}
+
+.ra-dd-panel.show {
+  display: block;
+}
+
+.ra-dd-search {
+  padding: 12px 12px 8px;
+}
+
+.ra-dd-search-input {
+  width: 100%;
+  padding: 0.68rem 0.8rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  color: #0f172a;
+  font-size: 0.88rem;
+}
+
+.ra-dd-search-input:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.ra-dd-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.ra-dd-clear {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.ra-dd-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.ra-dd-item,
+.ra-dd-empty {
+  padding: 0.7rem 0.78rem;
+  border-radius: 10px;
+  color: #334155;
+  font-size: 0.88rem;
+}
+
+.ra-dd-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ra-dd-item:hover {
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.ra-dd-item.is-selected {
+  background: linear-gradient(180deg, #e0e7ff 0%, #eef2ff 100%);
+  color: #312e81;
+  font-weight: 700;
+}
+
+.ra-dd-empty {
+  color: #64748b;
+}
+
+.ra-applied-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #edf2f7;
+}
+
+.ra-applied-label {
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ra-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+
+.ra-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.ra-filter-badge:hover,
+.ra-filter-clear:hover {
+  color: #312e81;
+}
+
+.ra-filter-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.ra-filter-clear {
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.ra-table-toolbar {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.ra-search-wrap {
+  position: relative;
+}
+
+.ra-search-wrap i {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  font-size: 1rem;
+}
+
+.ra-search-wrap input {
+  width: 100%;
+  padding: 0.78rem 0.95rem 0.78rem 2.75rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+}
+
+.ra-toolbar-select {
+  min-width: 96px;
+  padding: 0.78rem 0.9rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+}
+
+.ra-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ra-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0.7rem 1rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: all 0.18s ease;
+}
+
+.ra-toolbar-btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+}
+
+.ra-toolbar-btn--primary:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.ra-toolbar-btn--ghost {
+  color: #334155;
+  background: #fff;
+  border-color: #dbe3ef;
+}
+
+.ra-toolbar-btn--ghost:hover {
+  background: #f8fafc;
+}
+
+.ra-section,
+.ra-show-card {
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.ra-section-title,
+.ra-panel-head,
+.ra-show-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.ra-section-title {
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.76rem;
+}
+
+.ra-section-title i,
+.ra-panel-head i,
+.ra-show-head i {
+  color: #4f46e5;
+}
+
+.ra-field-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.ra-form-control,
+.ra-form-select,
+.ra-textarea {
+  width: 100%;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ra-textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.ra-form-control:focus,
+.ra-form-select:focus,
+.ra-textarea:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.ra-help {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.ra-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
+body.ra-page .ra-selected-file-preview {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+body.ra-page .ra-selected-file-preview__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: #334155;
+  font-size: 0.84rem;
+}
+
+body.ra-page .ra-selected-file-preview__meta i {
+  color: #6366f1;
+}
+
+body.ra-page .ra-selected-file-preview__size {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+body.ra-page .ra-selected-file-preview__media {
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+}
+
+body.ra-page .ra-selected-file-preview__media img {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  width: auto;
+}
+
+body.ra-page .ra-selected-file-preview__media iframe {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  border: 0;
+  background: #fff;
+}
+
+body.ra-page .ra-selected-file-preview__fallback {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.ra-footer-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -8px 25px rgba(15, 23, 42, 0.05);
+}
+
+.ra-footer-meta {
+  margin-right: auto;
+  color: #64748b;
+  font-size: 0.79rem;
+}
+
+.ra-table-wrap {
+  overflow-x: auto;
+}
+
+.ra-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ra-table th,
+.ra-table td {
+  padding: 0.95rem 0.9rem;
+  border-bottom: 1px solid #eef2f7;
+  vertical-align: top;
+  font-size: 0.9rem;
+}
+
+.ra-table th {
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ra-table tbody tr:hover {
+  background: #fafcff;
+}
+
+.ra-ref {
+  color: #312e81;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.ra-muted {
+  color: #64748b;
+}
+
+.ra-owner {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.ra-address {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.ra-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ra-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #dbe3ef;
+  color: #334155;
+  background: #fff;
+  text-decoration: none;
+}
+
+.ra-empty {
+  padding: 2rem 1rem !important;
+  text-align: center;
+  color: #64748b;
+}
+
+.ra-show-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.ra-show-item {
+  padding: 14px;
+  border: 1px solid #edf2f7;
+  border-radius: 14px;
+  background: #fbfdff;
+}
+
+.ra-show-item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ra-show-item-label i {
+  color: #4f46e5;
+}
+
+.ra-show-item-value {
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.ra-show-item-value--pre {
+  white-space: pre-line;
+  font-weight: 600;
+}
+
+.ra-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ra-pagination {
+  margin-top: 16px;
+}
+
+/* —— Agreement register (data table) —— */
+body.ra-page .ra-panel-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  background: #fff;
+}
+
+body.ra-page .ra-panel-head--table {
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 0.85rem !important;
+  margin-bottom: 0 !important;
+}
+
+body.ra-page .ra-table-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+}
+
+body.ra-page .ra-table-meta__count {
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+body.ra-page .ra-table-meta__label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+body.ra-page .ra-table-wrap--register {
+  margin-top: 0;
+  border-radius: 12px;
+  border: 1px solid #e8edf5;
+  background: #fafbfc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+body.ra-page .ra-table--register {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1040px;
+}
+
+body.ra-page .ra-table--register thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.72rem 0.85rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 2px solid #e2e8f0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  white-space: nowrap;
+}
+
+body.ra-page .ra-table--register thead th:first-child {
+  border-top-left-radius: 11px;
+}
+
+body.ra-page .ra-table--register thead th:last-child {
+  border-top-right-radius: 11px;
+}
+
+body.ra-page .ra-table--register tbody td {
+  padding: 0.85rem 0.85rem;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+body.ra-page .ra-table--register tbody tr:last-child td {
+  border-bottom: none;
+}
+
+body.ra-page .ra-table--register tbody tr:nth-child(even) td {
+  background: #fbfcfe;
+}
+
+body.ra-page .ra-table--register tbody tr:hover td {
+  background: #f5f7ff;
+  box-shadow: inset 3px 0 0 #6366f1;
+}
+
+body.ra-page .ra-th--numeric,
+body.ra-page .ra-td--numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+body.ra-page .ra-th--actions,
+body.ra-page .ra-td--actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+body.ra-page .ra-th--attach,
+body.ra-page .ra-td--attach {
+  width: 1%;
+  white-space: nowrap;
+}
+
+body.ra-page .ra-th--gst,
+body.ra-page .ra-td--gst {
+  width: 1%;
+  white-space: nowrap;
+}
+
+body.ra-page .ra-ref--code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  color: #3730a3 !important;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none !important;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+body.ra-page .ra-ref--code:hover {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #312e81 !important;
+}
+
+body.ra-page .ra-cell-date {
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+body.ra-page .ra-cell-strong {
+  color: #0f172a;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+body.ra-page .ra-table--register .ra-address {
+  margin-top: 3px;
+  font-size: 0.78rem;
+  max-width: 220px;
+}
+
+body.ra-page .ra-cell-period {
+  color: #334155;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  max-width: 200px;
+  display: inline-block;
+}
+
+body.ra-page .ra-money {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.875rem;
+}
+
+body.ra-page .ra-gst-pill {
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  padding: 0.35em 0.65em !important;
+  letter-spacing: 0.02em;
+}
+
+body.ra-page .ra-file-chip--table {
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  gap: 0.35rem;
+}
+
+body.ra-page .ra-muted--table {
+  font-size: 0.85rem;
+}
+
+body.ra-page .ra-table--register .ra-actions {
+  justify-content: flex-end;
+}
+
+body.ra-page .ra-table--register .ra-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #475569;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+body.ra-page .ra-table--register .ra-icon-btn:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.15);
+}
+
+body.ra-page .ra-empty--table {
+  padding: 3rem 1.5rem !important;
+  text-align: center;
+  vertical-align: middle !important;
+  background: linear-gradient(180deg, #fafbfc 0%, #fff 45%) !important;
+  border: none !important;
+}
+
+body.ra-page .ra-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #94a3b8;
+  font-size: 1.75rem;
+}
+
+body.ra-page .ra-empty__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.35rem;
+}
+
+body.ra-page .ra-empty__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.ra-page .ra-pagination--table {
+  margin-top: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+body.ra-page .ra-pagination--table .pagination {
+  margin-bottom: 0;
+  gap: 0.25rem;
+}
+
+body.ra-page .ra-pagination--table .page-link {
+  border-radius: 8px;
+  border-color: #e2e8f0;
+  color: #475569;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+}
+
+body.ra-page .ra-pagination--table .page-item.active .page-link {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+body.ra-page .ra-pagination--table .page-link:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #312e81;
+}
+
+body.ra-page .ra-pagination--table .page-item.active .page-link:hover {
+  background: #4338ca;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+.ra-alert {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  margin-bottom: 16px;
+}
+
+.ra-alert ul {
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
+}
+
+@media (max-width: 991.98px) {
+  .ra-hero,
+  .ra-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .ra-table th,
+  .ra-table td {
+    padding: 0.8rem 0.72rem;
+  }
+
+  .ra-footer-bar {
+    position: static;
+  }
+
+  .ra-filter-shell {
+    padding: 14px;
+  }
+
+  .ra-applied-bar {
+    align-items: flex-start;
+  }
+
+  .ra-table-toolbar {
+    padding: 14px;
+  }
+
+  .ra-toolbar-actions {
+    width: 100%;
+  }
+
+  .ra-toolbar-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* Payment request style filter shell for rental agreement index */
+body.ra-page .tk-pr-index .tk-filter-shell {
+  margin-bottom: 20px;
+  padding: 18px 20px 20px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.ra-page .tk-pr-index .tk-filter-shell.tk-filter-qd {
+  padding: 0;
+  background: #fff;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  overflow: visible;
+}
+
+body.ra-page .tk-pr-index .tk-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+body.ra-page .tk-pr-index .tk-filter-shell.tk-filter-qd > .tk-filter-head {
+  margin-bottom: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eef0f7;
+}
+
+body.ra-page .tk-pr-index .tk-filter-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #0f2744;
+}
+
+body.ra-page .tk-pr-index .tk-filter-title i {
+  color: #4f46e5;
+  font-size: 17px;
+}
+
+body.ra-page .tk-pr-index .tk-showing-pill {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+  padding: 8px 16px;
+  background: #fff;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.ra-page .tk-pr-index .tk-showing-pill strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filters.pay-pr-qd-filters {
+  padding: 12px 18px 10px;
+  background: #f9fafd;
+  border-bottom: 1px solid #eef0f7;
+}
+
+body.ra-page .tk-pr-index .pay-pr-qd-filter-spacer {
+  visibility: hidden;
+  pointer-events: none;
+  min-height: 0;
+}
+
+/* Category, landlord, state, RCM, GST type — five columns on rental agreements register. */
+body.ra-page .tk-pr-index #ra-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 8px 16px;
+  margin-bottom: 0;
+}
+
+body.ra-page .tk-pr-index #llp-report-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px 16px;
+  margin-bottom: 0;
+}
+
+body.ra-page .tk-pr-index #ra-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst .ra-filter-category-gst-cell,
+body.ra-page .tk-pr-index #llp-report-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst .ra-filter-category-gst-cell {
+  min-width: 0;
+}
+
+body.ra-page .tk-pr-index #ra-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst .tax-dropdown-wrapper.pay-pr-dd,
+body.ra-page .tk-pr-index #llp-report-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst .tax-dropdown-wrapper.pay-pr-dd {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  body.ra-page .tk-pr-index #ra-filter-form .pay-pr-table-toolbar .pay-pr-table-toolbar-search:not(.col-auto) {
+    flex: 1 1 0 !important;
+    max-width: 100% !important;
+  }
+
+  body.ra-page .tk-pr-index.ra-register--llp-match #ra-filter-form .pay-pr-table-toolbar .pay-pr-table-toolbar-search {
+    flex: 0 1 auto !important;
+    max-width: 300px !important;
+  }
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group > label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9aa5b8;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group .form-control,
+body.ra-page .tk-pr-index .pay-pr-filter-shell .pay-pr-per-page-select,
+body.ra-page .tk-pr-index .qd-search-wrap input {
+  box-shadow: none !important;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group .form-control {
+  height: 36px !important;
+  border: 1px solid #d4d9e8 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  font-size: 12.5px !important;
+  color: #3d4a5c !important;
+  padding: 0 10px !important;
+  transition: border-color 0.15s !important;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group .form-control:focus {
+  border-color: #4f6ef7 !important;
+  box-shadow: 0 0 0 2px rgba(79, 110, 247, 0.12) !important;
+  outline: none !important;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group .form-select {
+  height: 36px !important;
+  border: 1px solid #d4d9e8 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  font-size: 12.5px !important;
+  color: #3d4a5c !important;
+  padding: 0 10px !important;
+  transition: border-color 0.15s !important;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group .form-select:focus {
+  border-color: #4f6ef7 !important;
+  box-shadow: 0 0 0 2px rgba(79, 110, 247, 0.12) !important;
+  outline: none !important;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-filter-group .form-control::placeholder {
+  color: #b0b9cc;
+}
+
+body.ra-page .tk-pr-index .qd-date-wrap {
+  height: 36px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-size: 12.5px;
+  color: #3d4a5c;
+  box-shadow: none;
+}
+
+body.ra-page .tk-pr-index .qd-date-wrap:hover {
+  border-color: #a8b3d0;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-date-wrap #raDateLabel,
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-date-wrap #llpReportDateLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: #3d4a5c;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .qd-date-wrap .fa {
+  color: #9aa5b8;
+  font-size: 13px;
+}
+
+body.ra-page .tk-pr-index .qd-applied-bar {
+  padding: 6px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border-bottom: 1px solid #eef0f7;
+  min-height: 34px;
+}
+
+body.ra-page .tk-pr-index .qd-applied-bar .applied-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9aa5b8;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-chips {
+  min-width: 0;
+}
+
+body.ra-page .filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  margin: 2px 0;
+  border-radius: 6px;
+  background: #28a745;
+  color: #fff;
+  font-size: 9px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+body.ra-page .filter-badge:hover {
+  opacity: 0.85;
+}
+
+body.ra-page .filter-badge .remove-icon {
+  margin-left: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+body.ra-page .filter-clear {
+  background-color: #dc3545;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-chips .filter-badge,
+body.ra-page .tk-pr-index .pay-pr-filter-chips a.filter-badge.text-white {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  line-height: 1.35;
+  max-width: 100%;
+  border-radius: 8px;
+  background: #eef2ff !important;
+  color: #4338ca !important;
+  border: 1px solid #e0e7ff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-chips .filter-badge:hover {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+  border-color: #c7d2fe;
+  opacity: 1;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-chips .filter-badge.filter-clear {
+  background: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-chips .filter-badge.filter-clear:hover {
+  background: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-color: #fda4af;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-chips .filter-badge span:not(.remove-icon) {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.ra-page .tk-pr-index .pay-pr-table-toolbar {
+  width: 100%;
+  border-top: 1px solid #eef0f7;
+  padding: 6px 18px 12px;
+}
+
+body.ra-page .tk-pr-index .pay-pr-table-toolbar-search {
+  max-width: 100%;
+}
+
+body.ra-page .tk-pr-index .pay-pr-toolbar-search-row {
+  padding: 0 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+body.ra-page .tk-pr-index .qd-search-row {
+  display: flex;
+  align-items: center;
+}
+
+body.ra-page .tk-pr-index .qd-search-wrap {
+  position: relative;
+  width: 280px;
+}
+
+body.ra-page .tk-pr-index .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 280px;
+  max-width: 100%;
+}
+
+body.ra-page .tk-pr-index.ra-register--llp-match .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 100%;
+  max-width: 300px;
+}
+
+body.ra-page .tk-pr-index .qd-search-wrap i {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9aa5b8;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+body.ra-page .tk-pr-index .qd-search-wrap input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  padding: 0 10px 0 32px;
+  font-size: 12.5px;
+  color: #3d4a5c;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+body.ra-page .tk-pr-index .qd-search-wrap input:focus {
+  border-color: #4f6ef7;
+  outline: none;
+}
+
+body.ra-page .tk-pr-index .qd-search-wrap input::placeholder {
+  color: #b0b9cc;
+}
+
+body.ra-page .tk-pr-index .pay-pr-toolbar-search-wrap.qd-search-wrap input {
+  height: 38px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+body.ra-page .tk-pr-index .pay-pr-per-page-field {
+  flex: 0 0 auto;
+}
+
+body.ra-page .tk-pr-index .pay-pr-per-page-field--toolbar {
+  align-self: flex-end;
+}
+
+body.ra-page .tk-pr-index .pay-pr-per-page-field .pay-pr-per-page-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+
+body.ra-page .tk-pr-index .pay-pr-per-page-field .pay-pr-per-page-select {
+  min-width: 88px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #d4d9e8;
+  color: #0f172a;
+  font-size: 0.875rem;
+  padding-right: 2rem;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .tax-dropdown-wrapper {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+body.ra-page #ra-filter-form .dropdown-menu.tax-dropdown.pay-pr-tax-dd,
+body.ra-page > .dropdown-menu.tax-dropdown.pay-pr-tax-dd {
+  max-height: min(320px, 70vh);
+  overflow: hidden;
+  display: none;
+  padding: 0;
+  margin: 0 !important;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
+  z-index: 10050;
+  box-sizing: border-box;
+}
+
+body.ra-page #ra-filter-form .pay-pr-tax-dd .dropdown-list.multiselect,
+body.ra-page > .pay-pr-tax-dd .dropdown-list.multiselect {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+body.ra-page #ra-filter-form .pay-pr-tax-dd .dropdown-list.multiselect div,
+body.ra-page > .pay-pr-tax-dd .dropdown-list.multiselect div {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: #334155;
+}
+
+body.ra-page #ra-filter-form .pay-pr-tax-dd .dropdown-list.multiselect div:hover,
+body.ra-page > .pay-pr-tax-dd .dropdown-list.multiselect div:hover {
+  background: #f8fafc;
+}
+
+body.ra-page #ra-filter-form .pay-pr-tax-dd .dropdown-list.multiselect div.selected,
+body.ra-page > .pay-pr-tax-dd .dropdown-list.multiselect div.selected {
+  background: #ecfdf5;
+  font-weight: 600;
+  color: #166534;
+}
+
+body.ra-page > .pay-pr-tax-dd .inner-search-container,
+body.ra-page #ra-filter-form .pay-pr-tax-dd .inner-search-container {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+body.ra-page > .pay-pr-tax-dd .inner-search,
+body.ra-page #ra-filter-form .pay-pr-tax-dd .inner-search {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  border: 1px solid #d4d9e8;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+body.ra-page > .pay-pr-tax-dd .inner-search:focus,
+body.ra-page #ra-filter-form .pay-pr-tax-dd .inner-search:focus {
+  outline: none;
+  border-color: #4f6ef7;
+}
+
+body.ra-page .ra-dd-empty {
+  padding: 8px 12px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+
+/* Register grid: table/card/rows/pagination match Payment Requests (payment_request.css .tk-pr-index). */
+
+body.ra-page .tk-pr-index .pay-pr-table-card .pay-pr-row td {
+  vertical-align: middle;
+}
+
+.tk-pr-index .pay-pr-type-pill--hospital {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+.tk-pr-index .pay-pr-type-pill--hostel {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+
+.tk-pr-index .ra-gst-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.42em 0.85em;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.tk-pr-index .ra-gst-pill--including_gst {
+  background: #d1fae5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.tk-pr-index .ra-gst-pill--excluding_gst {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.tk-pr-index .ra-gst-pill--no_gst {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.tk-pr-index .ra-gst-pill--unknown {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+body.ra-page .ra-tax-cell,
+.tk-pr-index .ra-tax-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+body.ra-page .ra-rcm-line,
+.tk-pr-index .ra-rcm-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+}
+
+body.ra-page .ra-rcm-pill,
+.tk-pr-index .ra-rcm-pill {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+body.ra-page .ra-rcm-pill--yes,
+.tk-pr-index .ra-rcm-pill--yes {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+body.ra-page .ra-rcm-pill--no,
+.tk-pr-index .ra-rcm-pill--no {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+body.ra-page .ra-rcm-value,
+.tk-pr-index .ra-rcm-value {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+body.ra-page .ra-gst-meta,
+.tk-pr-index .ra-gst-meta {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #475569;
+  line-height: 1.3;
+}
+
+body.ra-page #ra_rcm_value_wrap.ra-rcm-value--hidden {
+  display: none;
+}
+
+body.ra-page .ra-gst-detail-wrap--hidden,
+body.ra-page .ra-gst-detail-fields.ra-gst-detail-wrap--hidden {
+  display: none !important;
+}
+
+body.ra-page .ra-gst-fields-wrap.ra-gst-fields--hidden {
+  display: none !important;
+}
+
+/* GST card — inputs row + breakdown below */
+body.ra-page .ra-gst-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: visible;
+  width: 100%;
+}
+
+body.ra-page .ra-gst-card--with-breakdown {
+  gap: 1rem;
+}
+
+body.ra-page .ra-gst-card__inputs {
+  min-width: 0;
+}
+
+body.ra-page .ra-gst-inputs-row.ra-rent-grid--4 {
+  width: 100%;
+}
+
+body.ra-page .ra-gst-input-field {
+  min-width: 0;
+}
+
+body.ra-page .ra-gst-card__breakdown {
+  min-width: 0;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+body.ra-page .ra-gst-card:not(.ra-gst-card--with-breakdown) .ra-gst-card__breakdown {
+  display: none !important;
+}
+
+body.ra-page .ra-gst-breakdown-heading {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.01em;
+}
+
+body.ra-page .ra-gst-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: stretch;
+}
+
+body.ra-page .ra-gst-breakdown-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+body.ra-page .ra-gst-breakdown-col-title {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-col-title {
+  color: #2563eb;
+}
+
+body.ra-page .ra-gst-tax-block {
+  margin-top: 0.25rem;
+}
+
+body.ra-page .ra-tax-mode-badge {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+body.ra-page .ra-gst-dropdown.tax-dropdown-wrapper,
+body.ra-page .ra-tds-dropdown.tax-dropdown-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+body.ra-page .ra-gst-dropdown .tax-dropdown,
+body.ra-page .ra-tds-dropdown .tax-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 1060;
+  width: 100%;
+  min-width: 14rem;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  padding: 0;
+  overflow: visible;
+}
+
+body.ra-page .ra-gst-dropdown .tax-dropdown.show,
+body.ra-page .ra-tds-dropdown .tax-dropdown.show {
+  display: block !important;
+}
+
+body.ra-page .ra-gst-dropdown .tax-gst-list,
+body.ra-page .ra-tds-dropdown .tax-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+body.ra-page .ra-gst-dropdown .tax-gst-list div,
+body.ra-page .ra-tds-dropdown .tax-list div {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+body.ra-page .ra-gst-dropdown .tax-gst-list div:hover,
+body.ra-page .ra-tds-dropdown .tax-list div:hover {
+  background: #f1f5f9;
+}
+
+body.ra-page .ra-section .row:has(.ra-gst-dropdown),
+body.ra-page .ra-section .row:has(.ra-tds-dropdown),
+body.ra-page .ra-gst-fields-wrap,
+body.ra-page .ra-gst-tax-block {
+  overflow: visible;
+}
+
+body.ra-page .ra-gst_calculate_show.gst_calculate_show {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+body.ra-page .ra-gst_calculate_show .ra-tax_show.tax_show {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+body.ra-page .ra-gst_calculate_show .ra-tax_show label {
+  margin: 0;
+  font-weight: 600;
+}
+
+body.ra-page .ra-gst_calculate_show:empty {
+  display: none;
+}
+
+body.ra-page .ra-gst-show-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+body.ra-page .ra-gst-show-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+body.ra-page .ra-tax-section-block {
+  margin-top: 0.5rem;
+}
+
+/* ── Rent and charges (create form — 4-card layout) ─────────── */
+body.ra-page .ra-rent-charges-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  overflow: visible;
+}
+
+/* Override uikit `section { padding: 100px 0; }` on rent-charge cards */
+body.ra-page .ra-rent-charges-stack > section,
+body.ra-page .ra-rent-block {
+  padding: 0;
+  margin: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: visible;
+}
+
+body.ra-page .ra-rent-block-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+body.ra-page .ra-rent-block-head i {
+  font-size: 1.05rem;
+  color: #3b82f6;
+}
+
+body.ra-page .ra-rent-block-body {
+  padding: 0.65rem 1rem 0.85rem;
+  overflow: visible;
+}
+
+body.ra-page .ra-rent-grid {
+  display: grid;
+  gap: 0.85rem 1rem;
+}
+
+body.ra-page .ra-rent-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.ra-page .ra-rent-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.ra-page .ra-rent-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+body.ra-page .ra-rent-grid--rcm {
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  align-items: start;
+}
+
+body.ra-page .ra-rent-input-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  overflow: visible;
+}
+
+body.ra-page .ra-rent-input-wrap:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+body.ra-page .ra-rent-input-prefix,
+body.ra-page .ra-rent-input-suffix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding: 0 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+body.ra-page .ra-rent-input-prefix {
+  grid-column: 1;
+  border-radius: 7px 0 0 7px;
+}
+
+body.ra-page .ra-rent-input-wrap--suffix {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+body.ra-page .ra-rent-input-wrap--suffix .ra-rent-input-suffix {
+  grid-column: 2;
+  border-right: 0;
+  border-left: 1px solid #e2e8f0;
+  border-radius: 0 7px 7px 0;
+}
+
+body.ra-page .ra-rent-input-wrap--suffix .ra-rent-input,
+body.ra-page .ra-rent-input-wrap--suffix .ra-form-control.ra-rent-input {
+  grid-column: 1;
+}
+
+body.ra-page .ra-rent-input-wrap .ra-rent-input,
+body.ra-page .ra-rent-input-wrap .ra-form-control {
+  grid-column: 2;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 0.7rem 0.85rem;
+  overflow-x: auto;
+}
+
+body.ra-page .ra-rent-input-wrap:has(.ra-rent-input-prefix) .ra-rent-input,
+body.ra-page .ra-rent-input-wrap:has(.ra-rent-input-prefix) .ra-form-control.ra-rent-input {
+  border-radius: 0 7px 7px 0;
+}
+
+body.ra-page .ra-rent-input-wrap--suffix .ra-rent-input,
+body.ra-page .ra-rent-input-wrap--suffix .ra-form-control.ra-rent-input {
+  border-radius: 7px 0 0 7px;
+}
+
+body.ra-page .ra-rent-input-wrap .ra-rent-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+body.ra-page .ra-rent-input-wrap .ra-rent-input[type='number']::-webkit-outer-spin-button,
+body.ra-page .ra-rent-input-wrap .ra-rent-input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+body.ra-page .ra-rent-input-wrap .ra-rent-input:focus,
+body.ra-page .ra-rent-input-wrap .ra-form-control:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+body.ra-page .ra-rent-field-hint {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+body.ra-page .ra-rent-tax-row {
+  display: grid;
+  gap: 0.85rem 1rem;
+  overflow: visible;
+}
+
+body.ra-page .ra-rent-tax-row--gst {
+  grid-template-columns: 1fr;
+  margin-bottom: 0.85rem;
+}
+
+body.ra-page .ra-rent-tax-row--tds {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 0.85rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+body.ra-page .ra-rent-tax-col {
+  min-width: 0;
+  overflow: visible;
+}
+
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-box {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+body.ra-page .ra-gst-breakdown-box {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
+  flex: 1;
+  min-height: 4.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-box {
+  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  min-height: 5.5rem;
+  padding: 0.65rem 0.75rem;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+body.ra-page .ra-gst-breakdown-box--empty {
+  min-height: 4.5rem;
+}
+
+body.ra-page .ra-gst-breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-item {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+body.ra-page .ra-gst-breakdown-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+body.ra-page .ra-gst-breakdown-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-value {
+  font-size: 0.8rem;
+}
+
+body.ra-page .ra-gst-breakdown-item--total .ra-gst-breakdown-value {
+  color: #2563eb;
+  font-size: 0.82rem;
+}
+
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-item--total .ra-gst-breakdown-label,
+body.ra-page .ra-gst-breakdown-col--total .ra-gst-breakdown-item--total .ra-gst-breakdown-value {
+  font-weight: 700;
+}
+
+body.ra-page .ra-rcm-radios {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-top: 0.35rem;
+  min-height: 2.5rem;
+}
+
+body.ra-page .ra-rcm-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+}
+
+body.ra-page .ra-rcm-radio input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+body.ra-page .ra-rcm-value--hidden {
+  display: none !important;
+}
+
+@media (max-width: 767.98px) {
+  body.ra-page .ra-gst-breakdown-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  body.ra-page .ra-gst-breakdown-box {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 991.98px) {
+  body.ra-page .ra-rent-grid--3,
+  body.ra-page .ra-rent-grid--4,
+  body.ra-page .ra-rent-tax-row--gst,
+  body.ra-page .ra-rent-tax-row--tds {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body.ra-page .ra-rent-grid--3,
+  body.ra-page .ra-rent-grid--4,
+  body.ra-page .ra-rent-grid--rcm,
+  body.ra-page .ra-rent-tax-row--gst,
+  body.ra-page .ra-rent-tax-row--tds {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.ra-page .ra-section-subtitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+body.ra-page .ra-tds-dropdown.tax-dropdown-wrapper {
+  position: relative;
+}
+
+body.ra-page .ra-tds-dropdown .ra-tds-tax-dropdown-menu.tax-dropdown {
+  width: 100%;
+  max-height: 220px;
+  overflow: hidden;
+}
+
+body.ra-page .ra-tds_calculate_show {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+body.ra-page .ra-tds_calculate_show:empty {
+  display: none;
+}
+
+body.ra-page .ra-tds-fields-wrap {
+  margin-top: 0.25rem;
+}
+
+/* ── Standalone index: category filter + Create toolbar ───── */
+body.ra-page .ra-standalone-toolbar {
+  margin: 0 0 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Toolbar lives inside .pc-content (same as register body) so it aligns with the main column. */
+body.ra-page .pc-container .pc-content > .ra-standalone-toolbar {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+body.ra-page .ra-standalone-toolbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+body.ra-page .ra-standalone-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+body.ra-page .ra-standalone-toolbar-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+body.ra-page .ra-seg-pills .nav-link {
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: 0.45rem 1.1rem;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+body.ra-page .ra-seg-pills .nav-link:hover {
+  color: #4338ca;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+body.ra-page .ra-seg-pills .nav-link.active {
+  color: #fff;
+  background: linear-gradient(145deg, #4f46e5 0%, #4338ca 100%);
+  border-color: transparent;
+}
+
+body.ra-page .ra-seg-pills .nav-link i {
+  margin-right: 0.25rem;
+  opacity: 0.9;
+}
+
+body.ra-page .tk-pr-index .pay-pr-filter-shell .ra-category-select {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+body.ra-page .ra-type-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.ra-page .ra-standalone-toolbar-create {
+  flex-shrink: 0;
+}
+
+/* ── Register UI aligned with landlord advances (hero, filters, table shell) ─ */
+body.ra-page .ra-shell.ra-register--llp-match > .ra-card {
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 14px 40px rgba(49, 46, 129, 0.045);
+  border-color: #e2e8f0;
+  overflow: hidden;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-body {
+  padding: 1.1rem 1.15rem 1.25rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-stats {
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-stat {
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .tk-filter-shell.tk-filter-qd {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  margin-bottom: 1rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .tk-filter-shell.tk-filter-qd > .tk-filter-head {
+  padding: 1rem 1.15rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .tk-filter-title {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .tk-filter-title i {
+  color: #6366f1;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .tk-showing-pill {
+  border-radius: 999px;
+  border-color: #e2e8f0;
+  background: #fff;
+  font-weight: 600;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .pay-pr-filter-shell .qd-filters.pay-pr-qd-filters {
+  background: #fff;
+  border-bottom: 1px solid #eef2f7;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match.tk-pr-index .pay-pr-table-card {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 14px 40px rgba(49, 46, 129, 0.045);
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-empty.ra-register-empty {
+  padding: 2.75rem 1.25rem !important;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-empty.ra-register-empty .pay-pr-empty-icon {
+  font-size: 2.25rem;
+  color: #cbd5e1;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-empty.ra-register-empty .pay-pr-empty-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #475569;
+  letter-spacing: -0.02em;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-empty.ra-register-empty .pay-pr-empty-hint,
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-empty.ra-register-empty .ra-register-empty-hint {
+  max-width: 22rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-pagination-bar {
+  margin-top: 1.1rem;
+}
+
+/* Register: Google Maps + building thumb + other parties */
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-map-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-map-link:hover {
+  background: rgba(37, 99, 235, 0.18);
+  color: #1d4ed8;
+}
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-building-thumb {
+  display: block;
+  max-width: 72px;
+  max-height: 52px;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-names .pay-pr-extra-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1.35;
+  max-width: 10rem;
+}
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-refund,
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-rent {
+  min-width: 7.25rem;
+  width: 7.25rem;
+  white-space: nowrap;
+  vertical-align: middle;
+  padding-left: 0.5rem;
+  padding-right: 0.65rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-refund {
+  min-width: 8.5rem;
+  width: 8.5rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-amt-label {
+  display: inline-block;
+  line-height: 1.25;
+  text-align: right;
+  white-space: normal;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-amt {
+  min-width: 7.25rem;
+  white-space: nowrap;
+}
+
+.ra-maps-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  text-decoration: none;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+.ra-maps-chip:hover {
+  background: rgba(37, 99, 235, 0.16);
+  color: #1e3a8a;
+}
+
+.ra-building-show-img {
+  max-width: min(100%, 420px);
+  max-height: 280px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  object-fit: contain;
+}
+
+.ra-building-thumb-preview {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  object-fit: cover;
+}
+
+[data-field].is-invalid .ra-form-control,
+[data-field].is-invalid .ra-form-select,
+[data-field].is-invalid .ra-textarea,
+[data-field].is-invalid .form-control {
+  border-color: #dc3545;
+}
+
+[data-field] .invalid-feedback,
+[data-field] .js-field-feedback {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: #dc3545;
+}
+
+
+/* ========== Register, chart, period popover, owner payments ledger ========== */
+
+/* Rental agreements register — tk-hero header, chart, period popover, expandable rows */
+.ra-register-tk-hero .ra-hero-lead {
+  margin: 0;
+  max-width: 48rem;
+  font-size: 0.95rem;
+  color: rgba(248, 250, 252, 0.92);
+  line-height: 1.55;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.65rem;
+}
+.ra-register-tk-hero .ra-hero-lead strong {
+  color: #fff;
+  font-weight: 600;
+}
+.ra-register-tk-hero .ra-hero-lead-muted {
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 0.875rem;
+}
+.ra-register-tk-hero .ra-register-scope-label {
+  font-weight: 600;
+  color: rgba(248, 250, 252, 0.85);
+}
+.ra-register-tk-hero .ra-register-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ra-register-tk-hero .ra-register-cat-pill--hospital {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.ra-register-tk-hero .ra-register-cat-pill--hostel {
+  background: rgba(167, 243, 208, 0.25);
+  color: #ecfdf5;
+  border: 1px solid rgba(167, 243, 208, 0.45);
+}
+
+.ra-register-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+.ra-register-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.ra-chart-toggle.ra-chart-toggle--active,
+.ra-register-btn-ghost[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.ra-chart-layout {
+  display: block;
+}
+.ra-chart-layout--open {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 991.98px) {
+  .ra-chart-layout--open {
+    grid-template-columns: 1fr;
+  }
+}
+.ra-chart-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1rem;
+  position: sticky;
+  top: 0.75rem;
+}
+.ra-chart-panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+.ra-chart-panel-sub {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.ra-chart-canvas-wrap {
+  position: relative;
+  height: 220px;
+}
+.ra-chart-canvas-wrap--sm {
+  height: 200px;
+}
+.ra-register-main {
+  min-width: 0;
+}
+
+.ra-expand-cell {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.ra-expand-cell:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+tr.pay-pr-row.ra-row-expanded td {
+  background: rgba(99, 102, 241, 0.04);
+}
+.ra-detail-row td {
+  padding: 0 !important;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.ra-detail-panel {
+  padding: 0.85rem 1rem 1rem;
+}
+.ra-detail-panel-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin-bottom: 0.65rem;
+}
+.ra-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+}
+@media (max-width: 767.98px) {
+  .ra-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.ra-detail-item--wide {
+  grid-column: 1 / -1;
+}
+.ra-detail-lbl {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.15rem;
+}
+.ra-detail-val {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.ra-period-link {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  text-align: left;
+}
+.ra-period-link:hover,
+.ra-period-link--active {
+  color: #1d4ed8;
+}
+.ra-period-popover {
+  background: #fff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: 0.85rem 1rem;
+}
+.ra-period-pop-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.ra-period-pop-head strong {
+  font-size: 0.8125rem;
+  color: #4338ca;
+}
+.ra-period-pop-head span {
+  font-size: 0.8125rem;
+  color: #334155;
+}
+.ra-period-pop-table {
+  width: 100%;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+.ra-period-pop-table th,
+.ra-period-pop-table td {
+  padding: 0.35rem 0.4rem;
+  vertical-align: top;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ra-period-pop-table th {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+}
+.ra-period-pop-lbl {
+  font-weight: 700;
+  color: #4338ca;
+  white-space: nowrap;
+}
+.ra-period-pop-note {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* ── Register: Refine list + toolbar + table alignment ───────── */
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px 16px;
+  align-items: end;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-filter-shell .qd-filter-row.ra-filter-row-category-gst {
+  margin-top: 8px;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .ra-category-select,
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-filter-shell .qd-date-wrap {
+  min-height: 36px;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-table-toolbar.row {
+  align-items: center !important;
+  margin-top: 0.75rem !important;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-table-toolbar-search {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: min(100%, 300px);
+}
+
+@media (min-width: 768px) {
+  body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-table-toolbar-search.col-auto {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 300px;
+  }
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-per-page-field--toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
+  width: auto;
+  flex: 0 0 auto;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-per-page-field--toolbar .pay-pr-per-page-label {
+  margin-bottom: 0 !important;
+  white-space: nowrap;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-toolbar-search-wrap.qd-search-wrap {
+  width: 100%;
+  max-width: 300px;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-toolbar-search-wrap.qd-search-wrap input {
+  height: 36px;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-per-page-select {
+  height: 36px;
+  min-width: 5.5rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-thead.qdt-head th.pay-pr-th-amt.text-end {
+  text-align: right !important;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-amount-curr {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+}
+
+@media (max-width: 991.98px) {
+  body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-filter-shell .qd-filter-row.pay-pr-qd-filter-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.ra-page .ra-shell.ra-register--llp-match #ra-filter-form .pay-pr-per-page-field--toolbar {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Register table — location column (icon before zone) */
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-loc-stack,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-loc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-loc-zone,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-loc-zone,
+.tk-pr-index .pay-pr-loc-zone {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  margin-bottom: 0.25rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-loc-zone--branch-only,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-loc-zone--branch-only {
+  margin-bottom: 0;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-map-link--inline,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-map-link--inline,
+.tk-pr-index .pay-pr-map-link--inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-map-link--inline:hover,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-map-link--inline:hover,
+.tk-pr-index .pay-pr-map-link--inline:hover {
+  background: rgba(37, 99, 235, 0.18);
+  color: #1d4ed8;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-loc-zone .pay-pr-zone-pill,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-loc-zone .pay-pr-zone-pill {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-loc-stack > .pay-pr-branch-txt,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-loc-stack > .pay-pr-branch-txt {
+  padding-left: 1.85rem;
+}
+
+/* Register table — company column */
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-company,
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-company,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-th-company,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-td-company {
+  min-width: 16rem;
+  width: 18rem;
+  max-width: 24rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-company .pay-pr-company-name,
+body.llp-page .llp-ws-embed .ra-shell.ra-register--llp-match .pay-pr-td-company .pay-pr-company-name {
+  display: block;
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  word-break: normal;
+  font-weight: 500;
+  color: #334155;
+  line-height: 1.45;
+}
+
+/* Register table — RCM column */
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-rcm,
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-rcm {
+  text-align: center;
+  white-space: nowrap;
+  min-width: 4.5rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-rcm-col {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-rcm .ra-rcm-pill {
+  min-width: 2.25rem;
+  text-align: center;
+}
+
+/* Register table — attachment column */
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-th-attachment,
+body.ra-page .ra-shell.ra-register--llp-match .pay-pr-td-attachment {
+  min-width: 10.5rem;
+  width: 11.5rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  color: #1e293b;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match button.ra-attach-tile {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-family: inherit;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile:hover,
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile:focus-visible {
+  border-color: #6366f1;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.12);
+  outline: none;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-icon--pdf {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-icon--image {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-icon--doc {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-icon--file {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-kicker {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-name {
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 6.5rem;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-tile-badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-open:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4f46e5;
+}
+
+body.ra-page .ra-shell.ra-register--llp-match .ra-attach-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+body.ra-page .ra-attach-preview-body {
+  min-height: 50vh;
+}
+
+body.ra-page .ra-attach-preview-iframe {
+  width: 100%;
+  min-height: 65vh;
+  height: 70vh;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+body.ra-page .ra-attach-preview-img {
+  max-width: 100%;
+  width: auto;
+  max-height: 75vh;
+  object-fit: contain;
+  padding: 1rem;
+}
+
+body.ra-page .ra-attach-preview-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 40vh;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #64748b;
+}
+
+body.ra-page .sa-doc-pending-preview .ra-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+body.ra-page .ra-existing-files .ra-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+body.ra-page .ra-attach-preview-fallback i {
+  font-size: 2.5rem;
+  color: #94a3b8;
+}
+
+/* Owner name → bill payments & NEFT page */
+a.pay-pr-vendor-name.ra-owner-payments-link,
+button.pay-pr-vendor-name.ra-owner-payments-trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+}
+a.pay-pr-vendor-name.ra-owner-payments-link:hover,
+button.pay-pr-vendor-name.ra-owner-payments-trigger:hover,
+tr.pay-pr-row.ra-row-payments-expanded button.ra-owner-payments-trigger {
+  color: #4338ca;
+}
+tr.pay-pr-row.ra-row-payments-expanded td {
+  background: rgba(37, 99, 235, 0.05);
+}
+.ra-payments-row td.ra-payments-row-cell {
+  padding: 0 !important;
+  border-bottom: 1px solid #c7d2fe;
+  background: #f8fafc;
+}
+.ra-payments-panel {
+  padding: 0.85rem 1rem 1rem;
+}
+.ra-payments-panel-head {
+  margin-bottom: 0.75rem;
+}
+.ra-payments-panel-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #312e81;
+}
+.ra-payments-panel-sub {
+  font-size: 0.75rem;
+}
+.ra-payments-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+@media (max-width: 991.98px) {
+  .ra-payments-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 575.98px) {
+  .ra-payments-summary {
+    grid-template-columns: 1fr;
+  }
+}
+.ra-payments-stat {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+}
+.ra-payments-stat-lbl {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.1rem;
+}
+.ra-payments-stat-val {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ra-payments-stat-val--warn {
+  color: #b45309;
+}
+.ra-payments-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+.ra-payments-table {
+  width: 100%;
+  margin: 0;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+.ra-payments-table th {
+  background: #f1f5f9;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #475569;
+  padding: 0.45rem 0.55rem;
+  white-space: nowrap;
+}
+.ra-payments-table td {
+  padding: 0.45rem 0.55rem;
+  border-top: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.ra-payments-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 1rem !important;
+}
+.ra-pay-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.ra-pay-pill--done {
+  background: #dcfce7;
+  color: #166534;
+}
+.ra-pay-pill--pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.ra-pay-pill--opening {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+body.ra-page.ra-owner-payments-page .ra-hero .ra-owner-payments-sub {
+  font-size: 0.93rem;
+  margin-top: 0.35rem;
+  color: rgba(248, 250, 252, 0.9);
+}
+body.ra-page.ra-owner-payments-page .ra-hero .ra-owner-payments-agreement {
+  font-weight: 700;
+  color: #e0e7ff;
+  letter-spacing: 0.02em;
+}
+body.ra-page.ra-owner-payments-page .ra-hero .ra-hero-sub-muted {
+  color: rgba(248, 250, 252, 0.78);
+}
+body.ra-page.ra-owner-payments-page .ra-hero .ra-hero-cat-pill {
+  margin-right: 0.5rem;
+}
+body.ra-page.ra-owner-payments-page .ra-payments-summary--page {
+  margin-bottom: 1.25rem;
+}
+body.ra-page.ra-owner-payments-page .ra-payments-table-wrap--page {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+body.ra-page.ra-owner-payments-page .ra-owner-payments-footnote a {
+  font-weight: 600;
+}
+.ra-owner-agreements-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ra-owner-agreement-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #312e81;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ra-owner-agreement-chip:hover {
+  background: #e0e7ff;
+  color: #1e1b4b;
+}
+.ra-owner-agreement-chip-cat {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6366f1;
+}
+.ra-payments-agreement-link {
+  font-weight: 600;
+  color: #4338ca;
+  text-decoration: none;
+}
+.ra-payments-agreement-link:hover {
+  text-decoration: underline;
+}
+body.ra-page.ra-owner-payments-page .ra-owner-payments-hero .ra-owner-payments-agreement {
+  font-weight: 700;
+  color: #e0e7ff;
+}
+.ra-payments-utr {
+  color: #64748b;
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+.ra-payments-open-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+.ra-payments-open-link:hover {
+  text-decoration: underline;
+}
+body.llp-page .llp-ws-embed .ra-payments-panel,
+body.ra-page .ra-payments-panel {
+  padding: 0.85rem 1rem 1rem;
+}
+
+/* Owner ledger — compact sections (override uikit `section { padding: 100px 0 }`) */
+body.ra-page.ra-owner-payments-page section.ra-ledger-section {
+  padding: 0;
+  margin: 0;
+}
+body.ra-page.ra-owner-payments-page .ra-payments-summary--ledger {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 0.75rem;
+}
+@media (max-width: 991.98px) {
+  body.ra-page.ra-owner-payments-page .ra-payments-summary--ledger {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+body.ra-page.ra-owner-payments-page .ra-payments-stat--rent-expense { border-top: 3px solid #2563eb; }
+body.ra-page.ra-owner-payments-page .ra-payments-stat--rent-advance { border-top: 3px solid #7c3aed; }
+body.ra-page.ra-owner-payments-page .ra-payments-stat--maintenance { border-top: 3px solid #d97706; }
+body.ra-page.ra-owner-payments-page .ra-payments-stat--total-sent { border-top: 3px solid #059669; }
+.ra-ledger-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.ra-ledger-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.ra-ledger-section--rent-expenses { border-top: 3px solid #2563eb; }
+.ra-ledger-section--rent-advance { border-top: 3px solid #7c3aed; }
+.ra-ledger-section--maintenance-charges { border-top: 3px solid #d97706; }
+.ra-ledger-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.ra-ledger-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ra-ledger-section-pending {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #c2410c;
+}
+.ra-ledger-section-table {
+  border: 0;
+  box-shadow: none;
+}
+
+/* Security agreement — paid leave row collapses to 2 columns when days hidden */
+.sa-paid-leave-days-wrap--hidden {
+  display: none !important;
+}
+
+body.ra-page .ra-rent-grid--3.ra-paid-leave-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.ra-page .ra-rent-block-body > .ra-rent-grid--3 + .ra-rent-grid--3 {
+  margin-top: 0.85rem;
+}
+
+/* File attachment preview cards (create/edit form) */
+.ra-attach-section-head {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.ra-attach-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 0.35rem;
+  width: 100%;
+}
+.pr-pay-attachment-zone .ra-attach-section {
+  width: 100%;
+}
+.ra-attach-section .ra-attach-grid:empty {
+  display: none !important;
+  margin: 0;
+  min-height: 0;
+}
+.ra-attach-grid > .ra-attach-card {
+  flex: 0 0 132px;
+  width: 132px;
+  max-width: 132px;
+}
+.ra-attach-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+  flex: 0 0 132px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
+  transition: box-shadow 0.15s ease, opacity 0.2s ease, transform 0.15s ease;
+}
+.ra-attach-card:hover {
+  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.18);
+}
+.ra-attach-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(32, 33, 36, 0.72);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.ra-attach-card:hover .ra-attach-remove,
+.ra-attach-card:focus-within .ra-attach-remove {
+  opacity: 1;
+}
+.ra-attach-remove:hover {
+  background: #d93025;
+}
+.ra-attach-thumb {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: #f8f9fa;
+  cursor: pointer;
+  text-align: left;
+}
+.ra-attach-thumb-inner {
+  display: block;
+  width: 100%;
+  height: 118px;
+  overflow: hidden;
+  background: #fff;
+  position: relative;
+}
+.ra-attach-thumb--pdf .ra-attach-thumb-media {
+  width: 200%;
+  height: 200%;
+  border: 0;
+  transform: scale(0.5);
+  transform-origin: top left;
+  pointer-events: none;
+}
+.ra-attach-thumb--image .ra-attach-thumb-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.ra-attach-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #5f6368;
+  font-size: 2.25rem;
+  background: linear-gradient(180deg, #f8f9fa 0%, #e8eaed 100%);
+}
+.ra-attach-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 6px;
+  background: #f1f3f4;
+  border-top: 1px solid #e8eaed;
+}
+.ra-attach-type-badge {
+  flex-shrink: 0;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 2px;
+  color: #fff;
+  text-transform: uppercase;
+}
+.ra-attach-type-pdf { background: #d93025; }
+.ra-attach-type-doc { background: #1a73e8; }
+.ra-attach-type-img { background: #188038; }
+.ra-attach-type-file { background: #5f6368; }
+.ra-attach-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #3c4043;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ra-attach-fold {
+  position: absolute;
+  right: 0;
+  bottom: 28px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 12px 12px;
+  border-color: transparent transparent #f1f3f4 transparent;
+  pointer-events: none;
+  z-index: 2;
+}
+.ra-attach-fold::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -12px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 12px 12px;
+  border-color: transparent transparent #d93025 transparent;
+  opacity: 0.85;
+}

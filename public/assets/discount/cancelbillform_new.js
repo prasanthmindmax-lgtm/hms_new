@@ -1747,6 +1747,7 @@ function renderTablesaved(data, pageSizedocuments, pageNum, isApprover) {
         let consultant  = user.can_consultant || '-';
         let billno      = user.can_bill_no || '-';
         let billdate    = formatBillDate(user.can_date);
+        let requestedAt = formatBillDate(user.created_at);
         let billtype    = user.can_form_status || '-';
         let total       = user.can_total || '-';
         let patient_ph = user.can_mobile || '-';
@@ -1807,6 +1808,7 @@ function renderTablesaved(data, pageSizedocuments, pageNum, isApprover) {
         <tr onclick="rowClick(event)" data-id="${user.can_id}">
             ${checkboxCell}
             <td class="tdview"><strong>#${index + 1}</strong></td>
+            <td class="tdview requested-at">${requestedAt}</td>
             <td class="tdview" data-id="${user.locationid}">${zone}</td>
             <td class="tdview branchname">${location}</td>
             <td class="tdview" data-ph_id="${wmrd}"><a href="#">${wmrd}<br>${wname}</a></td>
@@ -1881,7 +1883,7 @@ function renderTablesaved(data, pageSizedocuments, pageNum, isApprover) {
     });
 
     if (pageData.length === 0) {
-        body = `<tr><td colspan="22" class="tdview text-center">No data available</td></tr>`;
+        body = `<tr><td colspan="23" class="tdview text-center">No data available</td></tr>`;
     }
 
     $("#sveddata_tbl").html(body);
@@ -1906,6 +1908,8 @@ function patchCancelSavedTableRow(rec) {
         });
     }
     if (!$tr.length) return false;
+
+    $tr.find('td.requested-at').text(formatBillDate(rec.created_at));
 
     function renderStatus(status, approverName) {
         status = parseInt(status, 10);
